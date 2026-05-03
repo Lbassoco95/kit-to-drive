@@ -134,6 +134,11 @@ export default function Produccion() {
                             ✓ Armado
                           </Button>
                         )}
+                        {canEditFabrica && r.estatus_armado === "ARMADO" && (
+                          <Button size="sm" variant="outline" onClick={() => updateMoto(r.id, { estatus_armado: "LISTO" })}>
+                            ✓ Listo
+                          </Button>
+                        )}
                         {canEditEntrega && r.estatus_entrega === "PROGRAMADA" && (
                           <Button size="sm" variant="outline" onClick={() => updateMoto(r.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: new Date().toISOString().slice(0,10) })}>
                             🚚 Entregada
