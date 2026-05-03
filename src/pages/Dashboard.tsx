@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { ROLE_LABELS, ESTATUS_ARMADO_COLOR, fmtDate } from "@/lib/dazon";
+import { EstatusArmadoBadge } from "@/components/EstatusArmadoBadge";
 import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -183,7 +184,7 @@ function ProximasOrdenes({ motos }: { motos: any[] }) {
             <td>{m.modelo}</td>
             <td>{m.color}</td>
             <td>{fmtDate(m.fecha_estimada_armado)}</td>
-            <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ARMADO_COLOR[m.estatus_armado]}`}>{m.estatus_armado}</span></td>
+            <td><EstatusArmadoBadge estatus={m.estatus_armado} /></td>
           </tr>
         ))}
       </tbody>

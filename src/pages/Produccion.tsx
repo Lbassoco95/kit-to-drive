@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ESTATUS_ARMADO_COLOR, ESTATUS_ENTREGA_COLOR, fmtDate } from "@/lib/dazon";
+import { EstatusArmadoBadge } from "@/components/EstatusArmadoBadge";
 import { Download, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -111,7 +112,7 @@ export default function Produccion() {
                   <td>{r.modelo}</td>
                   <td>{r.color}</td>
                   <td>{fmtDate(r.fecha_estimada_armado)}</td>
-                  <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ARMADO_COLOR[r.estatus_armado]}`}>{r.estatus_armado}</span></td>
+                  <td><EstatusArmadoBadge estatus={r.estatus_armado} /></td>
                   <td>{fmtDate(r.fecha_real_armado)}</td>
                   <td className="font-mono text-[11px]">{r.ns_chasis || "—"}</td>
                   <td className="font-mono text-[11px]">{r.ns_motor || "—"}</td>

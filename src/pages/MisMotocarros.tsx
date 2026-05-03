@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ESTATUS_ARMADO_COLOR, ESTATUS_ENTREGA_COLOR, fmtDate } from "@/lib/dazon";
+import { EstatusArmadoBadge } from "@/components/EstatusArmadoBadge";
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,7 +50,7 @@ export default function MisMotocarros() {
                   <td>{r.color}</td>
                   <td>{r.remisiones?.clientes?.codigo_erp || "—"}</td>
                   <td>{r.remisiones?.folio_remision}</td>
-                  <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ARMADO_COLOR[r.estatus_armado]}`}>{r.estatus_armado}</span></td>
+                  <td><EstatusArmadoBadge estatus={r.estatus_armado} /></td>
                   <td>{fmtDate(r.fecha_estimada_entrega)}</td>
                   <td>{fmtDate(r.fecha_real_entrega)}</td>
                   <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
