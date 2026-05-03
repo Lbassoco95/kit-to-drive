@@ -18,6 +18,8 @@ export default function Produccion() {
   const [q, setQ] = useState("");
   const [estatus, setEstatus] = useState("__all");
   const [color, setColor] = useState("__all");
+  const [editing, setEditing] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
 
   const load = async () => {
     const { data } = await supabase
