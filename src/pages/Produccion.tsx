@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BandejaRemisiones } from "@/components/BandejaRemisiones";
+import { RecibirContenedor } from "@/components/RecibirContenedor";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
@@ -115,6 +116,7 @@ export default function Produccion() {
               <TableIcon size={18}/> Ver tabla
             </button>
           </div>
+          {(role === "admin" || role === "fabrica") && <RecibirContenedor onDone={load} />}
           <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> Exportar CSV</Button>
         </div>
       </div>

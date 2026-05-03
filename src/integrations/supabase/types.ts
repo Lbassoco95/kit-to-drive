@@ -384,6 +384,16 @@ export type Database = {
         Args: { _fecha: string; _motocarro_id: string; _notas?: string }
         Returns: undefined
       }
+      recibir_contenedor: {
+        Args: {
+          _color: string
+          _fecha_arribo: string
+          _folio_contenedor: string
+          _modelo: string
+          _unidades: Json
+        }
+        Returns: Json
+      }
       reintentar_asignar_remision: {
         Args: { _remision_id: string }
         Returns: number
