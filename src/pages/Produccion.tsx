@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BandejaRemisiones } from "@/components/BandejaRemisiones";
 import { RecibirContenedor } from "@/components/RecibirContenedor";
+import { InventarioStatus } from "@/components/InventarioStatus";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
@@ -121,6 +122,7 @@ export default function Produccion() {
         </div>
       </div>
 
+      {(role === "admin" || role === "fabrica" || role === "logistica" || role === "coordinador") && <InventarioStatus refreshKey={rows.length} />}
       {(role === "admin" || role === "fabrica") && <BandejaRemisiones onChange={load} />}
 
       {/* Filter chips */}
