@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BandejaRemisiones } from "@/components/BandejaRemisiones";
 import { RecibirContenedor } from "@/components/RecibirContenedor";
+import { InventarioStatus } from "@/components/InventarioStatus";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
