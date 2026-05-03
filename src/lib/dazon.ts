@@ -9,7 +9,7 @@ export const ESTATUS_ARMADO_COLOR: Record<string, string> = {
   PENDIENTE: "bg-muted text-muted-foreground",
   EN_PROCESO: "bg-secondary text-secondary-foreground",
   ARMADO: "bg-success/20 text-success border border-success/30",
-  LISTO: "bg-success text-success-foreground",
+  LISTO: "bg-[#EDE9FE] text-[#5B21B6]",
   ATRASADO: "bg-warning text-warning-foreground",
 };
 
