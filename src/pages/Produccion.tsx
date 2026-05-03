@@ -149,6 +149,28 @@ export default function Produccion() {
           </table>
         </div>
       </Card>
+
+      <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar motocarro #{editing?.orden_armado}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>NS Chasis</Label><Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: e.target.value })} /></div>
+            <div><Label>NS Motor</Label><Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: e.target.value })} /></div>
+            <div><Label>Chasis asignado</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
+            <div><Label>Fecha estimada armado</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
+            <div><Label>Observaciones / paro</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
+          </div>
+          <DialogFooter>
+            <Button onClick={async () => {
+              const patch = { ...editForm };
+              Object.keys(patch).forEach(k => { if (patch[k] === "") patch[k] = null; });
+              await updateMoto(editing.id, patch);
+              setEditing(null);
+            }}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
