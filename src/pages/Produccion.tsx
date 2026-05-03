@@ -5,9 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ESTATUS_ARMADO_COLOR, ESTATUS_ENTREGA_COLOR, fmtDate } from "@/lib/dazon";
-import { Download } from "lucide-react";
+import { Download, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Produccion() {
   const { role } = useAuth();
