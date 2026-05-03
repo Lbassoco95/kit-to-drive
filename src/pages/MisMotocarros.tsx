@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ESTATUS_ARMADO_COLOR, ESTATUS_ENTREGA_COLOR, fmtDate } from "@/lib/dazon";
+import { EstatusArmadoBadge } from "@/components/EstatusArmadoBadge";
 import { Copy } from "lucide-react";
 import { toast } from "sonner";
 
