@@ -123,7 +123,12 @@ export default function Produccion() {
                   <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
                   {(canEditFabrica || canEditEntrega) && (
                     <td>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
+                        {canEditFabrica && (
+                          <Button size="sm" variant="ghost" onClick={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "" }); }}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
                         {canEditFabrica && r.estatus_armado !== "ARMADO" && r.estatus_armado !== "LISTO" && (
                           <Button size="sm" variant="outline" onClick={() => updateMoto(r.id, { estatus_armado: "ARMADO", fecha_real_armado: new Date().toISOString().slice(0,10) })}>
                             ✓ Armado
