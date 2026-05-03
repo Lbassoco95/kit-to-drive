@@ -14,16 +14,351 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bitacora_eventos: {
+        Row: {
+          accion: string | null
+          created_at: string
+          datos_antes: Json | null
+          datos_despues: Json | null
+          entidad_id: string | null
+          entidad_tipo: string | null
+          id: string
+          modulo: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          accion?: string | null
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          entidad_id?: string | null
+          entidad_tipo?: string | null
+          id?: string
+          modulo?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          accion?: string | null
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          entidad_id?: string | null
+          entidad_tipo?: string | null
+          id?: string
+          modulo?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
+      clientes: {
+        Row: {
+          activo: boolean
+          codigo_erp: string
+          created_at: string
+          direccion: string | null
+          id: string
+          nombre_comercial: string | null
+          telefono: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo_erp: string
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo_erp?: string
+          created_at?: string
+          direccion?: string | null
+          id?: string
+          nombre_comercial?: string | null
+          telefono?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      config_general: {
+        Row: {
+          capacidad_diaria: number
+          empresa_logo_url: string | null
+          empresa_nombre: string
+          id: number
+          plazo_max_credito_dias: number
+          updated_at: string
+        }
+        Insert: {
+          capacidad_diaria?: number
+          empresa_logo_url?: string | null
+          empresa_nombre?: string
+          id?: number
+          plazo_max_credito_dias?: number
+          updated_at?: string
+        }
+        Update: {
+          capacidad_diaria?: number
+          empresa_logo_url?: string | null
+          empresa_nombre?: string
+          id?: number
+          plazo_max_credito_dias?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contenedores: {
+        Row: {
+          created_at: string
+          fecha_arribo: string | null
+          folio_contenedor: string
+          id: string
+          modelo_default: string | null
+          notas: string | null
+          total_unidades: number
+        }
+        Insert: {
+          created_at?: string
+          fecha_arribo?: string | null
+          folio_contenedor: string
+          id?: string
+          modelo_default?: string | null
+          notas?: string | null
+          total_unidades?: number
+        }
+        Update: {
+          created_at?: string
+          fecha_arribo?: string | null
+          folio_contenedor?: string
+          id?: string
+          modelo_default?: string | null
+          notas?: string | null
+          total_unidades?: number
+        }
+        Relationships: []
+      }
+      motocarros: {
+        Row: {
+          chasis_asignado: string | null
+          color: string
+          contenedor_id: string | null
+          created_at: string
+          estatus_armado: Database["public"]["Enums"]["estatus_armado"]
+          estatus_entrega: Database["public"]["Enums"]["estatus_entrega"]
+          evidencia_entrega_url: string | null
+          fecha_estimada_armado: string | null
+          fecha_estimada_entrega: string | null
+          fecha_real_armado: string | null
+          fecha_real_entrega: string | null
+          id: string
+          modelo: string
+          ns_chasis: string | null
+          ns_motor: string | null
+          observaciones_paro: string | null
+          orden_armado: number
+          remision_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          chasis_asignado?: string | null
+          color?: string
+          contenedor_id?: string | null
+          created_at?: string
+          estatus_armado?: Database["public"]["Enums"]["estatus_armado"]
+          estatus_entrega?: Database["public"]["Enums"]["estatus_entrega"]
+          evidencia_entrega_url?: string | null
+          fecha_estimada_armado?: string | null
+          fecha_estimada_entrega?: string | null
+          fecha_real_armado?: string | null
+          fecha_real_entrega?: string | null
+          id?: string
+          modelo?: string
+          ns_chasis?: string | null
+          ns_motor?: string | null
+          observaciones_paro?: string | null
+          orden_armado: number
+          remision_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          chasis_asignado?: string | null
+          color?: string
+          contenedor_id?: string | null
+          created_at?: string
+          estatus_armado?: Database["public"]["Enums"]["estatus_armado"]
+          estatus_entrega?: Database["public"]["Enums"]["estatus_entrega"]
+          evidencia_entrega_url?: string | null
+          fecha_estimada_armado?: string | null
+          fecha_estimada_entrega?: string | null
+          fecha_real_armado?: string | null
+          fecha_real_entrega?: string | null
+          id?: string
+          modelo?: string
+          ns_chasis?: string | null
+          ns_motor?: string | null
+          observaciones_paro?: string | null
+          orden_armado?: number
+          remision_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motocarros_contenedor_id_fkey"
+            columns: ["contenedor_id"]
+            isOneToOne: false
+            referencedRelation: "contenedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "motocarros_remision_id_fkey"
+            columns: ["remision_id"]
+            isOneToOne: false
+            referencedRelation: "remisiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          activo: boolean
+          codigo_vendedor: string | null
+          created_at: string
+          id: string
+          nombre_completo: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          codigo_vendedor?: string | null
+          created_at?: string
+          id: string
+          nombre_completo?: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          codigo_vendedor?: string | null
+          created_at?: string
+          id?: string
+          nombre_completo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      remisiones: {
+        Row: {
+          cliente_id: string | null
+          color_solicitado: string | null
+          created_at: string
+          documento_url: string | null
+          estatus: Database["public"]["Enums"]["estatus_remision"]
+          fecha_remision: string | null
+          folio_remision: string
+          id: string
+          modelo_solicitado: string | null
+          notas: string | null
+          total_unidades_solicitadas: number
+          updated_at: string
+          vendedor_id: string | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          color_solicitado?: string | null
+          created_at?: string
+          documento_url?: string | null
+          estatus?: Database["public"]["Enums"]["estatus_remision"]
+          fecha_remision?: string | null
+          folio_remision: string
+          id?: string
+          modelo_solicitado?: string | null
+          notas?: string | null
+          total_unidades_solicitadas?: number
+          updated_at?: string
+          vendedor_id?: string | null
+        }
+        Update: {
+          cliente_id?: string | null
+          color_solicitado?: string | null
+          created_at?: string
+          documento_url?: string | null
+          estatus?: Database["public"]["Enums"]["estatus_remision"]
+          fecha_remision?: string | null
+          folio_remision?: string
+          id?: string
+          modelo_solicitado?: string | null
+          notas?: string | null
+          total_unidades_solicitadas?: number
+          updated_at?: string
+          vendedor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remisiones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "remisiones_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_my_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "fabrica" | "logistica" | "ventas"
+      estatus_armado:
+        | "PENDIENTE"
+        | "EN_PROCESO"
+        | "ARMADO"
+        | "LISTO"
+        | "ATRASADO"
+      estatus_entrega: "NO_APLICA" | "PROGRAMADA" | "EN_RUTA" | "ENTREGADA"
+      estatus_remision: "NUEVA" | "PARCIAL" | "COMPLETA" | "CANCELADA"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +485,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "fabrica", "logistica", "ventas"],
+      estatus_armado: [
+        "PENDIENTE",
+        "EN_PROCESO",
+        "ARMADO",
+        "LISTO",
+        "ATRASADO",
+      ],
+      estatus_entrega: ["NO_APLICA", "PROGRAMADA", "EN_RUTA", "ENTREGADA"],
+      estatus_remision: ["NUEVA", "PARCIAL", "COMPLETA", "CANCELADA"],
+    },
   },
 } as const
