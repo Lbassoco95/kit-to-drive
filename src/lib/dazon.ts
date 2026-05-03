@@ -3,6 +3,7 @@ export const ROLE_LABELS: Record<string, string> = {
   fabrica: "Fábrica",
   logistica: "Logística",
   ventas: "Ventas",
+  coordinador: "Coordinador comercial",
 };
 
 // Semáforo system shared
