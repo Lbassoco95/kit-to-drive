@@ -337,6 +337,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      asignar_chasis_remision: {
+        Args: { _cantidad: number; _color?: string; _remision_id: string }
+        Returns: number
+      }
       get_my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
