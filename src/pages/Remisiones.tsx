@@ -237,18 +237,12 @@ export default function Remisiones() {
               {motos.length > 0 && (
                 <Collapsible open={!!expanded[r.id]} onOpenChange={(o) => setExpanded(s => ({ ...s, [r.id]: o }))}>
                   <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 rounded-md bg-slate-50 hover:bg-slate-100 text-sm font-medium">
-                    Ver chasis ({motos.length})
+                    Ver chasis y entregas ({motos.length})
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id] ? "rotate-180" : ""}`} />
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-1">
+                  <CollapsibleContent className="mt-2 space-y-2">
                     {motos.map((m: any) => (
-                      <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-white text-sm">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
-                          <span className="text-xs font-mono text-muted-foreground truncate">{m.ns_chasis || m.chasis_asignado || "—"}</span>
-                        </div>
-                        <EstatusBadge estatus={m.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : effEstatusArmado(m)} size="sm" />
-                      </div>
+                      <MotoRow key={m.id} m={m} canPropose={canPropose} role={role} onChange={load} />
                     ))}
                   </CollapsibleContent>
                 </Collapsible>
