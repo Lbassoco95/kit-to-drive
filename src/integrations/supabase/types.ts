@@ -144,6 +144,10 @@ export type Database = {
         Row: {
           chasis_asignado: string | null
           color: string
+          confirmada_fabrica_at: string | null
+          confirmada_fabrica_por: string | null
+          confirmada_logistica_at: string | null
+          confirmada_logistica_por: string | null
           contenedor_id: string | null
           created_at: string
           estatus_armado: Database["public"]["Enums"]["estatus_armado"]
@@ -151,6 +155,7 @@ export type Database = {
           evidencia_entrega_url: string | null
           fecha_estimada_armado: string | null
           fecha_estimada_entrega: string | null
+          fecha_propuesta_entrega: string | null
           fecha_real_armado: string | null
           fecha_real_entrega: string | null
           id: string
@@ -159,12 +164,19 @@ export type Database = {
           ns_motor: string | null
           observaciones_paro: string | null
           orden_armado: number
+          propuesta_entrega_at: string | null
+          propuesta_entrega_notas: string | null
+          propuesta_entrega_por: string | null
           remision_id: string | null
           updated_at: string
         }
         Insert: {
           chasis_asignado?: string | null
           color?: string
+          confirmada_fabrica_at?: string | null
+          confirmada_fabrica_por?: string | null
+          confirmada_logistica_at?: string | null
+          confirmada_logistica_por?: string | null
           contenedor_id?: string | null
           created_at?: string
           estatus_armado?: Database["public"]["Enums"]["estatus_armado"]
@@ -172,6 +184,7 @@ export type Database = {
           evidencia_entrega_url?: string | null
           fecha_estimada_armado?: string | null
           fecha_estimada_entrega?: string | null
+          fecha_propuesta_entrega?: string | null
           fecha_real_armado?: string | null
           fecha_real_entrega?: string | null
           id?: string
@@ -180,12 +193,19 @@ export type Database = {
           ns_motor?: string | null
           observaciones_paro?: string | null
           orden_armado: number
+          propuesta_entrega_at?: string | null
+          propuesta_entrega_notas?: string | null
+          propuesta_entrega_por?: string | null
           remision_id?: string | null
           updated_at?: string
         }
         Update: {
           chasis_asignado?: string | null
           color?: string
+          confirmada_fabrica_at?: string | null
+          confirmada_fabrica_por?: string | null
+          confirmada_logistica_at?: string | null
+          confirmada_logistica_por?: string | null
           contenedor_id?: string | null
           created_at?: string
           estatus_armado?: Database["public"]["Enums"]["estatus_armado"]
@@ -193,6 +213,7 @@ export type Database = {
           evidencia_entrega_url?: string | null
           fecha_estimada_armado?: string | null
           fecha_estimada_entrega?: string | null
+          fecha_propuesta_entrega?: string | null
           fecha_real_armado?: string | null
           fecha_real_entrega?: string | null
           id?: string
@@ -201,6 +222,9 @@ export type Database = {
           ns_motor?: string | null
           observaciones_paro?: string | null
           orden_armado?: number
+          propuesta_entrega_at?: string | null
+          propuesta_entrega_notas?: string | null
+          propuesta_entrega_por?: string | null
           remision_id?: string | null
           updated_at?: string
         }
@@ -341,6 +365,10 @@ export type Database = {
         Args: { _cantidad: number; _color?: string; _remision_id: string }
         Returns: number
       }
+      confirmar_fecha_entrega: {
+        Args: { _area: string; _motocarro_id: string }
+        Returns: undefined
+      }
       get_my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["app_role"]
@@ -351,6 +379,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      proponer_fecha_entrega: {
+        Args: { _fecha: string; _motocarro_id: string; _notas?: string }
+        Returns: undefined
       }
       reintentar_asignar_remision: {
         Args: { _remision_id: string }
