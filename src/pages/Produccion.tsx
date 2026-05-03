@@ -122,6 +122,7 @@ export default function Produccion() {
         </div>
       </div>
 
+      {(role === "admin" || role === "fabrica" || role === "logistica" || role === "coordinador") && <InventarioStatus refreshKey={rows.length} />}
       {(role === "admin" || role === "fabrica") && <BandejaRemisiones onChange={load} />}
 
       {/* Filter chips */}
