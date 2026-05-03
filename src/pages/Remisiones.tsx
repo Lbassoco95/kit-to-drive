@@ -118,35 +118,67 @@ export default function Remisiones() {
           <p className="text-muted-foreground text-base mt-1">{rows.length} remisiones {role === "ventas" ? "(solo las tuyas)" : ""}</p>
         </div>
         {canCreate && (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setForm((f: any) => ({ ...f, folio_remision: f.folio_remision || suggestNextFolio(recentFolios) })); }}>
             <DialogTrigger asChild>
-              <Button className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+              <Button onClick={abrirNueva} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
                 <Plus className="h-5 w-5 mr-2" /> Nueva remisión
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader><DialogTitle>Nueva remisión</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div><Label>Folio</Label><Input value={form.folio_remision} onChange={e => setForm({ ...form, folio_remision: e.target.value })} placeholder="REM-001" /></div>
-                <div><Label>Cliente</Label>
-                  <Select value={form.cliente_id} onValueChange={v => setForm({ ...form, cliente_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona cliente" /></SelectTrigger>
-                    <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.codigo_erp}{c.nombre_comercial ? ` — ${c.nombre_comercial}` : ""}</SelectItem>)}</SelectContent>
-                  </Select>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base">Folio de remisión</Label>
+                  <Input value={form.folio_remision} onChange={e => setForm({ ...form, folio_remision: e.target.value })} placeholder="REM-001" className="h-12 text-base font-mono" />
+                  {recentFolios.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-muted-foreground mb-1">Últimas remisiones (toca para basar el siguiente folio):</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recentFolios.map(f => (
+                          <button key={f} type="button" onClick={() => setForm((s: any) => ({ ...s, folio_remision: suggestNextFolio([f]) }))} className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-[#1F3864] border" title={`Sugerir ${suggestNextFolio([f])}`}>
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base">Cliente</Label>
+                    <button type="button" onClick={() => setCreandoCliente(s => !s)} className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
+                      <UserPlus className="h-3.5 w-3.5" /> {creandoCliente ? "Cancelar" : "Nuevo cliente"}
+                    </button>
+                  </div>
+                  {!creandoCliente ? (
+                    <Select value={form.cliente_id} onValueChange={v => setForm({ ...form, cliente_id: v })}>
+                      <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente" /></SelectTrigger>
+                      <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.codigo_erp}{c.nombre_comercial ? ` — ${c.nombre_comercial}` : ""}</SelectItem>)}</SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
+                      <Input placeholder="Código ERP *" value={nuevoCliente.codigo_erp} onChange={e => setNuevoCliente({ ...nuevoCliente, codigo_erp: e.target.value })} className="h-11" />
+                      <Input placeholder="Nombre comercial" value={nuevoCliente.nombre_comercial} onChange={e => setNuevoCliente({ ...nuevoCliente, nombre_comercial: e.target.value })} className="h-11" />
+                      <Input placeholder="Teléfono" value={nuevoCliente.telefono} onChange={e => setNuevoCliente({ ...nuevoCliente, telefono: e.target.value })} className="h-11" />
+                      <Button type="button" onClick={guardarNuevoCliente} className="w-full h-11 bg-[#2E75B6] hover:bg-[#246094]">Guardar cliente</Button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Unidades</Label><Input type="number" min={1} value={form.total_unidades_solicitadas} onChange={e => setForm({ ...form, total_unidades_solicitadas: e.target.value })} /></div>
+                  <div><Label>Unidades</Label><Input type="number" min={1} value={form.total_unidades_solicitadas} onChange={e => setForm({ ...form, total_unidades_solicitadas: e.target.value })} className="h-12 text-base" /></div>
                   <div><Label>Color</Label>
                     <Select value={form.color_solicitado} onValueChange={v => setForm({ ...form, color_solicitado: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="BLANCO">Blanco</SelectItem><SelectItem value="AZUL">Azul</SelectItem></SelectContent>
                     </Select>
                   </div>
                 </div>
-                <div><Label>Fecha</Label><Input type="date" value={form.fecha_remision} onChange={e => setForm({ ...form, fecha_remision: e.target.value })} /></div>
-                <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} /></div>
+                <div><Label>Fecha</Label><Input type="date" value={form.fecha_remision} onChange={e => setForm({ ...form, fecha_remision: e.target.value })} className="h-12 text-base" /></div>
+                <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} className="h-12 text-base" /></div>
               </div>
-              <DialogFooter><Button onClick={crearRemision}>Crear</Button></DialogFooter>
+              <DialogFooter><Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Crear remisión</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         )}
