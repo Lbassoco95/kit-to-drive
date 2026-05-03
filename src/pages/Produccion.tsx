@@ -5,9 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ESTATUS_ARMADO_COLOR, ESTATUS_ENTREGA_COLOR, fmtDate } from "@/lib/dazon";
-import { Download } from "lucide-react";
+import { Download, Pencil } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Produccion() {
   const { role } = useAuth();
@@ -15,6 +18,8 @@ export default function Produccion() {
   const [q, setQ] = useState("");
   const [estatus, setEstatus] = useState("__all");
   const [color, setColor] = useState("__all");
+  const [editing, setEditing] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState<any>({});
 
   const load = async () => {
     const { data } = await supabase
@@ -118,7 +123,12 @@ export default function Produccion() {
                   <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
                   {(canEditFabrica || canEditEntrega) && (
                     <td>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-wrap">
+                        {canEditFabrica && (
+                          <Button size="sm" variant="ghost" onClick={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "" }); }}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
                         {canEditFabrica && r.estatus_armado !== "ARMADO" && r.estatus_armado !== "LISTO" && (
                           <Button size="sm" variant="outline" onClick={() => updateMoto(r.id, { estatus_armado: "ARMADO", fecha_real_armado: new Date().toISOString().slice(0,10) })}>
                             ✓ Armado
@@ -139,6 +149,28 @@ export default function Produccion() {
           </table>
         </div>
       </Card>
+
+      <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Editar motocarro #{editing?.orden_armado}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>NS Chasis</Label><Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: e.target.value })} /></div>
+            <div><Label>NS Motor</Label><Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: e.target.value })} /></div>
+            <div><Label>Chasis asignado</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
+            <div><Label>Fecha estimada armado</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
+            <div><Label>Observaciones / paro</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
+          </div>
+          <DialogFooter>
+            <Button onClick={async () => {
+              const patch = { ...editForm };
+              Object.keys(patch).forEach(k => { if (patch[k] === "") patch[k] = null; });
+              await updateMoto(editing.id, patch);
+              setEditing(null);
+            }}>Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
