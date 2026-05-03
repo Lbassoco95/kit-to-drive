@@ -11,7 +11,21 @@ import { fmtDate, normColor, effEstatusArmado } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown } from "lucide-react";
+import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus } from "lucide-react";
+
+// Sugiere el siguiente folio incrementando el sufijo numérico del último
+function suggestNextFolio(folios: string[]): string {
+  if (!folios.length) return "REM-001";
+  const parsed = folios
+    .map(f => {
+      const m = (f || "").match(/^(.*?)(\d+)\s*$/);
+      return m ? { prefix: m[1], num: parseInt(m[2], 10), pad: m[2].length, raw: f } : null;
+    })
+    .filter(Boolean) as { prefix: string; num: number; pad: number; raw: string }[];
+  if (!parsed.length) return folios[0] + "-1";
+  const last = parsed.sort((a, b) => b.num - a.num)[0];
+  return `${last.prefix}${String(last.num + 1).padStart(last.pad, "0")}`;
+}
 
 export default function Remisiones() {
   const { role, user } = useAuth();
@@ -19,7 +33,15 @@ export default function Remisiones() {
   const [clientes, setClientes] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [recentFolios, setRecentFolios] = useState<string[]>([]);
+  const [creandoCliente, setCreandoCliente] = useState(false);
+  const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp: "", nombre_comercial: "", telefono: "" });
   const [form, setForm] = useState<any>({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "" });
+
+  const loadClientes = async () => {
+    const { data } = await supabase.from("clientes").select("id, codigo_erp, nombre_comercial").order("codigo_erp");
+    setClientes(data ?? []);
+  };
 
   const load = async () => {
     const { data } = await supabase
@@ -27,15 +49,37 @@ export default function Remisiones() {
       .select("*, clientes(codigo_erp, nombre_comercial), profiles:vendedor_id(nombre_completo), motocarros(id, orden_armado, modelo, color, ns_chasis, chasis_asignado, estatus_armado, fecha_estimada_armado, fecha_real_armado, estatus_entrega)")
       .order("fecha_remision", { ascending: false, nullsFirst: false });
     setRows(data ?? []);
+    // Tomar últimos folios del propio vendedor (o todos si admin) para sugerir siguiente
+    const propios = (data ?? []).filter((r: any) => role === "admin" || r.vendedor_id === user?.id);
+    setRecentFolios(propios.slice(0, 5).map((r: any) => r.folio_remision));
   };
 
-  useEffect(() => { load(); supabase.from("clientes").select("id, codigo_erp, nombre_comercial").order("codigo_erp").then(({ data }) => setClientes(data ?? [])); }, []);
+  useEffect(() => { load(); loadClientes(); }, [user?.id, role]);
 
   const canCreate = role === "admin" || role === "ventas";
 
+  const abrirNueva = () => {
+    setForm(f => ({ ...f, folio_remision: suggestNextFolio(recentFolios) }));
+    setOpen(true);
+  };
+
+  const guardarNuevoCliente = async () => {
+    if (!nuevoCliente.codigo_erp.trim()) return toast.error("El código ERP es obligatorio");
+    const { data, error } = await supabase.from("clientes").insert(nuevoCliente).select("id, codigo_erp, nombre_comercial").single();
+    if (error) return toast.error(error.message);
+    toast.success("✓ Cliente creado");
+    await loadClientes();
+    setForm((f: any) => ({ ...f, cliente_id: data.id }));
+    setNuevoCliente({ codigo_erp: "", nombre_comercial: "", telefono: "" });
+    setCreandoCliente(false);
+  };
+
   const crearRemision = async () => {
     if (!form.folio_remision || !form.cliente_id) { toast.error("Folio y cliente son obligatorios"); return; }
-    const payload = { ...form, vendedor_id: user?.id, total_unidades_solicitadas: Number(form.total_unidades_solicitadas) || 1 };
+    if (recentFolios.includes(form.folio_remision.trim())) {
+      toast.error("Ese folio ya existe en tus remisiones recientes"); return;
+    }
+    const payload = { ...form, folio_remision: form.folio_remision.trim(), vendedor_id: user?.id, total_unidades_solicitadas: Number(form.total_unidades_solicitadas) || 1 };
     const { error } = await supabase.from("remisiones").insert(payload);
     if (error) return toast.error(error.message);
     toast.success("✓ Remisión creada");
@@ -74,35 +118,67 @@ export default function Remisiones() {
           <p className="text-muted-foreground text-base mt-1">{rows.length} remisiones {role === "ventas" ? "(solo las tuyas)" : ""}</p>
         </div>
         {canCreate && (
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setForm((f: any) => ({ ...f, folio_remision: f.folio_remision || suggestNextFolio(recentFolios) })); }}>
             <DialogTrigger asChild>
-              <Button className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+              <Button onClick={abrirNueva} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
                 <Plus className="h-5 w-5 mr-2" /> Nueva remisión
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader><DialogTitle>Nueva remisión</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <div><Label>Folio</Label><Input value={form.folio_remision} onChange={e => setForm({ ...form, folio_remision: e.target.value })} placeholder="REM-001" /></div>
-                <div><Label>Cliente</Label>
-                  <Select value={form.cliente_id} onValueChange={v => setForm({ ...form, cliente_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona cliente" /></SelectTrigger>
-                    <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.codigo_erp}{c.nombre_comercial ? ` — ${c.nombre_comercial}` : ""}</SelectItem>)}</SelectContent>
-                  </Select>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-base">Folio de remisión</Label>
+                  <Input value={form.folio_remision} onChange={e => setForm({ ...form, folio_remision: e.target.value })} placeholder="REM-001" className="h-12 text-base font-mono" />
+                  {recentFolios.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs text-muted-foreground mb-1">Últimas remisiones (toca para basar el siguiente folio):</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {recentFolios.map(f => (
+                          <button key={f} type="button" onClick={() => setForm((s: any) => ({ ...s, folio_remision: suggestNextFolio([f]) }))} className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-[#1F3864] border" title={`Sugerir ${suggestNextFolio([f])}`}>
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
+
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base">Cliente</Label>
+                    <button type="button" onClick={() => setCreandoCliente(s => !s)} className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
+                      <UserPlus className="h-3.5 w-3.5" /> {creandoCliente ? "Cancelar" : "Nuevo cliente"}
+                    </button>
+                  </div>
+                  {!creandoCliente ? (
+                    <Select value={form.cliente_id} onValueChange={v => setForm({ ...form, cliente_id: v })}>
+                      <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente" /></SelectTrigger>
+                      <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.codigo_erp}{c.nombre_comercial ? ` — ${c.nombre_comercial}` : ""}</SelectItem>)}</SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
+                      <Input placeholder="Código ERP *" value={nuevoCliente.codigo_erp} onChange={e => setNuevoCliente({ ...nuevoCliente, codigo_erp: e.target.value })} className="h-11" />
+                      <Input placeholder="Nombre comercial" value={nuevoCliente.nombre_comercial} onChange={e => setNuevoCliente({ ...nuevoCliente, nombre_comercial: e.target.value })} className="h-11" />
+                      <Input placeholder="Teléfono" value={nuevoCliente.telefono} onChange={e => setNuevoCliente({ ...nuevoCliente, telefono: e.target.value })} className="h-11" />
+                      <Button type="button" onClick={guardarNuevoCliente} className="w-full h-11 bg-[#2E75B6] hover:bg-[#246094]">Guardar cliente</Button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Unidades</Label><Input type="number" min={1} value={form.total_unidades_solicitadas} onChange={e => setForm({ ...form, total_unidades_solicitadas: e.target.value })} /></div>
+                  <div><Label>Unidades</Label><Input type="number" min={1} value={form.total_unidades_solicitadas} onChange={e => setForm({ ...form, total_unidades_solicitadas: e.target.value })} className="h-12 text-base" /></div>
                   <div><Label>Color</Label>
                     <Select value={form.color_solicitado} onValueChange={v => setForm({ ...form, color_solicitado: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
                       <SelectContent><SelectItem value="BLANCO">Blanco</SelectItem><SelectItem value="AZUL">Azul</SelectItem></SelectContent>
                     </Select>
                   </div>
                 </div>
-                <div><Label>Fecha</Label><Input type="date" value={form.fecha_remision} onChange={e => setForm({ ...form, fecha_remision: e.target.value })} /></div>
-                <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} /></div>
+                <div><Label>Fecha</Label><Input type="date" value={form.fecha_remision} onChange={e => setForm({ ...form, fecha_remision: e.target.value })} className="h-12 text-base" /></div>
+                <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} className="h-12 text-base" /></div>
               </div>
-              <DialogFooter><Button onClick={crearRemision}>Crear</Button></DialogFooter>
+              <DialogFooter><Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Crear remisión</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         )}
