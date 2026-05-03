@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,13 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
+import { User, Wrench, Truck, Briefcase } from "lucide-react";
 
 const DEMO = [
-  { email: "admin@dazon.demo",     pwd: "Dazon2026!", label: "Admin" },
-  { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", label: "Fábrica" },
-  { email: "logistica@dazon.demo", pwd: "Dazon2026!", label: "Logística" },
-  { email: "ventas@dazon.demo",    pwd: "Dazon2026!", label: "Ventas" },
+  { email: "admin@dazon.demo",     pwd: "Dazon2026!", label: "Admin",     icon: User },
+  { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", label: "Fábrica",   icon: Wrench },
+  { email: "logistica@dazon.demo", pwd: "Dazon2026!", label: "Logística", icon: Truck },
+  { email: "ventas@dazon.demo",    pwd: "Dazon2026!", label: "Ventas",    icon: Briefcase },
 ];
 
 export default function Auth() {
@@ -30,8 +30,7 @@ export default function Auth() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password: pwd });
     setBusy(false);
-    if (error) toast.error(error.message);
-    else nav("/");
+    if (error) toast.error(error.message); else nav("/");
   };
 
   const quickLogin = async (em: string, p: string) => {
@@ -43,35 +42,42 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-primary p-4">
-      <Card className="w-full max-w-md p-8 shadow-xl">
-        <div className="text-center mb-6">
-          <h1 className="!text-3xl">GRUPO DAZON</h1>
-          <p className="text-muted-foreground text-sm mt-1">Sistema de Control de Producción</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4">
+      <Card className="w-full max-w-lg p-8 shadow-2xl">
+        <div className="text-center mb-8">
+          <h1 className="!text-4xl !text-[#1F3864]">GRUPO DAZON</h1>
+          <p className="text-muted-foreground text-base mt-2">Sistema de Control de Producción</p>
         </div>
         <form onSubmit={login} className="space-y-4">
           <div>
-            <Label>Email</Label>
-            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Label className="text-base">Email</Label>
+            <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 text-base" />
           </div>
           <div>
-            <Label>Contraseña</Label>
-            <Input type="password" required value={pwd} onChange={(e) => setPwd(e.target.value)} />
+            <Label className="text-base">Contraseña</Label>
+            <Input type="password" required value={pwd} onChange={(e) => setPwd(e.target.value)} className="h-12 text-base" />
           </div>
-          <Button type="submit" disabled={busy} className="w-full">
+          <Button type="submit" disabled={busy} className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             {busy ? "Ingresando…" : "Iniciar sesión"}
           </Button>
         </form>
-        <div className="mt-6 pt-4 border-t">
-          <p className="text-xs text-muted-foreground mb-2">Acceso rápido demo:</p>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="mt-8 pt-6 border-t">
+          <p className="text-sm text-muted-foreground mb-3 text-center">Acceso rápido demo</p>
+          <div className="grid grid-cols-2 gap-3">
             {DEMO.map(d => (
-              <Button key={d.email} type="button" variant="outline" size="sm" onClick={() => quickLogin(d.email, d.pwd)}>
-                {d.label}
-              </Button>
+              <button
+                key={d.email}
+                type="button"
+                disabled={busy}
+                onClick={() => quickLogin(d.email, d.pwd)}
+                className="min-h-[80px] flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-[#2E75B6]/30 bg-white hover:bg-[#2E75B6]/10 hover:border-[#2E75B6] transition-all text-[#1F3864] font-semibold disabled:opacity-50"
+              >
+                <d.icon size={28} strokeWidth={2.2} />
+                <span className="text-base">{d.label}</span>
+              </button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-3">Contraseña demo: <code>Dazon2026!</code></p>
+          <p className="text-[11px] text-muted-foreground mt-4 text-center">Contraseña demo: <code>Dazon2026!</code></p>
         </div>
       </Card>
     </div>

@@ -6,20 +6,22 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth, AppRole } from "@/contexts/AuthContext";
 
-type Item = { title: string; url: string; icon: any; roles: AppRole[] };
+type Item = { title: string; url: string; icon: any; roles: AppRole[]; group: "Operación" | "Catálogos" | "Sistema" | "Inicio" };
 
 const ITEMS: Item[] = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas"] },
-  { title: "Producción", url: "/produccion", icon: Factory, roles: ["admin","fabrica","logistica"] },
-  { title: "Remisiones", url: "/remisiones", icon: FileText, roles: ["admin","fabrica","logistica","ventas"] },
-  { title: "Entregas", url: "/entregas", icon: Truck, roles: ["admin","logistica"] },
-  { title: "Mis Motocarros", url: "/mis-motocarros", icon: Bike, roles: ["ventas","admin"] },
-  { title: "Clientes", url: "/clientes", icon: Users, roles: ["admin","fabrica"] },
-  { title: "Importar datos", url: "/importar", icon: Upload, roles: ["admin"] },
-  { title: "Usuarios", url: "/usuarios", icon: Database, roles: ["admin"] },
-  { title: "Bitácora", url: "/bitacora", icon: ScrollText, roles: ["admin"] },
-  { title: "Configuración", url: "/configuracion", icon: Settings, roles: ["admin"] },
+  { title: "Dashboard",     url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas"], group: "Inicio" },
+  { title: "Producción",    url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica"],          group: "Operación" },
+  { title: "Remisiones",    url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas"], group: "Operación" },
+  { title: "Entregas",      url: "/entregas",      icon: Truck,           roles: ["admin","logistica"],                    group: "Operación" },
+  { title: "Mis Motocarros",url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin"],                       group: "Catálogos" },
+  { title: "Clientes",      url: "/clientes",      icon: Users,           roles: ["admin","fabrica"],                      group: "Catálogos" },
+  { title: "Importar datos",url: "/importar",      icon: Upload,          roles: ["admin"],                                group: "Sistema" },
+  { title: "Usuarios",      url: "/usuarios",      icon: Database,        roles: ["admin"],                                group: "Sistema" },
+  { title: "Bitácora",      url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                group: "Sistema" },
+  { title: "Configuración", url: "/configuracion", icon: Settings,        roles: ["admin"],                                group: "Sistema" },
 ];
+
+const GROUPS: Array<Item["group"]> = ["Inicio", "Operación", "Catálogos", "Sistema"];
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -30,30 +32,48 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarContent>
-        <div className={`px-4 py-4 border-b border-sidebar-border ${collapsed ? "text-center px-2" : ""}`}>
-          <div className="text-sidebar-foreground font-bold text-lg leading-tight">
+      <SidebarContent className="bg-[#1F3864]">
+        <div className={`px-4 py-5 border-b border-white/10 ${collapsed ? "text-center px-2" : ""}`}>
+          <div className="text-white font-extrabold text-xl leading-tight tracking-wide">
             {collapsed ? "GD" : "GRUPO DAZON"}
           </div>
-          {!collapsed && <div className="text-xs text-sidebar-foreground/70">Control de Producción</div>}
+          {!collapsed && <div className="text-xs text-white/70 mt-0.5">Control de Producción</div>}
         </div>
-        <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-sidebar-foreground/60">Módulos</SidebarGroupLabel>}
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map(item => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={pathname === item.url}>
-                    <NavLink to={item.url} end className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {GROUPS.map(g => {
+          const list = items.filter(i => i.group === g);
+          if (!list.length) return null;
+          return (
+            <SidebarGroup key={g}>
+              {!collapsed && g !== "Inicio" && (
+                <SidebarGroupLabel className="text-white/50 uppercase text-[11px] tracking-widest px-3 pt-3">
+                  {g}
+                </SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {list.map(item => {
+                    const active = pathname === item.url;
+                    return (
+                      <SidebarMenuItem key={item.url}>
+                        <SidebarMenuButton asChild isActive={active} className="h-12 my-0.5">
+                          <NavLink
+                            to={item.url}
+                            end
+                            className={`relative flex items-center gap-3 px-3 rounded-md text-white/90 hover:bg-white/10 ${active ? "bg-[#EFF6FF]/10 text-white font-semibold" : ""}`}
+                          >
+                            {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-white" />}
+                            <item.icon size={28} strokeWidth={active ? 2.4 : 2} className="shrink-0" />
+                            {!collapsed && <span className="text-[15px]">{item.title}</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
     </Sidebar>
   );
