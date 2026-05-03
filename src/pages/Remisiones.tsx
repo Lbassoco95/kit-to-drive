@@ -193,8 +193,9 @@ export default function Remisiones() {
           const pct = Math.round((listas / total) * 100);
           const pctColor = pct === 100 ? "#065F46" : pct >= 50 ? "#92400E" : "#991B1B";
           const isOwner = r.vendedor_id === user?.id;
-          const canAssign = role === "admin" || (role === "ventas" && isOwner);
-          const canUpload = role === "admin" || (role === "ventas" && isOwner);
+          const canAssign = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
+          const canUpload = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
+          const canPropose = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
           const vendedor = r.profiles?.nombre_completo || (r.notas?.replace("Vendedor original: ", "")) || "—";
           const initials = vendedor.split(" ").map((s: string) => s[0]).slice(0,2).join("").toUpperCase();
 
