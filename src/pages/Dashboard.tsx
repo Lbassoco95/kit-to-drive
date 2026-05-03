@@ -184,7 +184,7 @@ function ProximasOrdenes({ motos }: { motos: any[] }) {
             <td>{m.modelo}</td>
             <td>{m.color}</td>
             <td>{fmtDate(m.fecha_estimada_armado)}</td>
-            <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ARMADO_COLOR[m.estatus_armado]}`}>{m.estatus_armado}</span></td>
+            <td><EstatusArmadoBadge estatus={m.estatus_armado} /></td>
           </tr>
         ))}
       </tbody>
