@@ -352,6 +352,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      reintentar_asignar_remision: {
+        Args: { _remision_id: string }
+        Returns: number
+      }
     }
     Enums: {
       app_role: "admin" | "fabrica" | "logistica" | "ventas"

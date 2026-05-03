@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { BandejaRemisiones } from "@/components/BandejaRemisiones";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
@@ -117,6 +118,8 @@ export default function Produccion() {
           <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> Exportar CSV</Button>
         </div>
       </div>
+
+      {(role === "admin" || role === "fabrica") && <BandejaRemisiones onChange={load} />}
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
