@@ -1,55 +1,70 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ESTATUS_ARMADO_COLOR, ESTATUS_ENTREGA_COLOR, fmtDate } from "@/lib/dazon";
-import { EstatusArmadoBadge } from "@/components/EstatusArmadoBadge";
-import { Download, Pencil } from "lucide-react";
+import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
+import { EstatusBadge } from "@/components/EstatusBadge";
+import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
+type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
 export default function Produccion() {
   const { role } = useAuth();
   const [rows, setRows] = useState<any[]>([]);
   const [q, setQ] = useState("");
-  const [estatus, setEstatus] = useState("__all");
-  const [color, setColor] = useState("__all");
+  const [filter, setFilter] = useState<FilterKey>("TODOS");
+  const [colorFilter, setColorFilter] = useState<"TODOS" | "BLANCO" | "AZUL">("TODOS");
+  const [view, setView] = useState<"cards" | "tabla">("cards");
   const [editing, setEditing] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [confirm, setConfirm] = useState<{ moto: any; action: "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
 
   const load = async () => {
     const { data } = await supabase
       .from("motocarros")
       .select("*, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo, codigo_vendedor), clientes(codigo_erp))")
       .order("orden_armado", { ascending: true });
-    setRows(data ?? []);
+    setRows((data ?? []).map((r: any) => ({ ...r, color: normColor(r.color), _eff: effEstatusArmado(r) })));
   };
   useEffect(() => { load(); }, []);
 
-  const filtered = useMemo(() => {
-    return rows.filter(r => {
-      if (estatus !== "__all" && r.estatus_armado !== estatus) return false;
-      if (color !== "__all" && r.color !== color) return false;
-      if (q) {
-        const t = q.toLowerCase();
-        const blob = [r.orden_armado, r.chasis_asignado, r.ns_chasis, r.ns_motor,
-          r.remisiones?.folio_remision, r.remisiones?.clientes?.codigo_erp,
-          r.remisiones?.profiles?.nombre_completo, r.remisiones?.profiles?.codigo_vendedor]
-          .filter(Boolean).join(" ").toLowerCase();
-        if (!blob.includes(t)) return false;
-      }
-      return true;
+  const counts = useMemo(() => {
+    const c = { TODOS: rows.length, PENDIENTES: 0, ARMADOS: 0, ATRASADOS: 0, ENTREGADOS: 0 };
+    rows.forEach(r => {
+      if (r.estatus_entrega === "ENTREGADA") c.ENTREGADOS++;
+      else if (r._eff === "ATRASADO") c.ATRASADOS++;
+      else if (r._eff === "ARMADO" || r._eff === "LISTO") c.ARMADOS++;
+      else c.PENDIENTES++;
     });
-  }, [rows, q, estatus, color]);
+    return c;
+  }, [rows]);
+
+  const filtered = useMemo(() => rows.filter(r => {
+    if (colorFilter !== "TODOS" && r.color !== colorFilter) return false;
+    if (filter === "PENDIENTES" && !(r._eff === "PENDIENTE" || r._eff === "EN_PROCESO")) return false;
+    if (filter === "ARMADOS" && !(r._eff === "ARMADO" || r._eff === "LISTO")) return false;
+    if (filter === "ATRASADOS" && r._eff !== "ATRASADO") return false;
+    if (filter === "ENTREGADOS" && r.estatus_entrega !== "ENTREGADA") return false;
+    if (q) {
+      const t = q.toLowerCase();
+      const blob = [r.orden_armado, r.chasis_asignado, r.ns_chasis, r.ns_motor,
+        r.remisiones?.folio_remision, r.remisiones?.clientes?.codigo_erp,
+        r.remisiones?.profiles?.nombre_completo].filter(Boolean).join(" ").toLowerCase();
+      if (!blob.includes(t)) return false;
+    }
+    return true;
+  }), [rows, q, filter, colorFilter]);
 
   const exportCsv = () => {
-    const header = ["Orden","Modelo","Color","F.Est.Armado","Estatus","F.Real.Armado","NS Chasis","NS Motor","Chasis","Vendedor","Cliente","Remisión","F.Est.Entrega","Estatus Entrega"];
-    const rows2 = filtered.map(r => [r.orden_armado, r.modelo, r.color, r.fecha_estimada_armado, r.estatus_armado, r.fecha_real_armado || "", r.ns_chasis||"", r.ns_motor||"", r.chasis_asignado||"", r.remisiones?.profiles?.nombre_completo||"", r.remisiones?.clientes?.codigo_erp||"", r.remisiones?.folio_remision||"", r.fecha_estimada_entrega||"", r.estatus_entrega]);
+    const header = ["Orden","Modelo","Color","Fecha estimada de armado","Estatus","Fecha real de armado","Número de serie del chasis","Número de serie del motor","Chasis","Vendedor","Cliente","Remisión","Fecha estimada de entrega","Estatus entrega"];
+    const rows2 = filtered.map(r => [r.orden_armado, r.modelo, r.color, r.fecha_estimada_armado, r._eff, r.fecha_real_armado || "", r.ns_chasis||"", r.ns_motor||"", r.chasis_asignado||"", r.remisiones?.profiles?.nombre_completo||"", r.remisiones?.clientes?.codigo_erp||"", r.remisiones?.folio_remision||"", r.fecha_estimada_entrega||"", r.estatus_entrega]);
     const csv = [header, ...rows2].map(r => r.map(c => `"${String(c ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
@@ -59,111 +74,130 @@ export default function Produccion() {
   const updateMoto = async (id: string, patch: any) => {
     const { error } = await supabase.from("motocarros").update(patch).eq("id", id);
     if (error) toast.error(error.message);
-    else { toast.success("Actualizado"); load(); }
+    else { toast.success("✓ Actualizado correctamente"); load(); }
+  };
+
+  const doConfirm = async () => {
+    if (!confirm) return;
+    const { moto, action } = confirm;
+    const today = new Date().toISOString().slice(0,10);
+    if (action === "ARMADO") await updateMoto(moto.id, { estatus_armado: "ARMADO", fecha_real_armado: today });
+    else if (action === "LISTO") await updateMoto(moto.id, { estatus_armado: "LISTO" });
+    else if (action === "ENTREGADA") await updateMoto(moto.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: today });
+    setConfirm(null);
   };
 
   const canEditFabrica = role === "admin" || role === "fabrica";
   const canEditEntrega = role === "admin" || role === "logistica";
 
+  const FILTERS: { key: FilterKey; label: string; }[] = [
+    { key: "TODOS", label: "Todos" },
+    { key: "PENDIENTES", label: "Pendientes" },
+    { key: "ARMADOS", label: "Armados" },
+    { key: "ATRASADOS", label: "Atrasados" },
+    { key: "ENTREGADOS", label: "Entregados" },
+  ];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1>Producción</h1>
-          <p className="text-muted-foreground text-sm">{filtered.length} de {rows.length} motocarros</p>
+          <p className="text-muted-foreground text-base mt-1">{filtered.length} de {rows.length} motocarros</p>
         </div>
-        <Button onClick={exportCsv} variant="outline"><Download className="h-4 w-4 mr-1" /> Exportar CSV</Button>
+        <div className="flex gap-2 items-center">
+          <div className="inline-flex rounded-lg border p-1 bg-card">
+            <button onClick={() => setView("cards")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "cards" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}>
+              <LayoutGrid size={18}/> Tarjetas
+            </button>
+            <button onClick={() => setView("tabla")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "tabla" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}>
+              <TableIcon size={18}/> Ver tabla
+            </button>
+          </div>
+          <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> Exportar CSV</Button>
+        </div>
       </div>
 
-      <Card className="p-4 flex flex-wrap gap-3 items-center">
-        <Input className="max-w-xs" placeholder="Buscar orden/chasis/NS/remisión…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <Select value={estatus} onValueChange={setEstatus}>
-          <SelectTrigger className="w-44"><SelectValue placeholder="Estatus armado" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all">Todos los estatus</SelectItem>
-            {["PENDIENTE","EN_PROCESO","ARMADO","LISTO","ATRASADO"].map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={color} onValueChange={setColor}>
-          <SelectTrigger className="w-36"><SelectValue placeholder="Color" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all">Todos los colores</SelectItem>
-            <SelectItem value="BLANCO">Blanco</SelectItem>
-            <SelectItem value="AZUL">Azul</SelectItem>
-          </SelectContent>
-        </Select>
-      </Card>
+      {/* Filter chips */}
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map(f => {
+          const active = filter === f.key;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`min-h-[48px] px-5 rounded-full font-semibold text-base transition-all border-2 ${active ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-[#1F3864] border-[#2E75B6]/30 hover:border-[#2E75B6]"}`}
+            >
+              {f.label} <span className={`ml-2 px-2 py-0.5 rounded-full text-sm ${active ? "bg-white/20" : "bg-[#2E75B6]/10"}`}>{(counts as any)[f.key]}</span>
+            </button>
+          );
+        })}
+      </div>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto max-h-[70vh]">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Orden</th><th>Modelo</th><th>Color</th><th>F.Est.Arm</th><th>Estatus</th>
-                <th>F.Real.Arm</th><th>NS Chasis</th><th>NS Motor</th><th>Chasis</th>
-                <th>Vendedor</th><th>Cliente</th><th>Remisión</th><th>F.Est.Ent</th><th>Entrega</th>
-                {(canEditFabrica || canEditEntrega) && <th>Acciones</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(r => (
-                <tr key={r.id}>
-                  <td className="font-semibold text-primary">{r.orden_armado}</td>
-                  <td>{r.modelo}</td>
-                  <td>{r.color}</td>
-                  <td>{fmtDate(r.fecha_estimada_armado)}</td>
-                  <td><EstatusArmadoBadge estatus={r.estatus_armado} /></td>
-                  <td>{fmtDate(r.fecha_real_armado)}</td>
-                  <td className="font-mono text-[11px]">{r.ns_chasis || "—"}</td>
-                  <td className="font-mono text-[11px]">{r.ns_motor || "—"}</td>
-                  <td>{r.chasis_asignado || "—"}</td>
-                  <td>{r.remisiones?.profiles?.nombre_completo || (r.remisiones?.notas?.replace("Vendedor original: ", "")) || "—"}</td>
-                  <td>{r.remisiones?.clientes?.codigo_erp || "—"}</td>
-                  <td>{r.remisiones?.folio_remision || "—"}</td>
-                  <td>{fmtDate(r.fecha_estimada_entrega)}</td>
-                  <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
-                  {(canEditFabrica || canEditEntrega) && (
-                    <td>
-                      <div className="flex gap-1 flex-wrap">
-                        {canEditFabrica && (
-                          <Button size="sm" variant="ghost" onClick={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "" }); }}>
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                        )}
-                        {canEditFabrica && r.estatus_armado !== "ARMADO" && r.estatus_armado !== "LISTO" && (
-                          <Button size="sm" variant="outline" onClick={() => updateMoto(r.id, { estatus_armado: "ARMADO", fecha_real_armado: new Date().toISOString().slice(0,10) })}>
-                            ✓ Armado
-                          </Button>
-                        )}
-                        {canEditFabrica && r.estatus_armado === "ARMADO" && (
-                          <Button size="sm" variant="outline" onClick={() => updateMoto(r.id, { estatus_armado: "LISTO" })}>
-                            ✓ Listo
-                          </Button>
-                        )}
-                        {canEditEntrega && r.estatus_entrega === "PROGRAMADA" && (
-                          <Button size="sm" variant="outline" onClick={() => updateMoto(r.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: new Date().toISOString().slice(0,10) })}>
-                            🚚 Entregada
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {!filtered.length && <tr><td colSpan={15} className="text-center text-muted-foreground py-6">Sin resultados</td></tr>}
-            </tbody>
-          </table>
+      <Card className="p-3 flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
+          <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+          <Input className="pl-10 h-12 text-base" placeholder="Buscar orden, chasis, NS, remisión…" value={q} onChange={e => setQ(e.target.value)} />
+        </div>
+        <div className="inline-flex rounded-lg border p-1 bg-card">
+          {(["TODOS","BLANCO","AZUL"] as const).map(c => (
+            <button key={c} onClick={() => setColorFilter(c)} className={`px-3 py-2 rounded-md text-sm font-medium ${colorFilter === c ? "bg-[#2E75B6] text-white" : "text-muted-foreground"}`}>
+              {c === "TODOS" ? "Todos los colores" : c}
+            </button>
+          ))}
         </div>
       </Card>
 
+      {view === "cards" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
+            onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "" }); }}
+            onAction={(action) => setConfirm({ moto: r, action })}
+          />)}
+          {!filtered.length && <div className="col-span-full text-center text-muted-foreground py-12 bg-card rounded-lg border">Sin resultados</div>}
+        </div>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto max-h-[70vh]">
+            <table className="data-table">
+              <thead><tr>
+                <th>Orden</th><th>Modelo</th><th>Color</th><th>Fecha estimada de armado</th><th>Estatus</th>
+                <th>Fecha real de armado</th><th>Número de serie del chasis</th><th>Número de serie del motor</th><th>Chasis</th>
+                <th>Vendedor</th><th>Cliente</th><th>Remisión</th><th>Fecha estimada de entrega</th><th>Entrega</th>
+              </tr></thead>
+              <tbody>
+                {filtered.map(r => (
+                  <tr key={r.id}>
+                    <td className="font-semibold text-primary">{r.orden_armado}</td>
+                    <td>{r.modelo}</td><td>{r.color}</td>
+                    <td>{fmtDate(r.fecha_estimada_armado)}</td>
+                    <td><EstatusBadge estatus={r._eff} size="sm" /></td>
+                    <td>{fmtDate(r.fecha_real_armado)}</td>
+                    <td className="font-mono text-[11px]">{r.ns_chasis || "—"}</td>
+                    <td className="font-mono text-[11px]">{r.ns_motor || "—"}</td>
+                    <td>{r.chasis_asignado || "—"}</td>
+                    <td>{r.remisiones?.profiles?.nombre_completo || "—"}</td>
+                    <td>{r.remisiones?.clientes?.codigo_erp || "—"}</td>
+                    <td>{r.remisiones?.folio_remision || "—"}</td>
+                    <td>{fmtDate(r.fecha_estimada_entrega)}</td>
+                    <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      {/* Edit modal */}
       <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Editar motocarro #{editing?.orden_armado}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>NS Chasis</Label><Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: e.target.value })} /></div>
-            <div><Label>NS Motor</Label><Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: e.target.value })} /></div>
+            <div><Label>Número de serie del chasis</Label><Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: e.target.value })} /></div>
+            <div><Label>Número de serie del motor</Label><Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: e.target.value })} /></div>
             <div><Label>Chasis asignado</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
-            <div><Label>Fecha estimada armado</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
+            <div><Label>Fecha estimada de armado</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
             <div><Label>Observaciones / paro</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
           </div>
           <DialogFooter>
@@ -176,7 +210,131 @@ export default function Produccion() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation */}
+      <AlertDialog open={!!confirm} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Confirmar acción?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Motocarro #{confirm?.moto.orden_armado} se marcará como{" "}
+              <strong>{confirm?.action === "ARMADO" ? "ARMADO" : confirm?.action === "LISTO" ? "LISTO" : "ENTREGADO"}</strong>. Esta acción quedará registrada en bitácora.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={doConfirm}>Sí, confirmar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction }: any) {
+  const desv = diasDesvio(r);
+  const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
+  const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
+
+  const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
+  const colorBg   = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";
+
+  // timeline state
+  const steps = ["PENDIENTE", "ARMADO", "LISTO", "ENTREGADO"];
+  let activeIdx = 0;
+  if (r.estatus_entrega === "ENTREGADA") activeIdx = 3;
+  else if (r._eff === "LISTO") activeIdx = 2;
+  else if (r._eff === "ARMADO") activeIdx = 1;
+
+  return (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
+      <div className="flex items-start justify-between p-4 pb-2" style={{ background: colorBg }}>
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-white/70">
+            <Bike size={36} strokeWidth={2} color={colorBike} />
+          </div>
+          <div>
+            <div className="text-sm text-muted-foreground font-medium">{r.color}</div>
+            <div className="text-base font-semibold text-[#1F3864]">{r.modelo}</div>
+          </div>
+        </div>
+        <div className="px-3 py-1.5 rounded-md bg-[#1F3864] text-white font-bold text-xl tracking-tight">
+          #{r.orden_armado}
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3 flex-1">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <EstatusBadge estatus={r.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : r._eff} size="md" />
+          {desvLabel && <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${desvCls}`}>{desvLabel}</span>}
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 text-xs">
+          {r.remisiones?.clientes?.codigo_erp && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
+              👤 {r.remisiones.clientes.codigo_erp}
+            </span>
+          )}
+          {r.remisiones?.profiles?.nombre_completo && (
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] font-medium">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#2E75B6] text-white text-[10px] font-bold">
+                {r.remisiones.profiles.nombre_completo.split(" ").map((n: string) => n[0]).slice(0,2).join("")}
+              </span>
+              {r.remisiones.profiles.nombre_completo.split(" ")[0]}
+            </span>
+          )}
+          {r.remisiones?.folio_remision && (
+            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
+              📄 {r.remisiones.folio_remision}
+            </span>
+          )}
+        </div>
+
+        {/* Timeline */}
+        <div className="flex items-center justify-between pt-2">
+          {steps.map((s, i) => (
+            <div key={s} className="flex items-center flex-1 last:flex-none">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${i <= activeIdx ? "bg-[#1F3864] text-white" : "bg-slate-200 text-slate-400"}`} title={s}>
+                {i + 1}
+              </div>
+              {i < steps.length - 1 && <div className={`flex-1 h-1 mx-1 rounded ${i < activeIdx ? "bg-[#1F3864]" : "bg-slate-200"}`} />}
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-between text-[10px] text-muted-foreground -mt-1">
+          <span>Pend.</span><span>Armado</span><span>Listo</span><span>Entreg.</span>
+        </div>
+
+        <div className="text-xs text-muted-foreground">
+          Estimada armado: <strong className="text-foreground">{fmtDate(r.fecha_estimada_armado)}</strong>
+        </div>
+      </div>
+
+      <div className="border-t p-3 flex gap-2 items-stretch">
+        {canEditFabrica && (r._eff === "PENDIENTE" || r._eff === "EN_PROCESO" || r._eff === "ATRASADO") && (
+          <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base">
+            <CheckCircle className="h-5 w-5 mr-2" /> Marcar armado
+          </Button>
+        )}
+        {canEditFabrica && r._eff === "ARMADO" && (
+          <Button onClick={() => onAction("LISTO")} className="flex-1 h-12 bg-[#065F46] hover:bg-[#054c38] text-base">
+            <CheckCircle className="h-5 w-5 mr-2" /> Marcar listo
+          </Button>
+        )}
+        {canEditEntrega && r._eff === "LISTO" && r.estatus_entrega !== "ENTREGADA" && (
+          <Button onClick={() => onAction("ENTREGADA")} className="flex-1 h-12 bg-[#5B21B6] hover:bg-[#4c1d95] text-base">
+            <TruckIcon className="h-5 w-5 mr-2" /> Marcar entregado
+          </Button>
+        )}
+        {r.estatus_entrega === "ENTREGADA" && (
+          <div className="flex-1 h-12 flex items-center justify-center text-[#5B21B6] font-semibold bg-[#EDE9FE] rounded-md">
+            <TruckIcon className="h-5 w-5 mr-2" /> Entregado
+          </div>
+        )}
+        {canEditFabrica && (
+          <Button variant="outline" onClick={onEdit} className="h-12 w-12 p-0" title="Editar"><Pencil className="h-5 w-5" /></Button>
+        )}
+      </div>
+    </Card>
+  );
+}
