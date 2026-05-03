@@ -46,17 +46,17 @@ export default function Remisiones() {
   const load = async () => {
     const { data } = await supabase
       .from("remisiones")
-      .select("*, clientes(codigo_erp, nombre_comercial), profiles:vendedor_id(nombre_completo), motocarros(id, orden_armado, modelo, color, ns_chasis, chasis_asignado, estatus_armado, fecha_estimada_armado, fecha_real_armado, estatus_entrega)")
+      .select("*, clientes(codigo_erp, nombre_comercial), profiles:vendedor_id(nombre_completo), motocarros(id, orden_armado, modelo, color, ns_chasis, chasis_asignado, estatus_armado, fecha_estimada_armado, fecha_real_armado, estatus_entrega, fecha_estimada_entrega, fecha_propuesta_entrega, propuesta_entrega_notas, confirmada_fabrica_at, confirmada_logistica_at)")
       .order("fecha_remision", { ascending: false, nullsFirst: false });
     setRows(data ?? []);
-    // Tomar últimos folios del propio vendedor (o todos si admin) para sugerir siguiente
-    const propios = (data ?? []).filter((r: any) => role === "admin" || r.vendedor_id === user?.id);
+    // Tomar últimos folios del propio vendedor (o todos si admin/coordinador) para sugerir siguiente
+    const propios = (data ?? []).filter((r: any) => role === "admin" || role === "coordinador" || r.vendedor_id === user?.id);
     setRecentFolios(propios.slice(0, 5).map((r: any) => r.folio_remision));
   };
 
   useEffect(() => { load(); loadClientes(); }, [user?.id, role]);
 
-  const canCreate = role === "admin" || role === "ventas";
+  const canCreate = role === "admin" || role === "ventas" || role === "coordinador";
 
   const abrirNueva = () => {
     setForm(f => ({ ...f, folio_remision: suggestNextFolio(recentFolios) }));
