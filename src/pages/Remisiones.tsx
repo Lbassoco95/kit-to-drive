@@ -11,7 +11,7 @@ import { fmtDate, normColor, effEstatusArmado } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus } from "lucide-react";
+import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck } from "lucide-react";
 
 // Sugiere el siguiente folio incrementando el sufijo numérico del último
 function suggestNextFolio(folios: string[]): string {
@@ -46,17 +46,17 @@ export default function Remisiones() {
   const load = async () => {
     const { data } = await supabase
       .from("remisiones")
-      .select("*, clientes(codigo_erp, nombre_comercial), profiles:vendedor_id(nombre_completo), motocarros(id, orden_armado, modelo, color, ns_chasis, chasis_asignado, estatus_armado, fecha_estimada_armado, fecha_real_armado, estatus_entrega)")
+      .select("*, clientes(codigo_erp, nombre_comercial), profiles:vendedor_id(nombre_completo), motocarros(id, orden_armado, modelo, color, ns_chasis, chasis_asignado, estatus_armado, fecha_estimada_armado, fecha_real_armado, estatus_entrega, fecha_estimada_entrega, fecha_propuesta_entrega, propuesta_entrega_notas, confirmada_fabrica_at, confirmada_logistica_at)")
       .order("fecha_remision", { ascending: false, nullsFirst: false });
     setRows(data ?? []);
-    // Tomar últimos folios del propio vendedor (o todos si admin) para sugerir siguiente
-    const propios = (data ?? []).filter((r: any) => role === "admin" || r.vendedor_id === user?.id);
+    // Tomar últimos folios del propio vendedor (o todos si admin/coordinador) para sugerir siguiente
+    const propios = (data ?? []).filter((r: any) => role === "admin" || role === "coordinador" || r.vendedor_id === user?.id);
     setRecentFolios(propios.slice(0, 5).map((r: any) => r.folio_remision));
   };
 
   useEffect(() => { load(); loadClientes(); }, [user?.id, role]);
 
-  const canCreate = role === "admin" || role === "ventas";
+  const canCreate = role === "admin" || role === "ventas" || role === "coordinador";
 
   const abrirNueva = () => {
     setForm(f => ({ ...f, folio_remision: suggestNextFolio(recentFolios) }));
@@ -193,8 +193,9 @@ export default function Remisiones() {
           const pct = Math.round((listas / total) * 100);
           const pctColor = pct === 100 ? "#065F46" : pct >= 50 ? "#92400E" : "#991B1B";
           const isOwner = r.vendedor_id === user?.id;
-          const canAssign = role === "admin" || (role === "ventas" && isOwner);
-          const canUpload = role === "admin" || (role === "ventas" && isOwner);
+          const canAssign = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
+          const canUpload = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
+          const canPropose = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
           const vendedor = r.profiles?.nombre_completo || (r.notas?.replace("Vendedor original: ", "")) || "—";
           const initials = vendedor.split(" ").map((s: string) => s[0]).slice(0,2).join("").toUpperCase();
 
@@ -236,18 +237,12 @@ export default function Remisiones() {
               {motos.length > 0 && (
                 <Collapsible open={!!expanded[r.id]} onOpenChange={(o) => setExpanded(s => ({ ...s, [r.id]: o }))}>
                   <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 rounded-md bg-slate-50 hover:bg-slate-100 text-sm font-medium">
-                    Ver chasis ({motos.length})
+                    Ver chasis y entregas ({motos.length})
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id] ? "rotate-180" : ""}`} />
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-1">
+                  <CollapsibleContent className="mt-2 space-y-2">
                     {motos.map((m: any) => (
-                      <div key={m.id} className="flex items-center justify-between px-3 py-2 rounded-md border bg-white text-sm">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
-                          <span className="text-xs font-mono text-muted-foreground truncate">{m.ns_chasis || m.chasis_asignado || "—"}</span>
-                        </div>
-                        <EstatusBadge estatus={m.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : effEstatusArmado(m)} size="sm" />
-                      </div>
+                      <MotoRow key={m.id} m={m} canPropose={canPropose} role={role} onChange={load} />
                     ))}
                   </CollapsibleContent>
                 </Collapsible>
@@ -281,6 +276,103 @@ export default function Remisiones() {
         })}
         {!rows.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones</div>}
       </div>
+    </div>
+  );
+}
+
+function MotoRow({ m, canPropose, role, onChange }: { m: any; canPropose: boolean; role: string | null; onChange: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [fecha, setFecha] = useState<string>(m.fecha_propuesta_entrega || "");
+  const [notas, setNotas] = useState<string>(m.propuesta_entrega_notas || "");
+  const proponer = async () => {
+    if (!fecha) return toast.error("Selecciona una fecha");
+    const { error } = await supabase.rpc("proponer_fecha_entrega", { _motocarro_id: m.id, _fecha: fecha, _notas: notas || null });
+    if (error) return toast.error(error.message);
+    toast.success("✓ Fecha propuesta enviada a fábrica y logística");
+    setEditing(false); onChange();
+  };
+  const confirmar = async (area: "fabrica" | "logistica") => {
+    const { error } = await supabase.rpc("confirmar_fecha_entrega", { _motocarro_id: m.id, _area: area });
+    if (error) return toast.error(error.message);
+    toast.success(`✓ Confirmado por ${area}`); onChange();
+  };
+  const canConfirmFab = role === "admin" || role === "fabrica";
+  const canConfirmLog = role === "admin" || role === "logistica";
+  const tieneFab = !!m.confirmada_fabrica_at;
+  const tieneLog = !!m.confirmada_logistica_at;
+
+  return (
+    <div className="rounded-md border bg-white text-sm overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+          <span className="text-xs font-mono text-muted-foreground truncate">{m.ns_chasis || m.chasis_asignado || "—"}</span>
+        </div>
+        <EstatusBadge estatus={m.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : effEstatusArmado(m)} size="sm" />
+      </div>
+      <div className="px-3 pb-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <div className="text-muted-foreground">Estim. armado:</div>
+        <div className="text-right font-medium">{fmtDate(m.fecha_estimada_armado)}</div>
+        <div className="text-muted-foreground">Estim. entrega:</div>
+        <div className="text-right font-medium">{fmtDate(m.fecha_estimada_entrega || m.fecha_propuesta_entrega)}</div>
+      </div>
+
+      {!editing ? (
+        <div className="px-3 pb-3 flex flex-wrap items-center gap-2">
+          {m.fecha_propuesta_entrega ? (
+            <div className="flex-1 min-w-0 text-xs">
+              <div className="font-medium text-[#1F3864] flex items-center gap-1.5">
+                <CalendarClock className="h-3.5 w-3.5" /> Propuesta: {fmtDate(m.fecha_propuesta_entrega)}
+              </div>
+              {m.propuesta_entrega_notas && <div className="text-muted-foreground truncate">{m.propuesta_entrega_notas}</div>}
+              <div className="flex gap-1.5 mt-1">
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${tieneFab ? "bg-[#D1FAE5] text-[#065F46]" : "bg-slate-100 text-slate-500"}`}>
+                  <Factory className="h-3 w-3" /> {tieneFab ? "Fábrica ✓" : "Fábrica pendiente"}
+                </span>
+                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${tieneLog ? "bg-[#D1FAE5] text-[#065F46]" : "bg-slate-100 text-slate-500"}`}>
+                  <Truck className="h-3 w-3" /> {tieneLog ? "Logística ✓" : "Logística pendiente"}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 text-xs text-muted-foreground italic">Sin fecha propuesta con cliente</div>
+          )}
+          <div className="flex gap-1.5 ml-auto">
+            {canPropose && m.estatus_entrega !== "ENTREGADA" && (
+              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditing(true)}>
+                <CalendarClock className="h-3.5 w-3.5 mr-1" />{m.fecha_propuesta_entrega ? "Cambiar" : "Proponer"}
+              </Button>
+            )}
+            {m.fecha_propuesta_entrega && canConfirmFab && !tieneFab && (
+              <Button size="sm" className="h-8 text-xs bg-[#065F46] hover:bg-[#04432f]" onClick={() => confirmar("fabrica")}>
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Confirmar fábrica
+              </Button>
+            )}
+            {m.fecha_propuesta_entrega && canConfirmLog && !tieneLog && (
+              <Button size="sm" className="h-8 text-xs bg-[#065F46] hover:bg-[#04432f]" onClick={() => confirmar("logistica")}>
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />Confirmar logística
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="px-3 pb-3 space-y-2 bg-[#DBEAFE]/30">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label className="text-xs">Fecha pactada con cliente</Label>
+              <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="h-9 text-sm" />
+            </div>
+            <div>
+              <Label className="text-xs">Hora / contacto</Label>
+              <Input value={notas} onChange={e => setNotas(e.target.value)} placeholder="Ej: 10am, llamar al chofer" className="h-9 text-sm" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-9 bg-[#1F3864] hover:bg-[#162a4d]" onClick={proponer}>Enviar propuesta</Button>
+            <Button size="sm" variant="ghost" className="h-9" onClick={() => setEditing(false)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

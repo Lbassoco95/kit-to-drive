@@ -9,16 +9,16 @@ import { useAuth, AppRole } from "@/contexts/AuthContext";
 type Item = { title: string; url: string; icon: any; roles: AppRole[]; group: "Operación" | "Catálogos" | "Sistema" | "Inicio" };
 
 const ITEMS: Item[] = [
-  { title: "Dashboard",     url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas"], group: "Inicio" },
-  { title: "Producción",    url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica"],          group: "Operación" },
-  { title: "Remisiones",    url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas"], group: "Operación" },
-  { title: "Entregas",      url: "/entregas",      icon: Truck,           roles: ["admin","logistica"],                    group: "Operación" },
-  { title: "Mis Motocarros",url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin"],                       group: "Catálogos" },
-  { title: "Clientes",      url: "/clientes",      icon: Users,           roles: ["admin","fabrica"],                      group: "Catálogos" },
-  { title: "Importar datos",url: "/importar",      icon: Upload,          roles: ["admin"],                                group: "Sistema" },
-  { title: "Usuarios",      url: "/usuarios",      icon: Database,        roles: ["admin"],                                group: "Sistema" },
-  { title: "Bitácora",      url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                group: "Sistema" },
-  { title: "Configuración", url: "/configuracion", icon: Settings,        roles: ["admin"],                                group: "Sistema" },
+  { title: "Dashboard",     url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Inicio" },
+  { title: "Producción",    url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
+  { title: "Remisiones",    url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Operación" },
+  { title: "Entregas",      url: "/entregas",      icon: Truck,           roles: ["admin","logistica","coordinador"],                    group: "Operación" },
+  { title: "Mis Motocarros",url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin","coordinador"],                       group: "Catálogos" },
+  { title: "Clientes",      url: "/clientes",      icon: Users,           roles: ["admin","fabrica","coordinador"],                      group: "Catálogos" },
+  { title: "Importar datos",url: "/importar",      icon: Upload,          roles: ["admin"],                                              group: "Sistema" },
+  { title: "Usuarios",      url: "/usuarios",      icon: Database,        roles: ["admin"],                                              group: "Sistema" },
+  { title: "Bitácora",      url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                              group: "Sistema" },
+  { title: "Configuración", url: "/configuracion", icon: Settings,        roles: ["admin"],                                              group: "Sistema" },
 ];
 
 const GROUPS: Array<Item["group"]> = ["Inicio", "Operación", "Catálogos", "Sistema"];
