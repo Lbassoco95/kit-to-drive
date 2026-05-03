@@ -11,7 +11,7 @@ import { fmtDate, normColor, effEstatusArmado } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus } from "lucide-react";
+import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck } from "lucide-react";
 
 // Sugiere el siguiente folio incrementando el sufijo numérico del último
 function suggestNextFolio(folios: string[]): string {
