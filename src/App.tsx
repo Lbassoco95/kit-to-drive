@@ -32,11 +32,11 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/produccion" element={<ProtectedRoute roles={["admin","fabrica","logistica"]}><Produccion /></ProtectedRoute>} />
+              <Route path="/produccion" element={<ProtectedRoute roles={["admin","fabrica","logistica","coordinador"]}><Produccion /></ProtectedRoute>} />
               <Route path="/remisiones" element={<Remisiones />} />
-              <Route path="/entregas" element={<ProtectedRoute roles={["admin","logistica"]}><Entregas /></ProtectedRoute>} />
-              <Route path="/mis-motocarros" element={<ProtectedRoute roles={["admin","ventas"]}><MisMotocarros /></ProtectedRoute>} />
-              <Route path="/clientes" element={<ProtectedRoute roles={["admin","fabrica"]}><Clientes /></ProtectedRoute>} />
+              <Route path="/entregas" element={<ProtectedRoute roles={["admin","logistica","coordinador"]}><Entregas /></ProtectedRoute>} />
+              <Route path="/mis-motocarros" element={<ProtectedRoute roles={["admin","ventas","coordinador"]}><MisMotocarros /></ProtectedRoute>} />
+              <Route path="/clientes" element={<ProtectedRoute roles={["admin","fabrica","coordinador"]}><Clientes /></ProtectedRoute>} />
               <Route path="/importar" element={<ProtectedRoute roles={["admin"]}><Importar /></ProtectedRoute>} />
               <Route path="/usuarios" element={<ProtectedRoute roles={["admin"]}><Usuarios /></ProtectedRoute>} />
               <Route path="/bitacora" element={<ProtectedRoute roles={["admin"]}><Bitacora /></ProtectedRoute>} />
