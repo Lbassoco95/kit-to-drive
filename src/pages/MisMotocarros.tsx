@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLang } from "@/contexts/LangContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Copy, ChevronDown, Bike, Users } from "lucide-react";
 import { toast } from "sonner";
 
 export default function MisMotocarros() {
+  const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [openClient, setOpenClient] = useState<Record<string, boolean>>({});
   const [detail, setDetail] = useState<any | null>(null);
@@ -29,7 +31,7 @@ export default function MisMotocarros() {
     rows.forEach(r => {
       const c = r.remisiones?.clientes;
       const key = c?.id || "sin";
-      if (!map.has(key)) map.set(key, { cliente: c || { codigo_erp: "Sin cliente" }, items: [] });
+      if (!map.has(key)) map.set(key, { cliente: c || { codigo_erp: t.misMotocarros.sinCliente }, items: [] });
       map.get(key)!.items.push(r);
     });
     return Array.from(map.values());
@@ -38,12 +40,12 @@ export default function MisMotocarros() {
   const copyFactura = (r: any) => {
     const txt = `NS Chasis: ${r.ns_chasis || ""}\nNS Motor: ${r.ns_motor || ""}\nModelo: ${r.modelo}\nColor: ${r.color}`;
     navigator.clipboard.writeText(txt);
-    toast.success("✓ Datos copiados al portapapeles");
+    toast.success(t.misMotocarros.copiado);
   };
 
   return (
     <div className="space-y-5">
-      <div><h1>Mis Motocarros</h1><p className="text-muted-foreground text-base mt-1">{rows.length} unidades agrupadas en {groups.length} clientes</p></div>
+      <div><h1>{t.misMotocarros.title}</h1><p className="text-muted-foreground text-base mt-1">{t.misMotocarros.subtitle(rows.length, groups.length)}</p></div>
 
       <div className="space-y-3">
         {groups.map(({ cliente, items }) => {
@@ -65,11 +67,11 @@ export default function MisMotocarros() {
                       {cliente.nombre_comercial && <div className="text-sm text-muted-foreground truncate">{cliente.nombre_comercial}</div>}
                     </div>
                     <div className="hidden md:flex flex-col items-end gap-1">
-                      <div className="text-sm font-medium">{total} motocarros · {entregados} entregados</div>
+                      <div className="text-sm font-medium">{t.misMotocarros.totalEntregados(total, entregados)}</div>
                       <div className="w-48 h-2 rounded-full bg-slate-100 overflow-hidden">
                         <div className="h-full bg-[#065F46]" style={{ width: `${pct}%` }} />
                       </div>
-                      <div className="text-xs text-muted-foreground">{pct}% armados</div>
+                      <div className="text-xs text-muted-foreground">{t.misMotocarros.armados(pct)}</div>
                     </div>
                     <ChevronDown className={`h-6 w-6 transition-transform ${open ? "rotate-180" : ""}`} />
                   </div>
@@ -87,13 +89,13 @@ export default function MisMotocarros() {
                             <div className="text-xs text-muted-foreground truncate">{r.modelo}</div>
                           </div>
                         </div>
-                        <div className="text-xs font-mono text-muted-foreground truncate">{r.ns_chasis || r.chasis_asignado || "Sin NS"}</div>
+                        <div className="text-xs font-mono text-muted-foreground truncate">{r.ns_chasis || r.chasis_asignado || t.misMotocarros.sinNS}</div>
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <EstatusBadge estatus={r.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : effEstatusArmado(r)} size="sm" />
                           {r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">🔒 Retenido</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{t.pago.retenidoCorto}</span>
                           )}
-                          <Button size="sm" variant="outline" onClick={() => setDetail(r)} className="h-9">Ver detalle</Button>
+                          <Button size="sm" variant="outline" onClick={() => setDetail(r)} className="h-9">{t.misMotocarros.verDetalle}</Button>
                         </div>
                       </div>
                     ))}
@@ -103,31 +105,31 @@ export default function MisMotocarros() {
             </Card>
           );
         })}
-        {!groups.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border">Aún no tienes motocarros asignados</div>}
+        {!groups.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.misMotocarros.sinMotocarros}</div>}
       </div>
 
       <Dialog open={!!detail} onOpenChange={o => { if (!o) setDetail(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Motocarro #{detail?.orden_armado}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.misMotocarros.detalle(detail?.orden_armado)}</DialogTitle></DialogHeader>
           {detail && (
             <div className="space-y-3 text-sm">
               <Row k="Modelo" v={detail.modelo}/>
               <Row k="Color" v={detail.color}/>
-              <Row k="Chasis asignado" v={detail.chasis_asignado || "—"}/>
-              <Row k="Número de serie del chasis" v={detail.ns_chasis || "—"}/>
-              <Row k="Número de serie del motor" v={detail.ns_motor || "—"}/>
-              <Row k="Remisión" v={detail.remisiones?.folio_remision}/>
-              <Row k="Fecha estimada de armado" v={fmtDate(detail.fecha_estimada_armado)}/>
-              <Row k="Fecha real de armado" v={fmtDate(detail.fecha_real_armado)}/>
+              <Row k={t.misMotocarros.chasisAsignado} v={detail.chasis_asignado || "—"}/>
+              <Row k={t.misMotocarros.ns_chasis} v={detail.ns_chasis || "—"}/>
+              <Row k={t.misMotocarros.ns_motor} v={detail.ns_motor || "—"}/>
+              <Row k={t.misMotocarros.remision} v={detail.remisiones?.folio_remision}/>
+              <Row k={t.misMotocarros.fechaEstimadaArmado} v={fmtDate(detail.fecha_estimada_armado)}/>
+              <Row k={t.misMotocarros.fechaRealArmado} v={fmtDate(detail.fecha_real_armado)}/>
               {detail.remisiones?.tipo_pago === "contra_entrega" && !detail.remisiones?.pagado ? (
                 <div className="flex justify-between gap-4 border-b pb-1.5">
-                  <span className="text-muted-foreground">Entrega</span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-xs font-bold">🔒 Retenido — pago pendiente</span>
+                  <span className="text-muted-foreground">{t.misMotocarros.entrega}</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-xs font-bold">{t.pago.retenido}</span>
                 </div>
               ) : (
                 <>
-                  <Row k="Fecha estimada de entrega" v={fmtDate(detail.fecha_estimada_entrega)}/>
-                  <Row k="Fecha real de entrega" v={fmtDate(detail.fecha_real_entrega)}/>
+                  <Row k={t.misMotocarros.fechaEstimadaEntrega} v={fmtDate(detail.fecha_estimada_entrega)}/>
+                  <Row k={t.misMotocarros.fechaRealEntrega} v={fmtDate(detail.fecha_real_entrega)}/>
                 </>
               )}
               <div className="flex gap-2 pt-2">
@@ -136,7 +138,7 @@ export default function MisMotocarros() {
               </div>
               {detail.ns_chasis && (
                 <Button onClick={() => copyFactura(detail)} className="w-full h-12 text-base mt-3">
-                  <Copy className="h-5 w-5 mr-2"/> Copiar datos para factura
+                  <Copy className="h-5 w-5 mr-2"/> {t.misMotocarros.copiarFactura}
                 </Button>
               )}
             </div>

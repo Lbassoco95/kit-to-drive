@@ -7,13 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { User, Wrench, Truck, Briefcase } from "lucide-react";
 
-const DEMO = [
-  { email: "admin@dazon.demo",     pwd: "Dazon2026!", label: "Admin",     icon: User },
-  { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", label: "Fábrica",   icon: Wrench },
-  { email: "logistica@dazon.demo", pwd: "Dazon2026!", label: "Logística", icon: Truck },
-  { email: "ventas@dazon.demo",    pwd: "Dazon2026!", label: "Ventas",    icon: Briefcase },
+const DEMO_ROLES = [
+  { email: "admin@dazon.demo",     pwd: "Dazon2026!", labelKey: "admin" as const,     icon: User },
+  { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", labelKey: "fabrica" as const,   icon: Wrench },
+  { email: "logistica@dazon.demo", pwd: "Dazon2026!", labelKey: "logistica" as const, icon: Truck },
+  { email: "ventas@dazon.demo",    pwd: "Dazon2026!", labelKey: "ventas" as const,     icon: Briefcase },
 ];
 
 export default function Auth() {
@@ -22,6 +23,7 @@ export default function Auth() {
   const [busy, setBusy] = useState(false);
   const nav = useNavigate();
   const { user } = useAuth();
+  const { t, toggleLang } = useLang();
 
   useEffect(() => { if (user) nav("/"); }, [user, nav]);
 
@@ -37,34 +39,42 @@ export default function Auth() {
     setEmail(em); setPwd(p); setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email: em, password: p });
     setBusy(false);
-    if (error) toast.error("Usuario demo no creado todavía. Pídele al Admin que ejecute el seed.");
+    if (error) toast.error(t.auth.demoNotCreated);
     else nav("/");
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4">
-      <Card className="w-full max-w-lg p-8 shadow-2xl">
+      <Card className="w-full max-w-lg p-8 shadow-2xl relative">
+        {/* Language toggle */}
+        <button
+          onClick={toggleLang}
+          className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-[#1F3864] hover:border-[#1F3864] transition-all text-sm font-medium"
+        >
+          🌐 {t.otherLang}
+        </button>
+
         <div className="text-center mb-8">
-          <h1 className="!text-4xl !text-[#1F3864]">GRUPO DAZON</h1>
-          <p className="text-muted-foreground text-base mt-2">Sistema de Control de Producción</p>
+          <h1 className="!text-4xl !text-[#1F3864]">{t.auth.title}</h1>
+          <p className="text-muted-foreground text-base mt-2">{t.auth.subtitle}</p>
         </div>
         <form onSubmit={login} className="space-y-4">
           <div>
-            <Label className="text-base">Email</Label>
+            <Label className="text-base">{t.auth.email}</Label>
             <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 text-base" />
           </div>
           <div>
-            <Label className="text-base">Contraseña</Label>
+            <Label className="text-base">{t.auth.password}</Label>
             <Input type="password" required value={pwd} onChange={(e) => setPwd(e.target.value)} className="h-12 text-base" />
           </div>
           <Button type="submit" disabled={busy} className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-            {busy ? "Ingresando…" : "Iniciar sesión"}
+            {busy ? t.auth.signingIn : t.auth.signIn}
           </Button>
         </form>
         <div className="mt-8 pt-6 border-t">
-          <p className="text-sm text-muted-foreground mb-3 text-center">Acceso rápido demo</p>
+          <p className="text-sm text-muted-foreground mb-3 text-center">{t.auth.quickAccess}</p>
           <div className="grid grid-cols-2 gap-3">
-            {DEMO.map(d => (
+            {DEMO_ROLES.map(d => (
               <button
                 key={d.email}
                 type="button"
@@ -73,11 +83,11 @@ export default function Auth() {
                 className="min-h-[80px] flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-[#2E75B6]/30 bg-white hover:bg-[#2E75B6]/10 hover:border-[#2E75B6] transition-all text-[#1F3864] font-semibold disabled:opacity-50"
               >
                 <d.icon size={28} strokeWidth={2.2} />
-                <span className="text-base">{d.label}</span>
+                <span className="text-base">{t.roles[d.labelKey]}</span>
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-4 text-center">Contraseña demo: <code>Dazon2026!</code></p>
+          <p className="text-[11px] text-muted-foreground mt-4 text-center">{t.auth.demoPassword} <code>Dazon2026!</code></p>
         </div>
       </Card>
     </div>

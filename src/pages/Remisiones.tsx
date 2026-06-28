@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { fmtDate, normColor, effEstatusArmado } from "@/lib/dazon";
+import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ function suggestNextFolio(folios: string[]): string {
 
 export default function Remisiones() {
   const { role, user } = useAuth();
+  const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
@@ -92,7 +94,7 @@ export default function Remisiones() {
       const { error: upErr } = await supabase.storage.from("remisiones-docs").upload(path, formFile);
       if (!upErr) await supabase.from("remisiones").update({ documento_url: path }).eq("id", nueva.id);
     }
-    toast.success("✓ Remisión creada");
+    toast.success(t.remisiones.creada);
     setOpen(false);
     setFormFile(null);
     setForm({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "", tipo_pago: "anticipado", pagado: true });
@@ -123,7 +125,7 @@ export default function Remisiones() {
 
   const confirmarPago = async () => {
     if (!pagoDialog) return;
-    if (!comprobanteFile) { toast.error("Debes subir el comprobante de pago (foto o PDF con sello)"); return; }
+    if (!comprobanteFile) { toast.error(t.pago.sinComprobante); return; }
     setSubiendoPago(true);
     const path = `${pagoDialog.id}/comprobante_${Date.now()}_${comprobanteFile.name}`;
     const { error: upErr } = await supabase.storage.from("remisiones-docs").upload(path, comprobanteFile);
@@ -131,7 +133,7 @@ export default function Remisiones() {
     const { error } = await supabase.from("remisiones").update({ pagado: true, comprobante_pago_url: path }).eq("id", pagoDialog.id);
     setSubiendoPago(false);
     if (error) return toast.error(error.message);
-    toast.success("✓ Pago confirmado — logística puede programar la entrega");
+    toast.success(t.pago.confirmadoOk);
     setPagoDialog(null);
     setComprobanteFile(null);
     load();
@@ -146,22 +148,22 @@ export default function Remisiones() {
     <div className="space-y-5">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1>Remisiones</h1>
-          <p className="text-muted-foreground text-base mt-1">{rows.length} remisiones {role === "ventas" ? "(solo las tuyas)" : ""}</p>
+          <h1>{t.remisiones.title}</h1>
+          <p className="text-muted-foreground text-base mt-1">{t.remisiones.subtitle(rows.length)} {role === "ventas" ? "(solo las tuyas)" : ""}</p>
         </div>
         {canCreate && (
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) setForm((f: any) => ({ ...f, folio_remision: f.folio_remision || suggestNextFolio(recentFolios) })); }}>
             <DialogTrigger asChild>
               <Button onClick={abrirNueva} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-                <Plus className="h-5 w-5 mr-2" /> Nueva remisión
+                <Plus className="h-5 w-5 mr-2" /> {t.remisiones.nueva}
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle>Nueva remisión</DialogTitle></DialogHeader>
+              <DialogHeader><DialogTitle>{t.remisiones.crearTitulo}</DialogTitle></DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label className="text-base">Folio de remisión</Label>
-                  <Input value={form.folio_remision} onChange={e => setForm({ ...form, folio_remision: e.target.value })} placeholder="REM-001" className="h-12 text-base font-mono" />
+                  <Label className="text-base">{t.remisiones.folioRemision}</Label>
+                  <Input value={form.folio_remision} onChange={e => setForm({ ...form, folio_remision: e.target.value })} placeholder={t.remisiones.folioPlaceholder} className="h-12 text-base font-mono" />
                   {recentFolios.length > 0 && (
                     <div className="mt-2">
                       <div className="text-xs text-muted-foreground mb-1">Últimas remisiones (toca para basar el siguiente folio):</div>
@@ -199,7 +201,7 @@ export default function Remisiones() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Unidades</Label><Input type="number" min={1} value={form.total_unidades_solicitadas} onChange={e => setForm({ ...form, total_unidades_solicitadas: e.target.value })} className="h-12 text-base" /></div>
+                  <div><Label>{t.remisiones.cantMotocarros}</Label><Input type="number" min={1} value={form.total_unidades_solicitadas} onChange={e => setForm({ ...form, total_unidades_solicitadas: e.target.value })} className="h-12 text-base" /></div>
                   <div><Label>Color</Label>
                     <Select value={form.color_solicitado} onValueChange={v => setForm({ ...form, color_solicitado: v })}>
                       <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
@@ -209,12 +211,12 @@ export default function Remisiones() {
                 </div>
                 <div><Label>Fecha</Label><Input type="date" value={form.fecha_remision} onChange={e => setForm({ ...form, fecha_remision: e.target.value })} className="h-12 text-base" /></div>
                 <div>
-                  <Label>Tipo de pago</Label>
+                  <Label>{t.pago.tipo}</Label>
                   <Select value={form.tipo_pago} onValueChange={v => setForm({ ...form, tipo_pago: v, pagado: v === "anticipado" })}>
                     <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="anticipado">Anticipado (ya pagó)</SelectItem>
-                      <SelectItem value="contra_entrega">Contra entrega (paga al recibir)</SelectItem>
+                      <SelectItem value="anticipado">{t.remisiones.anticipado}</SelectItem>
+                      <SelectItem value="contra_entrega">{t.remisiones.contraEntrega}</SelectItem>
                     </SelectContent>
                   </Select>
                   {form.tipo_pago === "contra_entrega" && (
@@ -223,7 +225,7 @@ export default function Remisiones() {
                 </div>
                 <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} className="h-12 text-base" /></div>
                 <div>
-                  <Label>Foto / PDF de la remisión en papel <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                  <Label>{t.remisiones.subirRemision}</Label>
                   <label className="mt-1 flex items-center justify-center cursor-pointer h-12 rounded-md border-2 border-dashed border-slate-300 hover:border-[#2E75B6] hover:bg-[#DBEAFE]/30 text-sm text-muted-foreground gap-2">
                     <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setFormFile(e.target.files?.[0] ?? null)} />
                     <ImageIcon className="h-4 w-4" />
@@ -231,7 +233,7 @@ export default function Remisiones() {
                   </label>
                 </div>
               </div>
-              <DialogFooter><Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Crear remisión</Button></DialogFooter>
+              <DialogFooter><Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">{t.remisiones.crearBtn}</Button></DialogFooter>
             </DialogContent>
           </Dialog>
         )}
@@ -256,7 +258,7 @@ export default function Remisiones() {
             <Card key={r.id} className="p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Folio</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
                   <div className="text-2xl font-bold text-[#1F3864] leading-tight">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                 </div>
@@ -276,11 +278,11 @@ export default function Remisiones() {
                 </span>
                 {r.tipo_pago === "contra_entrega" && !r.pagado ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">
-                    ⚠ Pago pendiente
+                    {t.pago.pendiente}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                    <DollarSign className="h-3 w-3" /> {r.tipo_pago === "contra_entrega" ? "Contra entrega — Pagado" : "Anticipo pagado"}
+                    <DollarSign className="h-3 w-3" /> {r.tipo_pago === "contra_entrega" ? t.pago.contra_entrega : t.pago.anticipado}
                   </span>
                 )}
               </div>
@@ -334,12 +336,12 @@ export default function Remisiones() {
                 )}
                 {r.tipo_pago === "contra_entrega" && !r.pagado && (role === "admin" || role === "coordinador" || (role === "ventas" && r.vendedor_id === user?.id)) && (
                   <Button onClick={() => { setPagoDialog(r); setComprobanteFile(null); }} className="flex-1 h-12 text-base bg-emerald-600 hover:bg-emerald-700">
-                    <DollarSign className="h-5 w-5 mr-2" /> Confirmar pago
+                    <DollarSign className="h-5 w-5 mr-2" /> {t.pago.confirmar}
                   </Button>
                 )}
                 {r.tipo_pago === "contra_entrega" && r.pagado && r.comprobante_pago_url && (
                   <Button variant="outline" onClick={() => verComprobante(r.comprobante_pago_url)} className="flex-1 h-12 text-base">
-                    <FileDown className="h-5 w-5 mr-2" /> Ver comprobante
+                    <FileDown className="h-5 w-5 mr-2" /> {t.pago.verComprobante}
                   </Button>
                 )}
               </div>
@@ -352,25 +354,25 @@ export default function Remisiones() {
       {/* Dialog: confirmar pago con comprobante */}
       <Dialog open={!!pagoDialog} onOpenChange={o => { if (!o) { setPagoDialog(null); setComprobanteFile(null); } }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Confirmar pago — {pagoDialog?.folio_remision}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.pago.confirmar} — {pagoDialog?.folio_remision}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Sube la foto o PDF de la remisión <strong>con sello de pagado</strong>. Sin comprobante no se puede liberar para entrega.
+              {t.pago.confirmarDesc}
             </p>
             <label className="flex flex-col items-center justify-center cursor-pointer h-28 rounded-md border-2 border-dashed border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50 gap-2 text-sm text-muted-foreground">
               <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setComprobanteFile(e.target.files?.[0] ?? null)} />
               <ImageIcon className="h-8 w-8 text-emerald-400" />
               {comprobanteFile
                 ? <span className="text-emerald-700 font-medium truncate max-w-[220px]">{comprobanteFile.name}</span>
-                : <span>Toca para subir foto o PDF de pago</span>}
+                : <span>{t.pago.subirComprobante}</span>}
             </label>
-            {comprobanteFile && <p className="text-xs text-emerald-600 font-medium text-center">✓ Archivo listo — confirma para liberar a logística</p>}
+            {comprobanteFile && <p className="text-xs text-emerald-600 font-medium text-center">{t.pago.archivoListo}</p>}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setPagoDialog(null); setComprobanteFile(null); }}>Cancelar</Button>
+            <Button variant="outline" onClick={() => { setPagoDialog(null); setComprobanteFile(null); }}>{t.actions.cancel}</Button>
             <Button onClick={confirmarPago} disabled={!comprobanteFile || subiendoPago} className="bg-emerald-600 hover:bg-emerald-700">
               <DollarSign className="h-4 w-4 mr-2" />
-              {subiendoPago ? "Subiendo..." : "Confirmar pago"}
+              {subiendoPago ? t.actions.uploading : t.pago.confirmar}
             </Button>
           </DialogFooter>
         </DialogContent>

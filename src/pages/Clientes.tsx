@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck } from "lucide-react";
 
 export default function Clientes() {
   const { role } = useAuth();
+  const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [motos, setMotos] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
@@ -41,8 +43,8 @@ export default function Clientes() {
 
   const filtered = useMemo(() => {
     if (!q) return rows;
-    const t = q.toLowerCase();
-    return rows.filter(c => [c.codigo_erp, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(t));
+    const qLower = q.toLowerCase();
+    return rows.filter(c => [c.codigo_erp, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(qLower));
   }, [rows, q]);
 
   const canEdit = role === "admin" || role === "fabrica";
@@ -52,11 +54,11 @@ export default function Clientes() {
     if (editing) {
       const { error } = await supabase.from("clientes").update(form).eq("id", editing.id);
       if (error) return toast.error(error.message);
-      toast.success("✓ Cliente actualizado"); setEditing(null);
+      toast.success(t.clientes.actualizado); setEditing(null);
     } else {
       const { error } = await supabase.from("clientes").insert(form);
       if (error) return toast.error(error.message);
-      toast.success("✓ Cliente creado"); setCreating(false);
+      toast.success(t.clientes.creado); setCreating(false);
     }
     setForm({ codigo_erp: "", nombre_comercial: "", telefono: "", direccion: "", activo: true }); load();
   };
@@ -64,11 +66,11 @@ export default function Clientes() {
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-end flex-wrap gap-3">
-        <div><h1>Clientes</h1><p className="text-base text-muted-foreground mt-1">{filtered.length} de {rows.length} clientes</p></div>
+        <div><h1>{t.clientes.title}</h1><p className="text-base text-muted-foreground mt-1">{t.clientes.subtitle(filtered.length, rows.length)}</p></div>
         {canCreate && (
           <Button onClick={() => { setForm({ codigo_erp: "", nombre_comercial: "", telefono: "", direccion: "", activo: true }); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-            <Plus className="h-5 w-5 mr-2"/> Nuevo cliente
+            <Plus className="h-5 w-5 mr-2"/> {t.clientes.nuevo}
           </Button>
         )}
       </div>
@@ -76,7 +78,7 @@ export default function Clientes() {
       <Card className="p-3">
         <div className="relative">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input className="pl-10 h-12 text-base" placeholder="Buscar por código, nombre o teléfono…" value={q} onChange={e => setQ(e.target.value)} />
+          <Input className="pl-10 h-12 text-base" placeholder={t.clientes.buscar} value={q} onChange={e => setQ(e.target.value)} />
         </div>
       </Card>
 
@@ -88,9 +90,9 @@ export default function Clientes() {
             <Card key={c.id} className="p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <div className="text-xs uppercase text-muted-foreground tracking-wide font-medium">Código ERP</div>
+                  <div className="text-xs uppercase text-muted-foreground tracking-wide font-medium">{t.clientes.codigoErp}</div>
                   <div className="text-2xl font-bold text-[#1F3864] truncate">{c.codigo_erp}</div>
-                  <div className="text-sm text-muted-foreground truncate mt-0.5">{c.nombre_comercial || <em>Sin nombre comercial</em>}</div>
+                  <div className="text-sm text-muted-foreground truncate mt-0.5">{c.nombre_comercial || <em>{t.clientes.sinNombre}</em>}</div>
                 </div>
                 {canEdit && (
                   <Button size="icon" variant="ghost" onClick={() => { setForm(c); setEditing(c); }} className="h-10 w-10">
@@ -112,30 +114,30 @@ export default function Clientes() {
                 <div className="text-center p-2 rounded-md bg-[#DBEAFE]">
                   <Bike className="mx-auto mb-1 text-[#1E40AF]" size={20}/>
                   <div className="text-xl font-bold text-[#1E40AF]">{activos}</div>
-                  <div className="text-[11px] text-[#1E40AF] font-medium">Activos</div>
+                  <div className="text-[11px] text-[#1E40AF] font-medium">{t.clientes.activos}</div>
                 </div>
                 <div className="text-center p-2 rounded-md bg-[#EDE9FE]">
                   <Truck className="mx-auto mb-1 text-[#5B21B6]" size={20}/>
                   <div className="text-xl font-bold text-[#5B21B6]">{s.entregados}</div>
-                  <div className="text-[11px] text-[#5B21B6] font-medium">Entregados</div>
+                  <div className="text-[11px] text-[#5B21B6] font-medium">{t.clientes.entregados}</div>
                 </div>
               </div>
             </Card>
           );
         })}
-        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin resultados</div>}
+        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.clientes.sinResultados}</div>}
       </div>
 
       <Dialog open={creating || !!editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); } }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? "Editar cliente" : "Nuevo cliente"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? t.clientes.editar : t.clientes.nuevo}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Código ERP</Label><Input value={form.codigo_erp} onChange={e => setForm({ ...form, codigo_erp: e.target.value })} /></div>
-            <div><Label>Nombre comercial</Label><Input value={form.nombre_comercial || ""} onChange={e => setForm({ ...form, nombre_comercial: e.target.value })} /></div>
-            <div><Label>Teléfono</Label><Input value={form.telefono || ""} onChange={e => setForm({ ...form, telefono: e.target.value })} /></div>
-            <div><Label>Dirección</Label><Input value={form.direccion || ""} onChange={e => setForm({ ...form, direccion: e.target.value })} /></div>
+            <div><Label>{t.clientes.codigoErp}</Label><Input value={form.codigo_erp} onChange={e => setForm({ ...form, codigo_erp: e.target.value })} /></div>
+            <div><Label>{t.clientes.nombreComercial}</Label><Input value={form.nombre_comercial || ""} onChange={e => setForm({ ...form, nombre_comercial: e.target.value })} /></div>
+            <div><Label>{t.clientes.telefono}</Label><Input value={form.telefono || ""} onChange={e => setForm({ ...form, telefono: e.target.value })} /></div>
+            <div><Label>{t.clientes.direccion}</Label><Input value={form.direccion || ""} onChange={e => setForm({ ...form, direccion: e.target.value })} /></div>
           </div>
-          <DialogFooter><Button onClick={save} className="h-12 px-5 text-base">Guardar</Button></DialogFooter>
+          <DialogFooter><Button onClick={save} className="h-12 px-5 text-base">{t.actions.save}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

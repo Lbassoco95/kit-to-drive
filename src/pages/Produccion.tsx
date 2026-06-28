@@ -7,6 +7,7 @@ import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -20,6 +21,7 @@ type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS"
 
 export default function Produccion() {
   const { role } = useAuth();
+  const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<FilterKey>("TODOS");
@@ -56,11 +58,11 @@ export default function Produccion() {
     if (filter === "ATRASADOS" && r._eff !== "ATRASADO") return false;
     if (filter === "ENTREGADOS" && r.estatus_entrega !== "ENTREGADA") return false;
     if (q) {
-      const t = q.toLowerCase();
+      const qLower = q.toLowerCase();
       const blob = [r.orden_armado, r.chasis_asignado, r.ns_chasis, r.ns_motor,
         r.remisiones?.folio_remision, r.remisiones?.clientes?.codigo_erp,
         r.remisiones?.profiles?.nombre_completo].filter(Boolean).join(" ").toLowerCase();
-      if (!blob.includes(t)) return false;
+      if (!blob.includes(qLower)) return false;
     }
     return true;
   }), [rows, q, filter, colorFilter]);
@@ -77,7 +79,7 @@ export default function Produccion() {
   const updateMoto = async (id: string, patch: any) => {
     const { error } = await supabase.from("motocarros").update(patch).eq("id", id);
     if (error) toast.error(error.message);
-    else { toast.success("✓ Actualizado correctamente"); load(); }
+    else { toast.success(t.produccion.toastOk); load(); }
   };
 
   const doConfirm = async () => {
@@ -94,31 +96,31 @@ export default function Produccion() {
   const canEditEntrega = role === "admin" || role === "logistica";
 
   const FILTERS: { key: FilterKey; label: string; }[] = [
-    { key: "TODOS", label: "Todos" },
-    { key: "PENDIENTES", label: "Pendientes" },
-    { key: "ARMADOS", label: "Armados" },
-    { key: "ATRASADOS", label: "Atrasados" },
-    { key: "ENTREGADOS", label: "Entregados" },
+    { key: "TODOS", label: t.produccion.filtros.todos },
+    { key: "PENDIENTES", label: t.produccion.filtros.pendientes },
+    { key: "ARMADOS", label: t.produccion.filtros.armados },
+    { key: "ATRASADOS", label: t.produccion.filtros.atrasados },
+    { key: "ENTREGADOS", label: t.produccion.filtros.entregados },
   ];
 
   return (
     <div className="space-y-5">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1>Producción</h1>
-          <p className="text-muted-foreground text-base mt-1">{filtered.length} de {rows.length} motocarros</p>
+          <h1>{t.produccion.title}</h1>
+          <p className="text-muted-foreground text-base mt-1">{t.produccion.subtitle(filtered.length, rows.length)}</p>
         </div>
         <div className="flex gap-2 items-center">
           <div className="inline-flex rounded-lg border p-1 bg-card">
             <button onClick={() => setView("cards")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "cards" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}>
-              <LayoutGrid size={18}/> Tarjetas
+              <LayoutGrid size={18}/> {t.produccion.vista.tarjetas}
             </button>
             <button onClick={() => setView("tabla")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "tabla" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}>
-              <TableIcon size={18}/> Ver tabla
+              <TableIcon size={18}/> {t.produccion.vista.tabla}
             </button>
           </div>
           {(role === "admin" || role === "fabrica") && <RecibirContenedor onDone={load} />}
-          <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> Exportar CSV</Button>
+          <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> {t.produccion.exportarCsv}</Button>
         </div>
       </div>
 
@@ -144,12 +146,12 @@ export default function Produccion() {
       <Card className="p-3 flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input className="pl-10 h-12 text-base" placeholder="Buscar orden, chasis, NS, remisión…" value={q} onChange={e => setQ(e.target.value)} />
+          <Input className="pl-10 h-12 text-base" placeholder={t.produccion.buscar} value={q} onChange={e => setQ(e.target.value)} />
         </div>
         <div className="inline-flex rounded-lg border p-1 bg-card">
           {(["TODOS","BLANCO","AZUL"] as const).map(c => (
             <button key={c} onClick={() => setColorFilter(c)} className={`px-3 py-2 rounded-md text-sm font-medium ${colorFilter === c ? "bg-[#2E75B6] text-white" : "text-muted-foreground"}`}>
-              {c === "TODOS" ? "Todos los colores" : c}
+              {c === "TODOS" ? t.produccion.filtros.todosColores : c}
             </button>
           ))}
         </div>
@@ -160,17 +162,18 @@ export default function Produccion() {
           {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
             onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "" }); }}
             onAction={(action) => setConfirm({ moto: r, action })}
+            t={t}
           />)}
-          {!filtered.length && <div className="col-span-full text-center text-muted-foreground py-12 bg-card rounded-lg border">Sin resultados</div>}
+          {!filtered.length && <div className="col-span-full text-center text-muted-foreground py-12 bg-card rounded-lg border">{t.produccion.sinResultados}</div>}
         </div>
       ) : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto max-h-[70vh]">
             <table className="data-table">
               <thead><tr>
-                <th>Orden</th><th>Modelo</th><th>Color</th><th>Fecha estimada de armado</th><th>Estatus</th>
-                <th>Fecha real de armado</th><th>Número de serie del chasis</th><th>Número de serie del motor</th><th>Chasis</th>
-                <th>Vendedor</th><th>Cliente</th><th>Remisión</th><th>Fecha estimada de entrega</th><th>Entrega</th>
+                <th>{t.produccion.columna.orden}</th><th>{t.produccion.columna.modelo}</th><th>{t.produccion.columna.color}</th><th>{t.produccion.columna.fechaEstimada}</th><th>{t.produccion.columna.estatus}</th>
+                <th>{t.produccion.columna.fechaReal}</th><th>{t.produccion.columna.ns_chasis}</th><th>{t.produccion.columna.ns_motor}</th><th>{t.produccion.columna.chasis}</th>
+                <th>{t.produccion.columna.vendedor}</th><th>{t.produccion.columna.cliente}</th><th>{t.produccion.columna.remision}</th><th>{t.produccion.columna.fechaEntrega}</th><th>{t.produccion.columna.entrega}</th>
               </tr></thead>
               <tbody>
                 {filtered.map(r => (
@@ -188,7 +191,7 @@ export default function Produccion() {
                     <td>{r.remisiones?.folio_remision || "—"}</td>
                     <td>{fmtDate(r.fecha_estimada_entrega)}</td>
                     <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
-                    <td>{r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado ? <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-bold">🔒 Retenido</span> : "—"}</td>
+                    <td>{r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado ? <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-bold">{t.pago.retenidoCorto}</span> : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -200,13 +203,13 @@ export default function Produccion() {
       {/* Edit modal */}
       <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Editar motocarro #{editing?.orden_armado}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.produccion.editarTitulo(editing?.orden_armado)}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Número de serie del chasis</Label><Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: e.target.value })} /></div>
-            <div><Label>Número de serie del motor</Label><Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: e.target.value })} /></div>
-            <div><Label>Chasis asignado</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
-            <div><Label>Fecha estimada de armado</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
-            <div><Label>Observaciones / paro</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
+            <div><Label>{t.produccion.nsChasis}</Label><Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: e.target.value })} /></div>
+            <div><Label>{t.produccion.nsMot}</Label><Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: e.target.value })} /></div>
+            <div><Label>{t.produccion.chasisAsignado}</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
+            <div><Label>{t.produccion.fechaEstimadaArmado}</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
+            <div><Label>{t.produccion.observaciones}</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
           </div>
           <DialogFooter>
             <Button onClick={async () => {
@@ -214,7 +217,7 @@ export default function Produccion() {
               Object.keys(patch).forEach(k => { if (patch[k] === "") patch[k] = null; });
               await updateMoto(editing.id, patch);
               setEditing(null);
-            }}>Guardar</Button>
+            }}>{t.actions.save}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -223,15 +226,14 @@ export default function Produccion() {
       <AlertDialog open={!!confirm} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Confirmar acción?</AlertDialogTitle>
+            <AlertDialogTitle>{t.produccion.confirmarAccion}</AlertDialogTitle>
             <AlertDialogDescription>
-              Motocarro #{confirm?.moto.orden_armado} se marcará como{" "}
-              <strong>{confirm?.action === "ARMADO" ? "ARMADO" : confirm?.action === "LISTO" ? "LISTO" : "ENTREGADO"}</strong>. Esta acción quedará registrada en bitácora.
+              {t.produccion.confirmarDesc(confirm?.moto.orden_armado, confirm?.action === "ARMADO" ? t.produccion.filtros.armados : confirm?.action === "LISTO" ? t.produccion.filtros.todos : t.produccion.entregado)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={doConfirm}>Sí, confirmar</AlertDialogAction>
+            <AlertDialogCancel>{t.actions.cancel}</AlertDialogCancel>
+            <AlertDialogAction onClick={doConfirm}>{t.produccion.siConfirmar}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -239,7 +241,7 @@ export default function Produccion() {
   );
 }
 
-function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction }: any) {
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, t }: any) {
   const desv = diasDesvio(r);
   const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
   const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
@@ -277,7 +279,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction }: 
           <div className="flex gap-1.5 flex-wrap">
             {r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado && (
               <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-300">
-                🔒 RETENIDO — Pago pendiente
+                {t.pago.retenido}
               </span>
             )}
             {desvLabel && <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${desvCls}`}>{desvLabel}</span>}
@@ -317,33 +319,33 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction }: 
           ))}
         </div>
         <div className="flex justify-between text-[10px] text-muted-foreground -mt-1">
-          <span>Pend.</span><span>Armado</span><span>Listo</span><span>Entreg.</span>
+          <span>{t.produccion.timeline.pend}</span><span>{t.produccion.timeline.armado}</span><span>{t.produccion.timeline.listo}</span><span>{t.produccion.timeline.entreg}</span>
         </div>
 
         <div className="text-xs text-muted-foreground">
-          Estimada armado: <strong className="text-foreground">{fmtDate(r.fecha_estimada_armado)}</strong>
+          {t.produccion.estimadaArmado} <strong className="text-foreground">{fmtDate(r.fecha_estimada_armado)}</strong>
         </div>
       </div>
 
       <div className="border-t p-3 flex gap-2 items-stretch">
         {canEditFabrica && (r._eff === "PENDIENTE" || r._eff === "EN_PROCESO" || r._eff === "ATRASADO") && (
           <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base">
-            <CheckCircle className="h-5 w-5 mr-2" /> Marcar armado
+            <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarArmado}
           </Button>
         )}
         {canEditFabrica && r._eff === "ARMADO" && (
           <Button onClick={() => onAction("LISTO")} className="flex-1 h-12 bg-[#065F46] hover:bg-[#054c38] text-base">
-            <CheckCircle className="h-5 w-5 mr-2" /> Marcar listo
+            <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarListo}
           </Button>
         )}
         {canEditEntrega && r._eff === "LISTO" && r.estatus_entrega !== "ENTREGADA" && (
           <Button onClick={() => onAction("ENTREGADA")} className="flex-1 h-12 bg-[#5B21B6] hover:bg-[#4c1d95] text-base">
-            <TruckIcon className="h-5 w-5 mr-2" /> Marcar entregado
+            <TruckIcon className="h-5 w-5 mr-2" /> {t.produccion.marcarEntregado}
           </Button>
         )}
         {r.estatus_entrega === "ENTREGADA" && (
           <div className="flex-1 h-12 flex items-center justify-center text-[#5B21B6] font-semibold bg-[#EDE9FE] rounded-md">
-            <TruckIcon className="h-5 w-5 mr-2" /> Entregado
+            <TruckIcon className="h-5 w-5 mr-2" /> {t.produccion.entregado}
           </div>
         )}
         {canEditFabrica && (

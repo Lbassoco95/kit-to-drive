@@ -5,12 +5,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { LogOut, Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { ROLE_LABELS } from "@/lib/dazon";
 import { useState } from "react";
+import { useLang } from "@/contexts/LangContext";
 
 export default function AppLayout() {
   const { profileName, role, signOut, user } = useAuth();
   const nav = useNavigate();
+  const { t } = useLang();
   const [q, setQ] = useState("");
 
   return (
@@ -27,24 +28,24 @@ export default function AppLayout() {
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 value={q} onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar orden, chasis, NS, remisión, cliente…"
+                placeholder={t.layout.search}
                 className="pl-8 h-9"
               />
             </form>
             <Button variant="ghost" size="icon"><Bell className="h-4 w-4" /></Button>
             <div className="text-right text-xs leading-tight hidden sm:block">
               <div className="font-semibold text-foreground">{profileName || user?.email}</div>
-              <div className="text-muted-foreground">{role ? ROLE_LABELS[role] : ""}</div>
+              <div className="text-muted-foreground">{role ? t.roles[role] : ""}</div>
             </div>
             <Button variant="outline" size="sm" onClick={async () => { await signOut(); nav("/auth"); }}>
-              <LogOut className="h-4 w-4 mr-1" /> Salir
+              <LogOut className="h-4 w-4 mr-1" /> {t.layout.signOut}
             </Button>
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6 bg-surface">
             <Outlet />
           </main>
           <footer className="text-xs text-muted-foreground text-center py-2 border-t border-border bg-card">
-            Grupo Dazon — Sistema de Control de Producción — Uso interno
+            {t.footer}
           </footer>
         </div>
       </div>

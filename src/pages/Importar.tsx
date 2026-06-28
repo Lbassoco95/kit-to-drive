@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Papa from "papaparse";
 import { toast } from "sonner";
 import { Upload, CheckCircle2 } from "lucide-react";
+import { useLang } from "@/contexts/LangContext";
 
 type Result = { motocarros: number; remisiones: number; clientes: number; vendedores: number; errores: string[] };
 
@@ -29,6 +30,7 @@ const normEntrega = (v: any) => /^entregado$/i.test(String(v ?? "").trim()) ? "E
 export default function Importar() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const { t } = useLang();
 
   const fetchCsv = async (path: string) => {
     const r = await fetch(path); return await r.text();
@@ -139,7 +141,7 @@ export default function Importar() {
         vendedores: vendedorNombres.length,
         errores,
       });
-      toast.success("Importación finalizada");
+      toast.success(t.importar.finalizada);
     } catch (e: any) {
       toast.error(e.message);
       errores.push(String(e));
@@ -152,20 +154,18 @@ export default function Importar() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1>Importar datos iniciales</h1>
-        <p className="text-muted-foreground mt-1">
-          Carga los CSV de producción y remisiones que vienen del Excel actual. La operación es idempotente: registros existentes no se duplican.
-        </p>
+        <h1>{t.importar.title}</h1>
+        <p className="text-muted-foreground mt-1">{t.importar.subtitle}</p>
       </div>
       <Card className="p-6">
         <div className="flex items-center gap-4">
           <Upload className="h-10 w-10 text-secondary" />
           <div className="flex-1">
-            <div className="font-semibold">CSV pre-cargados en el servidor</div>
-            <div className="text-sm text-muted-foreground">produccion_carga_inicial.csv (134 filas) + remisiones_carga_inicial.csv (30 filas)</div>
+            <div className="font-semibold">{t.importar.csvInfo}</div>
+            <div className="text-sm text-muted-foreground">{t.importar.csvDesc}</div>
           </div>
           <Button onClick={importar} disabled={busy} size="lg">
-            {busy ? "Importando…" : "Iniciar importación"}
+            {busy ? t.importar.importando : t.importar.iniciar}
           </Button>
         </div>
       </Card>
@@ -173,17 +173,17 @@ export default function Importar() {
       {result && (
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4 text-success font-semibold">
-            <CheckCircle2 className="h-5 w-5" /> Importación completada
+            <CheckCircle2 className="h-5 w-5" /> {t.importar.completada}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Stat label="Motocarros creados" value={result.motocarros} />
-            <Stat label="Remisiones creadas" value={result.remisiones} />
-            <Stat label="Clientes creados" value={result.clientes} />
-            <Stat label="Vendedores detectados" value={result.vendedores} />
+            <Stat label={t.importar.motocarros} value={result.motocarros} />
+            <Stat label={t.importar.remisiones} value={result.remisiones} />
+            <Stat label={t.importar.clientes} value={result.clientes} />
+            <Stat label={t.importar.vendedores} value={result.vendedores} />
           </div>
           {result.errores.length > 0 && (
             <div className="mt-4">
-              <div className="font-semibold text-destructive mb-2">Avisos / errores:</div>
+              <div className="font-semibold text-destructive mb-2">{t.importar.avisosErrores}</div>
               <ul className="text-xs space-y-1 text-muted-foreground">
                 {result.errores.map((e, i) => <li key={i}>• {e}</li>)}
               </ul>

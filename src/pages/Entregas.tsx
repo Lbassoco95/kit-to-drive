@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLang } from "@/contexts/LangContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { toast } from "sonner";
 type Filter = "PENDIENTES" | "PROGRAMADAS_HOY" | "ENTREGADAS_HOY";
 
 export default function Entregas() {
+  const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [filter, setFilter] = useState<Filter>("PENDIENTES");
   const [scheduling, setScheduling] = useState<any | null>(null);
@@ -31,7 +33,7 @@ export default function Entregas() {
 
   const update = async (id: string, patch: any) => {
     const { error } = await supabase.from("motocarros").update(patch).eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("✓ Actualizado"); load(); }
+    if (error) toast.error(error.message); else { toast.success(t.produccion.toastOk); load(); }
   };
 
   const today = new Date().toISOString().slice(0,10);
@@ -48,14 +50,14 @@ export default function Entregas() {
   }), [rows, filter, today]);
 
   const FILTERS: { key: Filter; label: string }[] = [
-    { key: "PENDIENTES", label: "Pendientes de programar" },
-    { key: "PROGRAMADAS_HOY", label: "Programadas hoy" },
-    { key: "ENTREGADAS_HOY", label: "Entregadas hoy" },
+    { key: "PENDIENTES", label: t.entregas.filtros.pendientes },
+    { key: "PROGRAMADAS_HOY", label: t.entregas.filtros.programadasHoy },
+    { key: "ENTREGADAS_HOY", label: t.entregas.filtros.entregadasHoy },
   ];
 
   return (
     <div className="space-y-5">
-      <div><h1>Entregas</h1><p className="text-muted-foreground text-base mt-1">Gestión de entregas a clientes</p></div>
+      <div><h1>{t.entregas.title}</h1><p className="text-muted-foreground text-base mt-1">{t.entregas.subtitle}</p></div>
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map(f => {
@@ -87,11 +89,11 @@ export default function Entregas() {
               </div>
               <div className="p-4 space-y-2 flex-1">
                 <div className="text-sm">
-                  <div className="text-xs text-muted-foreground">Número de serie del chasis</div>
+                  <div className="text-xs text-muted-foreground">{t.entregas.ns_chasis}</div>
                   <div className="font-mono text-sm">{r.ns_chasis || "—"}</div>
                 </div>
                 <div className="text-sm">
-                  <div className="text-xs text-muted-foreground">Número de serie del motor</div>
+                  <div className="text-xs text-muted-foreground">{t.entregas.ns_motor}</div>
                   <div className="font-mono text-sm">{r.ns_motor || "—"}</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-1">
@@ -99,18 +101,18 @@ export default function Entregas() {
                   <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">📄 {r.remisiones?.folio_remision || "—"}</span>
                   {pagoPendiente && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">
-                      ⚠ Pago pendiente
+                      {t.pago.pendiente}
                     </span>
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground pt-1">Vendedor: <strong className="text-foreground">{r.remisiones?.profiles?.nombre_completo || "—"}</strong></div>
-                {r.fecha_estimada_entrega && <div className="text-xs">Programada: <strong>{fmtDate(r.fecha_estimada_entrega)}</strong></div>}
-                {r.fecha_real_entrega && <div className="text-xs">Entregada: <strong>{fmtDate(r.fecha_real_entrega)}</strong></div>}
+                {r.fecha_estimada_entrega && <div className="text-xs">{t.entregas.fechaEstimada} <strong>{fmtDate(r.fecha_estimada_entrega)}</strong></div>}
+                {r.fecha_real_entrega && <div className="text-xs">{t.entregas.fechaReal} <strong>{fmtDate(r.fecha_real_entrega)}</strong></div>}
               </div>
               <div className="border-t p-3 space-y-2">
                 {pagoPendiente && (
                   <div className="w-full px-3 py-2 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium text-center">
-                    ⚠ El vendedor debe confirmar el pago antes de programar la entrega
+                    {t.pago.vendedorDebeConfirmar}
                   </div>
                 )}
                 {r.estatus_entrega === "NO_APLICA" && (
@@ -119,31 +121,31 @@ export default function Entregas() {
                     onClick={() => { setScheduling(r); setDate(new Date().toISOString().slice(0,10)); }}
                     className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Calendar className="h-5 w-5 mr-2"/> Programar entrega
+                    <Calendar className="h-5 w-5 mr-2"/> {t.entregas.programar}
                   </Button>
                 )}
                 {r.estatus_entrega === "PROGRAMADA" && (
                   <Button onClick={() => update(r.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: today })} className="w-full h-12 text-base bg-[#5B21B6] hover:bg-[#4c1d95]">
-                    <Truck className="h-5 w-5 mr-2"/> Confirmar entrega
+                    <Truck className="h-5 w-5 mr-2"/> {t.entregas.confirmar}
                   </Button>
                 )}
                 {r.estatus_entrega === "ENTREGADA" && (
                   <div className="w-full h-12 flex items-center justify-center text-[#5B21B6] font-semibold bg-[#EDE9FE] rounded-md">
-                    <CheckCircle className="h-5 w-5 mr-2"/> Entregado
+                    <CheckCircle className="h-5 w-5 mr-2"/> {t.entregas.entregado}
                   </div>
                 )}
               </div>
             </Card>
           );
         })}
-        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin resultados en esta vista</div>}
+        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.entregas.sinResultados}</div>}
       </div>
 
       <Dialog open={!!scheduling} onOpenChange={o => { if (!o) setScheduling(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Programar entrega — Chasis {scheduling?.chasis_asignado}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.entregas.dialogTitulo(scheduling?.chasis_asignado)}</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
-            <Label>Fecha estimada de entrega</Label>
+            <Label>{t.entregas.fechaEntrega}</Label>
             <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 text-base" />
           </div>
           <DialogFooter>

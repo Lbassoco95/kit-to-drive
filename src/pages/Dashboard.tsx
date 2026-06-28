@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { ROLE_LABELS, fmtDate, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
+import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
@@ -29,6 +30,7 @@ const KpiCard = ({ label, value, icon: Icon, color, onClick, tooltip }: any) => 
 export default function Dashboard() {
   const { role, user, profileName } = useAuth();
   const nav = useNavigate();
+  const { t } = useLang();
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export default function Dashboard() {
     })();
   }, [user]);
 
-  if (!data) return <div className="text-muted-foreground p-8">Cargando KPIs…</div>;
+  if (!data) return <div className="text-muted-foreground p-8">{t.dashboard.cargando}</div>;
 
   const motos: any[] = data.motos;
   const rems: any[] = data.rems;
@@ -90,31 +92,31 @@ export default function Dashboard() {
     }, []);
 
   const isVendedor = role === "ventas";
-  const greeting = `Hola, ${profileName || "usuario"} — ${role ? ROLE_LABELS[role] : ""}`;
+  const greeting = t.dashboard.greeting(profileName || "usuario", role ? t.roles[role] : "");
 
   return (
     <div className="space-y-6">
       <div>
-        <h1>Dashboard</h1>
+        <h1>{t.dashboard.title}</h1>
         <p className="text-muted-foreground text-base mt-1">{greeting}</p>
       </div>
 
       {role === "admin" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <KpiCard label="Programadas" value={total} icon={BarChart3} color="#1F3864" tooltip="Total de motocarros en plan" onClick={() => nav("/produccion")} />
-            <KpiCard label="Armadas" value={armados} icon={CheckCircle} color="#065F46" tooltip="Armados o listos" onClick={() => nav("/produccion")} />
-            <KpiCard label="Pendientes" value={pendientes} icon={Clock} color="#6B7280" tooltip="Aún por armar" onClick={() => nav("/produccion")} />
-            <KpiCard label="Atrasadas" value={atrasados.length} icon={AlertTriangle} color="#991B1B" tooltip="Pasadas de fecha estimada" onClick={() => nav("/produccion")} />
-            <KpiCard label="Entregadas" value={entregados} icon={Truck} color="#5B21B6" tooltip="Entregadas a cliente" onClick={() => nav("/entregas")} />
-            <KpiCard label="% Avance" value={`${avance}%`} icon={BarChart3} color="#2E75B6" tooltip="Armados / total" />
+            <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="#1F3864" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
+            <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" tooltip={t.dashboard.tooltips.armadosLisots} onClick={() => nav("/produccion")} />
+            <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" tooltip={t.dashboard.tooltips.porArmar} onClick={() => nav("/produccion")} />
+            <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" tooltip={t.dashboard.tooltips.pasadosFecha} onClick={() => nav("/produccion")} />
+            <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={Truck} color="#5B21B6" tooltip={t.dashboard.tooltips.entregadosCliente} onClick={() => nav("/entregas")} />
+            <KpiCard label={t.dashboard.kpi.avance} value={`${avance}%`} icon={BarChart3} color="#2E75B6" tooltip={t.dashboard.tooltips.armadosTotal} />
           </div>
 
           {/* Capacidad de hoy */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-3">
-              <h3>Capacidad de hoy</h3>
-              <div className="text-2xl font-bold" style={{ color: capColor }}>{armadosHoy} de {CAPACIDAD} motocarros armados hoy</div>
+              <h3>{t.dashboard.capacidad.title}</h3>
+              <div className="text-2xl font-bold" style={{ color: capColor }}>{t.dashboard.capacidad.armadosHoy(armadosHoy, CAPACIDAD)}</div>
             </div>
             <div className="h-6 rounded-full bg-slate-100 overflow-hidden">
               <div className="h-full rounded-full transition-all" style={{ width: `${capPct}%`, backgroundColor: capColor }} />
@@ -143,16 +145,16 @@ export default function Dashboard() {
             <Card className="p-6 border-2 border-[#FEE2E2]" style={{ background: "#FEF2F2" }}>
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="text-[#991B1B]" size={28} />
-                <h3 className="!text-[#991B1B]">Motocarros atrasados ({atrasados.length})</h3>
+                <h3 className="!text-[#991B1B]">{t.dashboard.atrasados(atrasados.length)}</h3>
               </div>
               <div className="grid md:grid-cols-2 gap-2">
                 {atrasados.slice(0, 8).map(m => (
                   <button key={m.id} onClick={() => nav("/produccion")} className="text-left p-3 bg-white rounded-md border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
                     <div>
                       <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {m.modelo} {m.color}</div>
-                      <div className="text-xs text-muted-foreground">Estimada: {fmtDate(m.fecha_estimada_armado)}</div>
+                      <div className="text-xs text-muted-foreground">{t.dashboard.fechaEstimada}: {fmtDate(m.fecha_estimada_armado)}</div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">+{diasDesvio(m)}d</span>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">{t.dashboard.diasAtraso(diasDesvio(m) ?? 0)}</span>
                   </button>
                 ))}
               </div>
@@ -160,7 +162,7 @@ export default function Dashboard() {
           )}
 
           <Card className="p-6">
-            <h3 className="mb-4">Plan vs Real (acumulado)</h3>
+            <h3 className="mb-4">{t.dashboard.planVsReal}</h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series}>
@@ -177,15 +179,15 @@ export default function Dashboard() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="p-6">
-              <h3 className="mb-4 flex items-center gap-2"><Users size={22}/> Top vendedores</h3>
+              <h3 className="mb-4 flex items-center gap-2"><Users size={22}/> {t.dashboard.topVendedores}</h3>
               <TopVendedores rems={rems} />
             </Card>
             <Card className="p-6">
-              <h3 className="mb-4">Resumen rápido</h3>
+              <h3 className="mb-4">{t.dashboard.resumenRapido}</h3>
               <ul className="text-base space-y-3">
-                <li className="flex items-center gap-2"><Truck className="text-[#5B21B6]" size={20}/> {listosEntrega} listos para entregar</li>
-                <li className="flex items-center gap-2"><BarChart3 className="text-[#1F3864]" size={20}/> {rems.filter(r => r.estatus === "PARCIAL").length} remisiones parciales</li>
-                <li className="flex items-center gap-2"><CheckCircle className="text-[#065F46]" size={20}/> {rems.filter(r => r.estatus === "COMPLETA").length} remisiones completas</li>
+                <li className="flex items-center gap-2"><Truck className="text-[#5B21B6]" size={20}/> {t.dashboard.listosParaEntregar(listosEntrega)}</li>
+                <li className="flex items-center gap-2"><BarChart3 className="text-[#1F3864]" size={20}/> {t.dashboard.remisionesParciales(rems.filter(r => r.estatus === "PARCIAL").length)}</li>
+                <li className="flex items-center gap-2"><CheckCircle className="text-[#065F46]" size={20}/> {t.dashboard.remisionesCompletas(rems.filter(r => r.estatus === "COMPLETA").length)}</li>
               </ul>
             </Card>
           </div>
@@ -195,33 +197,33 @@ export default function Dashboard() {
       {role === "fabrica" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <KpiCard label="Pendientes" value={pendientes} icon={Clock} color="#6B7280" />
-            <KpiCard label="Armadas" value={armados} icon={CheckCircle} color="#065F46" />
-            <KpiCard label="Atrasadas" value={atrasados.length} icon={AlertTriangle} color="#991B1B" />
-            <KpiCard label="Capacidad diaria" value={CAPACIDAD} icon={Factory} color="#1F3864" />
+            <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" />
+            <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" />
+            <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" />
+            <KpiCard label={t.dashboard.kpi.capacidadDiaria} value={CAPACIDAD} icon={Factory} color="#1F3864" />
           </div>
           <Card className="p-6">
-            <h3 className="mb-3">Próximas 10 órdenes a armar</h3>
-            <ProximasOrdenes motos={motos} />
+            <h3 className="mb-3">{t.dashboard.proximasOrdenes}</h3>
+            <ProximasOrdenes motos={motos} t={t} />
           </Card>
         </>
       )}
 
       {role === "logistica" && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard label="Listos para entrega" value={listosEntrega} icon={Truck} color="#1F3864" onClick={() => nav("/entregas")} />
-          <KpiCard label="En ruta" value={motos.filter(m => m.estatus_entrega === "EN_RUTA").length} icon={Truck} color="#92400E" />
-          <KpiCard label="Programadas" value={motos.filter(m => m.estatus_entrega === "PROGRAMADA").length} icon={BarChart3} color="#2E75B6" />
-          <KpiCard label="Entregadas" value={entregados} icon={CheckCircle} color="#5B21B6" />
+          <KpiCard label={t.dashboard.kpi.listosEntrega} value={listosEntrega} icon={Truck} color="#1F3864" onClick={() => nav("/entregas")} />
+          <KpiCard label={t.dashboard.kpi.enRuta} value={motos.filter(m => m.estatus_entrega === "EN_RUTA").length} icon={Truck} color="#92400E" />
+          <KpiCard label={t.dashboard.kpi.programadasHoy} value={motos.filter(m => m.estatus_entrega === "PROGRAMADA").length} icon={BarChart3} color="#2E75B6" />
+          <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
       )}
 
       {isVendedor && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard label="Mis remisiones" value={rems.length} icon={BarChart3} color="#1F3864" onClick={() => nav("/remisiones")} />
-          <KpiCard label="Unidades asignadas" value={motos.filter(m => m.remision_id).length} icon={Bike} color="#2E75B6" onClick={() => nav("/mis-motocarros")} />
-          <KpiCard label="Listas para entrega" value={listosEntrega} icon={Truck} color="#065F46" />
-          <KpiCard label="Entregadas" value={entregados} icon={CheckCircle} color="#5B21B6" />
+          <KpiCard label={t.dashboard.kpi.misRemisiones} value={rems.length} icon={BarChart3} color="#1F3864" onClick={() => nav("/remisiones")} />
+          <KpiCard label={t.dashboard.kpi.unidadesAsignadas} value={motos.filter(m => m.remision_id).length} icon={Bike} color="#2E75B6" onClick={() => nav("/mis-motocarros")} />
+          <KpiCard label={t.dashboard.kpi.listasEntrega} value={listosEntrega} icon={Truck} color="#065F46" />
+          <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
       )}
     </div>
@@ -259,15 +261,15 @@ function TopVendedores({ rems }: { rems: any[] }) {
   );
 }
 
-function ProximasOrdenes({ motos }: { motos: any[] }) {
+function ProximasOrdenes({ motos, t }: { motos: any[]; t: any }) {
   const proximas = motos
     .filter(m => m._eff === "PENDIENTE" || m._eff === "EN_PROCESO" || m._eff === "ATRASADO")
     .sort((a, b) => (a.orden_armado - b.orden_armado))
     .slice(0, 10);
-  if (!proximas.length) return <div className="text-sm text-muted-foreground">No hay órdenes pendientes 🎉</div>;
+  if (!proximas.length) return <div className="text-sm text-muted-foreground">{t.dashboard.sinOrdenes}</div>;
   return (
     <table className="data-table">
-      <thead><tr><th>Orden</th><th>Modelo</th><th>Color</th><th>Fecha estimada</th><th>Estatus</th></tr></thead>
+      <thead><tr><th>{t.fields.orden}</th><th>{t.fields.modelo}</th><th>{t.fields.color}</th><th>{t.dashboard.fechaEstimada}</th><th>{t.fields.estatus}</th></tr></thead>
       <tbody>
         {proximas.map(m => (
           <tr key={m.id}>

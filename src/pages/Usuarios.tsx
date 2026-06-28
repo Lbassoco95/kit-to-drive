@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
-import { ROLE_LABELS } from "@/lib/dazon";
+import { useLang } from "@/contexts/LangContext";
 
 export default function Usuarios() {
   const [rows, setRows] = useState<any[]>([]);
+  const { t } = useLang();
+
   useEffect(() => {
     (async () => {
       const { data: profiles } = await supabase.from("profiles").select("*");
@@ -13,17 +15,23 @@ export default function Usuarios() {
       setRows(merged);
     })();
   }, []);
+
   return (
     <div className="space-y-4">
-      <h1>Usuarios</h1>
+      <h1>{t.usuarios.title}</h1>
       <Card className="overflow-hidden"><div className="overflow-x-auto"><table className="data-table">
-        <thead><tr><th>Nombre</th><th>Código vendedor</th><th>Rol</th><th>Activo</th></tr></thead>
+        <thead><tr>
+          <th>{t.usuarios.nombre}</th>
+          <th>{t.usuarios.codigoVendedor}</th>
+          <th>{t.usuarios.rol}</th>
+          <th>{t.usuarios.activo}</th>
+        </tr></thead>
         <tbody>
           {rows.map(u => <tr key={u.id}>
             <td>{u.nombre_completo}</td>
             <td>{u.codigo_vendedor || "—"}</td>
-            <td>{u.role ? ROLE_LABELS[u.role] : "—"}</td>
-            <td>{u.activo ? "Sí" : "No"}</td>
+            <td>{u.role ? t.roles[u.role as keyof typeof t.roles] : "—"}</td>
+            <td>{u.activo ? t.usuarios.si : t.usuarios.no}</td>
           </tr>)}
         </tbody>
       </table></div></Card>

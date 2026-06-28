@@ -5,29 +5,33 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth, AppRole } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 
-type Item = { title: string; url: string; icon: any; roles: AppRole[]; group: "Operación" | "Catálogos" | "Sistema" | "Inicio" };
+type Group = "Inicio" | "Operación" | "Catálogos" | "Sistema";
+
+type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; icon: any; roles: AppRole[]; group: Group };
 
 const ITEMS: Item[] = [
-  { title: "Dashboard",     url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Inicio" },
-  { title: "Producción",    url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
-  { title: "Remisiones",    url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Operación" },
-  { title: "Entregas",      url: "/entregas",      icon: Truck,           roles: ["admin","logistica","coordinador"],                    group: "Operación" },
-  { title: "Mis Motocarros",url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin","coordinador"],                       group: "Catálogos" },
-  { title: "Clientes",      url: "/clientes",      icon: Users,           roles: ["admin","fabrica","coordinador"],                      group: "Catálogos" },
-  { title: "Importar datos",url: "/importar",      icon: Upload,          roles: ["admin"],                                              group: "Sistema" },
-  { title: "Usuarios",      url: "/usuarios",      icon: Database,        roles: ["admin"],                                              group: "Sistema" },
-  { title: "Bitácora",      url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                              group: "Sistema" },
-  { title: "Configuración", url: "/configuracion", icon: Settings,        roles: ["admin"],                                              group: "Sistema" },
+  { key: "dashboard",      url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Inicio" },
+  { key: "produccion",     url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
+  { key: "remisiones",     url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Operación" },
+  { key: "entregas",       url: "/entregas",      icon: Truck,           roles: ["admin","logistica","coordinador"],                    group: "Operación" },
+  { key: "misMotocarros",  url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin","coordinador"],                       group: "Catálogos" },
+  { key: "clientes",       url: "/clientes",      icon: Users,           roles: ["admin","fabrica","coordinador"],                      group: "Catálogos" },
+  { key: "importar",       url: "/importar",      icon: Upload,          roles: ["admin"],                                              group: "Sistema" },
+  { key: "usuarios",       url: "/usuarios",      icon: Database,        roles: ["admin"],                                              group: "Sistema" },
+  { key: "bitacora",       url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                              group: "Sistema" },
+  { key: "configuracion",  url: "/configuracion", icon: Settings,        roles: ["admin"],                                              group: "Sistema" },
 ];
 
-const GROUPS: Array<Item["group"]> = ["Inicio", "Operación", "Catálogos", "Sistema"];
+const GROUPS: Group[] = ["Inicio", "Operación", "Catálogos", "Sistema"];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
   const { role } = useAuth();
+  const { t, toggleLang } = useLang();
   const items = ITEMS.filter(i => role && i.roles.includes(role));
 
   return (
@@ -37,7 +41,7 @@ export function AppSidebar() {
           <div className="text-white font-extrabold text-xl leading-tight tracking-wide">
             {collapsed ? "GD" : "GRUPO DAZON"}
           </div>
-          {!collapsed && <div className="text-xs text-white/70 mt-0.5">Control de Producción</div>}
+          {!collapsed && <div className="text-xs text-white/70 mt-0.5">{t.subtitle}</div>}
         </div>
         {GROUPS.map(g => {
           const list = items.filter(i => i.group === g);
@@ -46,7 +50,7 @@ export function AppSidebar() {
             <SidebarGroup key={g}>
               {!collapsed && g !== "Inicio" && (
                 <SidebarGroupLabel className="text-white/50 uppercase text-[11px] tracking-widest px-3 pt-3">
-                  {g}
+                  {t.groups[g]}
                 </SidebarGroupLabel>
               )}
               <SidebarGroupContent>
@@ -63,7 +67,7 @@ export function AppSidebar() {
                           >
                             {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-white" />}
                             <item.icon size={28} strokeWidth={active ? 2.4 : 2} className="shrink-0" />
-                            {!collapsed && <span className="text-[15px]">{item.title}</span>}
+                            {!collapsed && <span className="text-[15px]">{t.nav[item.key]}</span>}
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -74,6 +78,24 @@ export function AppSidebar() {
             </SidebarGroup>
           );
         })}
+
+        {/* Language toggle at the bottom */}
+        <div className={`mt-auto p-3 border-t border-white/10 ${collapsed ? "flex justify-center" : ""}`}>
+          <button
+            onClick={toggleLang}
+            className="flex items-center gap-2 px-3 py-2 rounded-md text-white/80 hover:bg-white/10 hover:text-white transition-all text-sm font-medium w-full"
+            title={collapsed ? t.otherLang : undefined}
+          >
+            <span className="text-lg leading-none">🌐</span>
+            {!collapsed && (
+              <span className="flex items-center gap-1">
+                <span className="font-bold text-white">{t.langLabel}</span>
+                <span className="text-white/40 mx-1">|</span>
+                <span className="text-white/60">{t.otherLang}</span>
+              </span>
+            )}
+          </button>
+        </div>
       </SidebarContent>
     </Sidebar>
   );
