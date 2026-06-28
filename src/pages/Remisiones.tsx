@@ -11,7 +11,7 @@ import { fmtDate, normColor, effEstatusArmado } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck } from "lucide-react";
+import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck, DollarSign } from "lucide-react";
 
 // Sugiere el siguiente folio incrementando el sufijo numérico del último
 function suggestNextFolio(folios: string[]): string {
@@ -36,7 +36,7 @@ export default function Remisiones() {
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp: "", nombre_comercial: "", telefono: "" });
-  const [form, setForm] = useState<any>({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "" });
+  const [form, setForm] = useState<any>({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "", tipo_pago: "anticipado", pagado: true });
 
   const loadClientes = async () => {
     const { data } = await supabase.from("clientes").select("id, codigo_erp, nombre_comercial").order("codigo_erp");
@@ -84,7 +84,7 @@ export default function Remisiones() {
     if (error) return toast.error(error.message);
     toast.success("✓ Remisión creada");
     setOpen(false);
-    setForm({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "" });
+    setForm({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "", tipo_pago: "anticipado", pagado: true });
     load();
   };
 
@@ -108,6 +108,13 @@ export default function Remisiones() {
   const verPdf = async (path: string) => {
     const { data } = await supabase.storage.from("remisiones-docs").createSignedUrl(path, 60);
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+  };
+
+  const marcarPagado = async (r: any) => {
+    const { error } = await supabase.from("remisiones").update({ pagado: true }).eq("id", r.id);
+    if (error) return toast.error(error.message);
+    toast.success("✓ Remisión marcada como pagada");
+    load();
   };
 
   return (
@@ -176,6 +183,19 @@ export default function Remisiones() {
                   </div>
                 </div>
                 <div><Label>Fecha</Label><Input type="date" value={form.fecha_remision} onChange={e => setForm({ ...form, fecha_remision: e.target.value })} className="h-12 text-base" /></div>
+                <div>
+                  <Label>Tipo de pago</Label>
+                  <Select value={form.tipo_pago} onValueChange={v => setForm({ ...form, tipo_pago: v, pagado: v === "anticipado" })}>
+                    <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="anticipado">Anticipado (ya pagó)</SelectItem>
+                      <SelectItem value="contra_entrega">Contra entrega (paga al recibir)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.tipo_pago === "contra_entrega" && (
+                    <p className="text-xs text-amber-600 mt-1">⚠ Logística no podrá programar la entrega hasta que se confirme el pago.</p>
+                  )}
+                </div>
                 <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} className="h-12 text-base" /></div>
               </div>
               <DialogFooter><Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Crear remisión</Button></DialogFooter>
@@ -221,6 +241,15 @@ export default function Remisiones() {
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
                   🎨 {r.color_solicitado || "—"}
                 </span>
+                {r.tipo_pago === "contra_entrega" && !r.pagado ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">
+                    ⚠ Pago pendiente
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                    <DollarSign className="h-3 w-3" /> {r.tipo_pago === "contra_entrega" ? "Contra entrega — Pagado" : "Anticipo pagado"}
+                  </span>
+                )}
               </div>
 
               <div>
@@ -269,6 +298,11 @@ export default function Remisiones() {
                   <div className="flex-1 h-12 flex items-center justify-center text-muted-foreground text-sm">
                     <FileText className="h-5 w-5 mr-2 opacity-40" /> Sin PDF
                   </div>
+                )}
+                {r.tipo_pago === "contra_entrega" && !r.pagado && (role === "admin" || role === "coordinador" || (role === "ventas" && r.vendedor_id === user?.id)) && (
+                  <Button onClick={() => marcarPagado(r)} className="flex-1 h-12 text-base bg-emerald-600 hover:bg-emerald-700">
+                    <DollarSign className="h-5 w-5 mr-2" /> Marcar pagado
+                  </Button>
                 )}
               </div>
             </Card>

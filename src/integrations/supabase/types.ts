@@ -284,6 +284,8 @@ export type Database = {
           id: string
           modelo_solicitado: string | null
           notas: string | null
+          pagado: boolean
+          tipo_pago: string
           total_unidades_solicitadas: number
           updated_at: string
           vendedor_id: string | null
@@ -299,6 +301,8 @@ export type Database = {
           id?: string
           modelo_solicitado?: string | null
           notas?: string | null
+          pagado?: boolean
+          tipo_pago?: string
           total_unidades_solicitadas?: number
           updated_at?: string
           vendedor_id?: string | null
@@ -314,6 +318,8 @@ export type Database = {
           id?: string
           modelo_solicitado?: string | null
           notas?: string | null
+          pagado?: boolean
+          tipo_pago?: string
           total_unidades_solicitadas?: number
           updated_at?: string
           vendedor_id?: string | null
