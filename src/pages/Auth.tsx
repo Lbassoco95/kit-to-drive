@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ export default function Auth() {
   const nav = useNavigate();
   const { user } = useAuth();
   const { t, toggleLang } = useLang();
+  const devMode = useMemo(() => new URLSearchParams(window.location.search).get("dev") === "1", []);
 
   useEffect(() => { if (user) nav("/"); }, [user, nav]);
 
@@ -71,7 +72,7 @@ export default function Auth() {
             {busy ? t.auth.signingIn : t.auth.signIn}
           </Button>
         </form>
-        <div className="mt-8 pt-6 border-t">
+        {devMode && <div className="mt-8 pt-6 border-t">
           <p className="text-sm text-muted-foreground mb-3 text-center">{t.auth.quickAccess}</p>
           <div className="grid grid-cols-2 gap-3">
             {DEMO_ROLES.map(d => (
@@ -88,7 +89,7 @@ export default function Auth() {
             ))}
           </div>
           <p className="text-[11px] text-muted-foreground mt-4 text-center">{t.auth.demoPassword} <code>Dazon2026!</code></p>
-        </div>
+        </div>}
       </Card>
     </div>
   );
