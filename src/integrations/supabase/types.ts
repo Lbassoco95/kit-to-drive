@@ -284,6 +284,7 @@ export type Database = {
           id: string
           modelo_solicitado: string | null
           notas: string | null
+          comprobante_pago_url: string | null
           pagado: boolean
           tipo_pago: string
           total_unidades_solicitadas: number
@@ -293,6 +294,7 @@ export type Database = {
         Insert: {
           cliente_id?: string | null
           color_solicitado?: string | null
+          comprobante_pago_url?: string | null
           created_at?: string
           documento_url?: string | null
           estatus?: Database["public"]["Enums"]["estatus_remision"]
@@ -310,6 +312,7 @@ export type Database = {
         Update: {
           cliente_id?: string | null
           color_solicitado?: string | null
+          comprobante_pago_url?: string | null
           created_at?: string
           documento_url?: string | null
           estatus?: Database["public"]["Enums"]["estatus_remision"]

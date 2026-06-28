@@ -18,7 +18,7 @@ export default function MisMotocarros() {
     (async () => {
       const { data } = await supabase
         .from("motocarros")
-        .select("*, remisiones!inner(folio_remision, clientes(id, codigo_erp, nombre_comercial))")
+        .select("*, remisiones!inner(folio_remision, tipo_pago, pagado, clientes(id, codigo_erp, nombre_comercial))")
         .order("orden_armado");
       setRows((data ?? []).map((r: any) => ({ ...r, color: normColor(r.color) })));
     })();
@@ -88,8 +88,11 @@ export default function MisMotocarros() {
                           </div>
                         </div>
                         <div className="text-xs font-mono text-muted-foreground truncate">{r.ns_chasis || r.chasis_asignado || "Sin NS"}</div>
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <EstatusBadge estatus={r.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : effEstatusArmado(r)} size="sm" />
+                          {r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">🔒 Retenido</span>
+                          )}
                           <Button size="sm" variant="outline" onClick={() => setDetail(r)} className="h-9">Ver detalle</Button>
                         </div>
                       </div>
@@ -116,8 +119,17 @@ export default function MisMotocarros() {
               <Row k="Remisión" v={detail.remisiones?.folio_remision}/>
               <Row k="Fecha estimada de armado" v={fmtDate(detail.fecha_estimada_armado)}/>
               <Row k="Fecha real de armado" v={fmtDate(detail.fecha_real_armado)}/>
-              <Row k="Fecha estimada de entrega" v={fmtDate(detail.fecha_estimada_entrega)}/>
-              <Row k="Fecha real de entrega" v={fmtDate(detail.fecha_real_entrega)}/>
+              {detail.remisiones?.tipo_pago === "contra_entrega" && !detail.remisiones?.pagado ? (
+                <div className="flex justify-between gap-4 border-b pb-1.5">
+                  <span className="text-muted-foreground">Entrega</span>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-xs font-bold">🔒 Retenido — pago pendiente</span>
+                </div>
+              ) : (
+                <>
+                  <Row k="Fecha estimada de entrega" v={fmtDate(detail.fecha_estimada_entrega)}/>
+                  <Row k="Fecha real de entrega" v={fmtDate(detail.fecha_real_entrega)}/>
+                </>
+              )}
               <div className="flex gap-2 pt-2">
                 <EstatusBadge estatus={effEstatusArmado(detail)} />
                 <EstatusBadge estatus={detail.estatus_entrega} />

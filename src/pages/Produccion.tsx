@@ -32,7 +32,7 @@ export default function Produccion() {
   const load = async () => {
     const { data } = await supabase
       .from("motocarros")
-      .select("*, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo, codigo_vendedor), clientes(codigo_erp))")
+      .select("*, remisiones(folio_remision, tipo_pago, pagado, vendedor_id, profiles:vendedor_id(nombre_completo, codigo_vendedor), clientes(codigo_erp))")
       .order("orden_armado", { ascending: true });
     setRows((data ?? []).map((r: any) => ({ ...r, color: normColor(r.color), _eff: effEstatusArmado(r) })));
   };
@@ -188,6 +188,7 @@ export default function Produccion() {
                     <td>{r.remisiones?.folio_remision || "—"}</td>
                     <td>{fmtDate(r.fecha_estimada_entrega)}</td>
                     <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
+                    <td>{r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado ? <span className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-bold">🔒 Retenido</span> : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -273,7 +274,14 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction }: 
       <div className="p-4 space-y-3 flex-1">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <EstatusBadge estatus={r.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : r._eff} size="md" />
-          {desvLabel && <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${desvCls}`}>{desvLabel}</span>}
+          <div className="flex gap-1.5 flex-wrap">
+            {r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-300">
+                🔒 RETENIDO — Pago pendiente
+              </span>
+            )}
+            {desvLabel && <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${desvCls}`}>{desvLabel}</span>}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-1.5 text-xs">

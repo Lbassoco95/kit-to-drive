@@ -11,7 +11,7 @@ import { fmtDate, normColor, effEstatusArmado } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck, DollarSign } from "lucide-react";
+import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck, DollarSign, ImageIcon } from "lucide-react";
 
 // Sugiere el siguiente folio incrementando el sufijo numérico del último
 function suggestNextFolio(folios: string[]): string {
@@ -37,6 +37,10 @@ export default function Remisiones() {
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp: "", nombre_comercial: "", telefono: "" });
   const [form, setForm] = useState<any>({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "", tipo_pago: "anticipado", pagado: true });
+  const [formFile, setFormFile] = useState<File | null>(null);
+  const [pagoDialog, setPagoDialog] = useState<any | null>(null);
+  const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
+  const [subiendoPago, setSubiendoPago] = useState(false);
 
   const loadClientes = async () => {
     const { data } = await supabase.from("clientes").select("id, codigo_erp, nombre_comercial").order("codigo_erp");
@@ -80,10 +84,17 @@ export default function Remisiones() {
       toast.error("Ese folio ya existe en tus remisiones recientes"); return;
     }
     const payload = { ...form, folio_remision: form.folio_remision.trim(), vendedor_id: user?.id, total_unidades_solicitadas: Number(form.total_unidades_solicitadas) || 1 };
-    const { error } = await supabase.from("remisiones").insert(payload);
+    const { data: nueva, error } = await supabase.from("remisiones").insert(payload).select("id").single();
     if (error) return toast.error(error.message);
+    // Si hay archivo adjunto, subirlo
+    if (formFile && nueva?.id) {
+      const path = `${nueva.id}/${Date.now()}_${formFile.name}`;
+      const { error: upErr } = await supabase.storage.from("remisiones-docs").upload(path, formFile);
+      if (!upErr) await supabase.from("remisiones").update({ documento_url: path }).eq("id", nueva.id);
+    }
     toast.success("✓ Remisión creada");
     setOpen(false);
+    setFormFile(null);
     setForm({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "", tipo_pago: "anticipado", pagado: true });
     load();
   };
@@ -110,11 +121,25 @@ export default function Remisiones() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
-  const marcarPagado = async (r: any) => {
-    const { error } = await supabase.from("remisiones").update({ pagado: true }).eq("id", r.id);
+  const confirmarPago = async () => {
+    if (!pagoDialog) return;
+    if (!comprobanteFile) { toast.error("Debes subir el comprobante de pago (foto o PDF con sello)"); return; }
+    setSubiendoPago(true);
+    const path = `${pagoDialog.id}/comprobante_${Date.now()}_${comprobanteFile.name}`;
+    const { error: upErr } = await supabase.storage.from("remisiones-docs").upload(path, comprobanteFile);
+    if (upErr) { setSubiendoPago(false); return toast.error(upErr.message); }
+    const { error } = await supabase.from("remisiones").update({ pagado: true, comprobante_pago_url: path }).eq("id", pagoDialog.id);
+    setSubiendoPago(false);
     if (error) return toast.error(error.message);
-    toast.success("✓ Remisión marcada como pagada");
+    toast.success("✓ Pago confirmado — logística puede programar la entrega");
+    setPagoDialog(null);
+    setComprobanteFile(null);
     load();
+  };
+
+  const verComprobante = async (path: string) => {
+    const { data } = await supabase.storage.from("remisiones-docs").createSignedUrl(path, 60);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
   return (
@@ -197,6 +222,14 @@ export default function Remisiones() {
                   )}
                 </div>
                 <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} className="h-12 text-base" /></div>
+                <div>
+                  <Label>Foto / PDF de la remisión en papel <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                  <label className="mt-1 flex items-center justify-center cursor-pointer h-12 rounded-md border-2 border-dashed border-slate-300 hover:border-[#2E75B6] hover:bg-[#DBEAFE]/30 text-sm text-muted-foreground gap-2">
+                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setFormFile(e.target.files?.[0] ?? null)} />
+                    <ImageIcon className="h-4 w-4" />
+                    {formFile ? <span className="text-[#1F3864] font-medium truncate max-w-[200px]">{formFile.name}</span> : "Subir foto o PDF"}
+                  </label>
+                </div>
               </div>
               <DialogFooter><Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Crear remisión</Button></DialogFooter>
             </DialogContent>
@@ -300,8 +333,13 @@ export default function Remisiones() {
                   </div>
                 )}
                 {r.tipo_pago === "contra_entrega" && !r.pagado && (role === "admin" || role === "coordinador" || (role === "ventas" && r.vendedor_id === user?.id)) && (
-                  <Button onClick={() => marcarPagado(r)} className="flex-1 h-12 text-base bg-emerald-600 hover:bg-emerald-700">
-                    <DollarSign className="h-5 w-5 mr-2" /> Marcar pagado
+                  <Button onClick={() => { setPagoDialog(r); setComprobanteFile(null); }} className="flex-1 h-12 text-base bg-emerald-600 hover:bg-emerald-700">
+                    <DollarSign className="h-5 w-5 mr-2" /> Confirmar pago
+                  </Button>
+                )}
+                {r.tipo_pago === "contra_entrega" && r.pagado && r.comprobante_pago_url && (
+                  <Button variant="outline" onClick={() => verComprobante(r.comprobante_pago_url)} className="flex-1 h-12 text-base">
+                    <FileDown className="h-5 w-5 mr-2" /> Ver comprobante
                   </Button>
                 )}
               </div>
@@ -310,6 +348,33 @@ export default function Remisiones() {
         })}
         {!rows.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones</div>}
       </div>
+
+      {/* Dialog: confirmar pago con comprobante */}
+      <Dialog open={!!pagoDialog} onOpenChange={o => { if (!o) { setPagoDialog(null); setComprobanteFile(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Confirmar pago — {pagoDialog?.folio_remision}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Sube la foto o PDF de la remisión <strong>con sello de pagado</strong>. Sin comprobante no se puede liberar para entrega.
+            </p>
+            <label className="flex flex-col items-center justify-center cursor-pointer h-28 rounded-md border-2 border-dashed border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50 gap-2 text-sm text-muted-foreground">
+              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setComprobanteFile(e.target.files?.[0] ?? null)} />
+              <ImageIcon className="h-8 w-8 text-emerald-400" />
+              {comprobanteFile
+                ? <span className="text-emerald-700 font-medium truncate max-w-[220px]">{comprobanteFile.name}</span>
+                : <span>Toca para subir foto o PDF de pago</span>}
+            </label>
+            {comprobanteFile && <p className="text-xs text-emerald-600 font-medium text-center">✓ Archivo listo — confirma para liberar a logística</p>}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => { setPagoDialog(null); setComprobanteFile(null); }}>Cancelar</Button>
+            <Button onClick={confirmarPago} disabled={!comprobanteFile || subiendoPago} className="bg-emerald-600 hover:bg-emerald-700">
+              <DollarSign className="h-4 w-4 mr-2" />
+              {subiendoPago ? "Subiendo..." : "Confirmar pago"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
