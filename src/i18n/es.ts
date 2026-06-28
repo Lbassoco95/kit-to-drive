@@ -325,7 +325,6 @@ export const es = {
     ns_motor: "Número de serie del motor",
     remision: "Remisión",
   },
-};
 
   // Usuarios
   usuarios: {
