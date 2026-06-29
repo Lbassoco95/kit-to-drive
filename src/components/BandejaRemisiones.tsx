@@ -86,7 +86,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         const extMap = Object.fromEntries(ext.map((r: any) => [r.id, r]));
         setItems(prev => prev.map(r => ({
           ...r,
-          total_unidades: extMap[r.id]?.total_unidades_solicitadas ?? r.asignados || 1,
+          total_unidades: extMap[r.id]?.total_unidades_solicitadas ?? (r.asignados || 1),
           nombre_vendedor: extMap[r.id]?.nombre_vendedor ?? null,
           documento_url: extMap[r.id]?.documento_url ?? null,
         })));
