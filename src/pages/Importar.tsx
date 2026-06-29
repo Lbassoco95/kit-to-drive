@@ -96,19 +96,16 @@ export default function Importar() {
         else { insR?.forEach(r => remMap.set(r.folio_remision, r.id)); creadasRem = insR?.length ?? 0; }
       }
 
-      // 4) Motocarros
-      const ordenes = prod.map(r => Number(r.orden_armado)).filter(n => !isNaN(n));
-      const { data: existMot } = await supabase.from("motocarros").select("orden_armado").in("orden_armado", ordenes);
-      const existSet = new Set(existMot?.map(m => m.orden_armado));
-      const nuevosMot: any[] = [];
+      // 4) Motocarros — upsert para tolerar duplicados en el CSV
+      const seenOrdenes = new Set<number>();
+      const todosMot: any[] = [];
       for (const r of prod) {
         const orden = Number(r.orden_armado);
-        if (!orden || existSet.has(orden)) continue;
+        if (!orden || seenOrdenes.has(orden)) continue; // dedup dentro del CSV
+        seenOrdenes.add(orden);
         const folio = String(r.remision || "").trim();
         const remId = folio ? remMap.get(folio) ?? null : null;
-        const estatus = normEstatus(r.estatus);
-        const fechaRealArmado = parseFecha(r.fecha_real_armado);
-        nuevosMot.push({
+        todosMot.push({
           orden_armado: orden,
           modelo: String(r.modelo || "200cc 2025").trim(),
           color: String(r.color || "BLANCO").trim().toUpperCase(),
@@ -116,21 +113,24 @@ export default function Importar() {
           ns_chasis: String(r.ns_chasis || "").trim() || null,
           ns_motor: String(r.ns_motor || "").trim() || null,
           fecha_estimada_armado: parseFecha(r.fecha_est_armado),
-          fecha_real_armado: fechaRealArmado,
-          estatus_armado: estatus,
+          fecha_real_armado: parseFecha(r.fecha_real_armado),
+          estatus_armado: normEstatus(r.estatus),
           observaciones_paro: String(r.observaciones_paro || "").trim() || null,
           remision_id: remId,
           fecha_estimada_entrega: parseFecha(r.fecha_est_entrega),
           fecha_real_entrega: parseFecha(r.fecha_real_entrega),
-          estatus_entrega: normEntrega(r.fecha_real_entrega) === "ENTREGADA" || /entregado/i.test(String(r.fecha_real_entrega)) ? "ENTREGADA" : "NO_APLICA",
+          estatus_entrega: /entregado/i.test(String(r.fecha_real_entrega || "").trim()) ? "ENTREGADA" : "NO_APLICA",
         });
       }
       let creadosMot = 0;
-      // batch insert in chunks
-      for (let i = 0; i < nuevosMot.length; i += 100) {
-        const chunk = nuevosMot.slice(i, i + 100);
-        const { error, data } = await supabase.from("motocarros").insert(chunk).select("id");
-        if (error) errores.push(`Motocarros lote ${i}: ${error.message}`);
+      // Upsert en lotes de 50 — onConflict orden_armado: actualiza si ya existe
+      for (let i = 0; i < todosMot.length; i += 50) {
+        const chunk = todosMot.slice(i, i + 50);
+        const { error, data } = await supabase
+          .from("motocarros")
+          .upsert(chunk, { onConflict: "orden_armado", ignoreDuplicates: false })
+          .select("id");
+        if (error) errores.push(`Motocarros lote ${i/50 + 1}: ${error.message}`);
         else creadosMot += data?.length ?? 0;
       }
 
