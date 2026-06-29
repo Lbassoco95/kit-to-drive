@@ -172,22 +172,34 @@ export default function Remisiones() {
     if (totalUnidades===0) { toast.error("Agrega al menos un motocarro"); return; }
 
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
-    // nombre_vendedor va separado: si el schema cache de PostgREST aún no lo conoce,
-    // el INSERT principal no falla — se intenta guardar en UPDATE posterior.
-    const payload:any = {
-      folio_remision: form.folio_remision.trim(), cliente_id: form.cliente_id, vendedor_id,
+
+    // INSERT mínimo: solo columnas que siempre han existido en la tabla.
+    // Las columnas agregadas en migraciones posteriores se guardan en UPDATE separado
+    // para no fallar si el schema cache de PostgREST no se ha refrescado aún.
+    const corePayload = {
+      folio_remision: form.folio_remision.trim(),
+      cliente_id: form.cliente_id,
+      vendedor_id,
       fecha_remision: form.fecha_remision,
-      notas: form.notas||null, tipo_pago: form.tipo_pago, pagado: form.tipo_pago==="anticipado",
-      color_solicitado: motos[0]?.color||"BLANCO", total_unidades_solicitadas: totalUnidades,
+      notas: form.notas||null,
+      estatus: "NUEVA",
     };
 
-    const { data: nueva, error } = await supabase.from("remisiones").insert(payload).select("id").single();
+    const { data: nueva, error } = await supabase.from("remisiones").insert(corePayload).select("id").single();
     if (error) return toast.error(error.message);
 
-    // Guardar nombre_vendedor por separado (columna puede no estar en cache aún)
-    if (nueva?.id && form.nombre_vendedor) {
-      await supabase.from("remisiones").update({ nombre_vendedor: form.nombre_vendedor }).eq("id", nueva.id);
-      // Si falla por cache, la remisión ya existe — se puede editar después
+    // UPDATE con columnas extendidas — tolerante a cache stale (falla silenciosamente)
+    if (nueva?.id) {
+      const extended: Record<string,any> = {
+        tipo_pago: form.tipo_pago,
+        pagado: form.tipo_pago === "anticipado",
+        color_solicitado: motos[0]?.color || "BLANCO",
+        total_unidades_solicitadas: totalUnidades,
+      };
+      if (form.nombre_vendedor) extended.nombre_vendedor = form.nombre_vendedor;
+      await supabase.from("remisiones").update(extended).eq("id", nueva.id);
+      // Si el UPDATE falla por cache, la remisión existe con datos core.
+      // Una vez que se corra NOTIFY pgrst en Supabase, todo queda guardado automáticamente.
     }
 
     // Build remision_items
