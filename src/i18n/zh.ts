@@ -9,6 +9,7 @@ export const zh: Translations = {
   nav: {
     dashboard: "仪表盘",
     produccion: "生产",
+    reportesTurno: "班次报告",
     remisiones: "提货单",
     entregas: "交付",
     misMotocarros: "我的三轮车",
@@ -236,6 +237,14 @@ export const zh: Translations = {
       retenido: "已扣押",
     },
     toastOk: "✓ 更新成功",
+    comentarios: {
+      title: "评论",
+      placeholder: "添加关于此三轮车的评论…",
+      enviar: "发送",
+      enviando: "发送中…",
+      sinComentarios: "暂无评论",
+      agregarFoto: "添加照片（可选）",
+    },
   },
 
   // Clientes
@@ -335,6 +344,30 @@ export const zh: Translations = {
     capacidadDiaria: "日产能（辆）",
     plazoMaxCredito: "最长信用期（天）",
     guardada: "设置已保存",
+  },
+
+  // Reportes de turno
+  reportesTurno: {
+    title: "班次报告",
+    subtitle: (n: number) => `${n} 份报告`,
+    nuevo: "新报告",
+    fecha: "日期",
+    turno: "班次",
+    turnos: {
+      manana: "早班",
+      tarde: "午班",
+      noche: "夜班",
+    },
+    unidadesArmadas: "组装数量",
+    paros: "停线 / 故障",
+    parasPlaceholder: "描述本班次停线、故障或异常情况（可选）",
+    observaciones: "备注",
+    observacionesPlaceholder: "其他备注（可选）",
+    registradoPor: "记录人",
+    sinReportes: "暂无报告",
+    guardado: "✓ 报告已保存",
+    editarTitulo: "编辑报告",
+    crearTitulo: "新建班次报告",
   },
 
   // Importar

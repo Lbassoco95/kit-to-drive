@@ -7,6 +7,7 @@ export const es = {
   nav: {
     dashboard: "Dashboard",
     produccion: "Producción",
+    reportesTurno: "Reportes de turno",
     remisiones: "Remisiones",
     entregas: "Entregas",
     misMotocarros: "Mis Motocarros",
@@ -234,6 +235,14 @@ export const es = {
       retenido: "Retenido",
     },
     toastOk: "✓ Actualizado correctamente",
+    comentarios: {
+      title: "Comentarios",
+      placeholder: "Agrega un comentario sobre este motocarro…",
+      enviar: "Enviar",
+      enviando: "Enviando…",
+      sinComentarios: "Aún no hay comentarios",
+      agregarFoto: "Agregar foto (opcional)",
+    },
   },
 
   // Clientes
@@ -357,6 +366,30 @@ export const es = {
     capacidadDiaria: "Capacidad diaria (motocarros)",
     plazoMaxCredito: "Plazo máx. crédito (días)",
     guardada: "Configuración guardada",
+  },
+
+  // Reportes de turno
+  reportesTurno: {
+    title: "Reportes de turno",
+    subtitle: (n: number) => `${n} reportes registrados`,
+    nuevo: "Nuevo reporte",
+    fecha: "Fecha",
+    turno: "Turno",
+    turnos: {
+      manana: "Mañana",
+      tarde: "Tarde",
+      noche: "Noche",
+    },
+    unidadesArmadas: "Unidades armadas",
+    paros: "Paros / incidencias",
+    parasPlaceholder: "Describe paros, fallas o incidencias del turno (opcional)",
+    observaciones: "Observaciones generales",
+    observacionesPlaceholder: "Observaciones adicionales del turno (opcional)",
+    registradoPor: "Registrado por",
+    sinReportes: "No hay reportes registrados aún",
+    guardado: "✓ Reporte guardado",
+    editarTitulo: "Editar reporte",
+    crearTitulo: "Nuevo reporte de turno",
   },
 
   // Importar

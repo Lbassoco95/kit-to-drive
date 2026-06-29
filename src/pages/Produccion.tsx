@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
-import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon } from "lucide-react";
+import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
@@ -19,6 +19,126 @@ import { InventarioStatus } from "@/components/InventarioStatus";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Comentarios dialog
+// ──────────────────────────────────────────────────────────────────────────────
+function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
+  motocarroId: string; orden: number; open: boolean; onClose: () => void; t: any;
+}) {
+  const { user } = useAuth();
+  const [comments, setComments] = useState<any[]>([]);
+  const [texto, setTexto] = useState("");
+  const [foto, setFoto] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const { lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
+  const tr = t.produccion.comentarios;
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("comentarios_motocarros")
+      .select("*, profiles(nombre_completo)")
+      .eq("motocarro_id", motocarroId)
+      .order("created_at", { ascending: true });
+    setComments(data ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (open) { load(); setTexto(""); setFoto(null); } }, [open, motocarroId]);
+
+  const send = async () => {
+    if (!texto.trim() || !user) return;
+    setSending(true);
+    let foto_url: string | null = null;
+    if (foto) {
+      const ext = foto.name.split(".").pop();
+      const path = `${motocarroId}/${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("comentarios-fotos").upload(path, foto);
+      if (!uploadErr) {
+        const { data } = supabase.storage.from("comentarios-fotos").getPublicUrl(path);
+        foto_url = data?.publicUrl ?? null;
+      }
+    }
+    const { error } = await supabase.from("comentarios_motocarros").insert({
+      motocarro_id: motocarroId,
+      usuario_id: user.id,
+      texto: texto.trim(),
+      foto_url,
+    });
+    setSending(false);
+    if (error) { toast.error(error.message); return; }
+    setTexto(""); setFoto(null); load();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={o => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg flex flex-col max-h-[80vh]">
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="flex items-center gap-2">
+            <MessageSquare size={18} /> {tr.title} — #{orden}
+          </DialogTitle>
+        </DialogHeader>
+
+        {/* Comments list */}
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1 min-h-0">
+          {loading ? (
+            <div className="text-center text-sm text-muted-foreground py-6">{t.actions.loading}</div>
+          ) : comments.length === 0 ? (
+            <div className="text-center text-sm text-muted-foreground py-8 border rounded-lg border-dashed">{tr.sinComentarios}</div>
+          ) : (
+            comments.map(c => (
+              <div key={c.id} className="flex gap-2.5">
+                <div className="shrink-0 w-8 h-8 rounded-full bg-[#1F3864] text-white text-xs flex items-center justify-center font-bold">
+                  {(c.profiles?.nombre_completo ?? "?").split(" ").map((n: string) => n[0]).slice(0,2).join("")}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-foreground">{c.profiles?.nombre_completo ?? "—"}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(c.created_at).toLocaleString(locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5 break-words">{c.texto}</p>
+                  {c.foto_url && (
+                    <a href={c.foto_url} target="_blank" rel="noopener noreferrer" className="mt-1 block">
+                      <img src={c.foto_url} alt="foto" className="max-h-32 rounded-md border object-contain" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Input */}
+        <div className="shrink-0 pt-3 border-t space-y-2">
+          <Textarea
+            placeholder={tr.placeholder}
+            value={texto}
+            onChange={e => setTexto(e.target.value)}
+            rows={2}
+            className="resize-none"
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+          />
+          <div className="flex items-center justify-between gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+              <input type="file" accept="image/*" className="hidden" onChange={e => setFoto(e.target.files?.[0] ?? null)} />
+              📷 {foto ? <span className="text-green-600 font-medium">✓ {foto.name}</span> : tr.agregarFoto}
+              {foto && <button type="button" onClick={() => setFoto(null)} className="ml-1 text-red-400 hover:text-red-600"><X size={12}/></button>}
+            </label>
+            <Button onClick={send} disabled={sending || !texto.trim()} size="sm" className="h-9 px-4 bg-[#1F3864] hover:bg-[#162a4d]">
+              <Send size={14} className="mr-1.5" />
+              {sending ? tr.enviando : tr.enviar}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Produccion() {
   const { role } = useAuth();
   const { t } = useLang();
@@ -30,6 +150,7 @@ export default function Produccion() {
   const [editing, setEditing] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [confirm, setConfirm] = useState<{ moto: any; action: "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
+  const [comentariosMoto, setComentariosMoto] = useState<{ id: string; orden: number } | null>(null);
 
   const load = async () => {
     const { data } = await supabase
@@ -162,6 +283,7 @@ export default function Produccion() {
           {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
             onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "" }); }}
             onAction={(action) => setConfirm({ moto: r, action })}
+            onComentarios={() => setComentariosMoto({ id: r.id, orden: r.orden_armado })}
             t={t}
           />)}
           {!filtered.length && <div className="col-span-full text-center text-muted-foreground py-12 bg-card rounded-lg border">{t.produccion.sinResultados}</div>}
@@ -222,6 +344,17 @@ export default function Produccion() {
         </DialogContent>
       </Dialog>
 
+      {/* Comentarios */}
+      {comentariosMoto && (
+        <ComentariosDialog
+          motocarroId={comentariosMoto.id}
+          orden={comentariosMoto.orden}
+          open={!!comentariosMoto}
+          onClose={() => setComentariosMoto(null)}
+          t={t}
+        />
+      )}
+
       {/* Confirmation */}
       <AlertDialog open={!!confirm} onOpenChange={(o) => { if (!o) setConfirm(null); }}>
         <AlertDialogContent>
@@ -241,7 +374,7 @@ export default function Produccion() {
   );
 }
 
-function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, t }: any) {
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, t }: any) {
   const desv = diasDesvio(r);
   const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
   const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
@@ -351,6 +484,9 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, t 
         {canEditFabrica && (
           <Button variant="outline" onClick={onEdit} className="h-12 w-12 p-0" title="Editar"><Pencil className="h-5 w-5" /></Button>
         )}
+        <Button variant="outline" onClick={onComentarios} className="h-12 w-12 p-0" title={t.produccion.comentarios.title}>
+          <MessageSquare className="h-5 w-5 text-[#1F3864]" />
+        </Button>
       </div>
     </Card>
   );

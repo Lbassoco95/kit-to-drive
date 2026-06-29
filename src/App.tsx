@@ -18,6 +18,7 @@ import Importar from "./pages/Importar";
 import Usuarios from "./pages/Usuarios";
 import Bitacora from "./pages/Bitacora";
 import Configuracion from "./pages/Configuracion";
+import ReportesTurno from "./pages/ReportesTurno";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/produccion" element={<ProtectedRoute roles={["admin","fabrica","logistica","coordinador"]}><Produccion /></ProtectedRoute>} />
+              <Route path="/reportes-turno" element={<ProtectedRoute roles={["admin","fabrica","logistica","coordinador"]}><ReportesTurno /></ProtectedRoute>} />
               <Route path="/remisiones" element={<Remisiones />} />
               <Route path="/entregas" element={<ProtectedRoute roles={["admin","logistica","coordinador"]}><Entregas /></ProtectedRoute>} />
               <Route path="/mis-motocarros" element={<ProtectedRoute roles={["admin","ventas","coordinador"]}><MisMotocarros /></ProtectedRoute>} />

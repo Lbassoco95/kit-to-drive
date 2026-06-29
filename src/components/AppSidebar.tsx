@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -14,6 +14,7 @@ type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; ic
 const ITEMS: Item[] = [
   { key: "dashboard",      url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Inicio" },
   { key: "produccion",     url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
+  { key: "reportesTurno",  url: "/reportes-turno",icon: ClipboardList,   roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
   { key: "remisiones",     url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Operación" },
   { key: "entregas",       url: "/entregas",      icon: Truck,           roles: ["admin","logistica","coordinador"],                    group: "Operación" },
   { key: "misMotocarros",  url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin","coordinador"],                       group: "Catálogos" },
