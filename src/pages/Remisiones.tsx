@@ -133,7 +133,16 @@ export default function Remisiones() {
   const addMoto   = () => setMotos(m => [...m, defaultMoto()]);
   const removeMoto = (idx:number) => setMotos(m => m.filter((_,i)=>i!==idx));
   const updateMoto = (idx:number, field:keyof MotoItem, val:any) =>
-    setMotos(m => m.map((item,i)=> i===idx ? {...item,[field]:val} : item));
+    setMotos(m => m.map((item,i) => {
+      if (i !== idx) return item;
+      const next = { ...item, [field]: val };
+      // Instalación de cabina implica caja montada
+      if (field === "con_instalacion" && val === true)  next.con_caja = true;
+      if (field === "con_instalacion" && val === false) next.con_caja = false;
+      // Si marcan caja pero tienen instalación activa, no dejar desmarcar la caja
+      if (field === "con_caja" && val === false && item.con_instalacion) next.con_caja = true;
+      return next;
+    }));
 
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
