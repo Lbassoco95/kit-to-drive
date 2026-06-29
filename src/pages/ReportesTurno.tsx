@@ -61,8 +61,10 @@ export default function ReportesTurno() {
       .order("fecha", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(200);
-    if (error) toast.error(error.message);
-    else setRows((data as Reporte[]) ?? []);
+    if (error) {
+      // Tabla no en schema cache aún — silenciar hasta que se corra NOTIFY pgrst
+      if (!error.message.includes("schema cache")) toast.error(error.message);
+    } else setRows((data as Reporte[]) ?? []);
     setLoading(false);
   };
 

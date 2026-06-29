@@ -113,44 +113,68 @@ export default function Remisiones() {
     setVendedores(data ?? []);
   };
   const load = async () => {
-    // Query base — sin tablas que puedan no estar en el schema cache aún
-    const { data, error } = await supabase
+    // ── 1. Query mínimo garantizado (solo tablas/columnas originales) ──────────
+    const { data: base } = await supabase
       .from("remisiones")
-      .select("*, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo), motocarros(id,orden_armado,modelo,color,ns_chasis,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,fecha_propuesta_entrega,propuesta_entrega_notas,confirmada_fabrica_at,confirmada_logistica_at)")
-      .order("fecha_remision", { ascending:false, nullsFirst:false });
+      .select("id,folio_remision,cliente_id,vendedor_id,fecha_remision,notas,estatus,created_at, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo)")
+      .order("created_at", { ascending:false });
 
-    if (error) {
-      // Si aún falla (cache muy stale), query mínimo sin joins opcionales
-      const { data: fallback } = await supabase
+    // Arrancar con lo que tenemos — siempre muestra algo
+    const baseRows = (base ?? []).map((r:any) => ({
+      ...r, remision_items:[], motocarros:[],
+      tipo_pago:null, pagado:null, nombre_vendedor:null,
+      color_solicitado:null, total_unidades_solicitadas:null,
+    }));
+    setRows(baseRows);
+    const propios = baseRows.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
+    setRecentFolios(propios.slice(0,5).map((r:any)=>r.folio_remision));
+
+    if (!base?.length) return;
+    const ids = base.map((r:any) => r.id);
+
+    // ── 2. Columnas extendidas de remisiones (pueden no estar en cache) ────────
+    try {
+      const { data: ext } = await supabase
         .from("remisiones")
-        .select("*, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo)")
-        .order("created_at", { ascending:false });
-      const mapped = (fallback ?? []).map((r:any) => ({ ...r, remision_items: [], motocarros: [] }));
-      setRows(mapped);
-      setRecentFolios(mapped.slice(0,5).map((r:any)=>r.folio_remision));
-      return;
-    }
+        .select("id,tipo_pago,pagado,nombre_vendedor,color_solicitado,total_unidades_solicitadas")
+        .in("id", ids);
+      if (ext?.length) {
+        const extMap = Object.fromEntries(ext.map((r:any) => [r.id, r]));
+        setRows(prev => prev.map(r => ({ ...r, ...extMap[r.id] })));
+      }
+    } catch (_) { /* cache stale — ignorar */ }
 
-    // Cargar remision_items por separado (tabla nueva — puede no estar en cache)
-    const ids = (data ?? []).map((r:any) => r.id);
-    let itemsMap: Record<string,any[]> = {};
-    if (ids.length) {
+    // ── 3. remision_items (tabla nueva) ───────────────────────────────────────
+    try {
       const { data: items } = await supabase
         .from("remision_items")
         .select("id,remision_id,tipo_servicio,modelo,color,cantidad,con_caja")
         .in("remision_id", ids);
-      if (items) {
+      if (items?.length) {
+        const itemsMap: Record<string,any[]> = {};
         for (const item of items) {
           if (!itemsMap[item.remision_id]) itemsMap[item.remision_id] = [];
           itemsMap[item.remision_id].push(item);
         }
+        setRows(prev => prev.map(r => ({ ...r, remision_items: itemsMap[r.id] ?? [] })));
       }
-    }
+    } catch (_) { /* cache stale — ignorar */ }
 
-    const merged = (data ?? []).map((r:any) => ({ ...r, remision_items: itemsMap[r.id] ?? [] }));
-    setRows(merged);
-    const propios = merged.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
-    setRecentFolios(propios.slice(0,5).map((r:any)=>r.folio_remision));
+    // ── 4. motocarros (solo columnas seguras) ─────────────────────────────────
+    try {
+      const { data: motos } = await supabase
+        .from("motocarros")
+        .select("id,remision_id,orden_armado,modelo,color,ns_chasis,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega")
+        .in("remision_id", ids);
+      if (motos?.length) {
+        const motosMap: Record<string,any[]> = {};
+        for (const m of motos) {
+          if (!motosMap[m.remision_id]) motosMap[m.remision_id] = [];
+          motosMap[m.remision_id].push(m);
+        }
+        setRows(prev => prev.map(r => ({ ...r, motocarros: motosMap[r.id] ?? [] })));
+      }
+    } catch (_) { /* cache stale — ignorar */ }
   };
 
   useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, role]);
