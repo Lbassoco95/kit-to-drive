@@ -150,11 +150,51 @@ export default function Produccion() {
   const [comentariosMoto, setComentariosMoto] = useState<{ id: string; orden: number } | null>(null);
 
   const load = async () => {
-    const { data } = await supabase
+    // ── 1. Query base garantizado (sin columnas nuevas en joins) ──────────────
+    const { data: base } = await supabase
       .from("motocarros")
-      .select("*, remisiones(folio_remision, tipo_pago, pagado, vendedor_id, profiles:vendedor_id(nombre_completo, codigo_vendedor), clientes(codigo_erp))")
+      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
       .order("orden_armado", { ascending: true });
-    setRows((data ?? []).map((r: any) => ({ ...r, color: normColor(r.color), _eff: effEstatusArmado(r) })));
+
+    const mapped = (base ?? []).map((r: any) => ({
+      ...r, color: normColor(r.color), _eff: effEstatusArmado(r),
+      // defaults para columnas extendidas
+      fecha_propuesta_entrega: null, propuesta_entrega_notas: null,
+      confirmada_fabrica_at: null, confirmada_logistica_at: null, con_caja: false,
+    }));
+    setRows(mapped);
+    if (!base?.length) return;
+
+    // ── 2. Columnas extendidas de motocarros (agregadas en migraciones) ───────
+    try {
+      const ids = base.map((r: any) => r.id);
+      const { data: ext } = await supabase
+        .from("motocarros")
+        .select("id,fecha_propuesta_entrega,propuesta_entrega_notas,confirmada_fabrica_at,confirmada_logistica_at,con_caja")
+        .in("id", ids);
+      if (ext?.length) {
+        const extMap = Object.fromEntries(ext.map((r: any) => [r.id, r]));
+        setRows(prev => prev.map(r => ({ ...r, ...extMap[r.id] })));
+      }
+    } catch (_) {}
+
+    // ── 3. tipo_pago / pagado de remisiones (columnas nuevas) ─────────────────
+    try {
+      const remIds = [...new Set(base.map((r: any) => r.remision_id).filter(Boolean))];
+      if (remIds.length) {
+        const { data: remExt } = await supabase
+          .from("remisiones")
+          .select("id,tipo_pago,pagado")
+          .in("id", remIds);
+        if (remExt?.length) {
+          const remMap = Object.fromEntries(remExt.map((r: any) => [r.id, r]));
+          setRows(prev => prev.map(r => ({
+            ...r,
+            remisiones: r.remisiones ? { ...r.remisiones, ...remMap[r.remision_id] } : r.remisiones,
+          })));
+        }
+      }
+    } catch (_) {}
   };
   useEffect(() => { load(); }, []);
 

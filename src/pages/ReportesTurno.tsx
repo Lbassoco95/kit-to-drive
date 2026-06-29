@@ -50,6 +50,7 @@ export default function ReportesTurno() {
   const [editing, setEditing] = useState<Reporte | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
+  const [autoArmados, setAutoArmados] = useState<{ orden: number; modelo: string; color: string }[]>([]);
 
   const canCreate = role === "admin" || role === "fabrica";
 
@@ -70,9 +71,23 @@ export default function ReportesTurno() {
 
   useEffect(() => { load(); }, []);
 
-  const openNew = () => {
+  const openNew = async () => {
     setEditing(null);
-    setForm({ ...EMPTY_FORM, fecha: new Date().toISOString().split("T")[0] });
+    const hoy = new Date().toISOString().split("T")[0];
+    // Auto-contar motocarros marcados ARMADO hoy
+    let autoCount = 0;
+    let autoList: { orden: number; modelo: string; color: string }[] = [];
+    try {
+      const { data } = await supabase
+        .from("motocarros")
+        .select("orden_armado,modelo,color")
+        .eq("fecha_real_armado", hoy)
+        .in("estatus_armado", ["ARMADO", "LISTO"]);
+      autoCount = data?.length ?? 0;
+      autoList = (data ?? []).map((m: any) => ({ orden: m.orden_armado, modelo: m.modelo, color: m.color }));
+    } catch (_) {}
+    setAutoArmados(autoList);
+    setForm({ ...EMPTY_FORM, fecha: hoy, unidades_armadas: autoCount });
     setOpen(true);
   };
 
@@ -247,6 +262,30 @@ export default function ReportesTurno() {
                 </div>
               </div>
             </div>
+
+            {/* Resumen auto desde motocarros marcados hoy */}
+            {!editing && autoArmados.length > 0 && (
+              <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+                <div className="text-xs font-semibold text-emerald-700 mb-1.5">
+                  ✓ {autoArmados.length} motocarros marcados como ARMADO hoy (auto-detectados)
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {autoArmados.slice(0, 12).map(m => (
+                    <span key={m.orden} className="text-[11px] px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-mono font-medium">
+                      #{m.orden} {m.color}
+                    </span>
+                  ))}
+                  {autoArmados.length > 12 && (
+                    <span className="text-[11px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">+{autoArmados.length - 12} más</span>
+                  )}
+                </div>
+              </div>
+            )}
+            {!editing && autoArmados.length === 0 && (
+              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-muted-foreground">
+                Sin motocarros marcados como ARMADO hoy — captura el número manualmente o ve a Producción a marcarlos primero.
+              </div>
+            )}
 
             <div>
               <Label className="text-sm">{tr.unidadesArmadas}</Label>
