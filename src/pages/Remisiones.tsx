@@ -113,12 +113,43 @@ export default function Remisiones() {
     setVendedores(data ?? []);
   };
   const load = async () => {
-    const { data } = await supabase
+    // Query base — sin tablas que puedan no estar en el schema cache aún
+    const { data, error } = await supabase
       .from("remisiones")
-      .select("*, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo), remision_items(id,tipo_servicio,modelo,color,cantidad,con_caja), motocarros(id,orden_armado,modelo,color,ns_chasis,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,fecha_propuesta_entrega,propuesta_entrega_notas,confirmada_fabrica_at,confirmada_logistica_at)")
+      .select("*, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo), motocarros(id,orden_armado,modelo,color,ns_chasis,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,fecha_propuesta_entrega,propuesta_entrega_notas,confirmada_fabrica_at,confirmada_logistica_at)")
       .order("fecha_remision", { ascending:false, nullsFirst:false });
-    setRows(data ?? []);
-    const propios = (data??[]).filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
+
+    if (error) {
+      // Si aún falla (cache muy stale), query mínimo sin joins opcionales
+      const { data: fallback } = await supabase
+        .from("remisiones")
+        .select("*, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo)")
+        .order("created_at", { ascending:false });
+      const mapped = (fallback ?? []).map((r:any) => ({ ...r, remision_items: [], motocarros: [] }));
+      setRows(mapped);
+      setRecentFolios(mapped.slice(0,5).map((r:any)=>r.folio_remision));
+      return;
+    }
+
+    // Cargar remision_items por separado (tabla nueva — puede no estar en cache)
+    const ids = (data ?? []).map((r:any) => r.id);
+    let itemsMap: Record<string,any[]> = {};
+    if (ids.length) {
+      const { data: items } = await supabase
+        .from("remision_items")
+        .select("id,remision_id,tipo_servicio,modelo,color,cantidad,con_caja")
+        .in("remision_id", ids);
+      if (items) {
+        for (const item of items) {
+          if (!itemsMap[item.remision_id]) itemsMap[item.remision_id] = [];
+          itemsMap[item.remision_id].push(item);
+        }
+      }
+    }
+
+    const merged = (data ?? []).map((r:any) => ({ ...r, remision_items: itemsMap[r.id] ?? [] }));
+    setRows(merged);
+    const propios = merged.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
     setRecentFolios(propios.slice(0,5).map((r:any)=>r.folio_remision));
   };
 
