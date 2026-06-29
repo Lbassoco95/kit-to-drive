@@ -172,15 +172,23 @@ export default function Remisiones() {
     if (totalUnidades===0) { toast.error("Agrega al menos un motocarro"); return; }
 
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
+    // nombre_vendedor va separado: si el schema cache de PostgREST aún no lo conoce,
+    // el INSERT principal no falla — se intenta guardar en UPDATE posterior.
     const payload:any = {
       folio_remision: form.folio_remision.trim(), cliente_id: form.cliente_id, vendedor_id,
-      nombre_vendedor: form.nombre_vendedor||null, fecha_remision: form.fecha_remision,
+      fecha_remision: form.fecha_remision,
       notas: form.notas||null, tipo_pago: form.tipo_pago, pagado: form.tipo_pago==="anticipado",
       color_solicitado: motos[0]?.color||"BLANCO", total_unidades_solicitadas: totalUnidades,
     };
 
     const { data: nueva, error } = await supabase.from("remisiones").insert(payload).select("id").single();
     if (error) return toast.error(error.message);
+
+    // Guardar nombre_vendedor por separado (columna puede no estar en cache aún)
+    if (nueva?.id && form.nombre_vendedor) {
+      await supabase.from("remisiones").update({ nombre_vendedor: form.nombre_vendedor }).eq("id", nueva.id);
+      // Si falla por cache, la remisión ya existe — se puede editar después
+    }
 
     // Build remision_items
     if (nueva?.id) {
