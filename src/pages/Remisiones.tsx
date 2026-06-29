@@ -15,8 +15,9 @@ import { toast } from "sonner";
 import {
   Plus, Upload, Wand2, FileDown, FileText, ChevronDown,
   UserPlus, CalendarClock, CheckCircle2, Factory, Truck,
-  DollarSign, Trash2, Package
+  DollarSign, Trash2, Package, CheckCheck, XCircle
 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { FileOrCamera } from "@/components/FileOrCamera";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
@@ -97,6 +98,8 @@ export default function Remisiones() {
   const [pagoDialog, setPagoDialog]           = useState<any|null>(null);
   const [comprobanteFile, setComprobanteFile] = useState<File|null>(null);
   const [subiendoPago, setSubiendoPago]       = useState(false);
+  const [cierreConfirm, setCierreConfirm]     = useState<any|null>(null);
+  const [deleteConfirm, setDeleteConfirm]     = useState<any|null>(null);
 
   const canAssignVendedor = role === "admin" || role === "coordinador";
   const totalUnidades = motos.reduce((s,m) => s + Number(m.cantidad||0), 0);
@@ -330,6 +333,24 @@ export default function Remisiones() {
   const verComprobante = async (path:string) => {
     const { data } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60);
     if (data?.signedUrl) window.open(data.signedUrl,"_blank");
+  };
+
+  const cerrarRemision = async (id: string) => {
+    const { error } = await supabase.from("remisiones").update({ estatus: "COMPLETA" }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("✓ Remisión marcada como entregada");
+    setCierreConfirm(null); load();
+  };
+
+  const eliminarRemision = async (id: string) => {
+    // Desligar motocarros antes de borrar
+    await supabase.from("motocarros").update({ remision_id: null }).eq("remision_id", id);
+    // Borrar items (tolerante a cache)
+    try { await supabase.from("remision_items").delete().eq("remision_id", id); } catch (_) {}
+    const { error } = await supabase.from("remisiones").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("✓ Remisión eliminada");
+    setDeleteConfirm(null); load();
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -642,7 +663,7 @@ export default function Remisiones() {
 
               {/* Actions */}
               <div className="flex gap-2 mt-auto pt-2 border-t flex-wrap">
-                {canAssign&&asignadas<total&&(
+                {canAssign&&asignadas<total&&r.estatus!=="COMPLETA"&&r.estatus!=="CANCELADA"&&(
                   <Button onClick={()=>asignarChasis(r)} className="flex-1 h-12 bg-[#2E75B6] hover:bg-[#246094] text-base min-w-[100px]">
                     <Wand2 className="h-5 w-5 mr-2"/> Asignar
                   </Button>
@@ -673,12 +694,72 @@ export default function Remisiones() {
                     <FileDown className="h-5 w-5 mr-2"/> {t.pago.verComprobante}
                   </Button>
                 )}
+                {/* Marcar entregada — admin/coordinador, solo si está activa */}
+                {(role==="admin"||role==="coordinador")&&(r.estatus==="NUEVA"||r.estatus==="PARCIAL")&&(
+                  <Button
+                    onClick={()=>setCierreConfirm(r)}
+                    className="flex-1 h-12 text-base bg-emerald-700 hover:bg-emerald-800 min-w-[120px]"
+                  >
+                    <CheckCheck className="h-5 w-5 mr-2"/> Entregar
+                  </Button>
+                )}
+                {/* Eliminar — solo admin */}
+                {role==="admin"&&(
+                  <Button
+                    variant="outline"
+                    onClick={()=>setDeleteConfirm(r)}
+                    className="h-12 w-12 p-0 shrink-0 border-red-200 text-red-500 hover:bg-red-50"
+                    title="Eliminar remisión"
+                  >
+                    <Trash2 className="h-5 w-5"/>
+                  </Button>
+                )}
               </div>
             </Card>
           );
         })}
         {!rows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones</div>}
       </div>
+
+      {/* Cierre / entregar remisión */}
+      <AlertDialog open={!!cierreConfirm} onOpenChange={o=>{ if(!o) setCierreConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Marcar como entregada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La remisión <strong>{cierreConfirm?.folio_remision}</strong> se marcará como <strong>COMPLETA</strong>.
+              Desaparecerá de la bandeja de fábrica. Esta acción se puede deshacer editando el estatus.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={()=>cerrarRemision(cierreConfirm?.id)} className="bg-emerald-700 hover:bg-emerald-800">
+              Sí, marcar entregada
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Eliminar remisión */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={o=>{ if(!o) setDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-700 flex items-center gap-2">
+              <XCircle className="h-5 w-5"/> Eliminar remisión
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              ¿Eliminar <strong>{deleteConfirm?.folio_remision}</strong> permanentemente?
+              Se desligarán los motocarros asignados. Esta acción <strong>no se puede deshacer</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={()=>eliminarRemision(deleteConfirm?.id)} className="bg-red-600 hover:bg-red-700">
+              Sí, eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Pago dialog */}
       <Dialog open={!!pagoDialog} onOpenChange={o=>{if(!o){setPagoDialog(null);setComprobanteFile(null);}}}>
