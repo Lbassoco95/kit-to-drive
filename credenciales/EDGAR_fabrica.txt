@@ -1,0 +1,18 @@
+KIT-TO-DRIVE — Acceso Sistema Grupo Dazon
+=========================================
+
+Nombre:    Edgar
+Cargo:     Supervisor de Fábrica
+Rol:       Fábrica
+
+URL:       https://kit-to-drive.vercel.app
+Correo:    edgar@dazon.demo
+Contraseña: ctFoByH!BY1IQQ
+
+Acceso como Fábrica:
+  - Ver bandeja de remisiones pendientes de asignar
+  - Asignar chasis a remisiones
+  - Capturar / editar configuración de pedidos
+  - Ver y actualizar estatus de motocarros en producción
+  - Registrar fechas de armado y entrega
+  - Ver comentarios por motocarro

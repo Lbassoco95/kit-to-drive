@@ -100,6 +100,8 @@ export default function Remisiones() {
   const [subiendoPago, setSubiendoPago]       = useState(false);
   const [cierreConfirm, setCierreConfirm]     = useState<any|null>(null);
   const [deleteConfirm, setDeleteConfirm]     = useState<any|null>(null);
+  const [activeTab, setActiveTab]             = useState<'activas'|'canceladas'>('activas');
+  const [notifOpen, setNotifOpen]             = useState(false);
 
   const canAssignVendedor = role === "admin" || role === "coordinador";
   const totalUnidades = motos.reduce((s,m) => s + Number(m.cantidad||0), 0);
@@ -186,6 +188,23 @@ export default function Remisiones() {
   }, [user?.id]);
 
   const canCreate = role==="admin"||role==="ventas"||role==="coordinador";
+
+  // ── Computed rows ────────────────────────────────────────────────────────────
+  const today = new Date().toISOString().slice(0, 10);
+  const activeRows   = rows.filter(r => r.estatus !== 'CANCELADA');
+  const canceledRows = rows.filter(r => r.estatus === 'CANCELADA' && (role==='admin' || r.vendedor_id===user?.id));
+  const displayRows  = activeTab === 'activas' ? activeRows : canceledRows;
+
+  // Motocarros atrasados — solo para remisiones activas del usuario actual
+  const motocarrosAtrasados = activeRows
+    .filter(r => role==='admin'||role==='coordinador'||r.vendedor_id===user?.id)
+    .filter(r => r.estatus!=='COMPLETA')
+    .flatMap(r => (r.motocarros??[]).map((m:any)=>({...m, folio:r.folio_remision})))
+    .filter((m:any) => {
+      const armadoLate   = m.fecha_estimada_armado   && m.fecha_estimada_armado   < today && !['ARMADO','LISTO'].includes(m.estatus_armado??'');
+      const entregaLate  = m.fecha_estimada_entrega  && m.fecha_estimada_entrega  < today && m.estatus_entrega!=='ENTREGADA';
+      return armadoLate || entregaLate;
+    });
 
   // ── Moto helpers ────────────────────────────────────────────────────────────
   const addMoto   = () => setMotos(m => [...m, defaultMoto()]);
@@ -343,14 +362,19 @@ export default function Remisiones() {
   };
 
   const eliminarRemision = async (id: string) => {
-    // Desligar motocarros antes de borrar
+    // Desligar motocarros — quedan libres para otras remisiones
     await supabase.from("motocarros").update({ remision_id: null }).eq("remision_id", id);
-    // Borrar items (tolerante a cache)
-    try { await supabase.from("remision_items").delete().eq("remision_id", id); } catch (_) {}
-    const { error } = await supabase.from("remisiones").delete().eq("id", id);
+    // Soft delete: marcar CANCELADA (reversible por admin desde la pestaña Canceladas)
+    const { error } = await supabase.from("remisiones").update({ estatus: "CANCELADA" }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("✓ Remisión eliminada");
+    toast.success("✓ Remisión cancelada — visible en pestaña Canceladas");
     setDeleteConfirm(null); load();
+  };
+
+  const restaurarRemision = async (id: string) => {
+    const { error } = await supabase.from("remisiones").update({ estatus: "NUEVA" }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success("✓ Remisión restaurada a activa"); load();
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -365,7 +389,7 @@ export default function Remisiones() {
         </div>
 
         {canCreate && (
-          <Dialog open={open} onOpenChange={o=>{ setOpen(o); if(o) abrirNueva(); }}>
+          <Dialog open={open} onOpenChange={o=>{ setOpen(o); if(o) abrirNueva(); if(!o) setActiveTab('activas'); }}>
             <DialogTrigger asChild>
               <Button className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
                 <Plus className="h-5 w-5 mr-2" /> {t.remisiones.nueva}
@@ -560,9 +584,92 @@ export default function Remisiones() {
         )}
       </div>
 
+      {/* ── Notificaciones de atrasos ─────────────────────────────────────── */}
+      {motocarrosAtrasados.length > 0 && (
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
+          <button
+            className="w-full flex items-center justify-between text-left"
+            onClick={() => setNotifOpen(o => !o)}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⚠️</span>
+              <span className="font-semibold text-amber-800 text-sm">
+                {motocarrosAtrasados.length} motocarro{motocarrosAtrasados.length > 1 ? "s" : ""} con fecha vencida
+              </span>
+            </div>
+            <ChevronDown className={`h-4 w-4 text-amber-700 transition-transform ${notifOpen ? "rotate-180" : ""}`} />
+          </button>
+          {notifOpen && (
+            <div className="mt-3 space-y-1.5 border-t border-amber-200 pt-3">
+              {motocarrosAtrasados.map((m: any) => (
+                <div key={m.id} className="flex items-center gap-2 text-xs text-amber-900">
+                  <span className="font-mono font-bold text-amber-700">{m.folio}</span>
+                  <span className="font-medium">#{m.orden_armado}</span>
+                  <span className="text-muted-foreground">{m.ns_chasis || m.chasis_asignado || "sin NS"}</span>
+                  {m.fecha_estimada_armado && m.fecha_estimada_armado < today && !['ARMADO','LISTO'].includes(m.estatus_armado ?? '') && (
+                    <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">Armado: {m.fecha_estimada_armado}</span>
+                  )}
+                  {m.fecha_estimada_entrega && m.fecha_estimada_entrega < today && m.estatus_entrega !== 'ENTREGADA' && (
+                    <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-semibold">Entrega: {m.fecha_estimada_entrega}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tabs Activas / Canceladas ─────────────────────────────────────── */}
+      <div className="flex gap-0 border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('activas')}
+          className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='activas' ? 'border-[#1F3864] text-[#1F3864]' : 'border-transparent text-muted-foreground hover:text-[#1F3864]'}`}
+        >
+          Activas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{activeRows.length}</span>
+        </button>
+        {(role==='admin'||role==='ventas'||role==='coordinador') && (
+          <button
+            onClick={() => setActiveTab('canceladas')}
+            className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='canceladas' ? 'border-red-500 text-red-600' : 'border-transparent text-muted-foreground hover:text-red-500'}`}
+          >
+            Canceladas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{canceledRows.length}</span>
+          </button>
+        )}
+      </div>
+
       {/* ── Cards ─────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {rows.map(r => {
+        {activeTab === 'canceladas' ? (
+          canceledRows.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones canceladas</div>
+          ) : canceledRows.map((r:any) => (
+            <Card key={r.id} className="p-5 flex flex-col gap-3 border-red-100 bg-red-50/30 opacity-80">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
+                  <div className="text-2xl font-bold text-slate-500 leading-tight line-through">{r.folio_remision}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">CANCELADA</span>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <div>👤 {r.clientes?.codigo_erp || "—"}{r.clientes?.nombre_comercial ? ` — ${r.clientes.nombre_comercial}` : ""}</div>
+                <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}</div>
+                <div>Fecha: {fmtDate(r.fecha_remision)}</div>
+              </div>
+              {role === 'admin' && (
+                <Button
+                  variant="outline"
+                  onClick={() => restaurarRemision(r.id)}
+                  className="w-full h-10 text-sm border-[#2E75B6] text-[#2E75B6] hover:bg-[#DBEAFE]"
+                >
+                  ↩ Restaurar remisión
+                </Button>
+              )}
+            </Card>
+          ))
+        ) : rows.map(r => {
+          if (r.estatus === 'CANCELADA') return null;
           const motos_   = r.motocarros??[];
           const items:any[] = r.remision_items??[];
           const motoItems  = items.filter((i:any)=>i.tipo_servicio==="motocarro");
@@ -718,7 +825,7 @@ export default function Remisiones() {
             </Card>
           );
         })}
-        {!rows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones</div>}
+        {activeTab==='activas'&&!activeRows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones activas</div>}
       </div>
 
       {/* Cierre / entregar remisión */}
@@ -745,17 +852,17 @@ export default function Remisiones() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-red-700 flex items-center gap-2">
-              <XCircle className="h-5 w-5"/> Eliminar remisión
+              <XCircle className="h-5 w-5"/> Cancelar remisión
             </AlertDialogTitle>
             <AlertDialogDescription>
-              ¿Eliminar <strong>{deleteConfirm?.folio_remision}</strong> permanentemente?
-              Se desligarán los motocarros asignados. Esta acción <strong>no se puede deshacer</strong>.
+              La remisión <strong>{deleteConfirm?.folio_remision}</strong> se cancelará y desaparecerá de fábrica.
+              Los motocarros asignados quedarán disponibles. La remisión quedará en la pestaña <strong>Canceladas</strong> y un administrador puede restaurarla.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={()=>eliminarRemision(deleteConfirm?.id)} className="bg-red-600 hover:bg-red-700">
-              Sí, eliminar
+              Sí, cancelar remisión
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

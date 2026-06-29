@@ -1,0 +1,17 @@
+KIT-TO-DRIVE — Acceso Sistema Grupo Dazon
+=========================================
+
+Nombre:    Ana Karen
+Cargo:     Ventas
+Rol:       Ventas
+
+URL:       https://kit-to-drive.vercel.app
+Correo:    anakaren@dazon.demo
+Contraseña: r^xH7I^zzRjjty
+
+Acceso como Ventas:
+  - Crear nuevas remisiones
+  - Ver y gestionar sus propias remisiones
+  - Cancelar sus propias remisiones
+  - Ver notificaciones de motocarros atrasados
+  - Subir comprobantes de pago
