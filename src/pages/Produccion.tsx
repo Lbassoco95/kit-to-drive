@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
-import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X } from "lucide-react";
+import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X, Package } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
@@ -19,6 +19,19 @@ import { InventarioStatus } from "@/components/InventarioStatus";
 import { FileOrCamera } from "@/components/FileOrCamera";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
+
+const tipoIcon: Record<string, string> = {
+  cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",
+};
+const tipoLabel: Record<string, string> = {
+  cabina: "Cabina", instalacion_cabina: "Instalación", activacion: "Activación", flete: "Flete",
+};
+const tipoBadgeConfig: Record<string, string> = {
+  cabina: "bg-violet-50 text-violet-700 border-violet-200",
+  instalacion_cabina: "bg-purple-50 text-purple-700 border-purple-200",
+  activacion: "bg-amber-50 text-amber-700 border-amber-200",
+  flete: "bg-blue-50 text-blue-700 border-blue-200",
+};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Comentarios dialog
@@ -161,6 +174,7 @@ export default function Produccion() {
       // defaults para columnas extendidas
       fecha_propuesta_entrega: null, propuesta_entrega_notas: null,
       confirmada_fabrica_at: null, confirmada_logistica_at: null, con_caja: false,
+      remision_items: [],
     }));
     setRows(mapped);
     if (!base?.length) return;
@@ -192,6 +206,25 @@ export default function Produccion() {
             ...r,
             remisiones: r.remisiones ? { ...r.remisiones, ...remMap[r.remision_id] } : r.remisiones,
           })));
+        }
+      }
+    } catch (_) {}
+
+    // ── 4. remision_items — configuración del pedido por motocarro ────────────
+    try {
+      const remIds = [...new Set(base.map((r: any) => r.remision_id).filter(Boolean))];
+      if (remIds.length) {
+        const { data: remItems } = await supabase
+          .from("remision_items")
+          .select("id,remision_id,tipo_servicio,modelo,color,cantidad,con_caja")
+          .in("remision_id", remIds);
+        if (remItems?.length) {
+          const itemsMap: Record<string, any[]> = {};
+          for (const it of remItems) {
+            if (!itemsMap[it.remision_id]) itemsMap[it.remision_id] = [];
+            itemsMap[it.remision_id].push(it);
+          }
+          setRows(prev => prev.map(r => ({ ...r, remision_items: itemsMap[r.remision_id] ?? [] })));
         }
       }
     } catch (_) {}
@@ -484,6 +517,28 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
             </span>
           )}
         </div>
+
+        {/* Configuración del pedido */}
+        {(() => {
+          const items: any[] = r.remision_items ?? [];
+          const servicios = items.filter((it: any) => it.tipo_servicio !== "motocarro");
+          const hasCaja = items.some((it: any) => it.tipo_servicio === "motocarro" && it.con_caja);
+          if (!servicios.length && !hasCaja) return null;
+          return (
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {hasCaja && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full border bg-slate-100 text-slate-700 border-slate-200 font-medium">
+                  <Package size={8}/> Caja
+                </span>
+              )}
+              {servicios.map((it: any) => (
+                <span key={it.id} className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${tipoBadgeConfig[it.tipo_servicio] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
+                  {tipoIcon[it.tipo_servicio]} {tipoLabel[it.tipo_servicio] ?? it.tipo_servicio}
+                </span>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Timeline */}
         <div className="flex items-center justify-between pt-2">

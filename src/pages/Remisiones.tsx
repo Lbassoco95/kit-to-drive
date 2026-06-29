@@ -703,8 +703,8 @@ export default function Remisiones() {
                     <CheckCheck className="h-5 w-5 mr-2"/> Entregar
                   </Button>
                 )}
-                {/* Eliminar — solo admin */}
-                {role==="admin"&&(
+                {/* Eliminar — admin o ventas (solo sus propias) */}
+                {(role==="admin"||(role==="ventas"&&isOwner))&&(
                   <Button
                     variant="outline"
                     onClick={()=>setDeleteConfirm(r)}
