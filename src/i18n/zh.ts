@@ -375,7 +375,7 @@ export const zh: Translations = {
     title: "导入初始数据",
     subtitle: "从当前Excel上传生产和提货单CSV文件。操作幂等，已存在记录不会重复。",
     csvInfo: "服务器预载CSV文件",
-    csvDesc: "produccion_carga_inicial.csv（134行）+ remisiones_carga_inicial.csv（30行）",
+    csvDesc: "produccion.csv（260条）+ remisiones.csv（51条）— 2026年6月29日更新",
     iniciar: "开始导入",
     importando: "导入中…",
     completada: "导入完成",

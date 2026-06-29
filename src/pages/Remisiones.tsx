@@ -33,20 +33,32 @@ export default function Remisiones() {
   const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
+  const [vendedores, setVendedores] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp: "", nombre_comercial: "", telefono: "" });
-  const [form, setForm] = useState<any>({ folio_remision: "", cliente_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "", tipo_pago: "anticipado", pagado: true });
+  const [form, setForm] = useState<any>({ folio_remision: "", cliente_id: "", vendedor_asignado_id: "", total_unidades_solicitadas: 1, color_solicitado: "BLANCO", fecha_remision: new Date().toISOString().slice(0,10), notas: "", tipo_pago: "anticipado", pagado: true });
   const [formFile, setFormFile] = useState<File | null>(null);
   const [pagoDialog, setPagoDialog] = useState<any | null>(null);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [subiendoPago, setSubiendoPago] = useState(false);
 
+  const canAssignVendedor = role === "admin" || role === "coordinador";
+
   const loadClientes = async () => {
     const { data } = await supabase.from("clientes").select("id, codigo_erp, nombre_comercial").order("codigo_erp");
     setClientes(data ?? []);
+  };
+
+  const loadVendedores = async () => {
+    // Obtener perfiles con rol ventas o coordinador
+    const { data: roles } = await supabase.from("user_roles").select("user_id, role").in("role", ["ventas", "coordinador"]);
+    if (!roles?.length) return;
+    const ids = roles.map(r => r.user_id);
+    const { data: profs } = await supabase.from("profiles").select("id, nombre_completo, codigo_vendedor, activo").in("id", ids).eq("activo", true).order("nombre_completo");
+    setVendedores(profs ?? []);
   };
 
   const load = async () => {
@@ -60,7 +72,7 @@ export default function Remisiones() {
     setRecentFolios(propios.slice(0, 5).map((r: any) => r.folio_remision));
   };
 
-  useEffect(() => { load(); loadClientes(); }, [user?.id, role]);
+  useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, role]);
 
   const canCreate = role === "admin" || role === "ventas" || role === "coordinador";
 
@@ -85,7 +97,12 @@ export default function Remisiones() {
     if (recentFolios.includes(form.folio_remision.trim())) {
       toast.error("Ese folio ya existe en tus remisiones recientes"); return;
     }
-    const payload = { ...form, folio_remision: form.folio_remision.trim(), vendedor_id: user?.id, total_unidades_solicitadas: Number(form.total_unidades_solicitadas) || 1 };
+    // Admin/coordinador pueden asignar a otro vendedor; ventas se asigna a sí mismo
+    const vendedor_id = canAssignVendedor && form.vendedor_asignado_id
+      ? form.vendedor_asignado_id
+      : user?.id;
+    const payload = { ...form, folio_remision: form.folio_remision.trim(), vendedor_id, total_unidades_solicitadas: Number(form.total_unidades_solicitadas) || 1 };
+    delete payload.vendedor_asignado_id; // no existe en DB
     const { data: nueva, error } = await supabase.from("remisiones").insert(payload).select("id").single();
     if (error) return toast.error(error.message);
     // Si hay archivo adjunto, subirlo
@@ -199,6 +216,25 @@ export default function Remisiones() {
                     </div>
                   )}
                 </div>
+
+                {/* Selector de vendedor — solo visible para admin/coordinador */}
+                {canAssignVendedor && (
+                  <div>
+                    <Label className="text-base">Vendedor asignado</Label>
+                    <Select value={form.vendedor_asignado_id} onValueChange={v => setForm({ ...form, vendedor_asignado_id: v })}>
+                      <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona vendedor (opcional)" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">— Asignar a mí mismo —</SelectItem>
+                        {vendedores.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.nombre_completo}{v.codigo_vendedor ? ` (${v.codigo_vendedor})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">Si no seleccionas, la remisión queda asignada a tu usuario.</p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label>{t.remisiones.cantMotocarros}</Label><Input type="number" min={1} value={form.total_unidades_solicitadas} onChange={e => setForm({ ...form, total_unidades_solicitadas: e.target.value })} className="h-12 text-base" /></div>

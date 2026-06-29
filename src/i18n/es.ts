@@ -397,7 +397,7 @@ export const es = {
     title: "Importar datos iniciales",
     subtitle: "Carga los CSV de producción y remisiones que vienen del Excel actual. La operación es idempotente: registros existentes no se duplican.",
     csvInfo: "CSV pre-cargados en el servidor",
-    csvDesc: "produccion_carga_inicial.csv (134 filas) + remisiones_carga_inicial.csv (30 filas)",
+    csvDesc: "produccion.csv (260 órdenes) + remisiones.csv (51 remisiones) — datos actualizados al 29 jun 2026",
     iniciar: "Iniciar importación",
     importando: "Importando…",
     completada: "Importación completada",
