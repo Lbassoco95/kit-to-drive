@@ -2,60 +2,132 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Inbox, RefreshCw, AlertCircle } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Inbox, RefreshCw, ChevronDown, FileDown, Package } from "lucide-react";
 import { fmtDate } from "@/lib/dazon";
 import { toast } from "sonner";
 
-type Pendiente = {
+const tipoIcon: Record<string, string> = {
+  motocarro: "🏍️", cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",
+};
+const tipoLabel: Record<string, string> = {
+  motocarro: "Motocarro", cabina: "Cabina", instalacion_cabina: "Instalación cabina",
+  activacion: "Activación", flete: "Flete",
+};
+const tipoBadge: Record<string, string> = {
+  motocarro: "bg-[#1F3864]/10 text-[#1F3864] border-[#1F3864]/20",
+  cabina: "bg-violet-50 text-violet-700 border-violet-200",
+  instalacion_cabina: "bg-purple-50 text-purple-700 border-purple-200",
+  activacion: "bg-amber-50 text-amber-700 border-amber-200",
+  flete: "bg-blue-50 text-blue-700 border-blue-200",
+};
+
+type RemisionCard = {
   id: string;
   folio_remision: string;
-  total_unidades_solicitadas: number;
-  color_solicitado: string | null;
   fecha_remision: string | null;
   estatus: string;
-  asignados: number;
+  notas: string | null;
+  documento_url: string | null;
   vendedor: string;
+  nombre_vendedor: string | null;
   cliente: string;
+  total_unidades: number;
+  asignados: number;
+  items: any[];
 };
 
 export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
-  const [items, setItems] = useState<Pendiente[]>([]);
+  const [items, setItems] = useState<RemisionCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase
+
+    // ── Query mínimo garantizado ──────────────────────────────────────────────
+    const { data: base } = await supabase
       .from("remisiones")
-      .select("id, folio_remision, total_unidades_solicitadas, color_solicitado, fecha_remision, estatus, profiles:vendedor_id(nombre_completo), clientes(codigo_erp, nombre_comercial), motocarros(id)")
+      .select("id,folio_remision,fecha_remision,estatus,notas, profiles:vendedor_id(nombre_completo), clientes(codigo_erp,nombre_comercial), motocarros(id)")
       .in("estatus", ["NUEVA", "PARCIAL"])
       .order("created_at", { ascending: false });
-    const mapped: Pendiente[] = (data ?? []).map((r: any) => ({
+
+    if (!base?.length) { setItems([]); setLoading(false); return; }
+
+    // Arrancar con lo básico
+    const mapped: RemisionCard[] = base.map((r: any) => ({
       id: r.id,
       folio_remision: r.folio_remision,
-      total_unidades_solicitadas: r.total_unidades_solicitadas,
-      color_solicitado: r.color_solicitado,
       fecha_remision: r.fecha_remision,
       estatus: r.estatus,
-      asignados: (r.motocarros ?? []).length,
+      notas: r.notas,
+      documento_url: null,
       vendedor: r.profiles?.nombre_completo ?? "—",
-      cliente: r.clientes?.codigo_erp ? `${r.clientes.codigo_erp} ${r.clientes.nombre_comercial ?? ""}` : "—",
+      nombre_vendedor: null,
+      cliente: r.clientes?.codigo_erp
+        ? `${r.clientes.codigo_erp}${r.clientes.nombre_comercial ? " · " + r.clientes.nombre_comercial : ""}`
+        : "—",
+      total_unidades: 1,
+      asignados: (r.motocarros ?? []).length,
+      items: [],
     }));
     setItems(mapped);
+
+    const ids = base.map((r: any) => r.id);
+
+    // ── Columnas extendidas (pueden no estar en cache) ────────────────────────
+    try {
+      const { data: ext } = await supabase
+        .from("remisiones")
+        .select("id,total_unidades_solicitadas,nombre_vendedor,documento_url")
+        .in("id", ids);
+      if (ext?.length) {
+        const extMap = Object.fromEntries(ext.map((r: any) => [r.id, r]));
+        setItems(prev => prev.map(r => ({
+          ...r,
+          total_unidades: extMap[r.id]?.total_unidades_solicitadas ?? r.asignados || 1,
+          nombre_vendedor: extMap[r.id]?.nombre_vendedor ?? null,
+          documento_url: extMap[r.id]?.documento_url ?? null,
+        })));
+      }
+    } catch (_) {}
+
+    // ── remision_items (tabla nueva) ──────────────────────────────────────────
+    try {
+      const { data: remItems } = await supabase
+        .from("remision_items")
+        .select("id,remision_id,tipo_servicio,modelo,color,cantidad,con_caja")
+        .in("remision_id", ids)
+        .order("tipo_servicio");
+      if (remItems?.length) {
+        const itemsMap: Record<string, any[]> = {};
+        for (const it of remItems) {
+          if (!itemsMap[it.remision_id]) itemsMap[it.remision_id] = [];
+          itemsMap[it.remision_id].push(it);
+        }
+        setItems(prev => prev.map(r => ({ ...r, items: itemsMap[r.id] ?? [] })));
+      }
+    } catch (_) {}
+
     setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const reintentar = async (id: string) => {
+  const asignar = async (id: string, faltan: number) => {
     setBusy(id);
     const { data, error } = await supabase.rpc("reintentar_asignar_remision", { _remision_id: id });
     setBusy(null);
     if (error) { toast.error(error.message); return; }
     if ((data ?? 0) > 0) toast.success(`✓ ${data} motocarro(s) asignado(s)`);
-    else toast.info("No hay motocarros disponibles que coincidan");
-    await load();
-    onChange?.();
+    else toast.info("No hay motocarros disponibles con esas características");
+    await load(); onChange?.();
+  };
+
+  const verDoc = async (path: string) => {
+    const { data } = await supabase.storage.from("remisiones-docs").createSignedUrl(path, 60);
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
   if (!items.length && !loading) return null;
@@ -63,50 +135,106 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   return (
     <Card className="p-5 border-2 border-[#E8A30D]/40 bg-gradient-to-br from-[#FFF8E7] to-white">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-xl bg-[#E8A30D]/15 flex items-center justify-center">
-          <Inbox className="h-7 w-7 text-[#A36B00]" />
+        <div className="w-11 h-11 rounded-xl bg-[#E8A30D]/15 flex items-center justify-center shrink-0">
+          <Inbox className="h-6 w-6 text-[#A36B00]" />
         </div>
-        <div className="flex-1">
-          <h2 className="text-xl font-bold text-[#1F3864]">Remisiones por asignar</h2>
-          <p className="text-sm text-muted-foreground">{items.length} remisión(es) esperan motocarros disponibles</p>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-bold text-[#1F3864]">Remisiones pendientes de asignar</h2>
+          <p className="text-sm text-muted-foreground">{items.length} remisión(es) activas</p>
         </div>
-        <Button variant="outline" size="sm" onClick={load} className="h-10"><RefreshCw className="h-4 w-4 mr-2" />Actualizar</Button>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="h-9 shrink-0">
+          <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> Actualizar
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {items.map(it => {
-          const faltan = it.total_unidades_solicitadas - it.asignados;
-          const sinNada = it.asignados === 0;
+        {items.map(rem => {
+          const faltan = rem.total_unidades - rem.asignados;
+          const sinAsignar = rem.asignados === 0;
+          const vendedorDisplay = rem.nombre_vendedor || rem.vendedor;
+
           return (
-            <div key={it.id} className="bg-white rounded-lg border-2 border-[#E8A30D]/20 p-4 flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-2">
+            <div key={rem.id} className="bg-white rounded-xl border border-[#E8A30D]/25 flex flex-col overflow-hidden shadow-sm">
+              {/* Header */}
+              <div className="flex items-start justify-between px-4 pt-3 pb-2 border-b bg-[#FFFBF0]">
                 <div>
-                  <div className="font-mono font-bold text-base text-[#1F3864]">{it.folio_remision}</div>
-                  <div className="text-xs text-muted-foreground">{fmtDate(it.fecha_remision)}</div>
+                  <div className="font-mono font-bold text-base text-[#1F3864]">{rem.folio_remision}</div>
+                  <div className="text-xs text-muted-foreground">{fmtDate(rem.fecha_remision)}</div>
                 </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded ${sinNada ? "bg-[#C0392B]/10 text-[#C0392B]" : "bg-[#E8A30D]/15 text-[#A36B00]"}`}>
-                  {sinNada ? "SIN ASIGNAR" : "PARCIAL"}
+                <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${sinAsignar ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                  {sinAsignar ? "SIN ASIGNAR" : "PARCIAL"}
                 </span>
               </div>
-              <div className="text-sm space-y-1">
-                <div><span className="text-muted-foreground">Vendedor:</span> <span className="font-medium">{it.vendedor}</span></div>
-                <div><span className="text-muted-foreground">Cliente:</span> <span className="font-medium">{it.cliente}</span></div>
-                <div className="flex gap-3 pt-1">
-                  <span className="text-muted-foreground">Solicita: <strong className="text-foreground">{it.total_unidades_solicitadas}</strong></span>
-                  <span className="text-muted-foreground">Asignados: <strong className="text-foreground">{it.asignados}</strong></span>
-                  <span className="text-[#C0392B] font-bold">Faltan: {faltan}</span>
+
+              {/* Info */}
+              <div className="px-4 py-3 space-y-1.5 text-sm">
+                <div className="flex gap-4">
+                  <span className="text-muted-foreground">Vendedor: <strong className="text-foreground">{vendedorDisplay}</strong></span>
                 </div>
-                {it.color_solicitado && (
-                  <div className="text-xs"><span className="text-muted-foreground">Color:</span> <strong>{it.color_solicitado}</strong></div>
+                <div className="text-muted-foreground">Cliente: <strong className="text-foreground">{rem.cliente}</strong></div>
+                <div className="flex gap-3 pt-0.5 text-sm">
+                  <span className="text-muted-foreground">Solicita: <strong className="text-foreground">{rem.total_unidades}</strong></span>
+                  <span className="text-muted-foreground">Asignados: <strong className="text-foreground">{rem.asignados}</strong></span>
+                  <span className="text-red-600 font-bold">Faltan: {faltan}</span>
+                </div>
+              </div>
+
+              {/* Servicios / características */}
+              {rem.items.length > 0 && (
+                <Collapsible open={!!expanded[rem.id]} onOpenChange={o => setExpanded(s => ({ ...s, [rem.id]: o }))}>
+                  <CollapsibleTrigger className="w-full flex items-center justify-between px-4 py-2 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-[#1F3864] border-y">
+                    <span>Características del pedido ({rem.items.length} líneas)</span>
+                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded[rem.id] ? "rotate-180" : ""}`} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="px-4 py-3 space-y-1.5">
+                      {rem.items.map((it: any) => (
+                        <div key={it.id} className="flex items-center gap-2 flex-wrap">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${tipoBadge[it.tipo_servicio] ?? ""}`}>
+                            {tipoIcon[it.tipo_servicio]} {tipoLabel[it.tipo_servicio]}
+                          </span>
+                          {it.modelo && <span className="text-xs text-muted-foreground">{it.modelo}</span>}
+                          {it.color && <span className="text-xs font-medium">{it.color}</span>}
+                          {it.cantidad > 1 && <span className="text-xs text-muted-foreground">×{it.cantidad}</span>}
+                          {it.con_caja && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                              <Package size={9} /> Con caja
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {/* Notas */}
+              {rem.notas && (
+                <div className="px-4 py-2 bg-blue-50/50 border-t text-xs text-[#1E40AF]">
+                  <span className="font-semibold">Nota:</span> {rem.notas}
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div className="px-4 py-3 mt-auto border-t flex gap-2">
+                <Button
+                  onClick={() => asignar(rem.id, faltan)}
+                  disabled={busy === rem.id || faltan <= 0}
+                  className="flex-1 h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold text-sm"
+                >
+                  {busy === rem.id ? "Asignando…" : `Asignar ${faltan} disponibles`}
+                </Button>
+                {rem.documento_url && (
+                  <Button
+                    variant="outline"
+                    onClick={() => verDoc(rem.documento_url!)}
+                    className="h-11 w-11 p-0 shrink-0"
+                    title="Ver documento"
+                  >
+                    <FileDown className="h-5 w-5" />
+                  </Button>
                 )}
               </div>
-              <Button
-                onClick={() => reintentar(it.id)}
-                disabled={busy === it.id}
-                className="h-12 w-full bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold"
-              >
-                {busy === it.id ? "Asignando…" : <><AlertCircle className="h-4 w-4 mr-2" />Asignar siguientes {faltan} disponibles</>}
-              </Button>
             </div>
           );
         })}

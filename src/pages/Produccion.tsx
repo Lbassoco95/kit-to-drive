@@ -244,9 +244,10 @@ export default function Produccion() {
         </div>
       </div>
 
-      {/* Indicadores de inventario y remisiones: solo admin/coordinador */}
+      {/* InventarioStatus (alertas de déficit): solo admin/coordinador */}
       {(role === "admin" || role === "coordinador") && <InventarioStatus refreshKey={rows.length} />}
-      {(role === "admin" || role === "coordinador") && <BandejaRemisiones onChange={load} />}
+      {/* BandejaRemisiones: fábrica la necesita para asignar, ver docs y características */}
+      {(role === "admin" || role === "fabrica" || role === "coordinador") && <BandejaRemisiones onChange={load} />}
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
