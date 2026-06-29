@@ -12,17 +12,42 @@ import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck, DollarSign, Trash2, Package, Zap } from "lucide-react";
+import {
+  Plus, Upload, Wand2, FileDown, FileText, ChevronDown,
+  UserPlus, CalendarClock, CheckCircle2, Factory, Truck,
+  DollarSign, Trash2, Package
+} from "lucide-react";
 import { FileOrCamera } from "@/components/FileOrCamera";
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Catálogos ────────────────────────────────────────────────────────────────
 const MODELOS = ["200cc 2026", "300cc 2026"];
 const COLORES = ["BLANCO", "AZUL", "ROJO", "NEGRO", "GRIS", "VERDE", "AMARILLO"];
-const colorLabel = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
+
+const TIPOS_SERVICIO = [
+  { value: "motocarro",         label: "🏍️ Motocarro",             needsUnidad: true  },
+  { value: "cabina",            label: "🛖 Cabina",                needsUnidad: true  },
+  { value: "instalacion_cabina",label: "🔧 Instalación de cabina", needsUnidad: false },
+  { value: "activacion",        label: "⚡ Activación",            needsUnidad: false },
+  { value: "flete",             label: "🚛 Flete",                 needsUnidad: false },
+] as const;
+
+const tipoLabel = (v: string) => TIPOS_SERVICIO.find(t => t.value === v)?.label ?? v;
+const needsUnidad = (v: string) => TIPOS_SERVICIO.find(t => t.value === v)?.needsUnidad ?? false;
+const colorLabel  = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
+
+// Badge colors per service type
+const tipoBadgeClass: Record<string, string> = {
+  motocarro:          "bg-[#1F3864]/10 text-[#1F3864] border-[#1F3864]/20",
+  cabina:             "bg-violet-50 text-violet-700 border-violet-200",
+  instalacion_cabina: "bg-purple-50 text-purple-700 border-purple-200",
+  activacion:         "bg-amber-50 text-amber-700 border-amber-200",
+  flete:              "bg-blue-50 text-blue-700 border-blue-200",
+};
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface LineaItem {
   _key: string;
+  tipo_servicio: string;
   modelo: string;
   color: string;
   cantidad: number;
@@ -31,6 +56,7 @@ interface LineaItem {
 
 const defaultLinea = (): LineaItem => ({
   _key: crypto.randomUUID(),
+  tipo_servicio: "motocarro",
   modelo: "200cc 2026",
   color: "BLANCO",
   cantidad: 1,
@@ -41,31 +67,27 @@ const defaultLinea = (): LineaItem => ({
 function suggestNextFolio(folios: string[]): string {
   if (!folios.length) return "REM-001";
   const parsed = folios
-    .map(f => {
-      const m = (f || "").match(/^(.*?)(\d+)\s*$/);
-      return m ? { prefix: m[1], num: parseInt(m[2], 10), pad: m[2].length } : null;
-    })
+    .map(f => { const m = (f || "").match(/^(.*?)(\d+)\s*$/); return m ? { prefix: m[1], num: parseInt(m[2], 10), pad: m[2].length } : null; })
     .filter(Boolean) as { prefix: string; num: number; pad: number }[];
   if (!parsed.length) return folios[0] + "-1";
   const last = parsed.sort((a, b) => b.num - a.num)[0];
   return `${last.prefix}${String(last.num + 1).padStart(last.pad, "0")}`;
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function Remisiones() {
   const { role, user } = useAuth();
   const { t } = useLang();
-  const [rows, setRows] = useState<any[]>([]);
-  const [clientes, setClientes] = useState<any[]>([]);
+  const [rows, setRows]             = useState<any[]>([]);
+  const [clientes, setClientes]     = useState<any[]>([]);
   const [vendedores, setVendedores] = useState<any[]>([]);
-  const [myProfile, setMyProfile] = useState<{ nombre_completo: string } | null>(null);
-  const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [myProfile, setMyProfile]   = useState<{ nombre_completo: string } | null>(null);
+  const [open, setOpen]             = useState(false);
+  const [expanded, setExpanded]     = useState<Record<string, boolean>>({});
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp: "", nombre_comercial: "", telefono: "" });
 
-  // Form state
   const [form, setForm] = useState<any>({
     folio_remision: "",
     cliente_id: "",
@@ -75,27 +97,25 @@ export default function Remisiones() {
     notas: "",
     tipo_pago: "anticipado",
     pagado: true,
-    tipo_remision: "cabina",
   });
   const [lineas, setLineas] = useState<LineaItem[]>([defaultLinea()]);
   const [formFile, setFormFile] = useState<File | null>(null);
 
-  // Pago dialog
-  const [pagoDialog, setPagoDialog] = useState<any | null>(null);
+  const [pagoDialog, setPagoDialog]         = useState<any | null>(null);
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
-  const [subiendoPago, setSubiendoPago] = useState(false);
+  const [subiendoPago, setSubiendoPago]     = useState(false);
 
   const canAssignVendedor = role === "admin" || role === "coordinador";
   const totalLineas = lineas.reduce((s, l) => s + Number(l.cantidad || 0), 0);
 
-  // ── Load ────────────────────────────────────────────────────────────────────
+  // ── Loaders ──────────────────────────────────────────────────────────────────
   const loadClientes = async () => {
     const { data } = await supabase.from("clientes").select("id, codigo_erp, nombre_comercial").order("codigo_erp");
     setClientes(data ?? []);
   };
 
   const loadVendedores = async () => {
-    const { data: roles } = await supabase.from("user_roles").select("user_id, role").in("role", ["ventas", "coordinador"]);
+    const { data: roles } = await supabase.from("user_roles").select("user_id, role").in("role", ["ventas","coordinador"]);
     if (!roles?.length) return;
     const ids = roles.map(r => r.user_id);
     const { data: profs } = await supabase.from("profiles").select("id, nombre_completo, codigo_vendedor, activo").in("id", ids).eq("activo", true).order("nombre_completo");
@@ -105,16 +125,14 @@ export default function Remisiones() {
   const load = async () => {
     const { data } = await supabase
       .from("remisiones")
-      .select("*, clientes(codigo_erp, nombre_comercial), profiles:vendedor_id(nombre_completo), remision_items(id, modelo, color, cantidad, con_caja), motocarros(id, orden_armado, modelo, color, ns_chasis, chasis_asignado, estatus_armado, fecha_estimada_armado, fecha_real_armado, estatus_entrega, fecha_estimada_entrega, fecha_propuesta_entrega, propuesta_entrega_notas, confirmada_fabrica_at, confirmada_logistica_at)")
+      .select("*, clientes(codigo_erp, nombre_comercial), profiles:vendedor_id(nombre_completo), remision_items(id, tipo_servicio, modelo, color, cantidad, con_caja), motocarros(id, orden_armado, modelo, color, ns_chasis, chasis_asignado, estatus_armado, fecha_estimada_armado, fecha_real_armado, estatus_entrega, fecha_estimada_entrega, fecha_propuesta_entrega, propuesta_entrega_notas, confirmada_fabrica_at, confirmada_logistica_at)")
       .order("fecha_remision", { ascending: false, nullsFirst: false });
     setRows(data ?? []);
     const propios = (data ?? []).filter((r: any) => role === "admin" || role === "coordinador" || r.vendedor_id === user?.id);
     setRecentFolios(propios.slice(0, 5).map((r: any) => r.folio_remision));
   };
 
-  useEffect(() => {
-    load(); loadClientes(); loadVendedores();
-  }, [user?.id, role]);
+  useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, role]);
 
   useEffect(() => {
     if (user?.id) {
@@ -125,19 +143,32 @@ export default function Remisiones() {
 
   const canCreate = role === "admin" || role === "ventas" || role === "coordinador";
 
-  // ── Line item helpers ────────────────────────────────────────────────────────
+  // ── Line helpers ─────────────────────────────────────────────────────────────
   const addLinea = () => setLineas(l => [...l, defaultLinea()]);
   const removeLinea = (idx: number) => setLineas(l => l.filter((_, i) => i !== idx));
   const updateLinea = (idx: number, field: keyof LineaItem, value: any) =>
     setLineas(l => l.map((item, i) => i === idx ? { ...item, [field]: value } : item));
 
-  // ── Open dialog ─────────────────────────────────────────────────────────────
+  const changeTipo = (idx: number, tipo: string) => {
+    // When switching type, reset modelo/color/con_caja only if needed
+    setLineas(l => l.map((item, i) => {
+      if (i !== idx) return item;
+      return {
+        ...item,
+        tipo_servicio: tipo,
+        modelo: needsUnidad(tipo) ? (item.modelo || "200cc 2026") : "",
+        color:  needsUnidad(tipo) ? (item.color  || "BLANCO") : "",
+        con_caja: needsUnidad(tipo) ? item.con_caja : false,
+      };
+    }));
+  };
+
+  // ── Open/reset dialog ─────────────────────────────────────────────────────────
   const abrirNueva = () => {
     setForm((f: any) => ({
       ...f,
       folio_remision: suggestNextFolio(recentFolios),
       nombre_vendedor: role === "ventas" ? (myProfile?.nombre_completo || "") : "",
-      tipo_remision: "cabina",
     }));
     setLineas([defaultLinea()]);
     setFormFile(null);
@@ -145,22 +176,12 @@ export default function Remisiones() {
   };
 
   const resetForm = () => {
-    setForm({
-      folio_remision: "",
-      cliente_id: "",
-      vendedor_asignado_id: "",
-      nombre_vendedor: "",
-      fecha_remision: new Date().toISOString().slice(0, 10),
-      notas: "",
-      tipo_pago: "anticipado",
-      pagado: true,
-      tipo_remision: "cabina",
-    });
+    setForm({ folio_remision: "", cliente_id: "", vendedor_asignado_id: "", nombre_vendedor: "", fecha_remision: new Date().toISOString().slice(0, 10), notas: "", tipo_pago: "anticipado", pagado: true });
     setLineas([defaultLinea()]);
     setFormFile(null);
   };
 
-  // ── Save nuevo cliente ───────────────────────────────────────────────────────
+  // ── Save new cliente ──────────────────────────────────────────────────────────
   const guardarNuevoCliente = async () => {
     if (!nuevoCliente.codigo_erp.trim()) return toast.error("El código ERP es obligatorio");
     const { data, error } = await supabase.from("clientes").insert(nuevoCliente).select("id, codigo_erp, nombre_comercial").single();
@@ -172,21 +193,18 @@ export default function Remisiones() {
     setCreandoCliente(false);
   };
 
-  // ── Create remisión ──────────────────────────────────────────────────────────
+  // ── Create remisión ───────────────────────────────────────────────────────────
   const crearRemision = async () => {
-    if (!form.folio_remision || !form.cliente_id) {
-      toast.error("Folio y cliente son obligatorios"); return;
-    }
-    if (recentFolios.includes(form.folio_remision.trim())) {
-      toast.error("Ese folio ya existe en tus remisiones recientes"); return;
-    }
-    if (lineas.length === 0 || totalLineas === 0) {
-      toast.error("Agrega al menos una línea con unidades"); return;
-    }
+    if (!form.folio_remision || !form.cliente_id) { toast.error("Folio y cliente son obligatorios"); return; }
+    if (recentFolios.includes(form.folio_remision.trim())) { toast.error("Ese folio ya existe en tus remisiones recientes"); return; }
+    if (lineas.length === 0 || totalLineas === 0) { toast.error("Agrega al menos una línea"); return; }
 
-    const vendedor_id = canAssignVendedor && form.vendedor_asignado_id
-      ? form.vendedor_asignado_id
-      : user?.id;
+    const vendedor_id = canAssignVendedor && form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
+
+    // Compute totals for backward compat
+    const motoLineas = lineas.filter(l => l.tipo_servicio === "motocarro");
+    const total_unidades = motoLineas.reduce((s, l) => s + Number(l.cantidad), 0) || totalLineas;
+    const color_principal = motoLineas[0]?.color || lineas[0]?.color || "BLANCO";
 
     const payload: any = {
       folio_remision: form.folio_remision.trim(),
@@ -197,29 +215,28 @@ export default function Remisiones() {
       notas: form.notas || null,
       tipo_pago: form.tipo_pago,
       pagado: form.tipo_pago === "anticipado",
-      tipo_remision: form.tipo_remision,
-      // Backward compat: first line's color as main color_solicitado
-      color_solicitado: lineas[0]?.color || "BLANCO",
-      total_unidades_solicitadas: totalLineas,
+      color_solicitado: color_principal,
+      total_unidades_solicitadas: total_unidades,
     };
 
     const { data: nueva, error } = await supabase.from("remisiones").insert(payload).select("id").single();
     if (error) return toast.error(error.message);
 
     // Insert line items
-    if (nueva?.id && lineas.length > 0) {
+    if (nueva?.id) {
       const items = lineas.map(l => ({
         remision_id: nueva.id,
-        modelo: l.modelo,
-        color: l.color,
+        tipo_servicio: l.tipo_servicio,
+        modelo:   needsUnidad(l.tipo_servicio) ? l.modelo  : null,
+        color:    needsUnidad(l.tipo_servicio) ? l.color   : null,
         cantidad: Number(l.cantidad) || 1,
-        con_caja: l.con_caja,
+        con_caja: needsUnidad(l.tipo_servicio) ? l.con_caja : false,
       }));
       const { error: itemsErr } = await supabase.from("remision_items").insert(items);
-      if (itemsErr) console.error("Error al guardar líneas:", itemsErr.message);
+      if (itemsErr) console.error("Error líneas:", itemsErr.message);
     }
 
-    // Upload document if any
+    // Upload doc
     if (formFile && nueva?.id) {
       const path = `${nueva.id}/${Date.now()}_${formFile.name}`;
       const { error: upErr } = await supabase.storage.from("remisiones-docs").upload(path, formFile);
@@ -232,42 +249,33 @@ export default function Remisiones() {
     load();
   };
 
-  // ── Assign chasis ────────────────────────────────────────────────────────────
+  // ── Assign chasis ─────────────────────────────────────────────────────────────
   const asignarChasis = async (r: any) => {
-    const items: any[] = r.remision_items || [];
-    const motos: any[] = r.motocarros || [];
+    const items: any[] = (r.remision_items ?? []).filter((i: any) => i.tipo_servicio === "motocarro");
+    const motos: any[] = r.motocarros ?? [];
 
     if (!items.length) {
-      // Fallback: assign by total remaining (old behavior)
       const cant = (r.total_unidades_solicitadas || 1) - motos.length;
       if (cant <= 0) { toast.info("Ya están todos los chasis asignados"); return; }
-      const { data, error } = await supabase.rpc("asignar_chasis_remision", {
-        _remision_id: r.id, _cantidad: cant, _color: r.color_solicitado || null
-      });
+      const { data, error } = await supabase.rpc("asignar_chasis_remision", { _remision_id: r.id, _cantidad: cant, _color: r.color_solicitado || null });
       if (error) return toast.error(error.message);
       toast.success(`✓ ${data} chasis asignados`);
     } else {
-      // Assign per line item, matching by color
       let totalAsignados = 0;
       for (const item of items) {
-        const yaAsignados = motos.filter((m: any) =>
-          (m.color || "").toUpperCase() === item.color.toUpperCase()
-        ).length;
+        const yaAsignados = motos.filter((m: any) => (m.color || "").toUpperCase() === item.color?.toUpperCase()).length;
         const restantes = item.cantidad - yaAsignados;
         if (restantes <= 0) continue;
-        const { data, error } = await supabase.rpc("asignar_chasis_remision", {
-          _remision_id: r.id, _cantidad: restantes, _color: item.color
-        });
-        if (error) { console.error(`Error asignando ${item.color}:`, error.message); continue; }
+        const { data, error } = await supabase.rpc("asignar_chasis_remision", { _remision_id: r.id, _cantidad: restantes, _color: item.color });
+        if (error) { console.error(error.message); continue; }
         totalAsignados += (data || 0);
       }
       if (totalAsignados > 0) toast.success(`✓ ${totalAsignados} chasis asignados`);
-      else toast.info("No hay unidades disponibles en inventario con los colores solicitados");
+      else toast.info("No hay unidades disponibles con los colores solicitados");
     }
     load();
   };
 
-  // ── Upload PDF ───────────────────────────────────────────────────────────────
   const subirPdf = async (r: any, file: File) => {
     const path = `${r.id}/${Date.now()}_${file.name}`;
     const { error: upErr } = await supabase.storage.from("remisiones-docs").upload(path, file);
@@ -281,10 +289,8 @@ export default function Remisiones() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank");
   };
 
-  // ── Confirm pago ─────────────────────────────────────────────────────────────
   const confirmarPago = async () => {
-    if (!pagoDialog) return;
-    if (!comprobanteFile) { toast.error(t.pago.sinComprobante); return; }
+    if (!pagoDialog || !comprobanteFile) { toast.error(t.pago.sinComprobante); return; }
     setSubiendoPago(true);
     const path = `${pagoDialog.id}/comprobante_${Date.now()}_${comprobanteFile.name}`;
     const { error: upErr } = await supabase.storage.from("remisiones-docs").upload(path, comprobanteFile);
@@ -324,50 +330,18 @@ export default function Remisiones() {
               <DialogHeader><DialogTitle>{t.remisiones.crearTitulo}</DialogTitle></DialogHeader>
 
               <div className="space-y-4">
-                {/* Tipo de remisión */}
-                <div>
-                  <Label className="text-base">Tipo de remisión</Label>
-                  <Select value={form.tipo_remision} onValueChange={v => setForm({ ...form, tipo_remision: v })}>
-                    <SelectTrigger className="h-12 text-base"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cabina">🏍️ Cabina (unidad)</SelectItem>
-                      <SelectItem value="activacion">⚡ Activación</SelectItem>
-                      <SelectItem value="flete">🚛 Flete</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {form.tipo_remision === "activacion" && (
-                    <p className="text-xs text-amber-600 mt-1.5 bg-amber-50 rounded-md px-3 py-2 border border-amber-200">
-                      ⚡ Documenta el servicio de activación (batería, gasolina, ajustes). Anota el folio de la cabina en las notas.
-                    </p>
-                  )}
-                  {form.tipo_remision === "flete" && (
-                    <p className="text-xs text-blue-600 mt-1.5 bg-blue-50 rounded-md px-3 py-2 border border-blue-200">
-                      🚛 Documenta el costo de envío/flete. Anota el folio de la cabina en las notas.
-                    </p>
-                  )}
-                </div>
-
                 {/* Folio */}
                 <div>
                   <Label className="text-base">{t.remisiones.folioRemision}</Label>
-                  <Input
-                    value={form.folio_remision}
-                    onChange={e => setForm({ ...form, folio_remision: e.target.value })}
-                    placeholder={t.remisiones.folioPlaceholder}
-                    className="h-12 text-base font-mono"
-                  />
+                  <Input value={form.folio_remision} onChange={e => setForm({ ...form, folio_remision: e.target.value })} placeholder={t.remisiones.folioPlaceholder} className="h-12 text-base font-mono" />
                   {recentFolios.length > 0 && (
-                    <div className="mt-2">
-                      <div className="text-xs text-muted-foreground mb-1">Últimas remisiones:</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {recentFolios.map(f => (
-                          <button key={f} type="button"
-                            onClick={() => setForm((s: any) => ({ ...s, folio_remision: suggestNextFolio([f]) }))}
-                            className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-[#1F3864] border">
-                            {f}
-                          </button>
-                        ))}
-                      </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {recentFolios.map(f => (
+                        <button key={f} type="button" onClick={() => setForm((s: any) => ({ ...s, folio_remision: suggestNextFolio([f]) }))}
+                          className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-[#1F3864] border">
+                          {f}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -376,21 +350,14 @@ export default function Remisiones() {
                 <div>
                   <div className="flex items-center justify-between">
                     <Label className="text-base">Cliente</Label>
-                    <button type="button" onClick={() => setCreandoCliente(s => !s)}
-                      className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
+                    <button type="button" onClick={() => setCreandoCliente(s => !s)} className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
                       <UserPlus className="h-3.5 w-3.5" /> {creandoCliente ? "Cancelar" : "Nuevo cliente"}
                     </button>
                   </div>
                   {!creandoCliente ? (
                     <Select value={form.cliente_id} onValueChange={v => setForm({ ...form, cliente_id: v })}>
                       <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente" /></SelectTrigger>
-                      <SelectContent>
-                        {clientes.map(c => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.codigo_erp}{c.nombre_comercial ? ` — ${c.nombre_comercial}` : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
+                      <SelectContent>{clientes.map(c => <SelectItem key={c.id} value={c.id}>{c.codigo_erp}{c.nombre_comercial ? ` — ${c.nombre_comercial}` : ""}</SelectItem>)}</SelectContent>
                     </Select>
                   ) : (
                     <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
@@ -402,106 +369,101 @@ export default function Remisiones() {
                   )}
                 </div>
 
-                {/* Vendedor — selector para admin/coordinador, campo de nombre para todos */}
+                {/* Vendedor selector (admin/coordinador) */}
                 {canAssignVendedor && (
                   <div>
                     <Label className="text-base">Asignar a vendedor</Label>
-                    <Select
-                      value={form.vendedor_asignado_id}
-                      onValueChange={v => {
-                        const vend = vendedores.find(x => x.id === v);
-                        setForm({ ...form, vendedor_asignado_id: v, nombre_vendedor: vend?.nombre_completo || form.nombre_vendedor });
-                      }}
-                    >
+                    <Select value={form.vendedor_asignado_id} onValueChange={v => {
+                      const vend = vendedores.find(x => x.id === v);
+                      setForm({ ...form, vendedor_asignado_id: v, nombre_vendedor: vend?.nombre_completo || form.nombre_vendedor });
+                    }}>
                       <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Vendedor (opcional)" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="">— Asignar a mí mismo —</SelectItem>
-                        {vendedores.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.nombre_completo}{v.codigo_vendedor ? ` (${v.codigo_vendedor})` : ""}
-                          </SelectItem>
-                        ))}
+                        {vendedores.map(v => <SelectItem key={v.id} value={v.id}>{v.nombre_completo}{v.codigo_vendedor ? ` (${v.codigo_vendedor})` : ""}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                 )}
 
-                {/* Nombre del vendedor — visible para TODOS */}
+                {/* Nombre vendedor — visible todos */}
                 <div>
                   <Label className="text-base">
                     Nombre del vendedor
                     {role === "ventas" && <span className="ml-1 text-xs text-muted-foreground font-normal">(tu nombre)</span>}
                   </Label>
-                  <Input
-                    value={form.nombre_vendedor}
-                    onChange={e => setForm({ ...form, nombre_vendedor: e.target.value })}
-                    placeholder="Nombre completo del vendedor responsable"
-                    className="h-12 text-base"
-                  />
+                  <Input value={form.nombre_vendedor} onChange={e => setForm({ ...form, nombre_vendedor: e.target.value })} placeholder="Nombre completo del vendedor responsable" className="h-12 text-base" />
                 </div>
 
-                {/* LINE ITEMS — modelos/colores/cantidades */}
+                {/* ── LINE ITEMS ─────────────────────────────────────── */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-base">Motocarros solicitados</Label>
-                    <span className="text-sm font-semibold text-[#1F3864]">Total: {totalLineas} unidades</span>
+                    <Label className="text-base">Servicios / productos</Label>
+                    <span className="text-sm font-semibold text-[#1F3864]">{totalLineas} unidades</span>
                   </div>
 
                   {lineas.map((linea, idx) => (
-                    <div key={linea._key} className="border rounded-xl p-3 bg-slate-50 space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Modelo</Label>
-                          <Select value={linea.modelo} onValueChange={v => updateLinea(idx, "modelo", v)}>
+                    <div key={linea._key} className="border rounded-xl overflow-hidden bg-slate-50">
+                      {/* Tipo de servicio */}
+                      <div className="flex items-center gap-2 px-3 pt-3">
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground">Tipo</Label>
+                          <Select value={linea.tipo_servicio} onValueChange={v => changeTipo(idx, v)}>
                             <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {MODELOS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                              {TIPOS_SERVICIO.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Color</Label>
-                          <Select value={linea.color} onValueChange={v => updateLinea(idx, "color", v)}>
-                            <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {COLORES.map(c => <SelectItem key={c} value={c}>{colorLabel(c)}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className="w-28">
+                        <div className="w-24 shrink-0">
                           <Label className="text-xs text-muted-foreground">Cantidad</Label>
-                          <Input
-                            type="number" min={1}
-                            value={linea.cantidad}
+                          <Input type="number" min={1} value={linea.cantidad}
                             onChange={e => updateLinea(idx, "cantidad", Math.max(1, parseInt(e.target.value) || 1))}
-                            className="h-10 text-sm"
-                          />
+                            className="h-10 text-sm" />
                         </div>
-                        <label className="flex items-center gap-2 cursor-pointer pt-5 flex-1">
-                          <input
-                            type="checkbox"
-                            checked={linea.con_caja}
-                            onChange={e => updateLinea(idx, "con_caja", e.target.checked)}
-                            className="w-4 h-4 accent-[#1F3864]"
-                          />
-                          <span className="text-sm font-medium flex items-center gap-1">
-                            <Package size={14} className="text-[#1F3864]" /> Con caja de carga
-                          </span>
-                        </label>
                         {lineas.length > 1 && (
-                          <button type="button" onClick={() => removeLinea(idx)} className="pt-5 text-red-400 hover:text-red-600" title="Quitar línea">
+                          <button type="button" onClick={() => removeLinea(idx)} className="mt-5 text-red-400 hover:text-red-600" title="Quitar">
                             <Trash2 size={16} />
                           </button>
                         )}
                       </div>
+
+                      {/* Campos condicionales: solo para motocarro / cabina */}
+                      {needsUnidad(linea.tipo_servicio) && (
+                        <div className="px-3 pb-3 pt-2 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Modelo</Label>
+                              <Select value={linea.modelo} onValueChange={v => updateLinea(idx, "modelo", v)}>
+                                <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>{MODELOS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Color</Label>
+                              <Select value={linea.color} onValueChange={v => updateLinea(idx, "color", v)}>
+                                <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>{COLORES.map(c => <SelectItem key={c} value={c}>{colorLabel(c)}</SelectItem>)}</SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={linea.con_caja}
+                              onChange={e => updateLinea(idx, "con_caja", e.target.checked)}
+                              className="w-4 h-4 accent-[#1F3864]" />
+                            <span className="text-sm font-medium flex items-center gap-1.5">
+                              <Package size={14} className="text-[#1F3864]" />
+                              Con caja de carga montada
+                            </span>
+                          </label>
+                        </div>
+                      )}
                     </div>
                   ))}
 
-                  <Button type="button" variant="outline" onClick={addLinea} className="w-full h-10 border-dashed border-[#2E75B6]/50 text-[#2E75B6] hover:bg-[#DBEAFE]/30">
-                    <Plus className="h-4 w-4 mr-2" /> Agregar otra configuración
+                  <Button type="button" variant="outline" onClick={addLinea}
+                    className="w-full h-10 border-dashed border-[#2E75B6]/50 text-[#2E75B6] hover:bg-[#DBEAFE]/30">
+                    <Plus className="h-4 w-4 mr-2" /> Agregar servicio
                   </Button>
                 </div>
 
@@ -529,13 +491,13 @@ export default function Remisiones() {
                 {/* Notas */}
                 <div>
                   <Label>Notas</Label>
-                  <Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} placeholder={form.tipo_remision === "activacion" ? "Referencia el folio de venta, ej: REM-001" : ""} className="h-12 text-base" />
+                  <Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} className="h-12 text-base" />
                 </div>
 
-                {/* Doc upload */}
+                {/* Doc */}
                 <div>
                   <Label>{t.remisiones.subirRemision}</Label>
-                  <FileOrCamera value={formFile} onChange={setFormFile} label="Toma foto de la remisión física o sube el PDF" className="mt-1" />
+                  <FileOrCamera value={formFile} onChange={setFormFile} label="Toma foto o sube el PDF" className="mt-1" />
                 </div>
               </div>
 
@@ -549,49 +511,36 @@ export default function Remisiones() {
         )}
       </div>
 
-      {/* ── Card grid ─────────────────────────────────────────────────────── */}
+      {/* ── Cards ──────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {rows.map(r => {
-          const motos = r.motocarros ?? [];
+          const motos   = r.motocarros ?? [];
           const items: any[] = r.remision_items ?? [];
           const asignadas = motos.length;
-          const listas = motos.filter((m: any) => ["ARMADO","LISTO"].includes(m.estatus_armado)).length;
-          const total = r.total_unidades_solicitadas || asignadas || 1;
-          const pct = Math.round((listas / total) * 100);
-          const pctColor = pct === 100 ? "#065F46" : pct >= 50 ? "#92400E" : "#991B1B";
-          const isOwner = r.vendedor_id === user?.id;
-          const canAssign = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
-          const canUpload = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
+          const listas    = motos.filter((m: any) => ["ARMADO","LISTO"].includes(m.estatus_armado)).length;
+          const total     = r.total_unidades_solicitadas || asignadas || 1;
+          const pct       = Math.round((listas / total) * 100);
+          const pctColor  = pct === 100 ? "#065F46" : pct >= 50 ? "#92400E" : "#991B1B";
+          const isOwner   = r.vendedor_id === user?.id;
+          const canAssign  = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
+          const canUpload  = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
           const canPropose = role === "admin" || role === "coordinador" || (role === "ventas" && isOwner);
-
-          // Vendor display name: prefer nombre_vendedor, fallback to FK profile, fallback to notas
-          const vendedorNombre = r.nombre_vendedor || r.profiles?.nombre_completo || (r.notas?.replace("Vendedor original: ", "")) || "—";
+          const vendedorNombre = r.nombre_vendedor || r.profiles?.nombre_completo || "—";
           const initials = vendedorNombre.split(" ").map((s: string) => s[0]).slice(0,2).join("").toUpperCase();
 
           return (
             <Card key={r.id} className="p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
+              {/* Header */}
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
-                    {r.tipo_remision === "activacion" && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
-                        <Zap size={10} /> Activación
-                      </span>
-                    )}
-                    {r.tipo_remision === "flete" && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
-                        🚛 Flete
-                      </span>
-                    )}
-                  </div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
                   <div className="text-2xl font-bold text-[#1F3864] leading-tight">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                 </div>
                 <EstatusBadge estatus={r.estatus} size="md" />
               </div>
 
-              {/* Badges: vendedor + cliente + pago */}
+              {/* Vendedor + cliente + pago */}
               <div className="flex flex-wrap gap-1.5">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] text-xs font-medium">
                   <span className="w-5 h-5 rounded-full bg-[#2E75B6] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{initials || "?"}</span>
@@ -601,9 +550,7 @@ export default function Remisiones() {
                   👤 {r.clientes?.codigo_erp || "—"}
                 </span>
                 {r.tipo_pago === "contra_entrega" && !r.pagado ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">
-                    {t.pago.pendiente}
-                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">{t.pago.pendiente}</span>
                 ) : (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-700 text-xs font-semibold">
                     <DollarSign className="h-3 w-3" /> {r.tipo_pago === "contra_entrega" ? t.pago.contra_entrega : t.pago.anticipado}
@@ -611,28 +558,31 @@ export default function Remisiones() {
                 )}
               </div>
 
-              {/* Line items summary */}
+              {/* Services summary */}
               {items.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {items.map((item: any) => (
-                    <span key={item.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-[#1F3864]/5 text-[#1F3864] border border-[#1F3864]/15">
-                      {item.cantidad}× {item.modelo} <span className="text-muted-foreground">{colorLabel(item.color)}</span>
-                      {item.con_caja && <Package size={10} className="text-[#1F3864]" />}
+                    <span key={item.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${tipoBadgeClass[item.tipo_servicio] ?? "bg-slate-100 text-slate-700 border-slate-200"}`}>
+                      {item.cantidad > 1 && <span className="font-bold">{item.cantidad}×</span>}
+                      {tipoLabel(item.tipo_servicio)}
+                      {item.modelo && <span className="opacity-70 text-[10px]">{item.modelo}</span>}
+                      {item.color  && <span className="opacity-60">{colorLabel(item.color)}</span>}
+                      {item.con_caja && <Package size={9} />}
                     </span>
                   ))}
                 </div>
               )}
 
-              {/* Progress */}
+              {/* Progress bar (motocarros only) */}
               <div>
                 <div className="flex justify-between text-sm font-medium mb-1.5">
-                  <span>{listas} de {total} chasis listos</span>
+                  <span>{listas} de {total} listos</span>
                   <span style={{ color: pctColor }} className="font-bold">{pct}%</span>
                 </div>
                 <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: pctColor }} />
+                  <div className="h-full transition-all" style={{ width: `${Math.min(pct,100)}%`, backgroundColor: pctColor }} />
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">{asignadas} asignados de {total} solicitados</div>
+                <div className="text-xs text-muted-foreground mt-1">{asignadas} chasis asignados de {total} solicitados</div>
               </div>
 
               {/* Moto list */}
@@ -650,7 +600,7 @@ export default function Remisiones() {
                 </Collapsible>
               )}
 
-              {/* Actions */}
+              {/* Action buttons */}
               <div className="flex gap-2 mt-auto pt-2 border-t flex-wrap">
                 {canAssign && asignadas < total && (
                   <Button onClick={() => asignarChasis(r)} className="flex-1 h-12 bg-[#2E75B6] hover:bg-[#246094] text-base min-w-[100px]">
@@ -673,7 +623,7 @@ export default function Remisiones() {
                     <FileText className="h-5 w-5 mr-2 opacity-40" /> Sin PDF
                   </div>
                 )}
-                {r.tipo_pago === "contra_entrega" && !r.pagado && (role === "admin" || role === "coordinador" || (role === "ventas" && r.vendedor_id === user?.id)) && (
+                {r.tipo_pago === "contra_entrega" && !r.pagado && (role === "admin" || role === "coordinador" || (role === "ventas" && isOwner)) && (
                   <Button onClick={() => { setPagoDialog(r); setComprobanteFile(null); }} className="flex-1 h-12 text-base bg-emerald-600 hover:bg-emerald-700 min-w-[100px]">
                     <DollarSign className="h-5 w-5 mr-2" /> {t.pago.confirmar}
                   </Button>
@@ -687,12 +637,10 @@ export default function Remisiones() {
             </Card>
           );
         })}
-        {!rows.length && (
-          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones</div>
-        )}
+        {!rows.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones</div>}
       </div>
 
-      {/* Dialog: confirmar pago */}
+      {/* Pago dialog */}
       <Dialog open={!!pagoDialog} onOpenChange={o => { if (!o) { setPagoDialog(null); setComprobanteFile(null); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{t.pago.confirmar} — {pagoDialog?.folio_remision}</DialogTitle></DialogHeader>
@@ -714,7 +662,7 @@ export default function Remisiones() {
   );
 }
 
-// ─── MotoRow (sub-component) ──────────────────────────────────────────────────
+// ─── MotoRow ──────────────────────────────────────────────────────────────────
 function MotoRow({ m, canPropose, role, onChange }: { m: any; canPropose: boolean; role: string | null; onChange: () => void }) {
   const [editing, setEditing] = useState(false);
   const [fecha, setFecha] = useState<string>(m.fecha_propuesta_entrega || "");
@@ -724,7 +672,7 @@ function MotoRow({ m, canPropose, role, onChange }: { m: any; canPropose: boolea
     if (!fecha) return toast.error("Selecciona una fecha");
     const { error } = await supabase.rpc("proponer_fecha_entrega", { _motocarro_id: m.id, _fecha: fecha, _notas: notas || null });
     if (error) return toast.error(error.message);
-    toast.success("✓ Fecha propuesta enviada a fábrica y logística");
+    toast.success("✓ Fecha propuesta enviada");
     setEditing(false); onChange();
   };
 
@@ -754,7 +702,6 @@ function MotoRow({ m, canPropose, role, onChange }: { m: any; canPropose: boolea
         <div className="text-muted-foreground">Estim. entrega:</div>
         <div className="text-right font-medium">{fmtDate(m.fecha_estimada_entrega || m.fecha_propuesta_entrega)}</div>
       </div>
-
       {!editing ? (
         <div className="px-3 pb-3 flex flex-wrap items-center gap-2">
           {m.fecha_propuesta_entrega ? (
@@ -773,7 +720,7 @@ function MotoRow({ m, canPropose, role, onChange }: { m: any; canPropose: boolea
               </div>
             </div>
           ) : (
-            <div className="flex-1 text-xs text-muted-foreground italic">Sin fecha propuesta con cliente</div>
+            <div className="flex-1 text-xs text-muted-foreground italic">Sin fecha propuesta</div>
           )}
           <div className="flex gap-1.5 ml-auto">
             {canPropose && m.estatus_entrega !== "ENTREGADA" && (
@@ -796,14 +743,8 @@ function MotoRow({ m, canPropose, role, onChange }: { m: any; canPropose: boolea
       ) : (
         <div className="px-3 pb-3 space-y-2 bg-[#DBEAFE]/30">
           <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs">Fecha pactada con cliente</Label>
-              <Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="h-9 text-sm" />
-            </div>
-            <div>
-              <Label className="text-xs">Hora / contacto</Label>
-              <Input value={notas} onChange={e => setNotas(e.target.value)} placeholder="Ej: 10am, llamar al chofer" className="h-9 text-sm" />
-            </div>
+            <div><Label className="text-xs">Fecha pactada</Label><Input type="date" value={fecha} onChange={e => setFecha(e.target.value)} className="h-9 text-sm" /></div>
+            <div><Label className="text-xs">Hora / contacto</Label><Input value={notas} onChange={e => setNotas(e.target.value)} placeholder="Ej: 10am" className="h-9 text-sm" /></div>
           </div>
           <div className="flex gap-2">
             <Button size="sm" className="h-9 bg-[#1F3864] hover:bg-[#162a4d]" onClick={proponer}>Enviar propuesta</Button>
