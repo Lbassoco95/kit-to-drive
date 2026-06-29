@@ -13,6 +13,7 @@ import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Plus, Upload, Wand2, FileDown, FileText, ChevronDown, UserPlus, CalendarClock, CheckCircle2, Factory, Truck, DollarSign, ImageIcon } from "lucide-react";
+import { FileOrCamera } from "@/components/FileOrCamera";
 
 // Sugiere el siguiente folio incrementando el sufijo numérico del último
 function suggestNextFolio(folios: string[]): string {
@@ -262,11 +263,7 @@ export default function Remisiones() {
                 <div><Label>Notas</Label><Input value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} className="h-12 text-base" /></div>
                 <div>
                   <Label>{t.remisiones.subirRemision}</Label>
-                  <label className="mt-1 flex items-center justify-center cursor-pointer h-12 rounded-md border-2 border-dashed border-slate-300 hover:border-[#2E75B6] hover:bg-[#DBEAFE]/30 text-sm text-muted-foreground gap-2">
-                    <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setFormFile(e.target.files?.[0] ?? null)} />
-                    <ImageIcon className="h-4 w-4" />
-                    {formFile ? <span className="text-[#1F3864] font-medium truncate max-w-[200px]">{formFile.name}</span> : "Subir foto o PDF"}
-                  </label>
+                  <FileOrCamera value={formFile} onChange={setFormFile} label="Toma foto de la remisión física o sube el PDF" className="mt-1" />
                 </div>
               </div>
               <DialogFooter><Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">{t.remisiones.crearBtn}</Button></DialogFooter>
@@ -395,13 +392,7 @@ export default function Remisiones() {
             <p className="text-sm text-muted-foreground">
               {t.pago.confirmarDesc}
             </p>
-            <label className="flex flex-col items-center justify-center cursor-pointer h-28 rounded-md border-2 border-dashed border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50 gap-2 text-sm text-muted-foreground">
-              <input type="file" accept="image/*,application/pdf" className="hidden" onChange={e => setComprobanteFile(e.target.files?.[0] ?? null)} />
-              <ImageIcon className="h-8 w-8 text-emerald-400" />
-              {comprobanteFile
-                ? <span className="text-emerald-700 font-medium truncate max-w-[220px]">{comprobanteFile.name}</span>
-                : <span>{t.pago.subirComprobante}</span>}
-            </label>
+            <FileOrCamera value={comprobanteFile} onChange={setComprobanteFile} label={t.pago.subirComprobante} />
             {comprobanteFile && <p className="text-xs text-emerald-600 font-medium text-center">{t.pago.archivoListo}</p>}
           </div>
           <DialogFooter className="gap-2">

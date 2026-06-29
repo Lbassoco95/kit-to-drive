@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { BandejaRemisiones } from "@/components/BandejaRemisiones";
 import { RecibirContenedor } from "@/components/RecibirContenedor";
 import { InventarioStatus } from "@/components/InventarioStatus";
+import { FileOrCamera } from "@/components/FileOrCamera";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
@@ -122,13 +123,9 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
             className="resize-none"
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
           />
-          <div className="flex items-center justify-between gap-2">
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-              <input type="file" accept="image/*" className="hidden" onChange={e => setFoto(e.target.files?.[0] ?? null)} />
-              📷 {foto ? <span className="text-green-600 font-medium">✓ {foto.name}</span> : tr.agregarFoto}
-              {foto && <button type="button" onClick={() => setFoto(null)} className="ml-1 text-red-400 hover:text-red-600"><X size={12}/></button>}
-            </label>
-            <Button onClick={send} disabled={sending || !texto.trim()} size="sm" className="h-9 px-4 bg-[#1F3864] hover:bg-[#162a4d]">
+          <div className="space-y-2">
+            <FileOrCamera value={foto} onChange={setFoto} imageOnly label={tr.agregarFoto} />
+            <Button onClick={send} disabled={sending || !texto.trim()} size="sm" className="w-full h-10 bg-[#1F3864] hover:bg-[#162a4d]">
               <Send size={14} className="mr-1.5" />
               {sending ? tr.enviando : tr.enviar}
             </Button>
