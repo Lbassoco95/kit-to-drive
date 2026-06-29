@@ -204,7 +204,8 @@ export default function Produccion() {
     if (!confirm) return;
     const { moto, action } = confirm;
     const today = new Date().toISOString().slice(0,10);
-    if (action === "ARMADO") await updateMoto(moto.id, { estatus_armado: "ARMADO", fecha_real_armado: today });
+    if (action === "EN_PROCESO") await updateMoto(moto.id, { estatus_armado: "EN_PROCESO" });
+    else if (action === "ARMADO") await updateMoto(moto.id, { estatus_armado: "ARMADO", fecha_real_armado: today });
     else if (action === "LISTO") await updateMoto(moto.id, { estatus_armado: "LISTO" });
     else if (action === "ENTREGADA") await updateMoto(moto.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: today });
     setConfirm(null);
@@ -212,6 +213,7 @@ export default function Produccion() {
 
   const canEditFabrica = role === "admin" || role === "fabrica";
   const canEditEntrega = role === "admin" || role === "logistica";
+  type ConfirmAction = "EN_PROCESO" | "ARMADO" | "LISTO" | "ENTREGADA";
 
   const FILTERS: { key: FilterKey; label: string; }[] = [
     { key: "TODOS", label: t.produccion.filtros.todos },
@@ -242,8 +244,9 @@ export default function Produccion() {
         </div>
       </div>
 
-      {(role === "admin" || role === "fabrica" || role === "logistica" || role === "coordinador") && <InventarioStatus refreshKey={rows.length} />}
-      {(role === "admin" || role === "fabrica") && <BandejaRemisiones onChange={load} />}
+      {/* Indicadores de inventario y remisiones: solo admin/coordinador */}
+      {(role === "admin" || role === "coordinador") && <InventarioStatus refreshKey={rows.length} />}
+      {(role === "admin" || role === "coordinador") && <BandejaRemisiones onChange={load} />}
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
@@ -358,7 +361,11 @@ export default function Produccion() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t.produccion.confirmarAccion}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t.produccion.confirmarDesc(confirm?.moto.orden_armado, confirm?.action === "ARMADO" ? t.produccion.filtros.armados : confirm?.action === "LISTO" ? t.produccion.filtros.todos : t.produccion.entregado)}
+              {t.produccion.confirmarDesc(confirm?.moto.orden_armado,
+              confirm?.action === "EN_PROCESO" ? "En proceso" :
+              confirm?.action === "ARMADO" ? t.produccion.filtros.armados :
+              confirm?.action === "LISTO" ? t.produccion.filtros.todos :
+              t.produccion.entregado)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -457,9 +464,14 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         </div>
       </div>
 
-      <div className="border-t p-3 flex gap-2 items-stretch">
-        {canEditFabrica && (r._eff === "PENDIENTE" || r._eff === "EN_PROCESO" || r._eff === "ATRASADO") && (
-          <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base">
+      <div className="border-t p-3 flex gap-2 items-stretch flex-wrap">
+        {canEditFabrica && (r._eff === "PENDIENTE" || r._eff === "ATRASADO") && (
+          <Button onClick={() => onAction("EN_PROCESO")} className="flex-1 h-12 bg-amber-600 hover:bg-amber-700 text-base min-w-[120px]">
+            <Pencil className="h-5 w-5 mr-2" /> Iniciar ensamble
+          </Button>
+        )}
+        {canEditFabrica && r._eff === "EN_PROCESO" && (
+          <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base min-w-[120px]">
             <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarArmado}
           </Button>
         )}
