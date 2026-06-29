@@ -70,8 +70,20 @@ export const zh: Translations = {
 
   // Colors
   colors: {
-    BLANCO: "白色",
-    AZUL:   "蓝色",
+    BLANCO:   "白色",
+    AZUL:     "蓝色",
+    ROJO:     "红色",
+    NEGRO:    "黑色",
+    GRIS:     "灰色",
+    VERDE:    "绿色",
+    AMARILLO: "黄色",
+  },
+
+  // Remisión types
+  tipoRemision: {
+    cabina:     "🏍️ 车厢",
+    activacion: "⚡ 激活",
+    flete:      "🚛 运费",
   },
 
   // Payment

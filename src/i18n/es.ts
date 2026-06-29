@@ -68,8 +68,20 @@ export const es = {
 
   // Colors
   colors: {
-    BLANCO: "Blanco",
-    AZUL:   "Azul",
+    BLANCO:   "Blanco",
+    AZUL:     "Azul",
+    ROJO:     "Rojo",
+    NEGRO:    "Negro",
+    GRIS:     "Gris",
+    VERDE:    "Verde",
+    AMARILLO: "Amarillo",
+  },
+
+  // Remisión types
+  tipoRemision: {
+    cabina:     "🏍️ Cabina",
+    activacion: "⚡ Activación",
+    flete:      "🚛 Flete",
   },
 
   // Payment
