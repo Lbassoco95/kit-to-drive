@@ -1,11 +1,11 @@
 -- ============================================================
 -- Sprint Finanzas — Módulo de control de pagos e ingresos
 -- 2026-07-13
+-- ------------------------------------------------------------
+-- Los valores de enum 'finanzas' y 'admin_financiero' se agregan
+-- en la migración previa 20260713000000_finanzas_roles.sql (en su
+-- propia transacción) para poder usarlos aquí en las policies RLS.
 -- ============================================================
-
--- 1. Extend app_role enum with finanzas roles
-ALTER TYPE app_role ADD VALUE IF NOT EXISTS 'finanzas';
-ALTER TYPE app_role ADD VALUE IF NOT EXISTS 'admin_financiero';
 
 -- 2. Create pagos table
 CREATE TABLE IF NOT EXISTS public.pagos (
