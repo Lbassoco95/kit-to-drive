@@ -12,6 +12,7 @@ export const es = {
     entregas: "Entregas",
     misMotocarros: "Mis Motocarros",
     clientes: "Clientes",
+    finanzas: "Control Financiero",
     importar: "Importar datos",
     usuarios: "Usuarios",
     bitacora: "Bitácora",
@@ -21,6 +22,7 @@ export const es = {
     Inicio: "Inicio",
     "Operación": "Operación",
     "Catálogos": "Catálogos",
+    "Finanzas": "Finanzas",
     Sistema: "Sistema",
   },
   subtitle: "Control de Producción",
@@ -46,6 +48,8 @@ export const es = {
     logistica: "Logística",
     ventas: "Ventas",
     coordinador: "Coordinador comercial",
+    finanzas: "Finanzas",
+    admin_financiero: "Administrador Financiero",
   },
 
   // Status labels
