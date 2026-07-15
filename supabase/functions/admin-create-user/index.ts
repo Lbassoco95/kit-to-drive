@@ -50,7 +50,7 @@ serve(async (req) => {
       });
     }
 
-    const validRoles = ["admin", "fabrica", "logistica", "ventas", "coordinador"];
+    const validRoles = ["admin", "fabrica", "logistica", "ventas", "coordinador", "finanzas", "admin_financiero"];
     if (!validRoles.includes(role)) {
       return new Response(JSON.stringify({ error: "Rol inválido" }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" }

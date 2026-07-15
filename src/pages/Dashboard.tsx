@@ -34,6 +34,7 @@ export default function Dashboard() {
   const [data, setData] = useState<any>(null);
 
   useEffect(() => {
+    if (role === "finanzas" || role === "admin_financiero") { nav("/finanzas"); return; }
     (async () => {
       const { data: motos } = await supabase.from("motocarros").select("*");
       const { data: rems } = await supabase.from("remisiones").select("*, profiles:vendedor_id(nombre_completo)");

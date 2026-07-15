@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, Wallet } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -7,7 +7,7 @@ import {
 import { useAuth, AppRole } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 
-type Group = "Inicio" | "Operación" | "Catálogos" | "Sistema";
+type Group = "Inicio" | "Operación" | "Catálogos" | "Finanzas" | "Sistema";
 
 type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; icon: any; roles: AppRole[]; group: Group };
 
@@ -19,13 +19,14 @@ const ITEMS: Item[] = [
   { key: "entregas",       url: "/entregas",      icon: Truck,           roles: ["admin","logistica","coordinador"],                    group: "Operación" },
   { key: "misMotocarros",  url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin","coordinador"],                       group: "Catálogos" },
   { key: "clientes",       url: "/clientes",      icon: Users,           roles: ["admin","fabrica","coordinador"],                      group: "Catálogos" },
+  { key: "finanzas",        url: "/finanzas",      icon: Wallet,          roles: ["admin","finanzas","admin_financiero"],             group: "Finanzas" },
   { key: "importar",       url: "/importar",      icon: Upload,          roles: ["admin"],                                              group: "Sistema" },
   { key: "usuarios",       url: "/usuarios",      icon: Database,        roles: ["admin"],                                              group: "Sistema" },
   { key: "bitacora",       url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                              group: "Sistema" },
   { key: "configuracion",  url: "/configuracion", icon: Settings,        roles: ["admin"],                                              group: "Sistema" },
 ];
 
-const GROUPS: Group[] = ["Inicio", "Operación", "Catálogos", "Sistema"];
+const GROUPS: Group[] = ["Inicio", "Operación", "Catálogos", "Finanzas", "Sistema"];
 
 export function AppSidebar() {
   const { state } = useSidebar();

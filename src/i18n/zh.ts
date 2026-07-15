@@ -14,6 +14,7 @@ export const zh: Translations = {
     entregas: "交付",
     misMotocarros: "我的三轮车",
     clientes: "客户",
+    finanzas: "财务管理",
     importar: "导入数据",
     usuarios: "用户",
     bitacora: "日志",
@@ -23,6 +24,7 @@ export const zh: Translations = {
     Inicio: "首页",
     "Operación": "操作",
     "Catálogos": "目录",
+    "Finanzas": "财务",
     Sistema: "系统",
   },
   subtitle: "生产控制系统",
@@ -48,6 +50,8 @@ export const zh: Translations = {
     logistica: "物流",
     ventas: "销售",
     coordinador: "商务协调员",
+    finanzas: "财务",
+    admin_financiero: "财务管理员",
   },
 
   // Status labels

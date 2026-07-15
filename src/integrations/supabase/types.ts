@@ -344,6 +344,51 @@ export type Database = {
           },
         ]
       }
+      pagos: {
+        Row: {
+          id: string
+          nombre_pago: string
+          beneficiario: string
+          monto: number
+          moneda: string
+          tiene_factura: boolean
+          factura_url: string | null
+          aprobado_por: string | null
+          descripcion: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          nombre_pago: string
+          beneficiario: string
+          monto: number
+          moneda?: string
+          tiene_factura?: boolean
+          factura_url?: string | null
+          aprobado_por?: string | null
+          descripcion?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          nombre_pago?: string
+          beneficiario?: string
+          monto?: number
+          moneda?: string
+          tiene_factura?: boolean
+          factura_url?: string | null
+          aprobado_por?: string | null
+          descripcion?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -409,7 +454,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "fabrica" | "logistica" | "ventas" | "coordinador"
+      app_role: "admin" | "fabrica" | "logistica" | "ventas" | "coordinador" | "finanzas" | "admin_financiero"
       estatus_armado:
         | "PENDIENTE"
         | "EN_PROCESO"
@@ -545,7 +590,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "fabrica", "logistica", "ventas", "coordinador"],
+      app_role: ["admin", "fabrica", "logistica", "ventas", "coordinador", "finanzas", "admin_financiero"],
       estatus_armado: [
         "PENDIENTE",
         "EN_PROCESO",
