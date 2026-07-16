@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { useLang } from "@/contexts/LangContext";
 import { Plus, Pencil, Search, UserCheck, UserX, ShieldCheck } from "lucide-react";
 
-type AppRole = "admin" | "fabrica" | "logistica" | "ventas" | "coordinador";
+type AppRole = "admin" | "fabrica" | "logistica" | "ventas" | "coordinador" | "director_ventas" | "coordinador_ventas" | "auxiliar_ventas";
 
 interface Usuario {
   id: string;
@@ -23,11 +23,14 @@ interface Usuario {
 }
 
 const ROLE_COLORS: Record<AppRole, string> = {
-  admin:       "bg-red-100 text-red-700 border-red-200",
-  fabrica:     "bg-amber-100 text-amber-700 border-amber-200",
-  logistica:   "bg-indigo-100 text-indigo-700 border-indigo-200",
-  ventas:      "bg-emerald-100 text-emerald-700 border-emerald-200",
-  coordinador: "bg-purple-100 text-purple-700 border-purple-200",
+  admin:             "bg-red-100 text-red-700 border-red-200",
+  fabrica:           "bg-amber-100 text-amber-700 border-amber-200",
+  logistica:         "bg-indigo-100 text-indigo-700 border-indigo-200",
+  ventas:            "bg-emerald-100 text-emerald-700 border-emerald-200",
+  coordinador:       "bg-purple-100 text-purple-700 border-purple-200",
+  director_ventas:   "bg-blue-100 text-blue-700 border-blue-200",
+  coordinador_ventas: "bg-sky-100 text-sky-700 border-sky-200",
+  auxiliar_ventas:    "bg-cyan-100 text-cyan-700 border-cyan-200",
 };
 
 const EMPTY_NEW = { email: "", password: "", nombre_completo: "", role: "ventas" as AppRole, codigo_vendedor: "" };
@@ -212,7 +215,7 @@ export default function Usuarios() {
               <Select value={editForm.role} onValueChange={v => setEditForm({ ...editForm, role: v })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(["admin","fabrica","logistica","ventas","coordinador"] as AppRole[]).map(r => (
+                  {(["admin","fabrica","logistica","ventas","coordinador","director_ventas","coordinador_ventas","auxiliar_ventas"] as AppRole[]).map(r => (
                     <SelectItem key={r} value={r}>{t.roles[r as keyof typeof t.roles]}</SelectItem>
                   ))}
                 </SelectContent>
@@ -264,7 +267,7 @@ export default function Usuarios() {
               <Select value={newForm.role} onValueChange={v => setNewForm({ ...newForm, role: v as AppRole })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(["admin","fabrica","logistica","ventas","coordinador"] as AppRole[]).map(r => (
+                  {(["admin","fabrica","logistica","ventas","coordinador","director_ventas","coordinador_ventas","auxiliar_ventas"] as AppRole[]).map(r => (
                     <SelectItem key={r} value={r}>{t.roles[r as keyof typeof t.roles]}</SelectItem>
                   ))}
                 </SelectContent>

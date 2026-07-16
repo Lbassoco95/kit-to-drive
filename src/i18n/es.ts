@@ -16,11 +16,15 @@ export const es = {
     usuarios: "Usuarios",
     bitacora: "Bitácora",
     configuracion: "Configuración",
+    crmOportunidades: "Oportunidades",
+    crmActividades: "Actividades",
+    crmRutas: "Rutas",
   },
   groups: {
     Inicio: "Inicio",
     "Operación": "Operación",
     "Catálogos": "Catálogos",
+    CRM: "CRM",
     Sistema: "Sistema",
   },
   subtitle: "Control de Producción",
@@ -46,6 +50,9 @@ export const es = {
     logistica: "Logística",
     ventas: "Ventas",
     coordinador: "Coordinador comercial",
+    director_ventas: "Director de Ventas",
+    coordinador_ventas: "Coordinador de Ventas",
+    auxiliar_ventas: "Auxiliar de Ventas",
   },
 
   // Status labels

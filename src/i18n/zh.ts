@@ -18,11 +18,15 @@ export const zh: Translations = {
     usuarios: "用户",
     bitacora: "日志",
     configuracion: "设置",
+    crmOportunidades: "商机",
+    crmActividades: "活动",
+    crmRutas: "路线",
   },
   groups: {
     Inicio: "首页",
     "Operación": "操作",
     "Catálogos": "目录",
+    CRM: "CRM",
     Sistema: "系统",
   },
   subtitle: "生产控制系统",
@@ -48,6 +52,9 @@ export const zh: Translations = {
     logistica: "物流",
     ventas: "销售",
     coordinador: "商务协调员",
+    director_ventas: "销售总监",
+    coordinador_ventas: "销售协调员",
+    auxiliar_ventas: "销售助理",
   },
 
   // Status labels
