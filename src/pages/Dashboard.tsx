@@ -92,6 +92,12 @@ export default function Dashboard() {
     }, []);
 
   const isVendedor = role === "ventas";
+  
+  // Redirect based on role
+  useEffect(() => {
+    if (role === "finanzas" || role === "admin_financiero") { nav("/finanzas"); return; }
+  }, [role, nav]);
+  
   const greeting = t.dashboard.greeting(profileName || "usuario", role ? t.roles[role] : "");
 
   return (

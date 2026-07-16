@@ -19,6 +19,7 @@ import Usuarios from "./pages/Usuarios";
 import Bitacora from "./pages/Bitacora";
 import Configuracion from "./pages/Configuracion";
 import ReportesTurno from "./pages/ReportesTurno";
+import Finanzas from "./pages/Finanzas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/usuarios" element={<ProtectedRoute roles={["admin"]}><Usuarios /></ProtectedRoute>} />
               <Route path="/bitacora" element={<ProtectedRoute roles={["admin"]}><Bitacora /></ProtectedRoute>} />
               <Route path="/configuracion" element={<ProtectedRoute roles={["admin"]}><Configuracion /></ProtectedRoute>} />
+              <Route path="/finanzas" element={<ProtectedRoute roles={["admin","finanzas","admin_financiero"]}><Finanzas /></ProtectedRoute>} />
               <Route path="/buscar" element={<Navigate to="/produccion" replace />} />
             </Route>
             <Route path="*" element={<NotFound />} />

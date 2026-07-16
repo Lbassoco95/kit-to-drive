@@ -21,12 +21,15 @@ export const zh: Translations = {
     crmOportunidades: "商机",
     crmActividades: "活动",
     crmRutas: "路线",
+    crmDashboard: "团队监控",
+    finanzas: "财务管理",
   },
   groups: {
     Inicio: "首页",
     "Operación": "操作",
     "Catálogos": "目录",
     CRM: "CRM",
+    Finanzas: "财务",
     Sistema: "系统",
   },
   subtitle: "生产控制系统",
@@ -55,6 +58,8 @@ export const zh: Translations = {
     director_ventas: "销售总监",
     coordinador_ventas: "销售协调员",
     auxiliar_ventas: "销售助理",
+    finanzas: "财务",
+    admin_financiero: "财务管理员",
   },
 
   // Status labels

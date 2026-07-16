@@ -19,12 +19,15 @@ export const es = {
     crmOportunidades: "Oportunidades",
     crmActividades: "Actividades",
     crmRutas: "Rutas",
+    crmDashboard: "Monitor equipo",
+    finanzas: "Control Financiero",
   },
   groups: {
     Inicio: "Inicio",
     "Operación": "Operación",
     "Catálogos": "Catálogos",
     CRM: "CRM",
+    Finanzas: "Finanzas",
     Sistema: "Sistema",
   },
   subtitle: "Control de Producción",
@@ -53,6 +56,8 @@ export const es = {
     director_ventas: "Director de Ventas",
     coordinador_ventas: "Coordinador de Ventas",
     auxiliar_ventas: "Auxiliar de Ventas",
+    finanzas: "Finanzas",
+    admin_financiero: "Administrador Financiero",
   },
 
   // Status labels
