@@ -44,6 +44,11 @@ export default function Dashboard() {
     })();
   }, [user]);
 
+  // Redirect based on role
+  useEffect(() => {
+    if (role === "finanzas" || role === "admin_financiero") { nav("/finanzas"); return; }
+  }, [role, nav]);
+
   if (!data) return <div className="text-muted-foreground p-8">{t.dashboard.cargando}</div>;
 
   const motos: any[] = data.motos;
@@ -92,11 +97,6 @@ export default function Dashboard() {
     }, []);
 
   const isVendedor = role === "ventas";
-  
-  // Redirect based on role
-  useEffect(() => {
-    if (role === "finanzas" || role === "admin_financiero") { nav("/finanzas"); return; }
-  }, [role, nav]);
   
   const greeting = t.dashboard.greeting(profileName || "usuario", role ? t.roles[role] : "");
 
