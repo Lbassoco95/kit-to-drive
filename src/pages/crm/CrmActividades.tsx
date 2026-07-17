@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
-import { Plus, Pencil, Search, BookOpen, Calendar, User, Building2, CheckCircle, XCircle } from "lucide-react";
+import { Plus, Pencil, Search, BookOpen, Calendar, User, Building2, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 
 export default function CrmActividades() {
   const { role, user } = useAuth();
@@ -28,6 +28,12 @@ export default function CrmActividades() {
     tipo: "visita",
     fecha: "",
     resultado: "",
+    proxima_accion: "",
+    fecha_proxima: "",
+    limitante_descuento: false,
+    limitante_flete: false,
+    limitante_precio: false,
+    limitante_notas: "",
     notas: ""
   });
 
@@ -72,6 +78,7 @@ export default function CrmActividades() {
     const payload = {
       ...form,
       fecha: form.fecha || new Date().toISOString(),
+      fecha_proxima: form.fecha_proxima || null,
       vendedor_id: form.vendedor_id || user?.id
     };
 
@@ -84,6 +91,18 @@ export default function CrmActividades() {
       if (error) return toast.error(error.message);
       toast.success("Actividad creada"); setCreating(false);
     }
+    
+    // Update opportunity limitantes if activity has them
+    if (form.oportunidad_id && (form.limitante_descuento || form.limitante_flete || form.limitante_precio)) {
+      const updatePayload: any = {};
+      if (form.limitante_descuento) updatePayload.limitante_descuento = true;
+      if (form.limitante_flete) updatePayload.limitante_flete = true;
+      if (form.limitante_precio) updatePayload.limitante_precio = true;
+      if (form.limitante_notas) updatePayload.limitante_notas = form.limitante_notas;
+      
+      await supabase.from("crm_oportunidades").update(updatePayload).eq("id", form.oportunidad_id);
+    }
+    
     setForm({
       vendedor_id: "",
       oportunidad_id: "",
@@ -91,6 +110,12 @@ export default function CrmActividades() {
       tipo: "visita",
       fecha: "",
       resultado: "",
+      proxima_accion: "",
+      fecha_proxima: "",
+      limitante_descuento: false,
+      limitante_flete: false,
+      limitante_precio: false,
+      limitante_notas: "",
       notas: ""
     });
     load();
@@ -120,7 +145,7 @@ export default function CrmActividades() {
           <p className="text-base text-muted-foreground mt-1">{filtered.length} actividades registradas</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setForm({ vendedor_id: "", oportunidad_id: "", cliente_id: "", tipo: "visita", fecha: "", resultado: "", notas: "" }); setCreating(true); }}
+          <Button onClick={() => { setForm({ vendedor_id: "", oportunidad_id: "", cliente_id: "", tipo: "visita", fecha: "", resultado: "", proxima_accion: "", fecha_proxima: "", limitante_descuento: false, limitante_flete: false, limitante_precio: false, limitante_notas: "", notas: "" }); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> Nueva actividad
           </Button>
@@ -235,9 +260,12 @@ export default function CrmActividades() {
               <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="visita">Visita</SelectItem>
                   <SelectItem value="llamada">Llamada</SelectItem>
+                  <SelectItem value="visita">Visita</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
                   <SelectItem value="demo">Demo</SelectItem>
+                  <SelectItem value="nota">Nota</SelectItem>
                   <SelectItem value="seguimiento">Seguimiento</SelectItem>
                   <SelectItem value="cotizacion">Cotización</SelectItem>
                 </SelectContent>
@@ -249,10 +277,41 @@ export default function CrmActividades() {
             </div>
             <div>
               <Label>Resultado</Label>
-              <Input value={form.resultado || ""} onChange={e => setForm({ ...form, resultado: e.target.value })} />
+              <Input value={form.resultado || ""} onChange={e => setForm({ ...form, resultado: e.target.value })} placeholder="¿Qué pasó?" />
             </div>
             <div>
-              <Label>Notas</Label>
+              <Label>Próxima acción</Label>
+              <Input value={form.proxima_accion || ""} onChange={e => setForm({ ...form, proxima_accion: e.target.value })} placeholder="¿Qué sigue?" />
+            </div>
+            <div>
+              <Label>Fecha próxima acción</Label>
+              <Input type="date" value={form.fecha_proxima || ""} onChange={e => setForm({ ...form, fecha_proxima: e.target.value })} />
+            </div>
+            <div className="space-y-2 pt-2 border-t">
+              <Label className="text-sm font-medium">Limitantes (qué bloqueó esta venta)</Label>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.limitante_descuento} onChange={e => setForm({ ...form, limitante_descuento: e.target.checked })} className="rounded" />
+                  <span className="text-sm">Descuento</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.limitante_flete} onChange={e => setForm({ ...form, limitante_flete: e.target.checked })} className="rounded" />
+                  <span className="text-sm">Flete</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.limitante_precio} onChange={e => setForm({ ...form, limitante_precio: e.target.checked })} className="rounded" />
+                  <span className="text-sm">Precio</span>
+                </label>
+              </div>
+              {(form.limitante_descuento || form.limitante_flete || form.limitante_precio) && (
+                <div>
+                  <Label className="text-sm">Notas de limitante</Label>
+                  <Input value={form.limitante_notas || ""} onChange={e => setForm({ ...form, limitante_notas: e.target.value })} placeholder="Detalle de la limitante..." />
+                </div>
+              )}
+            </div>
+            <div>
+              <Label>Notas generales</Label>
               <Input value={form.notas || ""} onChange={e => setForm({ ...form, notas: e.target.value })} />
             </div>
           </div>

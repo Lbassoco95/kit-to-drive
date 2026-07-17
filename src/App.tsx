@@ -21,7 +21,10 @@ import Configuracion from "./pages/Configuracion";
 import ReportesTurno from "./pages/ReportesTurno";
 import Finanzas from "./pages/Finanzas";
 import CrmOportunidades from "./pages/crm/CrmOportunidades";
+import CrmActividades from "./pages/crm/CrmActividades";
+import CrmRutas from "./pages/crm/CrmRutas";
 import CrmEquipo from "./pages/crm/CrmEquipo";
+import CrmTracker from "./pages/crm/CrmTracker";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,7 +53,10 @@ const App = () => (
               <Route path="/configuracion" element={<ProtectedRoute roles={["admin"]}><Configuracion /></ProtectedRoute>} />
               <Route path="/finanzas" element={<ProtectedRoute roles={["admin","finanzas","admin_financiero"]}><Finanzas /></ProtectedRoute>} />
               <Route path="/crm/oportunidades" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmOportunidades /></ProtectedRoute>} />
+              <Route path="/crm/actividades" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmActividades /></ProtectedRoute>} />
+              <Route path="/crm/rutas" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmRutas /></ProtectedRoute>} />
               <Route path="/crm/equipo" element={<ProtectedRoute roles={["admin","director_ventas","coordinador_ventas"]}><CrmEquipo /></ProtectedRoute>} />
+              <Route path="/crm/tracker" element={<ProtectedRoute roles={["admin","director_ventas","coordinador_ventas"]}><CrmTracker /></ProtectedRoute>} />
               <Route path="/buscar" element={<Navigate to="/produccion" replace />} />
             </Route>
             <Route path="*" element={<NotFound />} />

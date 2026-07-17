@@ -24,6 +24,7 @@ const ITEMS: Item[] = [
   { key: "crmEquipo",       url: "/crm/equipo",       icon: Users,           roles: ["admin","director_ventas","coordinador_ventas"], group: "CRM" },
   { key: "crmActividades",  url: "/crm/actividades",  icon: BookOpen,       roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
   { key: "crmRutas",        url: "/crm/rutas",        icon: MapPin,         roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
+  { key: "crmTracker",      url: "/crm/tracker",      icon: BarChart2,      roles: ["admin","director_ventas","coordinador_ventas"], group: "CRM" },
   { key: "finanzas",       url: "/finanzas",      icon: Wallet,          roles: ["admin","finanzas","admin_financiero"],              group: "Finanzas" },
   { key: "importar",       url: "/importar",      icon: Upload,          roles: ["admin"],                                              group: "Sistema" },
   { key: "usuarios",       url: "/usuarios",      icon: Database,        roles: ["admin"],                                              group: "Sistema" },

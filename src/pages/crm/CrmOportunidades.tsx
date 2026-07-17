@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
-import { Plus, Pencil, Search, TrendingUp, DollarSign, Calendar, User, Building2 } from "lucide-react";
+import { Plus, Pencil, Search, TrendingUp, DollarSign, Calendar, User, Building2, AlertTriangle } from "lucide-react";
 
 export default function CrmOportunidades() {
   const { role, user } = useAuth();
@@ -20,10 +20,13 @@ export default function CrmOportunidades() {
   const [editing, setEditing] = useState<any | null>(null);
   const [creating, setCreating] = useState(false);
   const [q, setQ] = useState("");
+  const [selectedEtapa, setSelectedEtapa] = useState<string>("all");
+
+  const etapas = ["prospecto", "contacto", "cotizacion", "negociacion", "ganado", "perdido"];
   const [form, setForm] = useState<any>({
     cliente_id: "",
     vendedor_id: "",
-    tipo: "motocarro",
+    tipo_venta: "motocarro",
     cantidad_estimada: "",
     monto_estimado: "",
     etapa: "prospecto",
@@ -44,22 +47,33 @@ export default function CrmOportunidades() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    if (!q) return oportunidades;
-    const qLower = q.toLowerCase();
-    return oportunidades.filter((o: any) => {
-      const cliente = clientes.find((c: any) => c.id === o.cliente_id);
-      const vendedor = vendedores.find((v: any) => v.id === o.vendedor_id);
-      const searchable = [
-        o.tipo,
-        o.etapa,
-        cliente?.nombre_comercial,
-        cliente?.codigo_erp,
-        vendedor?.nombre_completo,
-        o.notas
-      ].filter(Boolean).join(" ").toLowerCase();
-      return searchable.includes(qLower);
-    });
-  }, [oportunidades, clientes, vendedores, q]);
+    let filtered = oportunidades;
+    
+    // Filter by stage
+    if (selectedEtapa !== "all") {
+      filtered = filtered.filter((o: any) => o.etapa === selectedEtapa);
+    }
+    
+    // Filter by search
+    if (q) {
+      const qLower = q.toLowerCase();
+      filtered = filtered.filter((o: any) => {
+        const cliente = clientes.find((c: any) => c.id === o.cliente_id);
+        const vendedor = vendedores.find((v: any) => v.id === o.vendedor_id);
+        const searchable = [
+          o.tipo_venta,
+          o.etapa,
+          cliente?.nombre_comercial,
+          cliente?.codigo_erp,
+          vendedor?.nombre_completo,
+          o.notas
+        ].filter(Boolean).join(" ").toLowerCase();
+        return searchable.includes(qLower);
+      });
+    }
+    
+    return filtered;
+  }, [oportunidades, clientes, vendedores, q, selectedEtapa]);
 
   const canEdit = role === "admin" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
   const canCreate = role === "admin" || role === "ventas" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
@@ -86,7 +100,7 @@ export default function CrmOportunidades() {
     setForm({
       cliente_id: "",
       vendedor_id: "",
-      tipo: "motocarro",
+      tipo_venta: "motocarro",
       cantidad_estimada: "",
       monto_estimado: "",
       etapa: "prospecto",
@@ -121,7 +135,7 @@ export default function CrmOportunidades() {
           <p className="text-base text-muted-foreground mt-1">{filtered.length} oportunidades registradas</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setForm({ cliente_id: "", vendedor_id: "", tipo: "motocarro", cantidad_estimada: "", monto_estimado: "", etapa: "prospecto", fecha_estimada_cierre: "", notas: "" }); setCreating(true); }}
+          <Button onClick={() => { setForm({ cliente_id: "", vendedor_id: "", tipo_venta: "motocarro", cantidad_estimada: "", monto_estimado: "", etapa: "prospecto", fecha_estimada_cierre: "", notas: "" }); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> Nueva oportunidad
           </Button>
@@ -135,16 +149,49 @@ export default function CrmOportunidades() {
         </div>
       </Card>
 
+      {/* Pipeline Stage Tabs */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setSelectedEtapa("all")}
+          className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+            selectedEtapa === "all"
+              ? "bg-[#1F3864] text-white"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+        >
+          Todas ({oportunidades.length})
+        </button>
+        {etapas.map((etapa) => {
+          const count = oportunidades.filter((o: any) => o.etapa === etapa).length;
+          return (
+            <button
+              key={etapa}
+              onClick={() => setSelectedEtapa(etapa)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                selectedEtapa === etapa
+                  ? etapaColors[etapa]
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+            >
+              {etapa.charAt(0).toUpperCase() + etapa.slice(1)} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map((o: any) => {
           const cliente = clientes.find((c: any) => c.id === o.cliente_id);
           const vendedor = vendedores.find((v: any) => v.id === o.vendedor_id);
+          const isVencida = o.fecha_estimada_cierre && new Date(o.fecha_estimada_cierre) < new Date();
           return (
             <Card key={o.id} className="p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div className="min-w-0">
-                  <div className="text-xs uppercase text-muted-foreground tracking-wide font-medium">{cliente?.nombre_comercial || "Sin cliente"}</div>
-                  <div className="text-lg font-bold text-[#1F3864] truncate capitalize">{o.tipo}</div>
+                  <div className="text-xs uppercase text-muted-foreground tracking-wide font-medium">
+                    {cliente?.nombre_comercial || "Sin cliente"} {cliente?.codigo_erp && `(${cliente.codigo_erp})`}
+                  </div>
+                  <div className="text-lg font-bold text-[#1F3864] truncate capitalize">{o.tipo_venta}</div>
                   <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${etapaColors[o.etapa]}`}>
                     {o.etapa}
                   </div>
@@ -178,11 +225,32 @@ export default function CrmOportunidades() {
                   </div>
                 )}
                 {o.fecha_estimada_cierre && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
+                  <div className={`flex items-center gap-2 ${isVencida ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
                     <Calendar size={16}/> <span>{new Date(o.fecha_estimada_cierre).toLocaleDateString()}</span>
                   </div>
                 )}
               </div>
+
+              {/* Limitantes Chips */}
+              {(o.limitante_descuento || o.limitante_flete || o.limitante_precio) && (
+                <div className="flex flex-wrap gap-1.5">
+                  {o.limitante_descuento && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                      <AlertTriangle className="h-3 w-3" /> Descuento
+                    </span>
+                  )}
+                  {o.limitante_flete && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs font-medium">
+                      <AlertTriangle className="h-3 w-3" /> Flete
+                    </span>
+                  )}
+                  {o.limitante_precio && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                      <AlertTriangle className="h-3 w-3" /> Precio
+                    </span>
+                  )}
+                </div>
+              )}
 
               {o.notas && (
                 <div className="text-sm text-muted-foreground line-clamp-2 mt-2 pt-2 border-t">
@@ -223,11 +291,12 @@ export default function CrmOportunidades() {
             </div>
             <div>
               <Label>Tipo</Label>
-              <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
+              <Select value={form.tipo_venta} onValueChange={(v) => setForm({ ...form, tipo_venta: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="motocarro">Motocarro</SelectItem>
                   <SelectItem value="refaccion">Refacción</SelectItem>
+                  <SelectItem value="servicio">Servicio</SelectItem>
                   <SelectItem value="otro">Otro</SelectItem>
                 </SelectContent>
               </Select>
