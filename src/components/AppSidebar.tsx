@@ -12,7 +12,7 @@ type Group = "Inicio" | "Operación" | "Catálogos" | "CRM" | "Finanzas" | "Sist
 type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; icon: any; roles: AppRole[]; group: Group };
 
 const ITEMS: Item[] = [
-  { key: "dashboard",      url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Inicio" },
+  { key: "dashboard",      url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador","director_ventas","coordinador_ventas","auxiliar_ventas"], group: "Inicio" },
   { key: "produccion",     url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
   { key: "reportesTurno",  url: "/reportes-turno",icon: ClipboardList,   roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
   { key: "remisiones",     url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Operación" },
