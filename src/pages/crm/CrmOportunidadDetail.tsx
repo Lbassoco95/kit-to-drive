@@ -99,7 +99,7 @@ export default function CrmOportunidadDetail() {
     );
   }
 
-  const isVencida = oportunidad.fecha_estimada_cierre && new Date(oportunidad.fecha_estimada_cierre) < new Date();
+  const isVencida = oportunidad.fecha_cierre_estimada && new Date(oportunidad.fecha_cierre_estimada) < new Date();
 
   return (
     <div className="space-y-6">
@@ -170,12 +170,12 @@ export default function CrmOportunidadDetail() {
             </div>
           )}
 
-          {oportunidad.fecha_estimada_cierre && (
+          {oportunidad.fecha_cierre_estimada && (
             <div>
               <Label className="text-muted-foreground text-sm">Fecha estimada de cierre</Label>
               <div className={`flex items-center gap-2 mt-1 ${isVencida ? "text-red-600 font-medium" : ""}`}>
                 <Calendar className="h-4 w-4" />
-                <span className="font-medium">{new Date(oportunidad.fecha_estimada_cierre).toLocaleDateString()}</span>
+                <span className="font-medium">{new Date(oportunidad.fecha_cierre_estimada).toLocaleDateString()}</span>
                 {isVencida && <span className="text-xs text-red-600">(Vencida)</span>}
               </div>
             </div>

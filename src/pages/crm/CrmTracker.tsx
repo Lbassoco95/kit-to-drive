@@ -25,7 +25,7 @@ type OpportunityData = {
   cantidad_estimada: number;
   monto_estimado: number;
   etapa: string;
-  fecha_estimada_cierre: string;
+  fecha_cierre_estimada: string;
   limitante_descuento: boolean;
   limitante_flete: boolean;
   limitante_precio: boolean;
@@ -47,7 +47,7 @@ export default function CrmTracker() {
     setLoading(true);
     const [{ data: sellersData }, { data: opsData }, { data: csData }] = await Promise.all([
       supabase.from("v_reporte_pipeline").select("*"),
-      supabase.from("crm_oportunidades").select("*").order("fecha_estimada_cierre", { ascending: true }),
+      supabase.from("crm_oportunidades").select("*").order("fecha_cierre_estimada", { ascending: true }),
       supabase.from("clientes").select("id, nombre_comercial, codigo_erp")
     ]);
     
@@ -165,7 +165,7 @@ export default function CrmTracker() {
                                   <div className="grid gap-2">
                                     {sellerOps.map((op) => {
                                       const cliente = clientes.find(c => c.id === op.cliente_id);
-                                      const isVencida = op.fecha_estimada_cierre && new Date(op.fecha_estimada_cierre) < new Date();
+                                      const isVencida = op.fecha_cierre_estimada && new Date(op.fecha_cierre_estimada) < new Date();
                                       
                                       return (
                                         <Card key={op.id} className="p-3">
@@ -181,7 +181,7 @@ export default function CrmTracker() {
                                                 <span>${op.monto_estimado?.toLocaleString() || "0"}</span>
                                                 <span>{op.cantidad_estimada || 0} unid</span>
                                                 <span className={isVencida ? "text-red-600 font-medium" : ""}>
-                                                  {op.fecha_estimada_cierre ? new Date(op.fecha_estimada_cierre).toLocaleDateString() : "Sin fecha"}
+                                                  {op.fecha_cierre_estimada ? new Date(op.fecha_cierre_estimada).toLocaleDateString() : "Sin fecha"}
                                                 </span>
                                               </div>
                                             </div>

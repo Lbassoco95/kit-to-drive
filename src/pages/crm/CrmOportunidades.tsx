@@ -32,7 +32,7 @@ export default function CrmOportunidades() {
     cantidad_estimada: "",
     monto_estimado: "",
     etapa: "prospecto",
-    fecha_estimada_cierre: "",
+    fecha_cierre_estimada: "",
     notas: ""
   });
 
@@ -86,7 +86,7 @@ export default function CrmOportunidades() {
       ...form,
       cantidad_estimada: form.cantidad_estimada ? parseInt(form.cantidad_estimada) : null,
       monto_estimado: form.monto_estimado ? parseFloat(form.monto_estimado) : null,
-      fecha_estimada_cierre: form.fecha_estimada_cierre || null,
+      fecha_cierre_estimada: form.fecha_cierre_estimada || null,
       vendedor_id: form.vendedor_id || user?.id
     };
 
@@ -110,7 +110,7 @@ export default function CrmOportunidades() {
       cantidad_estimada: "",
       monto_estimado: "",
       etapa: "prospecto",
-      fecha_estimada_cierre: "",
+      fecha_cierre_estimada: "",
       notas: ""
     });
     load();
@@ -141,7 +141,7 @@ export default function CrmOportunidades() {
           <p className="text-base text-muted-foreground mt-1">{filtered.length} oportunidades registradas</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setForm({ cliente_id: "", vendedor_id: "", tipo_venta: "motocarro", cantidad_estimada: "", monto_estimado: "", etapa: "prospecto", fecha_estimada_cierre: "", notas: "" }); setCreating(true); }}
+          <Button onClick={() => { setForm({ cliente_id: "", vendedor_id: "", tipo_venta: "motocarro", cantidad_estimada: "", monto_estimado: "", etapa: "prospecto", fecha_cierre_estimada: "", notas: "" }); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> Nueva oportunidad
           </Button>
@@ -189,7 +189,7 @@ export default function CrmOportunidades() {
         {filtered.map((o: any) => {
           const cliente = clientes.find((c: any) => c.id === o.cliente_id);
           const vendedor = vendedores.find((v: any) => v.id === o.vendedor_id);
-          const isVencida = o.fecha_estimada_cierre && new Date(o.fecha_estimada_cierre) < new Date();
+          const isVencida = o.fecha_cierre_estimada && new Date(o.fecha_cierre_estimada) < new Date();
           return (
             <Card key={o.id} className="p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
               <div className="flex items-start justify-between">
@@ -230,9 +230,9 @@ export default function CrmOportunidades() {
                     <DollarSign size={16}/> <span>${o.monto_estimado.toLocaleString()}</span>
                   </div>
                 )}
-                {o.fecha_estimada_cierre && (
+                {o.fecha_cierre_estimada && (
                   <div className={`flex items-center gap-2 ${isVencida ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-                    <Calendar size={16}/> <span>{new Date(o.fecha_estimada_cierre).toLocaleDateString()}</span>
+                    <Calendar size={16}/> <span>{new Date(o.fecha_cierre_estimada).toLocaleDateString()}</span>
                   </div>
                 )}
               </div>
@@ -331,7 +331,7 @@ export default function CrmOportunidades() {
             </div>
             <div>
               <Label>Fecha estimada de cierre</Label>
-              <Input type="date" value={form.fecha_estimada_cierre} onChange={e => setForm({ ...form, fecha_estimada_cierre: e.target.value })} />
+              <Input type="date" value={form.fecha_cierre_estimada} onChange={e => setForm({ ...form, fecha_cierre_estimada: e.target.value })} />
             </div>
             <div>
               <Label>Notas</Label>
