@@ -23,6 +23,7 @@ export default function CrmActividades() {
   const [oportunidades, setOportunidades] = useState<any[]>([]);
   const [editing, setEditing] = useState<any | null>(null);
   const [creating, setCreating] = useState(false);
+  const [completing, setCompleting] = useState<any | null>(null);
   const [q, setQ] = useState("");
   const [form, setForm] = useState<any>({
     vendedor_id: "",
@@ -61,6 +62,49 @@ export default function CrmActividades() {
   const [evidenciaFile, setEvidenciaFile] = useState<File | null>(null);
   const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [programarForm, setProgramarForm] = useState<any>({
+    vendedor_id: user?.id || "",
+    oportunidad_id: "",
+    cliente_id: "",
+    tipo: "visita",
+    fecha_actividad: "",
+    objetivo_visita: ""
+  });
+  const [completarForm, setCompletarForm] = useState<any>({
+    resultado: "",
+    asuntos_tratados: "",
+    acuerdos_alcanzados: "",
+    retroalimentacion_mercado: "",
+    proxima_accion: "",
+    fecha_proxima: "",
+    limitante_descuento: false,
+    limitante_flete: false,
+    limitante_precio: false,
+    limitante_notas: "",
+    region: "",
+    municipio: "",
+    codigo_cliente: "",
+    tipo_cliente_nuevo: false,
+    persona_contacto: "",
+    telefono_contacto: "",
+    tipo_negocio: "",
+    escala_operacion: "",
+    marcas_comercializa: "",
+    top3_marcas: "",
+    volumen_mensual_ventas: "",
+    fecha_ultima_visita: ""
+  });
+  const [marcasCheckboxes, setMarcasCheckboxes] = useState<Record<string, boolean>>({
+    alessia: false,
+    wimex: false,
+    nazaki: false,
+    dav: false,
+    mttc: false,
+    motocorp: false,
+    wapemex: false,
+    otro: false
+  });
+  const [otraMarca, setOtraMarca] = useState("");
 
   const load = async () => {
     const [{ data: acts }, { data: cs }, { data: vs }, { data: ops }] = await Promise.all([
@@ -99,13 +143,36 @@ export default function CrmActividades() {
   const canCreate = role === "admin" || role === "ventas" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
   const canDelete = role === "admin" || role === "coordinador_ventas";
 
-  const save = async () => {
-    let evidenciaUrl = form.evidencia_url;
+  const saveProgramar = async () => {
+    const payload = {
+      ...programarForm,
+      estatus: 'programada',
+      fecha_actividad: programarForm.fecha_actividad || new Date().toISOString(),
+      vendedor_id: programarForm.vendedor_id || user?.id
+    };
+
+    const { error } = await supabase.from("crm_actividades").insert(payload);
+    if (error) return toast.error(error.message);
+    toast.success("Visita programada");
+    setCreating(false);
+    setProgramarForm({
+      vendedor_id: user?.id || "",
+      oportunidad_id: "",
+      cliente_id: "",
+      tipo: "visita",
+      fecha_actividad: "",
+      objetivo_visita: ""
+    });
+    load();
+  };
+
+  const saveCompletar = async () => {
+    let evidenciaUrl = completing?.evidencia_url || "";
     
     // Upload evidence file if present
     if (evidenciaFile) {
       const fileExt = evidenciaFile.name.split('.').pop();
-      const fileName = `${form.vendedor_id || user?.id}/${Date.now()}.${fileExt}`;
+      const fileName = `${completing?.vendedor_id || user?.id}/${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('actividades-evidencia').upload(fileName, evidenciaFile);
       if (uploadError) {
         toast.error('Error al subir evidencia: ' + uploadError.message);
@@ -115,37 +182,71 @@ export default function CrmActividades() {
       evidenciaUrl = publicUrl;
     }
 
+    // Build marcas string from checkboxes
+    const marcasSeleccionadas = Object.entries(marcasCheckboxes)
+      .filter(([_, checked]) => checked)
+      .map(([marca]) => marca.charAt(0).toUpperCase() + marca.slice(1))
+      .join(', ');
+    const marcasFinal = marcasSeleccionadas + (otraMarca ? `, ${otraMarca}` : '');
+
     const payload = {
-      ...form,
+      ...completarForm,
+      marcas_comercializa: marcasFinal || completarForm.marcas_comercializa,
       evidencia_url: evidenciaUrl,
-      fecha_actividad: form.fecha_actividad || new Date().toISOString(),
-      fecha_proxima: form.fecha_proxima || null,
-      vendedor_id: form.vendedor_id || user?.id
+      estatus: 'completada',
+      fecha_proxima: completarForm.fecha_proxima || null
     };
 
-    if (editing) {
-      const { error } = await supabase.from("crm_actividades").update(payload).eq("id", editing.id);
-      if (error) return toast.error(error.message);
-      toast.success("Actividad actualizada"); setEditing(null);
-    } else {
-      const { error } = await supabase.from("crm_actividades").insert(payload);
-      if (error) return toast.error(error.message);
-      toast.success("Actividad creada"); setCreating(false);
-    }
-    
-    // Update opportunity limitantes if activity has them
-    if (form.oportunidad_id && (form.limitante_descuento || form.limitante_flete || form.limitante_precio)) {
-      const updatePayload: any = {};
-      if (form.limitante_descuento) updatePayload.limitante_descuento = true;
-      if (form.limitante_flete) updatePayload.limitante_flete = true;
-      if (form.limitante_precio) updatePayload.limitante_precio = true;
-      if (form.limitante_notas) updatePayload.limitante_notas = form.limitante_notas;
-      
-      await supabase.from("crm_oportunidades").update(updatePayload).eq("id", form.oportunidad_id);
-    }
-    
-    resetForm();
+    const { error } = await supabase.from("crm_actividades").update(payload).eq("id", completing.id);
+    if (error) return toast.error(error.message);
+    toast.success("Reporte de visita guardado");
+    setCompleting(null);
+    setEvidenciaFile(null);
+    setMarcasCheckboxes({
+      alessia: false,
+      wimex: false,
+      nazaki: false,
+      dav: false,
+      mttc: false,
+      motocorp: false,
+      wapemex: false,
+      otro: false
+    });
+    setOtraMarca("");
     load();
+  };
+
+  const openCompletar = async (actividad: any) => {
+    setCompleting(actividad);
+    
+    // Pre-load client data if exists
+    const cliente = clientes.find((c: any) => c.id === actividad.cliente_id);
+    if (cliente) {
+      setCompletarForm({
+        resultado: "",
+        asuntos_tratados: "",
+        acuerdos_alcanzados: "",
+        retroalimentacion_mercado: "",
+        proxima_accion: "",
+        fecha_proxima: "",
+        limitante_descuento: false,
+        limitante_flete: false,
+        limitante_precio: false,
+        limitante_notas: "",
+        region: cliente.estado || "",
+        municipio: cliente.municipio || "",
+        codigo_cliente: cliente.codigo_erp || "",
+        tipo_cliente_nuevo: false,
+        persona_contacto: "",
+        telefono_contacto: cliente.telefono || "",
+        tipo_negocio: "",
+        escala_operacion: "",
+        marcas_comercializa: "",
+        top3_marcas: "",
+        volumen_mensual_ventas: "",
+        fecha_ultima_visita: ""
+      });
+    }
   };
 
   const resetForm = () => {
@@ -201,6 +302,12 @@ export default function CrmActividades() {
     cotizacion: "bg-orange-100 text-orange-700"
   };
 
+  const estatusColors: Record<string, string> = {
+    programada: "bg-yellow-100 text-yellow-700",
+    completada: "bg-green-100 text-green-700",
+    cancelada: "bg-red-100 text-red-700"
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-end flex-wrap gap-3">
@@ -209,9 +316,9 @@ export default function CrmActividades() {
           <p className="text-base text-muted-foreground mt-1">{filtered.length} actividades registradas</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { resetForm(); setCreating(true); }}
+          <Button onClick={() => { setProgramarForm({ vendedor_id: user?.id || "", oportunidad_id: "", cliente_id: "", tipo: "visita", fecha_actividad: "", objetivo_visita: "" }); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-            <Plus className="h-5 w-5 mr-2"/> Nueva actividad
+            <Plus className="h-5 w-5 mr-2"/> Programar visita
           </Button>
         )}
       </div>
@@ -232,8 +339,13 @@ export default function CrmActividades() {
             <Card key={a.id} className="p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <div className="text-xs uppercase text-muted-foreground tracking-wide font-medium">{cliente?.nombre_comercial || "Sin cliente"}</div>
+                    {a.estatus && (
+                      <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${estatusColors[a.estatus]}`}>
+                        {a.estatus.charAt(0).toUpperCase() + a.estatus.slice(1)}
+                      </div>
+                    )}
                     {a.tipo === 'visita' && (
                       <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${tipoColors[a.tipo]}`}>
                         Visita
@@ -263,7 +375,12 @@ export default function CrmActividades() {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  {a.tipo === 'visita' && (
+                  {a.tipo === 'visita' && a.estatus === 'programada' && (
+                    <Button size="sm" onClick={() => openCompletar(a)} className="h-8 px-3 bg-[#1F3864] hover:bg-[#162a4d] text-xs">
+                      Completar visita →
+                    </Button>
+                  )}
+                  {a.tipo === 'visita' && a.estatus === 'completada' && (
                     <Button size="icon" variant="ghost" onClick={() => setExpandedActivity(expandedActivity === a.id ? null : a.id)} className="h-8 w-8">
                       <Expand className="h-4 w-4" />
                     </Button>
@@ -288,7 +405,12 @@ export default function CrmActividades() {
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar size={16}/> <span>{new Date(a.fecha_actividad).toLocaleString()}</span>
                 </div>
-                {a.resultado && (
+                {a.objetivo_visita && a.estatus === 'programada' && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <CheckCircle size={16}/> <span>Objetivo: {a.objetivo_visita}</span>
+                  </div>
+                )}
+                {a.resultado && a.estatus === 'completada' && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <CheckCircle size={16}/> <span>{a.resultado}</span>
                   </div>
@@ -349,168 +471,108 @@ export default function CrmActividades() {
         {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin actividades</div>}
       </div>
 
-      <Dialog open={creating || !!editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); setStep(1); setEvidenciaFile(null); } }}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Editar actividad" : "Nueva actividad"}</DialogTitle>
-            {form.tipo === 'visita' && (
-              <div className="text-sm text-muted-foreground mt-1">
-                Paso {step} de 2
-              </div>
-            )}
-          </DialogHeader>
-          
-          {step === 1 && (
-            <div className="space-y-3">
-              <div>
-                <Label>Cliente *</Label>
-                <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
-                  <SelectContent>
-                    {clientes.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>{c.nombre_comercial || c.codigo_erp}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Vendedor *</Label>
-                <Select value={form.vendedor_id} onValueChange={(v) => setForm({ ...form, vendedor_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar vendedor" /></SelectTrigger>
-                  <SelectContent>
-                    {vendedores.map((v: any) => (
-                      <SelectItem key={v.id} value={v.id}>{v.nombre_completo}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Oportunidad (opcional)</Label>
-                <Select value={form.oportunidad_id} onValueChange={(v) => setForm({ ...form, oportunidad_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar oportunidad" /></SelectTrigger>
-                  <SelectContent>
-                    {oportunidades.map((o: any) => (
-                      <SelectItem key={o.id} value={o.id}>{o.tipo} - {o.etapa}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Tipo</Label>
-                <Select value={form.tipo} onValueChange={(v) => { setForm({ ...form, tipo: v }); if (v !== 'visita') setStep(1); }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="llamada">Llamada</SelectItem>
-                    <SelectItem value="visita">Visita</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="videollamada">Videollamada</SelectItem>
-                    <SelectItem value="demo">Demo</SelectItem>
-                    <SelectItem value="nota">Nota</SelectItem>
-                    <SelectItem value="seguimiento">Seguimiento</SelectItem>
-                    <SelectItem value="cotizacion">Cotización</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Canal de contacto *</Label>
-                <Select value={form.canal_contacto} onValueChange={(v) => setForm({ ...form, canal_contacto: v })}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar canal" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="presencial">Presencial</SelectItem>
-                    <SelectItem value="telefonico">Telefónico</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="videollamada">Videollamada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Fecha y hora *</Label>
-                <Input type="datetime-local" value={form.fecha_actividad} onChange={e => setForm({ ...form, fecha_actividad: e.target.value })} />
-              </div>
-              <div>
-                <Label>Resultado / ¿Qué pasó?</Label>
-                <Textarea value={form.resultado || ""} onChange={e => setForm({ ...form, resultado: e.target.value })} placeholder="Describe el resultado..." rows={3} />
-              </div>
-              <div>
-                <Label>Próxima acción</Label>
-                <Input value={form.proxima_accion || ""} onChange={e => setForm({ ...form, proxima_accion: e.target.value })} placeholder="¿Qué sigue?" />
-              </div>
-              <div>
-                <Label>Fecha próxima acción</Label>
-                <Input type="date" value={form.fecha_proxima || ""} onChange={e => setForm({ ...form, fecha_proxima: e.target.value })} />
-              </div>
-              <div className="space-y-2 pt-2 border-t">
-                <Label className="text-sm font-medium">Limitantes</Label>
-                <div className="flex flex-wrap gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.limitante_descuento} onChange={e => setForm({ ...form, limitante_descuento: e.target.checked })} className="rounded" />
-                    <span className="text-sm">Descuento</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.limitante_flete} onChange={e => setForm({ ...form, limitante_flete: e.target.checked })} className="rounded" />
-                    <span className="text-sm">Flete</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.limitante_precio} onChange={e => setForm({ ...form, limitante_precio: e.target.checked })} className="rounded" />
-                    <span className="text-sm">Precio</span>
-                  </label>
-                </div>
-                {(form.limitante_descuento || form.limitante_flete || form.limitante_precio) && (
-                  <div>
-                    <Label className="text-sm">Notas de limitante</Label>
-                    <Input value={form.limitante_notas || ""} onChange={e => setForm({ ...form, limitante_notas: e.target.value })} placeholder="Detalle de la limitante..." />
-                  </div>
-                )}
-              </div>
-              <div>
-                <Label>Notas generales</Label>
-                <Textarea value={form.descripcion || ""} onChange={e => setForm({ ...form, descripcion: e.target.value })} placeholder="Notas adicionales..." rows={2} />
-              </div>
+      {/* Programar Visita Dialog */}
+      <Dialog open={creating} onOpenChange={(o) => { if (!o) { setCreating(false); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Programar visita</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Cliente *</Label>
+              <Select value={programarForm.cliente_id} onValueChange={(v) => setProgramarForm({ ...programarForm, cliente_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nombre_comercial || c.codigo_erp}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
+            <div>
+              <Label>Vendedor *</Label>
+              <Select value={programarForm.vendedor_id} onValueChange={(v) => setProgramarForm({ ...programarForm, vendedor_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar vendedor" /></SelectTrigger>
+                <SelectContent>
+                  {vendedores.map((v: any) => (
+                    <SelectItem key={v.id} value={v.id}>{v.nombre_completo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tipo *</Label>
+              <Select value={programarForm.tipo} onValueChange={(v) => setProgramarForm({ ...programarForm, tipo: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="visita">Visita</SelectItem>
+                  <SelectItem value="llamada">Llamada</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="otro">Otro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Oportunidad (opcional)</Label>
+              <Select value={programarForm.oportunidad_id} onValueChange={(v) => setProgramarForm({ ...programarForm, oportunidad_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar oportunidad" /></SelectTrigger>
+                <SelectContent>
+                  {oportunidades.map((o: any) => (
+                    <SelectItem key={o.id} value={o.id}>{o.tipo} - {o.etapa}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Fecha y hora programada *</Label>
+              <Input type="datetime-local" value={programarForm.fecha_actividad} onChange={e => setProgramarForm({ ...programarForm, fecha_actividad: e.target.value })} />
+            </div>
+            <div>
+              <Label>Objetivo de la visita</Label>
+              <Textarea value={programarForm.objetivo_visita || ""} onChange={e => setProgramarForm({ ...programarForm, objetivo_visita: e.target.value })} placeholder="¿Para qué va?" rows={2} />
+            </div>
+          </div>
+          <DialogFooter><Button onClick={saveProgramar} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Programar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-          {step === 2 && form.tipo === 'visita' && (
-            <div className="space-y-4">
-              <div className="space-y-3">
-                <div className="font-medium text-[#1F3864]">Datos del cliente</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Región / Estado</Label>
-                    <Input value={form.region || ""} onChange={e => setForm({ ...form, region: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Municipio</Label>
-                    <Input value={form.municipio || ""} onChange={e => setForm({ ...form, municipio: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Código de cliente</Label>
-                    <Input value={form.codigo_cliente || ""} onChange={e => setForm({ ...form, codigo_cliente: e.target.value })} />
-                  </div>
-                  <div className="flex items-center gap-2 pt-6">
-                    <Switch 
-                      checked={form.tipo_cliente_nuevo} 
-                      onCheckedChange={(checked) => setForm({ ...form, tipo_cliente_nuevo: checked })} 
-                    />
-                    <Label className="cursor-pointer">¿Es cliente nuevo?</Label>
-                  </div>
-                  <div>
-                    <Label>Persona de contacto</Label>
-                    <Input value={form.persona_contacto || ""} onChange={e => setForm({ ...form, persona_contacto: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Teléfono de contacto</Label>
-                    <Input type="tel" value={form.telefono_contacto || ""} onChange={e => setForm({ ...form, telefono_contacto: e.target.value })} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2 border-t">
-                <div className="font-medium text-[#1F3864]">Operación del negocio</div>
+      {/* Completar Visita Dialog */}
+      <Dialog open={!!completing} onOpenChange={(o) => { if (!o) { setCompleting(null); setEvidenciaFile(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Reporte de visita</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="font-medium text-[#1F3864]">Datos del cliente visitado</div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Tipo de negocio *</Label>
-                  <Select value={form.tipo_negocio} onValueChange={(v) => setForm({ ...form, tipo_negocio: v })}>
+                  <Label>Código de cliente</Label>
+                  <Input value={completarForm.codigo_cliente || ""} onChange={e => setCompletarForm({ ...completarForm, codigo_cliente: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Región / Estado</Label>
+                  <Input value={completarForm.region || ""} onChange={e => setCompletarForm({ ...completarForm, region: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Municipio</Label>
+                  <Input value={completarForm.municipio || ""} onChange={e => setCompletarForm({ ...completarForm, municipio: e.target.value })} />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <Switch 
+                    checked={completarForm.tipo_cliente_nuevo} 
+                    onCheckedChange={(checked) => setCompletarForm({ ...completarForm, tipo_cliente_nuevo: checked })} 
+                  />
+                  <Label className="cursor-pointer">¿Es cliente nuevo?</Label>
+                </div>
+                <div>
+                  <Label>Persona de contacto</Label>
+                  <Input value={completarForm.persona_contacto || ""} onChange={e => setCompletarForm({ ...completarForm, persona_contacto: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Teléfono de contacto</Label>
+                  <Input type="tel" value={completarForm.telefono_contacto || ""} onChange={e => setCompletarForm({ ...completarForm, telefono_contacto: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Tipo de negocio</Label>
+                  <Select value={completarForm.tipo_negocio} onValueChange={(v) => setCompletarForm({ ...completarForm, tipo_negocio: v })}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="refaccionaria">Refaccionaria</SelectItem>
@@ -522,7 +584,7 @@ export default function CrmActividades() {
                 </div>
                 <div>
                   <Label>Escala de operación</Label>
-                  <Select value={form.escala_operacion} onValueChange={(v) => setForm({ ...form, escala_operacion: v })}>
+                  <Select value={completarForm.escala_operacion} onValueChange={(v) => setCompletarForm({ ...completarForm, escala_operacion: v })}>
                     <SelectTrigger><SelectValue placeholder="Seleccionar escala" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="grande">Grande</SelectItem>
@@ -531,68 +593,230 @@ export default function CrmActividades() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <div className="font-medium text-[#1F3864]">Marcas que comercializa</div>
+              <div className="grid grid-cols-4 gap-2">
+                {Object.entries(marcasCheckboxes).map(([marca, checked]) => (
+                  <label key={marca} className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={checked} 
+                      onChange={e => setMarcasCheckboxes({ ...marcasCheckboxes, [marca]: e.target.checked })} 
+                      className="rounded" 
+                    />
+                    <span className="text-sm capitalize">{marca === 'dav' ? 'DAV' : marca === 'mttc' ? 'MTTC' : marca}</span>
+                  </label>
+                ))}
+              </div>
+              {marcasCheckboxes.otro && (
                 <div>
-                  <Label>Marcas que comercializa</Label>
-                  <Textarea value={form.marcas_comercializa || ""} onChange={e => setForm({ ...form, marcas_comercializa: e.target.value })} placeholder="Lista de marcas..." rows={2} />
+                  <Label>Otra marca</Label>
+                  <Input value={otraMarca} onChange={e => setOtraMarca(e.target.value)} placeholder="Especificar..." />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <div className="font-medium text-[#1F3864]">Top 3 marcas más vendidas</div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label>Marca 1</Label>
+                  <Select value={completarForm.top3_marcas?.split(',')[0] || ""} onValueChange={(v) => {
+                    const current = completarForm.top3_marcas?.split(',') || ["", "", ""];
+                    setCompletarForm({ ...completarForm, top3_marcas: [v, current[1], current[2]].filter(Boolean).join(',') });
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alessia">Alessia</SelectItem>
+                      <SelectItem value="wimex">Wimex</SelectItem>
+                      <SelectItem value="nazaki">Nazaki</SelectItem>
+                      <SelectItem value="dav">DAV</SelectItem>
+                      <SelectItem value="mttc">MTTC</SelectItem>
+                      <SelectItem value="motocorp">Motocorp</SelectItem>
+                      <SelectItem value="wapemex">Wapemex</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label>Top 3 marcas más vendidas</Label>
-                  <Input value={form.top3_marcas || ""} onChange={e => setForm({ ...form, top3_marcas: e.target.value })} placeholder="Ej: Toyota, Nissan, Honda" />
+                  <Label>Marca 2</Label>
+                  <Select value={completarForm.top3_marcas?.split(',')[1] || ""} onValueChange={(v) => {
+                    const current = completarForm.top3_marcas?.split(',') || ["", "", ""];
+                    setCompletarForm({ ...completarForm, top3_marcas: [current[0], v, current[2]].filter(Boolean).join(',') });
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alessia">Alessia</SelectItem>
+                      <SelectItem value="wimex">Wimex</SelectItem>
+                      <SelectItem value="nazaki">Nazaki</SelectItem>
+                      <SelectItem value="dav">DAV</SelectItem>
+                      <SelectItem value="mttc">MTTC</SelectItem>
+                      <SelectItem value="motocorp">Motocorp</SelectItem>
+                      <SelectItem value="wapemex">Wapemex</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+                <div>
+                  <Label>Marca 3</Label>
+                  <Select value={completarForm.top3_marcas?.split(',')[2] || ""} onValueChange={(v) => {
+                    const current = completarForm.top3_marcas?.split(',') || ["", "", ""];
+                    setCompletarForm({ ...completarForm, top3_marcas: [current[0], current[1], v].filter(Boolean).join(',') });
+                  }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alessia">Alessia</SelectItem>
+                      <SelectItem value="wimex">Wimex</SelectItem>
+                      <SelectItem value="nazaki">Nazaki</SelectItem>
+                      <SelectItem value="dav">DAV</SelectItem>
+                      <SelectItem value="mttc">MTTC</SelectItem>
+                      <SelectItem value="motocorp">Motocorp</SelectItem>
+                      <SelectItem value="wapemex">Wapemex</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <div className="font-medium text-[#1F3864]">Volumen y potencial</div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Volumen promedio mensual de ventas ($)</Label>
-                  <Input type="number" value={form.volumen_mensual_ventas || ""} onChange={e => setForm({ ...form, volumen_mensual_ventas: e.target.value })} placeholder="0.00" />
+                  <Input type="number" value={completarForm.volumen_mensual_ventas || ""} onChange={e => setCompletarForm({ ...completarForm, volumen_mensual_ventas: e.target.value })} placeholder="0.00" />
                 </div>
                 <div>
                   <Label>Fecha de última visita previa</Label>
-                  <Input type="date" value={form.fecha_ultima_visita || ""} onChange={e => setForm({ ...form, fecha_ultima_visita: e.target.value })} />
+                  <Input type="date" value={completarForm.fecha_ultima_visita || ""} onChange={e => setCompletarForm({ ...completarForm, fecha_ultima_visita: e.target.value })} />
                 </div>
-              </div>
-
-              <div className="space-y-3 pt-2 border-t">
-                <div className="font-medium text-[#1F3864]">Reporte de la visita</div>
-                <div>
-                  <Label>Asuntos tratados</Label>
-                  <Textarea value={form.asuntos_tratados || ""} onChange={e => setForm({ ...form, asuntos_tratados: e.target.value })} placeholder="Temas discutidos..." rows={2} />
-                </div>
-                <div>
-                  <Label>Acuerdos alcanzados</Label>
-                  <Textarea value={form.acuerdos_alcanzados || ""} onChange={e => setForm({ ...form, acuerdos_alcanzados: e.target.value })} placeholder="Acuerdos..." rows={2} />
-                </div>
-                <div>
-                  <Label>Retroalimentación de mercado</Label>
-                  <Textarea value={form.retroalimentacion_mercado || ""} onChange={e => setForm({ ...form, retroalimentacion_mercado: e.target.value })} placeholder="Comentarios del mercado..." rows={2} />
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-2 border-t">
-                <div className="font-medium text-[#1F3864]">Evidencia fotográfica</div>
-                <FileOrCamera 
-                  value={evidenciaFile} 
-                  onChange={setEvidenciaFile} 
-                  imageOnly={true} 
-                  label="Subir foto de evidencia (máx 10MB)"
-                />
               </div>
             </div>
-          )}
 
-          <DialogFooter className="gap-2">
-            {form.tipo === 'visita' && step === 2 && (
-              <Button variant="outline" onClick={() => setStep(1)} className="h-12 px-5 text-base">
-                <ChevronLeft className="h-4 w-4 mr-2" /> Atrás
-              </Button>
-            )}
-            {form.tipo === 'visita' && step === 1 ? (
-              <Button onClick={() => setStep(2)} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-                Siguiente <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
-              <Button onClick={save} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-                {form.tipo === 'visita' ? '✓ Guardar visita' : t.actions.save}
-              </Button>
-            )}
-          </DialogFooter>
+            <div className="space-y-3 pt-2 border-t">
+              <div className="font-medium text-[#1F3864]">Reporte de la visita</div>
+              <div>
+                <Label>Resultado / ¿Qué pasó?</Label>
+                <Textarea value={completarForm.resultado || ""} onChange={e => setCompletarForm({ ...completarForm, resultado: e.target.value })} placeholder="Describe el resultado..." rows={3} />
+              </div>
+              <div>
+                <Label>Asuntos tratados</Label>
+                <Textarea value={completarForm.asuntos_tratados || ""} onChange={e => setCompletarForm({ ...completarForm, asuntos_tratados: e.target.value })} placeholder="Temas discutidos..." rows={2} />
+              </div>
+              <div>
+                <Label>Acuerdos alcanzados</Label>
+                <Textarea value={completarForm.acuerdos_alcanzados || ""} onChange={e => setCompletarForm({ ...completarForm, acuerdos_alcanzados: e.target.value })} placeholder="Acuerdos..." rows={2} />
+              </div>
+              <div>
+                <Label>Retroalimentación de mercado</Label>
+                <Textarea value={completarForm.retroalimentacion_mercado || ""} onChange={e => setCompletarForm({ ...completarForm, retroalimentacion_mercado: e.target.value })} placeholder="Comentarios del mercado..." rows={2} />
+              </div>
+              <div>
+                <Label>Próxima acción</Label>
+                <Input value={completarForm.proxima_accion || ""} onChange={e => setCompletarForm({ ...completarForm, proxima_accion: e.target.value })} placeholder="¿Qué sigue?" />
+              </div>
+              <div>
+                <Label>Fecha próxima acción</Label>
+                <Input type="date" value={completarForm.fecha_proxima || ""} onChange={e => setCompletarForm({ ...completarForm, fecha_proxima: e.target.value })} />
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <div className="font-medium text-[#1F3864]">Limitantes detectadas</div>
+              <div className="flex flex-wrap gap-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={completarForm.limitante_descuento} onChange={e => setCompletarForm({ ...completarForm, limitante_descuento: e.target.checked })} className="rounded" />
+                  <span className="text-sm">Descuento</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={completarForm.limitante_flete} onChange={e => setCompletarForm({ ...completarForm, limitante_flete: e.target.checked })} className="rounded" />
+                  <span className="text-sm">Flete</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={completarForm.limitante_precio} onChange={e => setCompletarForm({ ...completarForm, limitante_precio: e.target.checked })} className="rounded" />
+                  <span className="text-sm">Precio</span>
+                </label>
+              </div>
+              {(completarForm.limitante_descuento || completarForm.limitante_flete || completarForm.limitante_precio) && (
+                <div>
+                  <Label className="text-sm">Notas de limitantes</Label>
+                  <Textarea value={completarForm.limitante_notas || ""} onChange={e => setCompletarForm({ ...completarForm, limitante_notas: e.target.value })} placeholder="Detalle de las limitantes..." rows={2} />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 pt-2 border-t">
+              <div className="font-medium text-[#1F3864]">Evidencia fotográfica</div>
+              <FileOrCamera 
+                value={evidenciaFile} 
+                onChange={setEvidenciaFile} 
+                imageOnly={true} 
+                label="Subir foto de evidencia (máx 10MB)"
+              />
+            </div>
+          </div>
+          <DialogFooter><Button onClick={saveCompletar} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Guardar reporte</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Activity Dialog (for non-visit activities or editing) */}
+      <Dialog open={!!editing} onOpenChange={(o) => { if (!o) { setEditing(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Editar actividad</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Cliente</Label>
+              <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.nombre_comercial || c.codigo_erp}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Vendedor</Label>
+              <Select value={form.vendedor_id} onValueChange={(v) => setForm({ ...form, vendedor_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar vendedor" /></SelectTrigger>
+                <SelectContent>
+                  {vendedores.map((v: any) => (
+                    <SelectItem key={v.id} value={v.id}>{v.nombre_completo}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tipo</Label>
+              <Select value={form.tipo} onValueChange={(v) => setForm({ ...form, tipo: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="llamada">Llamada</SelectItem>
+                  <SelectItem value="visita">Visita</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="videollamada">Videollamada</SelectItem>
+                  <SelectItem value="demo">Demo</SelectItem>
+                  <SelectItem value="nota">Nota</SelectItem>
+                  <SelectItem value="seguimiento">Seguimiento</SelectItem>
+                  <SelectItem value="cotizacion">Cotización</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Fecha</Label>
+              <Input type="datetime-local" value={form.fecha_actividad} onChange={e => setForm({ ...form, fecha_actividad: e.target.value })} />
+            </div>
+            <div>
+              <Label>Resultado</Label>
+              <Textarea value={form.resultado || ""} onChange={e => setForm({ ...form, resultado: e.target.value })} rows={3} />
+            </div>
+            <div>
+              <Label>Notas generales</Label>
+              <Textarea value={form.descripcion || ""} onChange={e => setForm({ ...form, descripcion: e.target.value })} rows={2} />
+            </div>
+          </div>
+          <DialogFooter><Button onClick={save} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Guardar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
