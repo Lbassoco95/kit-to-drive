@@ -7,9 +7,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Pencil, User, Building2, TrendingUp, DollarSign, Calendar, AlertTriangle, BookOpen } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, User, Building2, TrendingUp, DollarSign, Calendar, AlertTriangle, BookOpen, Expand, Camera } from "lucide-react";
 
 export default function CrmOportunidadDetail() {
   const { id } = useParams<{ id: string }>();
@@ -23,12 +24,15 @@ export default function CrmOportunidadDetail() {
   const [creatingActivity, setCreatingActivity] = useState(false);
   const [activityForm, setActivityForm] = useState<any>({
     tipo: "visita",
+    canal_contacto: "",
     fecha_actividad: "",
     resultado: "",
     proxima_accion: "",
     fecha_proxima: "",
     descripcion: ""
   });
+  const [expandedActivity, setExpandedActivity] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const etapaColors: Record<string, string> = {
     prospecto: "bg-gray-100 text-gray-700",
@@ -243,9 +247,34 @@ export default function CrmOportunidadDetail() {
               <Card key={act.id} className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="font-medium capitalize">{act.tipo}</span>
+                      {act.tipo === 'visita' && (
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-medium">
+                          Visita
+                        </span>
+                      )}
                       <span className="text-sm text-muted-foreground">· {new Date(act.fecha_actividad).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {act.evidencia_url && (
+                        <img 
+                          src={act.evidencia_url} 
+                          alt="Evidencia" 
+                          className="w-10 h-10 rounded object-cover cursor-pointer hover:opacity-80 border"
+                          onClick={() => setImagePreview(act.evidencia_url)}
+                        />
+                      )}
+                      {act.tipo_negocio && (
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 text-xs font-medium">
+                          {act.tipo_negocio}
+                        </span>
+                      )}
+                      {act.escala_operacion && (
+                        <span className="inline-block px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-medium">
+                          {act.escala_operacion}
+                        </span>
+                      )}
                     </div>
                     {act.resultado && <div className="text-sm mt-1">{act.resultado}</div>}
                     {act.proxima_accion && (
@@ -256,7 +285,50 @@ export default function CrmOportunidadDetail() {
                     )}
                     {act.descripcion && <div className="text-sm text-muted-foreground mt-2 line-clamp-2">{act.descripcion}</div>}
                   </div>
+                  {act.tipo === 'visita' && (
+                    <Button size="icon" variant="ghost" onClick={() => setExpandedActivity(expandedActivity === act.id ? null : act.id)} className="h-8 w-8 shrink-0">
+                      <Expand className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
+
+                {expandedActivity === act.id && act.tipo === 'visita' && (
+                  <div className="mt-4 pt-4 border-t space-y-3 text-sm">
+                    <div className="font-medium text-[#1F3864]">Perfil del cliente visitado</div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      {act.region && <div><span className="text-muted-foreground">Región:</span> {act.region}</div>}
+                      {act.municipio && <div><span className="text-muted-foreground">Municipio:</span> {act.municipio}</div>}
+                      {act.codigo_cliente && <div><span className="text-muted-foreground">Código:</span> {act.codigo_cliente}</div>}
+                      {act.tipo_cliente_nuevo !== undefined && <div><span className="text-muted-foreground">Cliente nuevo:</span> {act.tipo_cliente_nuevo ? 'Sí' : 'No'}</div>}
+                      {act.persona_contacto && <div><span className="text-muted-foreground">Contacto:</span> {act.persona_contacto}</div>}
+                      {act.telefono_contacto && <div><span className="text-muted-foreground">Teléfono:</span> {act.telefono_contacto}</div>}
+                    </div>
+
+                    <div className="font-medium text-[#1F3864] mt-2">Operación del negocio</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {act.tipo_negocio && <div><span className="text-muted-foreground">Tipo:</span> {act.tipo_negocio}</div>}
+                      {act.escala_operacion && <div><span className="text-muted-foreground">Escala:</span> {act.escala_operacion}</div>}
+                      {act.marcas_comercializa && <div className="col-span-2"><span className="text-muted-foreground">Marcas:</span> {act.marcas_comercializa}</div>}
+                      {act.top3_marcas && <div><span className="text-muted-foreground">Top 3:</span> {act.top3_marcas}</div>}
+                      {act.volumen_mensual_ventas && <div><span className="text-muted-foreground">Volumen mensual:</span> ${act.volumen_mensual_ventas}</div>}
+                      {act.fecha_ultima_visita && <div><span className="text-muted-foreground">Última visita:</span> {new Date(act.fecha_ultima_visita).toLocaleDateString()}</div>}
+                    </div>
+
+                    <div className="font-medium text-[#1F3864] mt-2">Reporte de la visita</div>
+                    <div className="space-y-2">
+                      {act.asuntos_tratados && <div><span className="text-muted-foreground">Asuntos tratados:</span> {act.asuntos_tratados}</div>}
+                      {act.acuerdos_alcanzados && <div><span className="text-muted-foreground">Acuerdos:</span> {act.acuerdos_alcanzados}</div>}
+                      {act.retroalimentacion_mercado && <div><span className="text-muted-foreground">Retroalimentación:</span> {act.retroalimentacion_mercado}</div>}
+                      {act.evidencia_url && (
+                        <div>
+                          <span className="text-muted-foreground">Evidencia:</span>
+                          <a href={act.evidencia_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline ml-1">Ver foto</a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </Card>
             ))}
           </div>
@@ -277,17 +349,31 @@ export default function CrmOportunidadDetail() {
                   <SelectItem value="llamada">Llamada</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="videollamada">Videollamada</SelectItem>
                   <SelectItem value="nota">Nota</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
+              <Label>Canal de contacto</Label>
+              <Select value={activityForm.canal_contacto} onValueChange={(v) => setActivityForm({ ...activityForm, canal_contacto: v })}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar canal" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="presencial">Presencial</SelectItem>
+                  <SelectItem value="telefonico">Telefónico</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="videollamada">Videollamada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label>Fecha</Label>
-              <Input type="date" value={activityForm.fecha_actividad} onChange={e => setActivityForm({ ...activityForm, fecha_actividad: e.target.value })} />
+              <Input type="datetime-local" value={activityForm.fecha_actividad} onChange={e => setActivityForm({ ...activityForm, fecha_actividad: e.target.value })} />
             </div>
             <div>
               <Label>Resultado</Label>
-              <Input value={activityForm.resultado} onChange={e => setActivityForm({ ...activityForm, resultado: e.target.value })} />
+              <Textarea value={activityForm.resultado} onChange={e => setActivityForm({ ...activityForm, resultado: e.target.value })} placeholder="¿Qué pasó?" rows={2} />
             </div>
             <div>
               <Label>Próxima acción</Label>
@@ -299,10 +385,20 @@ export default function CrmOportunidadDetail() {
             </div>
             <div>
               <Label>Notas</Label>
-              <Input value={activityForm.descripcion} onChange={e => setActivityForm({ ...activityForm, descripcion: e.target.value })} />
+              <Textarea value={activityForm.descripcion} onChange={e => setActivityForm({ ...activityForm, descripcion: e.target.value })} placeholder="Notas adicionales..." rows={2} />
             </div>
           </div>
           <DialogFooter><Button onClick={saveActivity} className="bg-[#1F3864] hover:bg-[#162a4d]">Guardar</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!imagePreview} onOpenChange={() => setImagePreview(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader><DialogTitle>Evidencia fotográfica</DialogTitle></DialogHeader>
+          {imagePreview && (
+            <img src={imagePreview} alt="Evidencia" className="w-full rounded-lg" />
+          )}
         </DialogContent>
       </Dialog>
     </div>
