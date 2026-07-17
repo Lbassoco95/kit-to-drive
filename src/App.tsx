@@ -21,6 +21,7 @@ import Configuracion from "./pages/Configuracion";
 import ReportesTurno from "./pages/ReportesTurno";
 import Finanzas from "./pages/Finanzas";
 import CrmOportunidades from "./pages/crm/CrmOportunidades";
+import CrmOportunidadDetail from "./pages/crm/CrmOportunidadDetail";
 import CrmActividades from "./pages/crm/CrmActividades";
 import CrmRutas from "./pages/crm/CrmRutas";
 import CrmEquipo from "./pages/crm/CrmEquipo";
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="/configuracion" element={<ProtectedRoute roles={["admin"]}><Configuracion /></ProtectedRoute>} />
               <Route path="/finanzas" element={<ProtectedRoute roles={["admin","finanzas","admin_financiero"]}><Finanzas /></ProtectedRoute>} />
               <Route path="/crm/oportunidades" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmOportunidades /></ProtectedRoute>} />
+              <Route path="/crm/oportunidades/:id" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmOportunidadDetail /></ProtectedRoute>} />
               <Route path="/crm/actividades" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmActividades /></ProtectedRoute>} />
               <Route path="/crm/rutas" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmRutas /></ProtectedRoute>} />
               <Route path="/crm/equipo" element={<ProtectedRoute roles={["admin","director_ventas","coordinador_ventas"]}><CrmEquipo /></ProtectedRoute>} />

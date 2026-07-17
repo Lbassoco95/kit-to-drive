@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Plus, Pencil, Search, TrendingUp, DollarSign, Calendar, User, Building2
 export default function CrmOportunidades() {
   const { role, user } = useAuth();
   const { t } = useLang();
+  const navigate = useNavigate();
   const [oportunidades, setOportunidades] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [vendedores, setVendedores] = useState<any[]>([]);
@@ -93,9 +95,13 @@ export default function CrmOportunidades() {
       if (error) return toast.error(error.message);
       toast.success("Oportunidad actualizada"); setEditing(null);
     } else {
-      const { error } = await supabase.from("crm_oportunidades").insert(payload);
+      const { data, error } = await supabase.from("crm_oportunidades").insert(payload).select("id").single();
       if (error) return toast.error(error.message);
       toast.success("Oportunidad creada"); setCreating(false);
+      if (data?.id) {
+        navigate(`/crm/oportunidades/${data.id}`);
+        return;
+      }
     }
     setForm({
       cliente_id: "",
