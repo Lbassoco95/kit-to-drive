@@ -47,7 +47,8 @@ export default function Dashboard() {
   // Redirect based on role
   useEffect(() => {
     if (role === "finanzas" || role === "admin_financiero") { nav("/finanzas"); return; }
-    if (role === "director_ventas" || role === "coordinador_ventas" || role === "auxiliar_ventas") { nav("/crm/oportunidades"); return; }
+    if (role === "ventas" || role === "auxiliar_ventas") { nav("/crm/oportunidades"); return; }
+    if (role === "director_ventas" || role === "coordinador_ventas") { nav("/crm/oportunidades"); return; }
   }, [role, nav]);
 
   if (!data) return <div className="text-muted-foreground p-8">{t.dashboard.cargando}</div>;

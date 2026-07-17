@@ -48,6 +48,7 @@ export const es = {
 
   // Roles
   roles: {
+    direccion: "Dirección",
     admin: "Administrador",
     fabrica: "Fábrica",
     logistica: "Logística",

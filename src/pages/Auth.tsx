@@ -8,13 +8,14 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
-import { User, Wrench, Truck, Briefcase } from "lucide-react";
+import { Building2, Wrench, Truck, Briefcase, Wallet } from "lucide-react";
 
 const DEMO_ROLES = [
-  { email: "admin@dazon.demo",     pwd: "Dazon2026!", labelKey: "admin" as const,     icon: User },
+  { email: "admin@dazon.demo",     pwd: "Dazon2026!", labelKey: "direccion" as const,  icon: Building2 },
   { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", labelKey: "fabrica" as const,   icon: Wrench },
   { email: "logistica@dazon.demo", pwd: "Dazon2026!", labelKey: "logistica" as const, icon: Truck },
   { email: "ventas@dazon.demo",    pwd: "Dazon2026!", labelKey: "ventas" as const,     icon: Briefcase },
+  { email: "finanzas@dazon.demo",  pwd: "Dazon2026!", labelKey: "finanzas" as const,  icon: Wallet },
 ];
 
 export default function Auth() {
@@ -74,7 +75,7 @@ export default function Auth() {
         </form>
         {devMode && <div className="mt-8 pt-6 border-t">
           <p className="text-sm text-muted-foreground mb-3 text-center">{t.auth.quickAccess}</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {DEMO_ROLES.map(d => (
               <button
                 key={d.email}

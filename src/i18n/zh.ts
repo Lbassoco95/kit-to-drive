@@ -50,6 +50,7 @@ export const zh: Translations = {
 
   // Roles
   roles: {
+    direccion: "管理层",
     admin: "管理员",
     fabrica: "工厂",
     logistica: "物流",
