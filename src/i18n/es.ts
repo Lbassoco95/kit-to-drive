@@ -17,6 +17,7 @@ export const es = {
     bitacora: "Bitácora",
     configuracion: "Configuración",
     crmOportunidades: "Oportunidades",
+    crmEquipo: "Equipo de Ventas",
     crmActividades: "Actividades",
     crmRutas: "Rutas",
     crmDashboard: "Monitor equipo",

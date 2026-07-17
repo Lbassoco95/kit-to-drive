@@ -21,6 +21,7 @@ const ITEMS: Item[] = [
   { key: "clientes",       url: "/clientes",      icon: Users,           roles: ["admin","fabrica","coordinador"],                      group: "Catálogos" },
   { key: "crmDashboard",    url: "/crm/dashboard",    icon: BarChart2,      roles: ["admin","director_ventas","coordinador_ventas","auxiliar_ventas"], group: "CRM" },
   { key: "crmOportunidades",url: "/crm/oportunidades",icon: TrendingUp,     roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
+  { key: "crmEquipo",       url: "/crm/equipo",       icon: Users,           roles: ["admin","director_ventas","coordinador_ventas"], group: "CRM" },
   { key: "crmActividades",  url: "/crm/actividades",  icon: BookOpen,       roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
   { key: "crmRutas",        url: "/crm/rutas",        icon: MapPin,         roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
   { key: "finanzas",       url: "/finanzas",      icon: Wallet,          roles: ["admin","finanzas","admin_financiero"],              group: "Finanzas" },

@@ -20,6 +20,8 @@ import Bitacora from "./pages/Bitacora";
 import Configuracion from "./pages/Configuracion";
 import ReportesTurno from "./pages/ReportesTurno";
 import Finanzas from "./pages/Finanzas";
+import CrmOportunidades from "./pages/crm/CrmOportunidades";
+import CrmEquipo from "./pages/crm/CrmEquipo";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +49,8 @@ const App = () => (
               <Route path="/bitacora" element={<ProtectedRoute roles={["admin"]}><Bitacora /></ProtectedRoute>} />
               <Route path="/configuracion" element={<ProtectedRoute roles={["admin"]}><Configuracion /></ProtectedRoute>} />
               <Route path="/finanzas" element={<ProtectedRoute roles={["admin","finanzas","admin_financiero"]}><Finanzas /></ProtectedRoute>} />
+              <Route path="/crm/oportunidades" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmOportunidades /></ProtectedRoute>} />
+              <Route path="/crm/equipo" element={<ProtectedRoute roles={["admin","director_ventas","coordinador_ventas"]}><CrmEquipo /></ProtectedRoute>} />
               <Route path="/buscar" element={<Navigate to="/produccion" replace />} />
             </Route>
             <Route path="*" element={<NotFound />} />
