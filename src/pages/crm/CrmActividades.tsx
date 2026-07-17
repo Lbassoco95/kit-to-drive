@@ -26,7 +26,7 @@ export default function CrmActividades() {
     oportunidad_id: "",
     cliente_id: "",
     tipo: "visita",
-    fecha: "",
+    fecha_actividad: "",
     resultado: "",
     proxima_accion: "",
     fecha_proxima: "",
@@ -34,12 +34,12 @@ export default function CrmActividades() {
     limitante_flete: false,
     limitante_precio: false,
     limitante_notas: "",
-    notas: ""
+    descripcion: ""
   });
 
   const load = async () => {
     const [{ data: acts }, { data: cs }, { data: vs }, { data: ops }] = await Promise.all([
-      supabase.from("crm_actividades").select("*").order("fecha", { ascending: false }),
+      supabase.from("crm_actividades").select("*").order("fecha_actividad", { ascending: false }),
       supabase.from("clientes").select("*").order("nombre_comercial"),
       supabase.from("profiles").select("id, nombre_completo").eq("activo", true),
       supabase.from("crm_oportunidades").select("*")
@@ -64,7 +64,7 @@ export default function CrmActividades() {
         cliente?.nombre_comercial,
         cliente?.codigo_erp,
         vendedor?.nombre_completo,
-        a.notas
+        a.descripcion
       ].filter(Boolean).join(" ").toLowerCase();
       return searchable.includes(qLower);
     });
@@ -77,7 +77,7 @@ export default function CrmActividades() {
   const save = async () => {
     const payload = {
       ...form,
-      fecha: form.fecha || new Date().toISOString(),
+      fecha_actividad: form.fecha_actividad || new Date().toISOString(),
       fecha_proxima: form.fecha_proxima || null,
       vendedor_id: form.vendedor_id || user?.id
     };
@@ -108,7 +108,7 @@ export default function CrmActividades() {
       oportunidad_id: "",
       cliente_id: "",
       tipo: "visita",
-      fecha: "",
+      fecha_actividad: "",
       resultado: "",
       proxima_accion: "",
       fecha_proxima: "",
@@ -116,7 +116,7 @@ export default function CrmActividades() {
       limitante_flete: false,
       limitante_precio: false,
       limitante_notas: "",
-      notas: ""
+      descripcion: ""
     });
     load();
   };
@@ -145,7 +145,7 @@ export default function CrmActividades() {
           <p className="text-base text-muted-foreground mt-1">{filtered.length} actividades registradas</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setForm({ vendedor_id: "", oportunidad_id: "", cliente_id: "", tipo: "visita", fecha: "", resultado: "", proxima_accion: "", fecha_proxima: "", limitante_descuento: false, limitante_flete: false, limitante_precio: false, limitante_notas: "", notas: "" }); setCreating(true); }}
+          <Button onClick={() => { setForm({ vendedor_id: "", oportunidad_id: "", cliente_id: "", tipo: "visita", fecha_actividad: "", resultado: "", proxima_accion: "", fecha_proxima: "", limitante_descuento: false, limitante_flete: false, limitante_precio: false, limitante_notas: "", descripcion: "" }); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> Nueva actividad
           </Button>
@@ -193,7 +193,7 @@ export default function CrmActividades() {
                   <User size={16}/> <span>{vendedor?.nombre_completo || "Sin vendedor"}</span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar size={16}/> <span>{new Date(a.fecha).toLocaleString()}</span>
+                  <Calendar size={16}/> <span>{new Date(a.fecha_actividad).toLocaleString()}</span>
                 </div>
                 {a.resultado && (
                   <div className="flex items-center gap-2 text-muted-foreground">
@@ -207,9 +207,9 @@ export default function CrmActividades() {
                 )}
               </div>
 
-              {a.notas && (
+              {a.descripcion && (
                 <div className="text-sm text-muted-foreground line-clamp-2 mt-2 pt-2 border-t">
-                  {a.notas}
+                  {a.descripcion}
                 </div>
               )}
             </Card>
@@ -273,7 +273,7 @@ export default function CrmActividades() {
             </div>
             <div>
               <Label>Fecha</Label>
-              <Input type="datetime-local" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
+              <Input type="datetime-local" value={form.fecha_actividad} onChange={e => setForm({ ...form, fecha_actividad: e.target.value })} />
             </div>
             <div>
               <Label>Resultado</Label>
@@ -312,7 +312,7 @@ export default function CrmActividades() {
             </div>
             <div>
               <Label>Notas generales</Label>
-              <Input value={form.notas || ""} onChange={e => setForm({ ...form, notas: e.target.value })} />
+              <Input value={form.descripcion || ""} onChange={e => setForm({ ...form, descripcion: e.target.value })} />
             </div>
           </div>
           <DialogFooter><Button onClick={save} className="h-12 px-5 text-base">{t.actions.save}</Button></DialogFooter>

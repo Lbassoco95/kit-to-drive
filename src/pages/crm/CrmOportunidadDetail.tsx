@@ -23,11 +23,11 @@ export default function CrmOportunidadDetail() {
   const [creatingActivity, setCreatingActivity] = useState(false);
   const [activityForm, setActivityForm] = useState<any>({
     tipo: "visita",
-    fecha: "",
+    fecha_actividad: "",
     resultado: "",
     proxima_accion: "",
     fecha_proxima: "",
-    notas: ""
+    descripcion: ""
   });
 
   const etapaColors: Record<string, string> = {
@@ -44,7 +44,7 @@ export default function CrmOportunidadDetail() {
     setLoading(true);
     const [{ data: op }, { data: acts }] = await Promise.all([
       supabase.from("crm_oportunidades").select("*").eq("id", id).single(),
-      supabase.from("crm_actividades").select("*").eq("oportunidad_id", id).order("fecha", { ascending: false })
+      supabase.from("crm_actividades").select("*").eq("oportunidad_id", id).order("fecha_actividad", { ascending: false })
     ]);
     
     if (op) {
@@ -67,7 +67,7 @@ export default function CrmOportunidadDetail() {
       ...activityForm,
       oportunidad_id: id,
       cliente_id: oportunidad?.cliente_id,
-      fecha: activityForm.fecha || new Date().toISOString(),
+      fecha_actividad: activityForm.fecha_actividad || new Date().toISOString(),
       fecha_proxima: activityForm.fecha_proxima || null,
       vendedor_id: user?.id
     };
@@ -76,7 +76,7 @@ export default function CrmOportunidadDetail() {
     if (error) return toast.error(error.message);
     toast.success("Actividad registrada");
     setCreatingActivity(false);
-    setActivityForm({ tipo: "visita", fecha: "", resultado: "", proxima_accion: "", fecha_proxima: "", notas: "" });
+    setActivityForm({ tipo: "visita", fecha_actividad: "", resultado: "", proxima_accion: "", fecha_proxima: "", descripcion: "" });
     load();
   };
 
@@ -245,7 +245,7 @@ export default function CrmOportunidadDetail() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium capitalize">{act.tipo}</span>
-                      <span className="text-sm text-muted-foreground">· {new Date(act.fecha).toLocaleDateString()}</span>
+                      <span className="text-sm text-muted-foreground">· {new Date(act.fecha_actividad).toLocaleDateString()}</span>
                     </div>
                     {act.resultado && <div className="text-sm mt-1">{act.resultado}</div>}
                     {act.proxima_accion && (
@@ -254,7 +254,7 @@ export default function CrmOportunidadDetail() {
                         {act.fecha_proxima && ` (${new Date(act.fecha_proxima).toLocaleDateString()})`}
                       </div>
                     )}
-                    {act.notas && <div className="text-sm text-muted-foreground mt-2 line-clamp-2">{act.notas}</div>}
+                    {act.descripcion && <div className="text-sm text-muted-foreground mt-2 line-clamp-2">{act.descripcion}</div>}
                   </div>
                 </div>
               </Card>
@@ -283,7 +283,7 @@ export default function CrmOportunidadDetail() {
             </div>
             <div>
               <Label>Fecha</Label>
-              <Input type="date" value={activityForm.fecha} onChange={e => setActivityForm({ ...activityForm, fecha: e.target.value })} />
+              <Input type="date" value={activityForm.fecha_actividad} onChange={e => setActivityForm({ ...activityForm, fecha_actividad: e.target.value })} />
             </div>
             <div>
               <Label>Resultado</Label>
@@ -299,7 +299,7 @@ export default function CrmOportunidadDetail() {
             </div>
             <div>
               <Label>Notas</Label>
-              <Input value={activityForm.notas} onChange={e => setActivityForm({ ...activityForm, notas: e.target.value })} />
+              <Input value={activityForm.descripcion} onChange={e => setActivityForm({ ...activityForm, descripcion: e.target.value })} />
             </div>
           </div>
           <DialogFooter><Button onClick={saveActivity} className="bg-[#1F3864] hover:bg-[#162a4d]">Guardar</Button></DialogFooter>
