@@ -116,6 +116,63 @@ export type Database = {
         }
         Relationships: []
       }
+      clientes_bitacora: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          datos_anteriores: Json | null
+          datos_nuevos: Json | null
+          id: string
+          motivo: string
+          tipo_cambio: string
+          usuario_id: string
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          datos_anteriores?: Json | null
+          datos_nuevos?: Json | null
+          id?: string
+          motivo: string
+          tipo_cambio: string
+          usuario_id: string
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          datos_anteriores?: Json | null
+          datos_nuevos?: Json | null
+          id?: string
+          motivo?: string
+          tipo_cambio?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
+      clientes_comentarios: {
+        Row: {
+          cliente_id: string
+          comentario: string
+          created_at: string
+          id: string
+          usuario_id: string
+        }
+        Insert: {
+          cliente_id: string
+          comentario: string
+          created_at?: string
+          id?: string
+          usuario_id: string
+        }
+        Update: {
+          cliente_id?: string
+          comentario?: string
+          created_at?: string
+          id?: string
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       config_general: {
         Row: {
           capacidad_diaria: number
