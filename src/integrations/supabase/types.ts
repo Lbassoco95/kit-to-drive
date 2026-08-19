@@ -151,6 +151,203 @@ export type Database = {
           }
         ]
       }
+      inventario_chasis: {
+        Row: {
+          color: string
+          contenedor_id: string | null
+          created_at: string
+          estatus: string
+          fecha_configuracion: string | null
+          fecha_importacion: string
+          id: string
+          modelo: string
+          motocarro_id: string | null
+          notas: string | null
+          numero_chasis: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          contenedor_id?: string | null
+          created_at?: string
+          estatus?: string
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
+          id?: string
+          modelo?: string
+          motocarro_id?: string | null
+          notas?: string | null
+          numero_chasis: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          contenedor_id?: string | null
+          created_at?: string
+          estatus?: string
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
+          id?: string
+          modelo?: string
+          motocarro_id?: string | null
+          notas?: string | null
+          numero_chasis?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_chasis_contenedor_id_fkey"
+            columns: ["contenedor_id"]
+            isOneToOne: false
+            referencedRelation: "contenedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_chasis_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "motocarros"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      inventario_motor: {
+        Row: {
+          contenedor_id: string | null
+          created_at: string
+          estatus: string
+          fecha_configuracion: string | null
+          fecha_importacion: string
+          id: string
+          modelo: string
+          motocarro_id: string | null
+          notas: string | null
+          numero_motor: string
+          updated_at: string
+        }
+        Insert: {
+          contenedor_id?: string | null
+          created_at?: string
+          estatus?: string
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
+          id?: string
+          modelo?: string
+          motocarro_id?: string | null
+          notas?: string | null
+          numero_motor: string
+          updated_at?: string
+        }
+        Update: {
+          contenedor_id?: string | null
+          created_at?: string
+          estatus?: string
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
+          id?: string
+          modelo?: string
+          motocarro_id?: string | null
+          notas?: string | null
+          numero_motor?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_motor_contenedor_id_fkey"
+            columns: ["contenedor_id"]
+            isOneToOne: false
+            referencedRelation: "contenedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_motor_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "motocarros"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      inventario_partes: {
+        Row: {
+          contenedor_id: string
+          cantidad_esperada: number
+          cantidad_recibida: number
+          created_at: string
+          descripcion: string
+          fecha_importacion: string
+          id: string
+          modelo: string | null
+          notas: string | null
+          updated_at: string
+        }
+        Insert: {
+          contenedor_id: string
+          cantidad_esperada?: number
+          cantidad_recibida?: number
+          created_at?: string
+          descripcion: string
+          fecha_importacion?: string
+          id?: string
+          modelo?: string | null
+          notas?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contenedor_id?: string
+          cantidad_esperada?: number
+          cantidad_recibida?: number
+          created_at?: string
+          descripcion?: string
+          fecha_importacion?: string
+          id?: string
+          modelo?: string | null
+          notas?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventario_partes_contenedor_id_fkey"
+            columns: ["contenedor_id"]
+            isOneToOne: false
+            referencedRelation: "contenedores"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      inventario_colores: {
+        Row: {
+          color: string
+          cantidad_disponible: number
+          created_at: string
+          id: string
+          modelo: string
+          ultima_actualizacion: string
+          umbral_alerta: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          cantidad_disponible?: number
+          created_at?: string
+          id?: string
+          modelo?: string
+          ultima_actualizacion?: string
+          umbral_alerta?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          cantidad_disponible?: number
+          created_at?: string
+          id?: string
+          modelo?: string
+          ultima_actualizacion?: string
+          umbral_alerta?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       contenedores: {
         Row: {
           created_at: string
@@ -456,6 +653,38 @@ export type Database = {
           _partes: Json
         }
         Returns: Json
+      }
+      importar_vins_inventario: {
+        Args: {
+          _contenedor_id: string
+          _folio_contenedor: string
+          _modelo: string
+          _vins: Json
+        }
+        Returns: Json
+      }
+      importar_packing_list: {
+        Args: {
+          _contenedor_id: string
+          _partes: Json
+        }
+        Returns: Json
+      }
+      incrementar_inventario_color: {
+        Args: {
+          _modelo: string
+          _color: string
+          _cantidad: number
+        }
+        Returns: void
+      }
+      decrementar_inventario_color: {
+        Args: {
+          _modelo: string
+          _color: string
+          _cantidad: number
+        }
+        Returns: void
       }
       reintentar_asignar_remision: {
         Args: { _remision_id: string }

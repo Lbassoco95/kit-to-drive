@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PackagePlus, Trash2, ClipboardPaste, KeyboardIcon, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { parseContenedoresExcel, ContenedorFromExcel } from "@/lib/excelParser";
+import { parseContenedoresExcel, ContenedorFromExcel, parseVinsExcel, VinFromExcel } from "@/lib/excelParser";
 
 type Unidad = { ns_chasis: string; ns_motor: string; chasis_asignado?: string };
 
@@ -34,14 +34,22 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   const [pasteText, setPasteText] = useState("");
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [parsedContenedores, setParsedContenedores] = useState<ContenedorFromExcel[]>([]);
-  const [importMode, setImportMode] = useState<"single" | "multiple">("single");
+  const [importMode, setImportMode] = useState<"single" | "multiple" | "vins">("single");
+  const [vinsFile, setVinsFile] = useState<File | null>(null);
+  const [parsedVins, setParsedVins] = useState<{ folio_contenedor: string; modelo: string; vins: VinFromExcel[] } | null>(null);
 
-  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setImportMode("single"); };
+  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setImportMode("single"); setVinsFile(null); setParsedVins(null); };
 
   const irPaso2 = () => {
     if (importMode === "multiple") {
       // For multiple containers, skip to import
       importarContenedoresExcel();
+      return;
+    }
+
+    if (importMode === "vins") {
+      // For VINs import, skip to import
+      importarVinsInventario();
       return;
     }
 
@@ -142,6 +150,95 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
     }
   };
 
+  const handleVinsUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBusy(true);
+    try {
+      const vinsData = await parseVinsExcel(file);
+      
+      if (vinsData.vins.length === 0) {
+        toast.error("No se encontraron VINs válidos en el archivo Excel");
+        setBusy(false);
+        return;
+      }
+
+      setParsedVins(vinsData);
+      setVinsFile(file);
+      
+      // Update form with extracted data
+      setCab({
+        folio_contenedor: vinsData.folio_contenedor || cab.folio_contenedor,
+        fecha_arribo: cab.fecha_arribo,
+        modelo: vinsData.modelo || cab.modelo,
+        color: cab.color,
+        cantidad: vinsData.vins.length,
+      });
+      
+      toast.success(`✓ ${vinsData.vins.length} VIN(s) cargado(s) del archivo`);
+    } catch (error) {
+      console.error("Error parsing VINs Excel:", error);
+      toast.error("Error al procesar el archivo Excel. Verifica el formato.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importarVinsInventario = async () => {
+    if (!parsedVins || parsedVins.vins.length === 0) {
+      toast.error("No hay VINs para importar");
+      return;
+    }
+
+    // First create the container
+    setBusy(true);
+    try {
+      // Create container first
+      const { data: containerData, error: containerError } = await supabase
+        .from("contenedores")
+        .insert({
+          folio_contenedor: cab.folio_contenedor.trim(),
+          fecha_arribo: cab.fecha_arribo,
+          modelo_default: cab.modelo,
+          total_unidades: parsedVins.vins.length,
+        })
+        .select()
+        .single();
+
+      if (containerError) {
+        toast.error(containerError.message);
+        setBusy(false);
+        return;
+      }
+
+      // Import VINs to inventario_chasis and update inventario_colores
+      const { data, error } = await supabase.rpc("importar_vins_inventario", {
+        _contenedor_id: containerData.id,
+        _folio_contenedor: cab.folio_contenedor.trim(),
+        _modelo: cab.modelo,
+        _vins: parsedVins.vins as any,
+      });
+
+      if (error) {
+        toast.error(error.message);
+        setBusy(false);
+        return;
+      }
+
+      const result = data as any;
+      toast.success(`✓ ${result.creados} VIN(s) importados a inventario y actualizado inventario_colores`);
+      setOpen(false);
+      reset();
+      onDone?.();
+    } catch (error) {
+      console.error("Error importing VINs:", error);
+      toast.error("Error al importar VINs al inventario");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const validacion = useMemo(() => {
     const errs: { idx: number; campo: string; msg: string }[] = [];
     const chasisCount = new Map<string, number>();
@@ -225,9 +322,10 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           {step === 1 && (
             <div className="space-y-4 mt-4">
               <Tabs value={importMode} onValueChange={v => setImportMode(v as any)} className="w-full">
-                <TabsList className="grid grid-cols-2 h-12">
+                <TabsList className="grid grid-cols-3 h-12">
                   <TabsTrigger value="single" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />Capturar manual</TabsTrigger>
-                  <TabsTrigger value="multiple" className="text-base"><FileSpreadsheet className="h-4 w-4 mr-2" />Importar Excel</TabsTrigger>
+                  <TabsTrigger value="vins" className="text-base"><FileSpreadsheet className="h-4 w-4 mr-2" />Importar VINs</TabsTrigger>
+                  <TabsTrigger value="multiple" className="text-base"><FileSpreadsheet className="h-4 w-4 mr-2" />Importar Contenedores</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="single" className="space-y-4 mt-4">
@@ -256,6 +354,59 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                       <p className="text-xs text-muted-foreground mt-1">Si vas a pegar desde Excel, se ajusta automáticamente.</p>
                     </div>
                   </div>
+                </TabsContent>
+
+                <TabsContent value="vins" className="space-y-4 mt-4">
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center">
+                    <Upload className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                    <p className="text-sm font-medium mb-2">Importar Excel VINs</p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Sube el archivo VIN file. El sistema leerá: CONTAINER NO., FRAME NUMBER (chasis), COLOR, MODEL.
+                      Los VINs se importarán a inventario_chasis y se actualizará inventario_colores automáticamente.
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleVinsUpload}
+                      disabled={busy}
+                      className="max-w-xs mx-auto"
+                    />
+                    {busy && <p className="text-xs text-muted-foreground mt-2">Procesando archivo...</p>}
+                  </div>
+
+                  {parsedVins && (
+                    <div className="bg-slate-50 rounded-lg p-4">
+                      <p className="font-medium mb-2">VINs detectados:</p>
+                      <ul className="text-sm space-y-1">
+                        <li>Contenedor: {parsedVins.folio_contenedor || 'No especificado'}</li>
+                        <li>Modelo: {parsedVins.modelo}</li>
+                        <li>Total VINs: {parsedVins.vins.length}</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {parsedVins && (
+                    <div className="border rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-50 sticky top-0">
+                          <tr>
+                            <th className="px-2 py-2 text-left">#</th>
+                            <th className="px-2 py-2 text-left">Chasis (FRAME NUMBER)</th>
+                            <th className="px-2 py-2 text-left">Color</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parsedVins.vins.map((vin, i) => (
+                            <tr key={i} className="border-t">
+                              <td className="px-2 py-1 text-muted-foreground">{i+1}</td>
+                              <td className="px-2 py-1 font-mono">{vin.numero_chasis}</td>
+                              <td className="px-2 py-1">{vin.color}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="multiple" className="space-y-4 mt-4">
@@ -386,6 +537,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           <DialogFooter className="gap-2">
             {step > 1 && <Button variant="outline" onClick={() => setStep((step - 1) as any)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
             {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
+            {step === 1 && importMode === "vins" && <Button onClick={irPaso2} disabled={busy || !parsedVins || parsedVins.vins.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedVins?.vins.length || 0} VIN(s)`}</Button>}
             {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContenedores.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContenedores.length} contenedor(es)`}</Button>}
             {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">Revisar<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? "Guardando…" : `Crear ${unidades.length} motocarros`}</Button>}

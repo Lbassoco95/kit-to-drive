@@ -40,7 +40,7 @@ export function ContenedorPartes({
 
   const cargarPartes = async () => {
     const { data, error } = await supabase
-      .from("contenedor_partes")
+      .from("inventario_partes")
       .select("*")
       .eq("contenedor_id", contenedorId)
       .order("descripcion");
@@ -67,7 +67,7 @@ export function ContenedorPartes({
         return;
       }
 
-      const { data, error } = await supabase.rpc("importar_partes_excel", {
+      const { data, error } = await supabase.rpc("importar_packing_list", {
         _contenedor_id: contenedorId,
         _partes: partesExcel as any, // Supabase RPC requires JSON type
       });
@@ -91,7 +91,7 @@ export function ContenedorPartes({
 
   const actualizarCantidadRecibida = async (parteId: string, nuevaCantidad: number) => {
     const { error } = await supabase
-      .from("contenedor_partes")
+      .from("inventario_partes")
       .update({ cantidad_recibida: nuevaCantidad })
       .eq("id", parteId);
 

@@ -7,6 +7,7 @@ export const es = {
   nav: {
     dashboard: "Dashboard",
     produccion: "Producción",
+    inventario: "Inventario",
     reportesTurno: "Reportes de turno",
     remisiones: "Remisiones",
     entregas: "Entregas",

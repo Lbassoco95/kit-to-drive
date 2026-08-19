@@ -9,6 +9,7 @@ export const zh: Translations = {
   nav: {
     dashboard: "仪表盘",
     produccion: "生产",
+    inventario: "库存",
     reportesTurno: "班次报告",
     remisiones: "提货单",
     entregas: "交付",

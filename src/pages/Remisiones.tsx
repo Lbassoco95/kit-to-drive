@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import {
   Plus, Upload, Wand2, FileDown, FileText, ChevronDown,
   UserPlus, CalendarClock, CheckCircle2, Factory, Truck,
-  DollarSign, Trash2, Package, CheckCheck, XCircle
+  DollarSign, Trash2, Package, CheckCheck, XCircle, AlertTriangle
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { FileOrCamera } from "@/components/FileOrCamera";
@@ -85,6 +85,7 @@ export default function Remisiones() {
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp:"", nombre_comercial:"", telefono:"" });
+  const [colorInventory, setColorInventory] = useState<Map<string, any>>(new Map()); // key: "modelo_color" -> inventory data
 
   const [form, setForm] = useState<any>({
     folio_remision:"", cliente_id:"", vendedor_asignado_id:"", nombre_vendedor:"",
@@ -117,7 +118,33 @@ export default function Remisiones() {
     const { data } = await supabase.from("profiles").select("id,nombre_completo,codigo_vendedor,activo").in("id", roles.map(r=>r.user_id)).eq("activo",true).order("nombre_completo");
     setVendedores(data ?? []);
   };
+  const loadColorInventory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("inventario_colores")
+        .select("*");
+      
+      if (error) {
+        console.error("Error loading color inventory:", error);
+        return;
+      }
+      
+      const inventoryMap = new Map<string, any>();
+      (data || []).forEach((item: any) => {
+        const key = `${item.modelo}_${item.color}`;
+        inventoryMap.set(key, item);
+      });
+      
+      setColorInventory(inventoryMap);
+    } catch (error) {
+      console.error("Error loading color inventory:", error);
+    }
+  };
+
   const load = async () => {
+    // Load color inventory for alerts
+    loadColorInventory();
+
     // ── 1. Query mínimo garantizado (solo tablas/columnas originales) ──────────
     const { data: base } = await supabase
       .from("remisiones")
@@ -355,8 +382,39 @@ export default function Remisiones() {
   };
 
   const cerrarRemision = async (id: string) => {
+    // Get the remision to know which model/color to decrement
+    const { data: remisionData, error: fetchError } = await supabase
+      .from("remisiones")
+      .select("color_solicitado, remision_items")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching remision data:", fetchError);
+    }
+
+    // Mark as complete
     const { error } = await supabase.from("remisiones").update({ estatus: "COMPLETA" }).eq("id", id);
     if (error) return toast.error(error.message);
+
+    // Decrement color inventory for each motocarro item
+    if (remisionData) {
+      const items = remisionData.remision_items || [];
+      for (const item of items) {
+        if (item.tipo_servicio === "motocarro" && item.modelo && item.color) {
+          try {
+            await supabase.rpc("decrementar_inventario_color", {
+              _modelo: item.modelo,
+              _color: item.color,
+              _cantidad: item.cantidad || 1,
+            });
+          } catch (error) {
+            console.error("Error decrementing color inventory:", error);
+          }
+        }
+      }
+    }
+
     toast.success("✓ Remisión marcada como entregada");
     setCierreConfirm(null); load();
   };
@@ -491,8 +549,58 @@ export default function Remisiones() {
                             <Label className="text-xs text-muted-foreground">Color</Label>
                             <Select value={moto.color} onValueChange={v=>updateMoto(idx,"color",v)}>
                               <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
-                              <SelectContent>{COLORES.map(c=><SelectItem key={c} value={c}>{colorLabel(c)}</SelectItem>)}</SelectContent>
+                              <SelectContent>
+                                {COLORES.map(c=>{
+                                  const key = `${moto.modelo}_${c}`;
+                                  const inventory = colorInventory.get(key);
+                                  const isLowStock = inventory && inventory.cantidad_disponible <= inventory.umbral_alerta;
+                                  const isOutOfStock = inventory && inventory.cantidad_disponible === 0;
+                                  
+                                  return (
+                                    <SelectItem 
+                                      key={c} 
+                                      value={c}
+                                      disabled={isOutOfStock}
+                                      className={isOutOfStock ? "opacity-50" : ""}
+                                    >
+                                      <div className="flex items-center justify-between w-full">
+                                        <span>{colorLabel(c)}</span>
+                                        {isOutOfStock && (
+                                          <span className="text-red-600 text-xs ml-2">Sin stock</span>
+                                        )}
+                                        {isLowStock && !isOutOfStock && (
+                                          <span className="text-amber-600 text-xs ml-2">
+                                            ¡Solo {inventory.cantidad_disponible} unidades!
+                                          </span>
+                                        )}
+                                      </div>
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
                             </Select>
+                            {/* Color alert badge */}
+                            {(() => {
+                              const key = `${moto.modelo}_${moto.color}`;
+                              const inventory = colorInventory.get(key);
+                              if (!inventory) return null;
+                              
+                              if (inventory.cantidad_disponible === 0) {
+                                return (
+                                  <div className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1">
+                                    <XCircle size={12} /> Sin stock de este color
+                                  </div>
+                                );
+                              }
+                              if (inventory.cantidad_disponible <= inventory.umbral_alerta) {
+                                return (
+                                  <div className="mt-1 text-xs text-amber-600 font-medium flex items-center gap-1">
+                                    <AlertTriangle size={12} /> ¡Solo quedan {inventory.cantidad_disponible} unidades de este color!
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
