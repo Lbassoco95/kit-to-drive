@@ -753,6 +753,13 @@ export type Database = {
         }
         Returns: Json
       }
+      importar_motores_inventario: {
+        Args: {
+          _folio_contenedor: string
+          _motores: Json
+        }
+        Returns: Json
+      }
       importar_packing_list: {
         Args: {
           _contenedor_id: string

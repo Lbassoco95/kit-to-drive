@@ -13,6 +13,20 @@ export type ContenedorFromExcel = {
   }>;
 };
 
+export type ContainerSheetData = {
+  folio_contenedor: string;
+  tipo: 'chasis' | 'motores';
+  modelo: string;
+  chasis: VinFromExcel[];
+  motores: MotorFromExcel[];
+};
+
+export type MotorFromExcel = {
+  numero_motor: string;
+  modelo?: string;
+  color?: string;
+};
+
 export type VinFromExcel = {
   numero_chasis: string;
   color: string;
@@ -27,10 +41,11 @@ export type ParteFromExcel = {
 
 /**
  * Parse Excel file with multiple sheets (one per container)
- * Extracts container info and VINs from each sheet
- * Uses dynamic header search instead of fixed row numbers
+ * Sheet name = container number (e.g., EGSU1319874)
+ * Detects type by headers: FRAME NUMBER = chasis, ENGINE NUMBER = motores
+ * Returns separate data for each sheet
  */
-export function parseContenedoresExcel(file: File): Promise<ContenedorFromExcel[]> {
+export function parseContenedoresExcel(file: File): Promise<ContainerSheetData[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
@@ -39,7 +54,7 @@ export function parseContenedoresExcel(file: File): Promise<ContenedorFromExcel[
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
         
-        const contenedores: ContenedorFromExcel[] = [];
+        const containerSheets: ContainerSheetData[] = [];
         
         // Process each sheet as a container
         workbook.SheetNames.forEach(sheetName => {
@@ -48,35 +63,14 @@ export function parseContenedoresExcel(file: File): Promise<ContenedorFromExcel[
           
           if (jsonData.length === 0) return;
           
-          // Find container info dynamically
-          let folioContenedor = '';
-          let modelo = '';
-          let cantidadDeclarada = 0;
-          let color = 'BLANCO';
+          // Use sheet name as container number
+          const folioContenedor = sheetName.trim();
           
-          // Search for CONTAINER NO., MODEL, QUANTITY in any row
-          for (let i = 0; i < Math.min(20, jsonData.length); i++) {
-            const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-            if (!row || row.length === 0) continue;
-            
-            row.forEach((cell, colIndex) => {
-              const cellStr = String(cell || '').trim().toUpperCase();
-              
-              if (cellStr.includes('CONTAINER NO.')) {
-                // Take only the part before "/" if present
-                const containerValue = String(row[colIndex + 1] || '').trim();
-                folioContenedor = containerValue.split('/')[0].trim();
-              } else if (cellStr.includes('MODEL :')) {
-                modelo = String(row[colIndex + 1] || '').trim();
-              } else if (cellStr.includes('QUANTITY') || cellStr.includes('CANTIDAD')) {
-                cantidadDeclarada = parseInt(String(row[colIndex + 1] || '0'), 10) || 0;
-              }
-            });
-          }
-          
-          // Find header row dynamically by searching for "FRAME NUMBER"
+          // Find header row dynamically by searching for "FRAME NUMBER" or "ENGINE NUMBER"
           let headerRowIndex = -1;
+          let sheetType: 'chasis' | 'motores' | null = null;
           let frameColIndex = -1;
+          let engineColIndex = -1;
           let colorColIndex = -1;
           let modelColIndex = -1;
           
@@ -89,20 +83,30 @@ export function parseContenedoresExcel(file: File): Promise<ContenedorFromExcel[
               if (cellStr === 'FRAME NUMBER' || cellStr === 'FRAME NO.') {
                 headerRowIndex = i;
                 frameColIndex = colIndex;
+                sheetType = 'chasis';
+              } else if (cellStr === 'ENGINE NUMBER' || cellStr === 'ENGINE NO.') {
+                headerRowIndex = i;
+                engineColIndex = colIndex;
+                sheetType = 'motores';
               } else if (cellStr === 'COLOR' && headerRowIndex === i) {
                 colorColIndex = colIndex;
-              } else if (cellStr === 'MODEL' && headerRowIndex === i) {
+              } else if ((cellStr === 'MODEL NO' || cellStr === 'MODEL') && headerRowIndex === i) {
                 modelColIndex = colIndex;
               }
             });
             
-            if (headerRowIndex !== -1 && frameColIndex !== -1) break;
+            if (headerRowIndex !== -1 && sheetType) break;
           }
           
-          // Extract VINs from rows after header
-          const unidades: ContenedorFromExcel['unidades'] = [];
+          if (!sheetType || headerRowIndex === -1) return; // Skip sheets without valid headers
           
-          if (headerRowIndex !== -1) {
+          // Extract data based on sheet type
+          const chasis: VinFromExcel[] = [];
+          const motores: MotorFromExcel[] = [];
+          let modelo = '';
+          
+          if (sheetType === 'chasis') {
+            // Extract chassis VINs
             for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
               const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
               if (!row || row.length === 0) continue;
@@ -110,43 +114,70 @@ export function parseContenedoresExcel(file: File): Promise<ContenedorFromExcel[
               const nsChasis = String(row[frameColIndex] || '').trim();
               if (!nsChasis || nsChasis.length < 4) continue; // Skip empty or invalid VINs
               
-              // Skip rows that look like supplier info (contain BRAND or are in first 15 rows)
-              // Supplier name (LUOYANG SHUAIYING...) is never displayed or stored per business rule
+              // Skip rows that look like supplier info (contain BRAND)
               const rowStr = row.join(' ').toUpperCase();
               if (rowStr.includes('BRAND') || rowStr.includes('SUPPLIER') || rowStr.includes('LUOYANG')) {
                 continue;
               }
               
-              unidades.push({
-                ns_chasis: nsChasis,
-                ns_motor: '', // Will be filled manually or from another column if available
-                color: colorColIndex !== -1 ? String(row[colorColIndex] || '').trim() : undefined,
+              chasis.push({
+                numero_chasis: nsChasis,
+                color: colorColIndex !== -1 ? String(row[colorColIndex] || '').trim() : 'BLANCO',
+                modelo: modelColIndex !== -1 ? String(row[modelColIndex] || '').trim() : undefined,
               });
             }
-          }
-          
-          // Use extracted model if not found in metadata
-          if (!modelo && unidades.length > 0 && modelColIndex !== -1) {
-            // Try to get model from first VIN row
-            const firstRow = jsonData[headerRowIndex + 1] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-            if (firstRow && firstRow[modelColIndex]) {
-              modelo = String(firstRow[modelColIndex]).trim();
+            
+            // Get model from first VIN row if not found in metadata
+            if (!modelo && chasis.length > 0 && modelColIndex !== -1) {
+              const firstRow = jsonData[headerRowIndex + 1] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+              if (firstRow && firstRow[modelColIndex]) {
+                modelo = String(firstRow[modelColIndex]).trim();
+              }
+            }
+          } else if (sheetType === 'motores') {
+            // Extract motor numbers
+            for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+              const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+              if (!row || row.length === 0) continue;
+              
+              const numeroMotor = String(row[engineColIndex] || '').trim();
+              if (!numeroMotor || numeroMotor.length < 4) continue; // Skip empty or invalid motors
+              
+              // Skip rows that look like supplier info (contain BRAND)
+              const rowStr = row.join(' ').toUpperCase();
+              if (rowStr.includes('BRAND') || rowStr.includes('SUPPLIER') || rowStr.includes('LUOYANG')) {
+                continue;
+              }
+              
+              motores.push({
+                numero_motor: numeroMotor,
+                color: colorColIndex !== -1 ? String(row[colorColIndex] || '').trim() : undefined,
+                modelo: modelColIndex !== -1 ? String(row[modelColIndex] || '').trim() : undefined,
+              });
+            }
+            
+            // Get model from first motor row - motors can have mixed models
+            if (!modelo && motores.length > 0 && modelColIndex !== -1) {
+              const firstRow = jsonData[headerRowIndex + 1] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+              if (firstRow && firstRow[modelColIndex]) {
+                modelo = String(firstRow[modelColIndex]).trim();
+              }
             }
           }
           
           // Only add if we have valid data
-          if (folioContenedor && unidades.length > 0) {
-            contenedores.push({
+          if ((sheetType === 'chasis' && chasis.length > 0) || (sheetType === 'motores' && motores.length > 0)) {
+            containerSheets.push({
               folio_contenedor: folioContenedor,
-              fecha_arribo: new Date().toISOString().slice(0, 10), // Default to today
+              tipo: sheetType,
               modelo: modelo || '200cc 2025',
-              color: color,
-              unidades,
+              chasis,
+              motores,
             });
           }
         });
         
-        resolve(contenedores);
+        resolve(containerSheets);
       } catch (error) {
         reject(error);
       }

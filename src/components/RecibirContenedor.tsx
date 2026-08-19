@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PackagePlus, Trash2, ClipboardPaste, KeyboardIcon, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { parseContenedoresExcel, ContenedorFromExcel, parseVinsExcel, VinFromExcel } from "@/lib/excelParser";
+import { parseContenedoresExcel, ContainerSheetData, ContenedorFromExcel, parseVinsExcel, VinFromExcel } from "@/lib/excelParser";
 
 type Unidad = { ns_chasis: string; ns_motor: string; chasis_asignado?: string };
 
@@ -34,11 +34,12 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   const [pasteText, setPasteText] = useState("");
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [parsedContenedores, setParsedContenedores] = useState<ContenedorFromExcel[]>([]);
+  const [parsedContainerSheets, setParsedContainerSheets] = useState<ContainerSheetData[]>([]);
   const [importMode, setImportMode] = useState<"single" | "multiple" | "vins">("single");
   const [vinsFile, setVinsFile] = useState<File | null>(null);
   const [parsedVins, setParsedVins] = useState<{ folio_contenedor: string; modelo: string; vins: VinFromExcel[] } | null>(null);
 
-  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setImportMode("single"); setVinsFile(null); setParsedVins(null); };
+  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setParsedContainerSheets([]); setImportMode("single"); setVinsFile(null); setParsedVins(null); };
 
   const irPaso2 = () => {
     if (importMode === "multiple") {
@@ -79,40 +80,23 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
     setBusy(true);
     try {
-      const contenedores = await parseContenedoresExcel(file);
+      const containerSheets = await parseContenedoresExcel(file);
       
-      if (contenedores.length === 0) {
-        toast.error("No se encontraron contenedores válidos en el archivo Excel");
+      if (containerSheets.length === 0) {
+        toast.error("No se encontraron hojas válidas en el archivo Excel");
         setBusy(false);
         return;
       }
 
-      setParsedContenedores(contenedores);
+      setParsedContainerSheets(containerSheets);
       setExcelFile(file);
       
-      if (contenedores.length === 1) {
-        // Single container mode - populate form
-        const cont = contenedores[0];
-        setCab({
-          folio_contenedor: cont.folio_contenedor,
-          fecha_arribo: cont.fecha_arribo,
-          modelo: cont.modelo,
-          color: (cont.color as any) || "BLANCO",
-          cantidad: cont.unidades.length,
-        });
-        setUnidades(cont.unidades.map(u => ({
-          ns_chasis: u.ns_chasis,
-          ns_motor: u.ns_motor,
-          chasis_asignado: u.chasis_asignado || "",
-        })));
-        toast.success(`✓ 1 contenedor cargado con ${cont.unidades.length} VINs`);
-      } else {
-        // Multiple containers mode
-        setImportMode("multiple");
-        toast.success(`✓ ${contenedores.length} contenedores detectados con ${contenedores.reduce((sum, c) => sum + c.unidades.length, 0)} VINs totales`);
-      }
+      const totalChasis = containerSheets.reduce((sum, sheet) => sum + sheet.chasis.length, 0);
+      const totalMotores = containerSheets.reduce((sum, sheet) => sum + sheet.motores.length, 0);
+      
+      toast.success(`✓ ${containerSheets.length} contenedor(es) detectado(s): ${totalChasis} chasis, ${totalMotores} motores`);
     } catch (error) {
-      console.error("Error parsing Excel:", error);
+      console.error("Error parsing containers Excel:", error);
       toast.error("Error al procesar el archivo Excel. Verifica el formato.");
     } finally {
       setBusy(false);
@@ -120,25 +104,66 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   };
 
   const importarContenedoresExcel = async () => {
-    if (parsedContenedores.length === 0) {
+    if (parsedContainerSheets.length === 0) {
       toast.error("No hay contenedores para importar");
       return;
     }
 
     setBusy(true);
     try {
-      const { data, error } = await supabase.rpc("importar_contenedores_excel", {
-        _contenedores: parsedContenedores as any, // Supabase RPC requires JSON type
-      });
+      let totalChasisImported = 0;
+      let totalMotoresImported = 0;
 
-      if (error) {
-        toast.error(error.message);
-        setBusy(false);
-        return;
+      for (const sheet of parsedContainerSheets) {
+        // Create container record
+        const { data: containerData, error: containerError } = await supabase
+          .from("contenedores")
+          .insert({
+            folio_contenedor: sheet.folio_contenedor.trim(),
+            fecha_arribo: new Date().toISOString().slice(0, 10),
+            modelo_default: sheet.modelo,
+            total_unidades: sheet.chasis.length + sheet.motores.length,
+          })
+          .select()
+          .single();
+
+        if (containerError) {
+          console.error("Error creating container:", containerError);
+          continue;
+        }
+
+        // Import chassis if present
+        if (sheet.chasis.length > 0) {
+          const { data: chassisData, error: chassisError } = await supabase.rpc("importar_vins_inventario", {
+            _contenedor_id: containerData.id,
+            _folio_contenedor: sheet.folio_contenedor.trim(),
+            _modelo: sheet.modelo,
+            _vins: sheet.chasis as any,
+          });
+
+          if (chassisError) {
+            console.error("Error importing chassis:", chassisError);
+          } else {
+            totalChasisImported += (chassisData as any)?.creados || 0;
+          }
+        }
+
+        // Import motors if present
+        if (sheet.motores.length > 0) {
+          const { data: motorsData, error: motorsError } = await supabase.rpc("importar_motores_inventario", {
+            _folio_contenedor: sheet.folio_contenedor.trim(),
+            _motores: sheet.motores as any,
+          });
+
+          if (motorsError) {
+            console.error("Error importing motors:", motorsError);
+          } else {
+            totalMotoresImported += (motorsData as any)?.total || 0;
+          }
+        }
       }
 
-      const result = data as any;
-      toast.success(`✓ ${result.contenedores_creados} contenedor(es) importado(s) con ${result.total_unidades} motocarros`);
+      toast.success(`✓ ${parsedContainerSheets.length} contenedor(es) importado(s): ${totalChasisImported} chasis, ${totalMotoresImported} motores`);
       setOpen(false);
       reset();
       onDone?.();
@@ -427,17 +452,45 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                     {busy && <p className="text-xs text-muted-foreground mt-2">Procesando archivo...</p>}
                   </div>
 
-                  {parsedContenedores.length > 0 && (
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <p className="font-medium mb-2">Contenedores detectados:</p>
-                      <ul className="text-sm space-y-1">
-                        {parsedContenedores.map((cont, i) => (
-                          <li key={i} className="flex justify-between">
-                            <span>{cont.folio_contenedor}</span>
-                            <span className="text-muted-foreground">{cont.unidades.length} VINs</span>
-                          </li>
-                        ))}
-                      </ul>
+                  {parsedContainerSheets.length > 0 && (
+                    <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+                      <p className="font-medium">Contenedores detectados:</p>
+                      {parsedContainerSheets.map((sheet, i) => (
+                        <div key={i} className="border rounded-lg p-3 bg-white">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="font-bold text-[#1F3864]">{sheet.folio_contenedor}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${sheet.tipo === 'chasis' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                              {sheet.tipo === 'chasis' ? 'Chasis' : 'Motores'}
+                            </span>
+                          </div>
+                          <div className="text-sm space-y-1">
+                            <div>Modelo: {sheet.modelo}</div>
+                            <div>Cantidad: {sheet.tipo === 'chasis' ? sheet.chasis.length : sheet.motores.length}</div>
+                          </div>
+                          {sheet.chasis.length > 0 && (
+                            <div className="mt-2 border-t pt-2">
+                              <p className="text-xs font-medium mb-1">Primeros chasis:</p>
+                              <ul className="text-xs space-y-0.5">
+                                {sheet.chasis.slice(0, 5).map((vin, j) => (
+                                  <li key={j} className="font-mono">{vin.numero_chasis} ({vin.color})</li>
+                                ))}
+                                {sheet.chasis.length > 5 && <li className="text-muted-foreground">... y {sheet.chasis.length - 5} más</li>}
+                              </ul>
+                            </div>
+                          )}
+                          {sheet.motores.length > 0 && (
+                            <div className="mt-2 border-t pt-2">
+                              <p className="text-xs font-medium mb-1">Primeros motores:</p>
+                              <ul className="text-xs space-y-0.5">
+                                {sheet.motores.slice(0, 5).map((motor, j) => (
+                                  <li key={j} className="font-mono">{motor.numero_motor} ({motor.modelo || 'N/A'})</li>
+                                ))}
+                                {sheet.motores.length > 5 && <li className="text-muted-foreground">... y {sheet.motores.length - 5} más</li>}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </TabsContent>
@@ -538,7 +591,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
             {step > 1 && <Button variant="outline" onClick={() => setStep((step - 1) as any)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
             {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 1 && importMode === "vins" && <Button onClick={irPaso2} disabled={busy || !parsedVins || parsedVins.vins.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedVins?.vins.length || 0} VIN(s)`}</Button>}
-            {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContenedores.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContenedores.length} contenedor(es)`}</Button>}
+            {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContainerSheets.length} contenedor(es)`}</Button>}
             {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">Revisar<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? "Guardando…" : `Crear ${unidades.length} motocarros`}</Button>}
           </DialogFooter>
