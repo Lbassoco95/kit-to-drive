@@ -181,27 +181,20 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
     setBusy(true);
     try {
-      const vinsData = await parseVinsExcel(file);
-      
-      if (vinsData.vins.length === 0) {
-        toast.error("No se encontraron VINs válidos en el archivo Excel");
+      const sheets = await parseContenedoresExcel(file);
+
+      if (sheets.length === 0) {
+        toast.error("No se encontraron hojas válidas en el archivo Excel");
         setBusy(false);
         return;
       }
 
-      setParsedVins(vinsData);
+      setParsedContainerSheets(sheets);
       setVinsFile(file);
-      
-      // Update form with extracted data
-      setCab({
-        folio_contenedor: vinsData.folio_contenedor || cab.folio_contenedor,
-        fecha_arribo: cab.fecha_arribo,
-        modelo: vinsData.modelo || cab.modelo,
-        color: cab.color,
-        cantidad: vinsData.vins.length,
-      });
-      
-      toast.success(`✓ ${vinsData.vins.length} VIN(s) cargado(s) del archivo`);
+
+      const totalVins = sheets.reduce((acc, s) => acc + s.chasis.length, 0);
+      const totalMotores = sheets.reduce((acc, s) => acc + s.motores.length, 0);
+      toast.success(`✓ ${sheets.length} contenedor(es) detectados — ${totalVins} chasis, ${totalMotores} motores`);
     } catch (error) {
       console.error("Error parsing VINs Excel:", error);
       toast.error("Error al procesar el archivo Excel. Verifica el formato.");
@@ -211,54 +204,81 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   };
 
   const importarVinsInventario = async () => {
-    if (!parsedVins || parsedVins.vins.length === 0) {
-      toast.error("No hay VINs para importar");
+    if (parsedContainerSheets.length === 0) {
+      toast.error("No hay contenedores para importar");
       return;
     }
 
-    // First create the container
     setBusy(true);
+    let totalChasis = 0;
+    let totalMotores = 0;
+
     try {
-      // Create container first
-      const { data: containerData, error: containerError } = await supabase
-        .from("contenedores")
-        .insert({
-          folio_contenedor: cab.folio_contenedor.trim(),
-          fecha_arribo: cab.fecha_arribo,
-          modelo_default: cab.modelo,
-          total_unidades: parsedVins.vins.length,
-        })
-        .select()
-        .single();
+      for (const sheet of parsedContainerSheets) {
+        // Crear contenedor por cada hoja
+        const { data: containerData, error: containerError } = await supabase
+          .from("contenedores")
+          .insert({
+            folio_contenedor: sheet.folio_contenedor,
+            fecha_arribo: new Date().toISOString().slice(0, 10),
+            modelo_default: sheet.modelo,
+            total_unidades: sheet.chasis.length + sheet.motores.length,
+          })
+          .select()
+          .single();
 
-      if (containerError) {
-        toast.error(containerError.message);
-        setBusy(false);
-        return;
+        if (containerError) {
+          // Si ya existe el folio, obtenerlo
+          const { data: existing } = await supabase
+            .from("contenedores")
+            .select("id")
+            .eq("folio_contenedor", sheet.folio_contenedor)
+            .single();
+          if (!existing) { toast.error(`Error contenedor ${sheet.folio_contenedor}: ${containerError.message}`); continue; }
+          (containerData as any) = existing;
+        }
+
+        const containerId = containerData?.id || (containerData as any)?.id;
+
+        // Importar chasis
+        if (sheet.chasis.length > 0) {
+          const vinsPayload = sheet.chasis.map(c => ({
+            frame_number: c.numero_chasis,
+            color: c.color || "SIN COLOR",
+            model_no: c.modelo || sheet.modelo,
+          }));
+          const { error: vinsError } = await supabase.rpc("importar_vins_inventario", {
+            _contenedor_id: containerId,
+            _folio_contenedor: sheet.folio_contenedor,
+            _modelo: sheet.modelo,
+            _vins: vinsPayload as any,
+          });
+          if (vinsError) toast.error(`Chasis ${sheet.folio_contenedor}: ${vinsError.message}`);
+          else totalChasis += sheet.chasis.length;
+        }
+
+        // Importar motores
+        if (sheet.motores.length > 0) {
+          const motoresPayload = sheet.motores.map(m => ({
+            engine_number: m.numero_motor,
+            modelo: m.modelo || sheet.modelo,
+          }));
+          const { error: motoresError } = await supabase.rpc("importar_motores_inventario", {
+            _folio_contenedor: sheet.folio_contenedor,
+            _motores: motoresPayload as any,
+          });
+          if (motoresError) toast.error(`Motores ${sheet.folio_contenedor}: ${motoresError.message}`);
+          else totalMotores += sheet.motores.length;
+        }
       }
 
-      // Import VINs to inventario_chasis and update inventario_colores
-      const { data, error } = await supabase.rpc("importar_vins_inventario", {
-        _contenedor_id: containerData.id,
-        _folio_contenedor: cab.folio_contenedor.trim(),
-        _modelo: cab.modelo,
-        _vins: parsedVins.vins as any,
-      });
-
-      if (error) {
-        toast.error(error.message);
-        setBusy(false);
-        return;
-      }
-
-      const result = data as any;
-      toast.success(`✓ ${result.creados} VIN(s) importados a inventario y actualizado inventario_colores`);
+      toast.success(`✓ ${parsedContainerSheets.length} contenedor(es) importados — ${totalChasis} chasis, ${totalMotores} motores`);
       setOpen(false);
       reset();
       onDone?.();
     } catch (error) {
-      console.error("Error importing VINs:", error);
-      toast.error("Error al importar VINs al inventario");
+      console.error("Error importing:", error);
+      toast.error("Error al importar al inventario");
     } finally {
       setBusy(false);
     }
@@ -399,37 +419,44 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                     {busy && <p className="text-xs text-muted-foreground mt-2">Procesando archivo...</p>}
                   </div>
 
-                  {parsedVins && (
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <p className="font-medium mb-2">VINs detectados:</p>
-                      <ul className="text-sm space-y-1">
-                        <li>Contenedor: {parsedVins.folio_contenedor || 'No especificado'}</li>
-                        <li>Modelo: {parsedVins.modelo}</li>
-                        <li>Total VINs: {parsedVins.vins.length}</li>
-                      </ul>
-                    </div>
-                  )}
-
-                  {parsedVins && (
-                    <div className="border rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-slate-50 sticky top-0">
-                          <tr>
-                            <th className="px-2 py-2 text-left">#</th>
-                            <th className="px-2 py-2 text-left">Chasis (FRAME NUMBER)</th>
-                            <th className="px-2 py-2 text-left">Color</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {parsedVins.vins.map((vin, i) => (
-                            <tr key={i} className="border-t">
-                              <td className="px-2 py-1 text-muted-foreground">{i+1}</td>
-                              <td className="px-2 py-1 font-mono">{vin.numero_chasis}</td>
-                              <td className="px-2 py-1">{vin.color}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  {parsedContainerSheets.length > 0 && (
+                    <div className="space-y-3 max-h-[50vh] overflow-y-auto">
+                      {parsedContainerSheets.map((sheet, si) => (
+                        <div key={si} className="border rounded-lg overflow-hidden">
+                          <div className="bg-slate-100 px-3 py-2 flex items-center justify-between">
+                            <span className="font-mono font-medium text-sm">{sheet.folio_contenedor}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {sheet.tipo === 'chasis' ? `${sheet.chasis.length} chasis` : `${sheet.motores.length} motores`}
+                              {' · '}{sheet.modelo}
+                            </span>
+                          </div>
+                          <table className="w-full text-xs">
+                            <thead className="bg-slate-50">
+                              <tr>
+                                <th className="px-2 py-1 text-left">#</th>
+                                <th className="px-2 py-1 text-left">{sheet.tipo === 'chasis' ? 'Chasis' : 'Motor'}</th>
+                                <th className="px-2 py-1 text-left">Color / Modelo</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(sheet.tipo === 'chasis' ? sheet.chasis.slice(0,5) : sheet.motores.slice(0,5)).map((item, i) => (
+                                <tr key={i} className="border-t">
+                                  <td className="px-2 py-1 text-muted-foreground">{i+1}</td>
+                                  <td className="px-2 py-1 font-mono">{'numero_chasis' in item ? item.numero_chasis : item.numero_motor}</td>
+                                  <td className="px-2 py-1">{'color' in item ? item.color : item.modelo}</td>
+                                </tr>
+                              ))}
+                              {(sheet.tipo === 'chasis' ? sheet.chasis : sheet.motores).length > 5 && (
+                                <tr className="border-t bg-slate-50">
+                                  <td colSpan={3} className="px-2 py-1 text-center text-muted-foreground">
+                                    + {(sheet.tipo === 'chasis' ? sheet.chasis : sheet.motores).length - 5} más…
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </TabsContent>
@@ -590,7 +617,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           <DialogFooter className="gap-2">
             {step > 1 && <Button variant="outline" onClick={() => setStep((step - 1) as any)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
             {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
-            {step === 1 && importMode === "vins" && <Button onClick={irPaso2} disabled={busy || !parsedVins || parsedVins.vins.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedVins?.vins.length || 0} VIN(s)`}</Button>}
+            {step === 1 && importMode === "vins" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContainerSheets.length} contenedor(es) — ${parsedContainerSheets.reduce((a,s)=>a+s.chasis.length+s.motores.length,0)} unidades`}</Button>}
             {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContainerSheets.length} contenedor(es)`}</Button>}
             {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">Revisar<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? "Guardando…" : `Crear ${unidades.length} motocarros`}</Button>}
