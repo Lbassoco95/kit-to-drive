@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { PackagePlus, Trash2, ClipboardPaste, KeyboardIcon, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle } from "lucide-react";
+import { PackagePlus, Trash2, ClipboardPaste, KeyboardIcon, ArrowRight, ArrowLeft, CheckCircle2, AlertTriangle, Upload, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { parseContenedoresExcel, ContenedorFromExcel } from "@/lib/excelParser";
 
 type Unidad = { ns_chasis: string; ns_motor: string; chasis_asignado?: string };
 
@@ -25,17 +26,26 @@ const NS_REGEX = /^[A-Z0-9-]{4,30}$/;
 export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [tab, setTab] = useState<"manual" | "pegar">("manual");
+  const [tab, setTab] = useState<"manual" | "pegar" | "excel">("manual");
   const [busy, setBusy] = useState(false);
 
   const [cab, setCab] = useState({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO" as const, cantidad: 4 });
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [pasteText, setPasteText] = useState("");
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [parsedContenedores, setParsedContenedores] = useState<ContenedorFromExcel[]>([]);
+  const [importMode, setImportMode] = useState<"single" | "multiple">("single");
 
-  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); };
+  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setImportMode("single"); };
 
   const irPaso2 = () => {
-    const r = cabeceraSchema.safeParse(cab);
+    if (importMode === "multiple") {
+      // For multiple containers, skip to import
+      importarContenedoresExcel();
+      return;
+    }
+
+    const r = cabeceraSchema.safeParse(cab); // eslint-disable-line @typescript-eslint/no-explicit-any
     if (!r.success) { toast.error(r.error.issues[0].message); return; }
     setUnidades(Array.from({ length: r.data.cantidad }, () => ({ ns_chasis: "", ns_motor: "", chasis_asignado: "" })));
     setStep(2);
@@ -53,6 +63,83 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
     setUnidades(out);
     setCab(c => ({ ...c, cantidad: out.length }));
     toast.success(`✓ ${out.length} fila(s) cargada(s)`);
+  };
+
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBusy(true);
+    try {
+      const contenedores = await parseContenedoresExcel(file);
+      
+      if (contenedores.length === 0) {
+        toast.error("No se encontraron contenedores válidos en el archivo Excel");
+        setBusy(false);
+        return;
+      }
+
+      setParsedContenedores(contenedores);
+      setExcelFile(file);
+      
+      if (contenedores.length === 1) {
+        // Single container mode - populate form
+        const cont = contenedores[0];
+        setCab({
+          folio_contenedor: cont.folio_contenedor,
+          fecha_arribo: cont.fecha_arribo,
+          modelo: cont.modelo,
+          color: (cont.color as any) || "BLANCO",
+          cantidad: cont.unidades.length,
+        });
+        setUnidades(cont.unidades.map(u => ({
+          ns_chasis: u.ns_chasis,
+          ns_motor: u.ns_motor,
+          chasis_asignado: u.chasis_asignado || "",
+        })));
+        toast.success(`✓ 1 contenedor cargado con ${cont.unidades.length} VINs`);
+      } else {
+        // Multiple containers mode
+        setImportMode("multiple");
+        toast.success(`✓ ${contenedores.length} contenedores detectados con ${contenedores.reduce((sum, c) => sum + c.unidades.length, 0)} VINs totales`);
+      }
+    } catch (error) {
+      console.error("Error parsing Excel:", error);
+      toast.error("Error al procesar el archivo Excel. Verifica el formato.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const importarContenedoresExcel = async () => {
+    if (parsedContenedores.length === 0) {
+      toast.error("No hay contenedores para importar");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("importar_contenedores_excel", {
+        _contenedores: parsedContenedores as any, // Supabase RPC requires JSON type
+      });
+
+      if (error) {
+        toast.error(error.message);
+        setBusy(false);
+        return;
+      }
+
+      const result = data as any;
+      toast.success(`✓ ${result.contenedores_creados} contenedor(es) importado(s) con ${result.total_unidades} motocarros`);
+      setOpen(false);
+      reset();
+      onDone?.();
+    } catch (error) {
+      console.error("Error importing containers:", error);
+      toast.error("Error al importar contenedores");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const validacion = useMemo(() => {
@@ -97,7 +184,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       _fecha_arribo: cab.fecha_arribo,
       _modelo: cab.modelo,
       _color: cab.color,
-      _unidades: payload as any,
+      _unidades: payload as any, // Supabase RPC requires JSON type
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
@@ -136,30 +223,74 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           </div>
 
           {step === 1 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <Label>Folio de contenedor *</Label>
-                <Input value={cab.folio_contenedor} onChange={e => setCab({ ...cab, folio_contenedor: e.target.value })} placeholder="CONT-2026-001" maxLength={50} className="h-12" />
-              </div>
-              <div>
-                <Label>Fecha de arribo *</Label>
-                <Input type="date" value={cab.fecha_arribo} onChange={e => setCab({ ...cab, fecha_arribo: e.target.value })} className="h-12" />
-              </div>
-              <div>
-                <Label>Modelo *</Label>
-                <Input value={cab.modelo} onChange={e => setCab({ ...cab, modelo: e.target.value })} maxLength={50} className="h-12" />
-              </div>
-              <div>
-                <Label>Color *</Label>
-                <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as any })} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
-                  {["BLANCO","AZUL","ROJO","NEGRO","VERDE"].map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label>Cantidad de unidades *</Label>
-                <Input type="number" min={1} max={500} value={cab.cantidad} onChange={e => setCab({ ...cab, cantidad: Number(e.target.value) })} className="h-12" />
-                <p className="text-xs text-muted-foreground mt-1">Si vas a pegar desde Excel, se ajusta automáticamente.</p>
-              </div>
+            <div className="space-y-4 mt-4">
+              <Tabs value={importMode} onValueChange={v => setImportMode(v as any)} className="w-full">
+                <TabsList className="grid grid-cols-2 h-12">
+                  <TabsTrigger value="single" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />Capturar manual</TabsTrigger>
+                  <TabsTrigger value="multiple" className="text-base"><FileSpreadsheet className="h-4 w-4 mr-2" />Importar Excel</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="single" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Folio de contenedor *</Label>
+                      <Input value={cab.folio_contenedor} onChange={e => setCab({ ...cab, folio_contenedor: e.target.value })} placeholder="CONT-2026-001" maxLength={50} className="h-12" />
+                    </div>
+                    <div>
+                      <Label>Fecha de arribo *</Label>
+                      <Input type="date" value={cab.fecha_arribo} onChange={e => setCab({ ...cab, fecha_arribo: e.target.value })} className="h-12" />
+                    </div>
+                    <div>
+                      <Label>Modelo *</Label>
+                      <Input value={cab.modelo} onChange={e => setCab({ ...cab, modelo: e.target.value })} maxLength={50} className="h-12" />
+                    </div>
+                    <div>
+                      <Label>Color *</Label>
+                      <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as any })} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
+                        {["BLANCO","AZUL","ROJO","NEGRO","VERDE"].map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Cantidad de unidades *</Label>
+                      <Input type="number" min={1} max={500} value={cab.cantidad} onChange={e => setCab({ ...cab, cantidad: Number(e.target.value) })} className="h-12" />
+                      <p className="text-xs text-muted-foreground mt-1">Si vas a pegar desde Excel, se ajusta automáticamente.</p>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="multiple" className="space-y-4 mt-4">
+                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center">
+                    <Upload className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                    <p className="text-sm font-medium mb-2">Importar desde Excel (VIN list)</p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Sube un archivo Excel con múltiples hojas (una por contenedor). El sistema leerá automáticamente:
+                      número de contenedor, modelo, cantidad y VINs (FRAME NUMBER, COLOR, MODEL).
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleExcelUpload}
+                      disabled={busy}
+                      className="max-w-xs mx-auto"
+                    />
+                    {busy && <p className="text-xs text-muted-foreground mt-2">Procesando archivo...</p>}
+                  </div>
+
+                  {parsedContenedores.length > 0 && (
+                    <div className="bg-slate-50 rounded-lg p-4">
+                      <p className="font-medium mb-2">Contenedores detectados:</p>
+                      <ul className="text-sm space-y-1">
+                        {parsedContenedores.map((cont, i) => (
+                          <li key={i} className="flex justify-between">
+                            <span>{cont.folio_contenedor}</span>
+                            <span className="text-muted-foreground">{cont.unidades.length} VINs</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           )}
 
@@ -254,7 +385,8 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
           <DialogFooter className="gap-2">
             {step > 1 && <Button variant="outline" onClick={() => setStep((step - 1) as any)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
-            {step === 1 && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
+            {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
+            {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContenedores.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContenedores.length} contenedor(es)`}</Button>}
             {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">Revisar<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? "Guardando…" : `Crear ${unidades.length} motocarros`}</Button>}
           </DialogFooter>

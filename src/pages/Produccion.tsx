@@ -17,6 +17,7 @@ import { BandejaRemisiones } from "@/components/BandejaRemisiones";
 import { RecibirContenedor } from "@/components/RecibirContenedor";
 import { InventarioStatus } from "@/components/InventarioStatus";
 import { FileOrCamera } from "@/components/FileOrCamera";
+import { ContenedorPartes } from "@/components/ContenedorPartes";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
@@ -153,6 +154,7 @@ export default function Produccion() {
   const { role } = useAuth();
   const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
+  const [contenedores, setContenedores] = useState<Map<string, string>>(new Map()); // contenedor_id -> folio
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<FilterKey>("TODOS");
   const [colorFilter, setColorFilter] = useState<"TODOS" | "BLANCO" | "AZUL">("TODOS");
@@ -161,12 +163,21 @@ export default function Produccion() {
   const [editForm, setEditForm] = useState<any>({});
   const [confirm, setConfirm] = useState<{ moto: any; action: "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
   const [comentariosMoto, setComentariosMoto] = useState<{ id: string; orden: number } | null>(null);
+  const [contenedorPartes, setContenedorPartes] = useState<{ id: string; folio: string } | null>(null);
 
   const load = async () => {
+    // ── 0. Load containers for folio mapping ─────────────────────────────────
+    const { data: conts } = await supabase
+      .from("contenedores")
+      .select("id, folio_contenedor");
+    const contMap = new Map<string, string>();
+    (conts ?? []).forEach((c: any) => contMap.set(c.id, c.folio_contenedor));
+    setContenedores(contMap);
+
     // ── 1. Query base garantizado (sin columnas nuevas en joins) ──────────────
     const { data: base } = await supabase
       .from("motocarros")
-      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
+      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
       .order("orden_armado", { ascending: true });
 
     const mapped = (base ?? []).map((r: any) => ({
@@ -321,6 +332,30 @@ export default function Produccion() {
       {(role === "admin" || role === "coordinador") && <InventarioStatus refreshKey={rows.length} />}
       {/* BandejaRemisiones: fábrica la necesita para asignar, ver docs y características */}
       {(role === "admin" || role === "fabrica" || role === "coordinador") && <BandejaRemisiones onChange={load} />}
+      
+      {/* Contenedor parts inventory button */}
+      {(role === "admin" || role === "fabrica") && contenedores.size > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h3 className="font-semibold text-lg">Inventario de Partes por Contenedor</h3>
+              <p className="text-sm text-muted-foreground">Gestiona el packing list de partes para cada contenedor</p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {Array.from(contenedores.entries()).map(([id, folio]) => (
+                <Button
+                  key={id}
+                  onClick={() => setContenedorPartes({ id, folio })}
+                  variant="outline"
+                  className="h-12"
+                >
+                  <Package className="h-5 w-5 mr-2" /> {folio}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Filter chips */}
       <div className="flex flex-wrap gap-2">
@@ -448,6 +483,16 @@ export default function Produccion() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Contenedor Parts Dialog */}
+      {contenedorPartes && (
+        <ContenedorPartes
+          contenedorId={contenedorPartes.id}
+          folioContenedor={contenedorPartes.folio}
+          open={!!contenedorPartes}
+          onOpenChange={(open) => { if (!open) setContenedorPartes(null); }}
+        />
+      )}
     </div>
   );
 }

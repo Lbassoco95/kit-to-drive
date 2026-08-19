@@ -110,6 +110,47 @@ export type Database = {
         }
         Relationships: []
       }
+      contenedor_partes: {
+        Row: {
+          contenedor_id: string
+          cantidad_esperada: number
+          cantidad_recibida: number
+          created_at: string
+          descripcion: string
+          id: string
+          modelo: string | null
+          updated_at: string
+        }
+        Insert: {
+          contenedor_id: string
+          cantidad_esperada?: number
+          cantidad_recibida?: number
+          created_at?: string
+          descripcion: string
+          id?: string
+          modelo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contenedor_id?: string
+          cantidad_esperada?: number
+          cantidad_recibida?: number
+          created_at?: string
+          descripcion?: string
+          id?: string
+          modelo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contenedor_partes_contenedor_id_fkey"
+            columns: ["contenedor_id"]
+            isOneToOne: false
+            referencedRelation: "contenedores"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       contenedores: {
         Row: {
           created_at: string
@@ -400,6 +441,19 @@ export type Database = {
           _folio_contenedor: string
           _modelo: string
           _unidades: Json
+        }
+        Returns: Json
+      }
+      importar_contenedores_excel: {
+        Args: {
+          _contenedores: Json
+        }
+        Returns: Json
+      }
+      importar_partes_excel: {
+        Args: {
+          _contenedor_id: string
+          _partes: Json
         }
         Returns: Json
       }
