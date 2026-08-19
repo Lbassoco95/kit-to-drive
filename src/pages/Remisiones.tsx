@@ -4,7 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { fmtDate, effEstatusArmado } from "@/lib/dazon";
@@ -101,6 +102,8 @@ export default function Remisiones() {
   const [subiendoPago, setSubiendoPago]       = useState(false);
   const [cierreConfirm, setCierreConfirm]     = useState<any|null>(null);
   const [deleteConfirm, setDeleteConfirm]     = useState<any|null>(null);
+  const [hardDeleteConfirm, setHardDeleteConfirm] = useState<any|null>(null);
+  const [deleteMotivo, setDeleteMotivo]       = useState("");
   const [activeTab, setActiveTab]             = useState<'activas'|'canceladas'>('activas');
   const [notifOpen, setNotifOpen]             = useState(false);
 
@@ -427,6 +430,61 @@ export default function Remisiones() {
     if (error) return toast.error(error.message);
     toast.success("✓ Remisión cancelada — visible en pestaña Canceladas");
     setDeleteConfirm(null); load();
+  };
+
+  const hardDeleteRemision = async (id: string, motivo: string) => {
+    if (!motivo || motivo.trim().length < 10) {
+      toast.error("El motivo debe tener al menos 10 caracteres");
+      return;
+    }
+
+    // Get complete remision data for audit log
+    const { data: remisionData, error: fetchError } = await supabase
+      .from("remisiones")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching remision data:", fetchError);
+      toast.error("Error al obtener datos de la remisión");
+      return;
+    }
+
+    // Insert audit log
+    const { error: auditError } = await supabase
+      .from("bitacora_eliminaciones")
+      .insert({
+        tabla: "remisiones",
+        registro_id: id,
+        eliminado_por: user?.id,
+        nombre_usuario: myProfile?.nombre_completo || user?.email,
+        motivo: motivo.trim(),
+        datos_eliminados: remisionData,
+      });
+
+    if (auditError) {
+      console.error("Error logging deletion:", auditError);
+      toast.error("Error al registrar la eliminación en bitácora");
+      return;
+    }
+
+    // Hard delete from database
+    const { error: deleteError } = await supabase
+      .from("remisiones")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      console.error("Error deleting remision:", deleteError);
+      toast.error("Error al eliminar la remisión");
+      return;
+    }
+
+    toast.success("✓ Remisión eliminada definitivamente y registrada en bitácora");
+    setHardDeleteConfirm(null);
+    setDeleteMotivo("");
+    load();
   };
 
   const restaurarRemision = async (id: string) => {
@@ -924,9 +982,20 @@ export default function Remisiones() {
                     variant="outline"
                     onClick={()=>setDeleteConfirm(r)}
                     className="h-12 w-12 p-0 shrink-0 border-red-200 text-red-500 hover:bg-red-50"
-                    title="Eliminar remisión"
+                    title="Cancelar remisión"
                   >
                     <Trash2 className="h-5 w-5"/>
+                  </Button>
+                )}
+                {/* Eliminar definitivamente — solo admin */}
+                {role==="admin"&&(
+                  <Button
+                    variant="outline"
+                    onClick={()=>setHardDeleteConfirm(r)}
+                    className="h-12 w-12 p-0 shrink-0 border-red-300 text-red-600 hover:bg-red-100"
+                    title="Eliminar definitivamente (requiere motivo)"
+                  >
+                    <XCircle className="h-5 w-5"/>
                   </Button>
                 )}
               </div>
@@ -975,6 +1044,51 @@ export default function Remisiones() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Eliminar definitivamente remisión — solo admin con motivo obligatorio */}
+      <Dialog open={!!hardDeleteConfirm} onOpenChange={o=>{ if(!o) { setHardDeleteConfirm(null); setDeleteMotivo(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-700 flex items-center gap-2">
+              <XCircle className="h-5 w-5"/> Eliminar definitivamente remisión
+            </DialogTitle>
+            <DialogDescription>
+              Esta acción eliminará permanentemente la remisión <strong>{hardDeleteConfirm?.folio_remision}</strong> del sistema.
+              Esta acción queda registrada en la bitácora de eliminaciones.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="motivo" className="text-sm font-medium">
+                Motivo de eliminación <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="motivo"
+                placeholder="Describa el motivo de esta eliminación (mínimo 10 caracteres)..."
+                value={deleteMotivo}
+                onChange={e => setDeleteMotivo(e.target.value)}
+                className="mt-2 min-h-[100px]"
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Mínimo 10 caracteres. Este motivo quedará registrado en la bitácora.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={()=>{ setHardDeleteConfirm(null); setDeleteMotivo(""); }}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={()=>hardDeleteRemision(hardDeleteConfirm?.id, deleteMotivo)}
+              disabled={!deleteMotivo || deleteMotivo.trim().length < 10}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Eliminar definitivamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Pago dialog */}
       <Dialog open={!!pagoDialog} onOpenChange={o=>{if(!o){setPagoDialog(null);setComprobanteFile(null);}}}>

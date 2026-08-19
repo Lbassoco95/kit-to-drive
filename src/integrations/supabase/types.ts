@@ -50,6 +50,39 @@ export type Database = {
         }
         Relationships: []
       }
+      bitacora_eliminaciones: {
+        Row: {
+          created_at: string
+          datos_eliminados: Json | null
+          eliminado_por: string
+          id: string
+          motivo: string
+          nombre_usuario: string
+          registro_id: string
+          tabla: string
+        }
+        Insert: {
+          created_at?: string
+          datos_eliminados?: Json
+          eliminado_por?: string
+          id?: string
+          motivo: string
+          nombre_usuario?: string
+          registro_id: string
+          tabla: string
+        }
+        Update: {
+          created_at?: string
+          datos_eliminados?: Json
+          eliminado_por?: string
+          id?: string
+          motivo?: string
+          nombre_usuario?: string
+          registro_id?: string
+          tabla?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           activo: boolean

@@ -2,26 +2,44 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLang } from "@/contexts/LangContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { Eye } from "lucide-react";
 
 export default function Bitacora() {
   const [rows, setRows] = useState<any[]>([]);
+  const [eliminaciones, setEliminaciones] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [selectedDeletion, setSelectedDeletion] = useState<any>(null);
   const { t, lang } = useLang();
+  const { role } = useAuth();
 
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from("bitacora_eventos").select("*").order("created_at", { ascending: false }).limit(200);
-      setRows(data ?? []);
-      const ids = Array.from(new Set((data ?? []).map((r: any) => r.usuario_id).filter(Boolean)));
-      if (ids.length) {
-        const { data: p } = await supabase.from("profiles").select("id, nombre_completo").in("id", ids);
-        const m: Record<string, string> = {};
-        p?.forEach((x: any) => { m[x.id] = x.nombre_completo; });
-        setProfiles(m);
-      }
-    })();
-  }, []);
+    loadEventos();
+    if (role === "admin") {
+      loadEliminaciones();
+    }
+  }, [role]);
+
+  const loadEventos = async () => {
+    const { data } = await supabase.from("bitacora_eventos").select("*").order("created_at", { ascending: false }).limit(200);
+    setRows(data ?? []);
+    const ids = Array.from(new Set((data ?? []).map((r: any) => r.usuario_id).filter(Boolean)));
+    if (ids.length) {
+      const { data: p } = await supabase.from("profiles").select("id, nombre_completo").in("id", ids);
+      const m: Record<string, string> = {};
+      p?.forEach((x: any) => { m[x.id] = x.nombre_completo; });
+      setProfiles(m);
+    }
+  };
+
+  const loadEliminaciones = async () => {
+    const { data } = await supabase.from("bitacora_eliminaciones").select("*").order("created_at", { ascending: false }).limit(200);
+    setEliminaciones(data ?? []);
+  };
 
   const locale = lang === "zh" ? "zh-CN" : "es-MX";
 
@@ -31,27 +49,120 @@ export default function Bitacora() {
         <h1>{t.bitacora.title}</h1>
         <p className="text-sm text-muted-foreground">{t.bitacora.eventos(rows.length)}</p>
       </div>
-      <Card className="overflow-hidden"><div className="overflow-x-auto"><table className="data-table">
-        <thead><tr>
-          <th>{t.bitacora.fecha}</th>
-          <th>{t.bitacora.usuario}</th>
-          <th>{t.bitacora.modulo}</th>
-          <th>{t.bitacora.accion}</th>
-          <th>{t.bitacora.cambios}</th>
-        </tr></thead>
-        <tbody>
-          {rows.map((r: any) => (
-            <tr key={r.id}>
-              <td className="text-xs text-muted-foreground whitespace-nowrap">{new Date(r.created_at).toLocaleString(locale)}</td>
-              <td>{r.usuario_id ? (profiles[r.usuario_id] || "—") : t.bitacora.sistema}</td>
-              <td><Badge variant="outline">{r.modulo}</Badge></td>
-              <td>{r.accion}</td>
-              <td className="font-mono text-[10px] max-w-md truncate">{r.datos_despues ? JSON.stringify(r.datos_despues) : ""}</td>
-            </tr>
-          ))}
-          {!rows.length && <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">{t.bitacora.sinEventos}</td></tr>}
-        </tbody>
-      </table></div></Card>
+
+      <Tabs defaultValue="eventos" className="w-full">
+        <TabsList>
+          <TabsTrigger value="eventos">Eventos del sistema</TabsTrigger>
+          {role === "admin" && (
+            <TabsTrigger value="eliminaciones">Eliminaciones (solo admin)</TabsTrigger>
+          )}
+        </TabsList>
+
+        <TabsContent value="eventos" className="space-y-4 mt-4">
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>{t.bitacora.fecha}</th>
+                    <th>{t.bitacora.usuario}</th>
+                    <th>{t.bitacora.modulo}</th>
+                    <th>{t.bitacora.accion}</th>
+                    <th>{t.bitacora.cambios}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r: any) => (
+                    <tr key={r.id}>
+                      <td className="text-xs text-muted-foreground whitespace-nowrap">{new Date(r.created_at).toLocaleString(locale)}</td>
+                      <td>{r.usuario_id ? (profiles[r.usuario_id] || "—") : t.bitacora.sistema}</td>
+                      <td><Badge variant="outline">{r.modulo}</Badge></td>
+                      <td>{r.accion}</td>
+                      <td className="font-mono text-[10px] max-w-md truncate">{r.datos_despues ? JSON.stringify(r.datos_despues) : ""}</td>
+                    </tr>
+                  ))}
+                  {!rows.length && <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">{t.bitacora.sinEventos}</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </TabsContent>
+
+        {role === "admin" && (
+          <TabsContent value="eliminaciones" className="space-y-4 mt-4">
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Tabla</th>
+                      <th>Usuario</th>
+                      <th>Motivo</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eliminaciones.map((r: any) => (
+                      <tr key={r.id}>
+                        <td className="text-xs text-muted-foreground whitespace-nowrap">{new Date(r.created_at).toLocaleString(locale)}</td>
+                        <td><Badge variant="outline">{r.tabla}</Badge></td>
+                        <td>{r.nombre_usuario || "—"}</td>
+                        <td className="max-w-md truncate">{r.motivo}</td>
+                        <td>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedDeletion(r)}
+                            className="h-8"
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Ver datos
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                    {!eliminaciones.length && <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No hay eliminaciones registradas</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </TabsContent>
+        )}
+      </Tabs>
+
+      {/* Dialog to view deleted data */}
+      <Dialog open={!!selectedDeletion} onOpenChange={() => setSelectedDeletion(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Datos eliminados</DialogTitle>
+          </DialogHeader>
+          {selectedDeletion && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Tabla:</span> {selectedDeletion.tabla}
+                </div>
+                <div>
+                  <span className="font-medium">Usuario:</span> {selectedDeletion.nombre_usuario}
+                </div>
+                <div>
+                  <span className="font-medium">Fecha:</span> {new Date(selectedDeletion.created_at).toLocaleString(locale)}
+                </div>
+                <div>
+                  <span className="font-medium">Motivo:</span> {selectedDeletion.motivo}
+                </div>
+              </div>
+              <div>
+                <span className="font-medium block mb-2">Datos eliminados:</span>
+                <pre className="bg-slate-100 p-4 rounded-lg text-xs overflow-x-auto">
+                  {JSON.stringify(selectedDeletion.datos_eliminados, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
