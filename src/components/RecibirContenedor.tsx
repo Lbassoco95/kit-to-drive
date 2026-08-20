@@ -148,12 +148,19 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           .select()
           .single();
 
+        let containerId = containerData?.id ?? null;
         if (containerError) {
-          console.error("Error creating container:", containerError);
-          continue;
+          const { data: existente } = await supabase
+            .from("contenedores")
+            .select("id")
+            .eq("folio_contenedor", sheet.folio_contenedor.trim())
+            .maybeSingle();
+          if (!existente) {
+            toast.error(`Contenedor ${sheet.folio_contenedor || "(sin folio)"}: ${containerError.message}`);
+            continue;
+          }
+          containerId = existente.id;
         }
-
-        const containerId = containerData.id;
 
         // Import chassis if present
         if (sheet.chasis.length > 0) {
