@@ -18,7 +18,7 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
     (async () => {
       const { data: motos } = await supabase
         .from("motocarros")
-        .select("id, ns_chasis, ns_motor, remision_id, estatus_armado");
+        .select("id, ns_chasis, ns_motor, remision_id, estatus_entrega");
       const { data: rems } = await supabase
         .from("remisiones")
         .select("id, total_unidades_solicitadas, estatus")
@@ -31,7 +31,7 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
       const asignCount = new Map<string, number>();
       (asign ?? []).forEach((m: any) => asignCount.set(m.remision_id, (asignCount.get(m.remision_id) ?? 0) + 1));
 
-      const disponiblesArr = (motos ?? []).filter((m: any) => !m.remision_id && m.estatus_armado !== "ENTREGADA");
+      const disponiblesArr = (motos ?? []).filter((m: any) => !m.remision_id && m.estatus_entrega !== "ENTREGADA");
       const disponibles = disponiblesArr.length;
       const conSerial = disponiblesArr.filter((m: any) => m.ns_chasis && m.ns_motor).length;
       const sinSerial = disponibles - conSerial;

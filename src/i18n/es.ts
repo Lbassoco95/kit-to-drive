@@ -179,12 +179,12 @@ export const es = {
       listasEntrega: "Listas para entrega",
     },
     tooltips: {
-      totalPlan: "Total de motocarros en plan",
-      armadosLisots: "Armados o listos",
-      porArmar: "Aún por armar",
-      pasadosFecha: "Pasadas de fecha estimada",
-      entregadosCliente: "Entregadas a cliente",
-      armadosTotal: "Armados / total",
+      totalPlan: "Unidades programadas en el embarque",
+      armadosLisots: "Unidades armadas o listas",
+      porArmar: "Unidades aún por armar",
+      pasadosFecha: "Unidades pasadas de fecha estimada",
+      entregadosCliente: "Unidades entregadas a cliente",
+      armadosTotal: "Unidades armadas / total programado",
     },
     capacidad: {
       title: "Capacidad de hoy",

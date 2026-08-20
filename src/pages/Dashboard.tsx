@@ -1,48 +1,116 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { fmtDate, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
-import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users } from "lucide-react";
+import { InventarioStatus } from "@/components/InventarioStatus";
+import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const CAPACIDAD = 4;
 
-const KpiCard = ({ label, value, icon: Icon, color, onClick, tooltip }: any) => (
-  <button
-    onClick={onClick}
-    title={tooltip}
-    className="text-left bg-card rounded-xl border border-border min-h-[140px] p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col"
-  >
-    <div className="flex items-start justify-between">
-      <div className="p-2.5 rounded-lg" style={{ backgroundColor: `${color}20` }}>
-        <Icon size={40} strokeWidth={2.2} style={{ color }} />
+function KpiCard({
+  label,
+  value,
+  icon: Icon,
+  color,
+  onClick,
+  tooltip,
+}: {
+  label: string;
+  value: ReactNode;
+  icon: LucideIcon;
+  color: string;
+  onClick?: () => void;
+  tooltip?: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={tooltip}
+      className="text-left bg-card rounded-xl border border-border min-h-[140px] p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col"
+    >
+      <div className="flex items-start justify-between">
+        <div className="p-2.5 rounded-lg" style={{ backgroundColor: `${color}20` }}>
+          <Icon size={40} strokeWidth={2.2} style={{ color }} />
+        </div>
       </div>
-    </div>
-    <div className="text-4xl font-bold mt-3" style={{ color }}>{value}</div>
-    <div className="text-sm text-muted-foreground uppercase tracking-wide mt-1 font-medium">{label}</div>
-  </button>
-);
+      <div className="text-4xl font-bold mt-3" style={{ color }}>{value}</div>
+      <div className="text-sm text-muted-foreground uppercase tracking-wide mt-1 font-medium">{label}</div>
+    </button>
+  );
+}
+
+function SeccionDashboard({
+  titulo,
+  subtitulo,
+  children,
+}: {
+  titulo: string;
+  subtitulo?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xl font-bold">{titulo}</h2>
+        {subtitulo && <p className="text-muted-foreground text-sm mt-0.5">{subtitulo}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function Dashboard() {
   const { role, user, profileName } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<{ motos: any[]; rems: any[] } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
-    (async () => {
-      const { data: motos } = await supabase.from("motocarros").select("*");
-      const { data: rems } = await supabase.from("remisiones").select("*, profiles:vendedor_id(nombre_completo)");
-      setData({
-        motos: (motos ?? []).map((m: any) => ({ ...m, color: normColor(m.color), _eff: effEstatusArmado(m) })),
-        rems: rems ?? [],
-      });
-    })();
-  }, [user]);
+    let cancelled = false;
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [{ data: motos, error: errM }, { data: rems, error: errR }] = await Promise.all([
+          supabase
+            .from("motocarros")
+            .select(
+              "id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado, estatus_entrega, chasis_asignado, remision_id, fecha_estimada_armado, fecha_real_armado, fecha_estimada_entrega, fecha_real_entrega"
+            ),
+          supabase
+            .from("remisiones")
+            .select(
+              "id, folio_remision, estatus, vendedor_id, total_unidades_solicitadas, notas, profiles:vendedor_id(nombre_completo)"
+            ),
+        ]);
+        if (cancelled) return;
+        if (errM || errR) {
+          setError([errM?.message, errR?.message].filter(Boolean).join("; ") || "Error al consultar Supabase");
+          setData(null);
+        } else {
+          setData({
+            motos: (motos ?? []).map((m: any) => ({ ...m, color: normColor(m.color), _eff: effEstatusArmado(m) })),
+            rems: rems ?? [],
+          });
+        }
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Error inesperado");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  }, [user, retry]);
 
   // Redirect based on role
   useEffect(() => {
@@ -51,7 +119,51 @@ export default function Dashboard() {
     if (role === "director_ventas" || role === "coordinador_ventas") { nav("/crm/oportunidades"); return; }
   }, [role, nav]);
 
-  if (!data) return <div className="text-muted-foreground p-8">{t.dashboard.cargando}</div>;
+  const greeting = t.dashboard.greeting(profileName || "usuario", role ? t.roles[role] : "");
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1>{t.dashboard.title}</h1>
+          <p className="text-muted-foreground text-base mt-1">{greeting}</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-36" />
+          ))}
+        </div>
+        <Skeleton className="h-48" />
+        <Skeleton className="h-72" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1>{t.dashboard.title}</h1>
+          <p className="text-muted-foreground text-base mt-1">{greeting}</p>
+        </div>
+        <Card className="p-6 border-[#991B1B]">
+          <div className="flex items-center gap-2 mb-2 text-[#991B1B] font-bold">
+            <AlertTriangle size={20} />
+            Error al cargar el dashboard
+          </div>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <button
+            onClick={() => setRetry(r => r + 1)}
+            className="px-4 py-2 rounded-md bg-[#1F3864] text-white font-medium hover:bg-[#152a4a] transition-colors"
+          >
+            Reintentar
+          </button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!data) return null;
 
   const motos: any[] = data.motos;
   const rems: any[] = data.rems;
@@ -99,8 +211,6 @@ export default function Dashboard() {
     }, []);
 
   const isVendedor = role === "ventas";
-  
-  const greeting = t.dashboard.greeting(profileName || "usuario", role ? t.roles[role] : "");
 
   return (
     <div className="space-y-6">
@@ -110,96 +220,108 @@ export default function Dashboard() {
       </div>
 
       {role === "admin" && (
-        <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="#1F3864" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
-            <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" tooltip={t.dashboard.tooltips.armadosLisots} onClick={() => nav("/produccion")} />
-            <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" tooltip={t.dashboard.tooltips.porArmar} onClick={() => nav("/produccion")} />
-            <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" tooltip={t.dashboard.tooltips.pasadosFecha} onClick={() => nav("/produccion")} />
-            <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={Truck} color="#5B21B6" tooltip={t.dashboard.tooltips.entregadosCliente} onClick={() => nav("/entregas")} />
-            <KpiCard label={t.dashboard.kpi.avance} value={`${avance}%`} icon={BarChart3} color="#2E75B6" tooltip={t.dashboard.tooltips.armadosTotal} />
-          </div>
+        <div className="space-y-8">
+          <SeccionDashboard titulo="Operación" subtitulo="Producción y entregas de las unidades del embarque">
+            <InventarioStatus />
 
-          {/* Capacidad de hoy */}
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3>{t.dashboard.capacidad.title}</h3>
-              <div className="text-2xl font-bold" style={{ color: capColor }}>{t.dashboard.capacidad.armadosHoy(armadosHoy, CAPACIDAD)}</div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="#1F3864" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
+              <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" tooltip={t.dashboard.tooltips.armadosLisots} onClick={() => nav("/produccion")} />
+              <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" tooltip={t.dashboard.tooltips.porArmar} onClick={() => nav("/produccion")} />
+              <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" tooltip={t.dashboard.tooltips.pasadosFecha} onClick={() => nav("/produccion")} />
+              <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={Truck} color="#5B21B6" tooltip={t.dashboard.tooltips.entregadosCliente} onClick={() => nav("/entregas")} />
             </div>
-            <div className="h-6 rounded-full bg-slate-100 overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${capPct}%`, backgroundColor: capColor }} />
-            </div>
-            <div className="flex gap-2 mt-5">
-              {weekDays.map(d => (
-                <div key={d.iso} className="flex-1 text-center" title={`${d.iso}: ${d.count} armados`}>
-                  <div className="text-xs text-muted-foreground mb-1 font-medium">{d.label}</div>
-                  <div
-                    className="h-12 rounded-md flex items-center justify-center text-sm font-bold border-2"
-                    style={{
-                      backgroundColor: d.status === "ok" ? "#D1FAE5" : d.status === "partial" ? "#FEF3C7" : d.status === "miss" ? "#FEE2E2" : "#F3F4F6",
-                      color: d.status === "ok" ? "#065F46" : d.status === "partial" ? "#92400E" : d.status === "miss" ? "#991B1B" : "#9CA3AF",
-                      borderColor: "transparent",
-                    }}
-                  >
-                    {d.status === "future" ? "—" : d.count}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
 
-          {/* Atrasados */}
-          {atrasados.length > 0 && (
-            <Card className="p-6 border-2 border-[#FEE2E2]" style={{ background: "#FEF2F2" }}>
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="text-[#991B1B]" size={28} />
-                <h3 className="!text-[#991B1B]">{t.dashboard.atrasados(atrasados.length)}</h3>
+            {/* Capacidad de hoy */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3>{t.dashboard.capacidad.title}</h3>
+                <div className="text-2xl font-bold" style={{ color: capColor }}>{t.dashboard.capacidad.armadosHoy(armadosHoy, CAPACIDAD)}</div>
               </div>
-              <div className="grid md:grid-cols-2 gap-2">
-                {atrasados.slice(0, 8).map(m => (
-                  <button key={m.id} onClick={() => nav("/produccion")} className="text-left p-3 bg-white rounded-md border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
-                    <div>
-                      <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {m.modelo} {m.color}</div>
-                      <div className="text-xs text-muted-foreground">{t.dashboard.fechaEstimada}: {fmtDate(m.fecha_estimada_armado)}</div>
+              <div className="h-6 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-full rounded-full transition-all" style={{ width: `${capPct}%`, backgroundColor: capColor }} />
+              </div>
+              <div className="flex gap-2 mt-5">
+                {weekDays.map(d => (
+                  <div key={d.iso} className="flex-1 text-center" title={`${d.iso}: ${d.count} armados`}>
+                    <div className="text-xs text-muted-foreground mb-1 font-medium">{d.label}</div>
+                    <div
+                      className="h-12 rounded-md flex items-center justify-center text-sm font-bold border-2"
+                      style={{
+                        backgroundColor: d.status === "ok" ? "#D1FAE5" : d.status === "partial" ? "#FEF3C7" : d.status === "miss" ? "#FEE2E2" : "#F3F4F6",
+                        color: d.status === "ok" ? "#065F46" : d.status === "partial" ? "#92400E" : d.status === "miss" ? "#991B1B" : "#9CA3AF",
+                        borderColor: "transparent",
+                      }}
+                    >
+                      {d.status === "future" ? "—" : d.count}
                     </div>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">{t.dashboard.diasAtraso(diasDesvio(m) ?? 0)}</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             </Card>
-          )}
 
-          <Card className="p-6">
-            <h3 className="mb-4">{t.dashboard.planVsReal}</h3>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={series}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="planAcum" stroke="#2E75B6" name="Plan acumulado" strokeWidth={3} />
-                  <Line type="monotone" dataKey="realAcum" stroke="#065F46" name="Real acumulado" strokeWidth={3} />
-                </LineChart>
-              </ResponsiveContainer>
+            {/* Atrasados */}
+            {atrasados.length > 0 && (
+              <Card className="p-6 border-2 border-[#FEE2E2]" style={{ background: "#FEF2F2" }}>
+                <div className="flex items-center gap-2 mb-3">
+                  <AlertTriangle className="text-[#991B1B]" size={28} />
+                  <h3 className="!text-[#991B1B]">{t.dashboard.atrasados(atrasados.length)}</h3>
+                </div>
+                <div className="grid md:grid-cols-2 gap-2">
+                  {atrasados.slice(0, 8).map(m => (
+                    <button key={m.id} onClick={() => nav("/produccion")} className="text-left p-3 bg-white rounded-md border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
+                      <div>
+                        <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {m.modelo} {m.color}</div>
+                        <div className="text-xs text-muted-foreground">{t.dashboard.fechaEstimada}: {fmtDate(m.fecha_estimada_armado)}</div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">{t.dashboard.diasAtraso(diasDesvio(m) ?? 0)}</span>
+                    </button>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </SeccionDashboard>
+
+          <SeccionDashboard titulo="Avance">
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="mb-0">{t.dashboard.planVsReal}</h3>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-[#2E75B6]/10 text-[#2E75B6]">
+                  {avance}% avance
+                </span>
+              </div>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={series}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="planAcum" stroke="#2E75B6" name="Plan acumulado" strokeWidth={3} />
+                    <Line type="monotone" dataKey="realAcum" stroke="#065F46" name="Real acumulado" strokeWidth={3} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </SeccionDashboard>
+
+          <SeccionDashboard titulo="Comercial">
+            <div className="grid md:grid-cols-2 gap-4">
+              <Card className="p-6">
+                <h3 className="mb-4 flex items-center gap-2"><Users size={22}/> {t.dashboard.topVendedores}</h3>
+                <TopVendedores rems={rems} />
+              </Card>
+              <Card className="p-6">
+                <h3 className="mb-4">{t.dashboard.resumenRapido}</h3>
+                <ul className="text-base space-y-3">
+                  <li className="flex items-center gap-2"><Truck className="text-[#5B21B6]" size={20}/> {t.dashboard.listosParaEntregar(listosEntrega)}</li>
+                  <li className="flex items-center gap-2"><BarChart3 className="text-[#1F3864]" size={20}/> {t.dashboard.remisionesParciales(rems.filter(r => r.estatus === "PARCIAL").length)}</li>
+                  <li className="flex items-center gap-2"><CheckCircle className="text-[#065F46]" size={20}/> {t.dashboard.remisionesCompletas(rems.filter(r => r.estatus === "COMPLETA").length)}</li>
+                </ul>
+              </Card>
             </div>
-          </Card>
-
-          <div className="grid md:grid-cols-2 gap-4">
-            <Card className="p-6">
-              <h3 className="mb-4 flex items-center gap-2"><Users size={22}/> {t.dashboard.topVendedores}</h3>
-              <TopVendedores rems={rems} />
-            </Card>
-            <Card className="p-6">
-              <h3 className="mb-4">{t.dashboard.resumenRapido}</h3>
-              <ul className="text-base space-y-3">
-                <li className="flex items-center gap-2"><Truck className="text-[#5B21B6]" size={20}/> {t.dashboard.listosParaEntregar(listosEntrega)}</li>
-                <li className="flex items-center gap-2"><BarChart3 className="text-[#1F3864]" size={20}/> {t.dashboard.remisionesParciales(rems.filter(r => r.estatus === "PARCIAL").length)}</li>
-                <li className="flex items-center gap-2"><CheckCircle className="text-[#065F46]" size={20}/> {t.dashboard.remisionesCompletas(rems.filter(r => r.estatus === "COMPLETA").length)}</li>
-              </ul>
-            </Card>
-          </div>
-        </>
+          </SeccionDashboard>
+        </div>
       )}
 
       {role === "fabrica" && (
