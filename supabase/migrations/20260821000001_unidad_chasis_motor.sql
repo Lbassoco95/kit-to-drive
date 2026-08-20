@@ -1,134 +1,195 @@
--- Migration: Unidad = Chasis + Motor (1:1)
--- Fixes KIT-1: proper unit counting, pareo logic, and error visibility
--- Date: 2026-08-21
+-- ============================================================================
+-- KIT-1 · Unidad = chasis + motor (1:1)
+-- Baseline del esquema real de producción (dmhzhyeivvuliumcgsmm)
+-- Fecha: 2026-08-21
+--
+-- ADVERTENCIA: Este script es IDEMPOTENTE pero está pensado para correrse
+-- directamente en el SQL editor de Supabase. NO usar `supabase db push`:
+-- este proyecto nunca aplicó migraciones por CLI, y el CLI intentaría crear
+-- objetos que ya existen.
+-- ============================================================================
 
--- A1 · Semántica del contenedor: unidades ≠ piezas
+
+-- ============================================================================
+-- BLOQUE 2 · Esquema: llevar el inventario al modelo correcto
+-- ============================================================================
+
+-- 2.1 · contenedor_id pasa de TEXT a uuid con FK real.
+-- Las tablas están vacías; el CASE es defensivo por si alguien importa algo
+-- entre que lees esto y lo corres (un folio no casteable queda en NULL, no truena).
+ALTER TABLE public.inventario_chasis
+  ALTER COLUMN contenedor_id TYPE uuid
+  USING (CASE WHEN contenedor_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              THEN contenedor_id::uuid END);
+
+ALTER TABLE public.inventario_motor
+  ALTER COLUMN contenedor_id TYPE uuid
+  USING (CASE WHEN contenedor_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              THEN contenedor_id::uuid END);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventario_chasis_contenedor_fk') THEN
+    ALTER TABLE public.inventario_chasis
+      ADD CONSTRAINT inventario_chasis_contenedor_fk
+      FOREIGN KEY (contenedor_id) REFERENCES public.contenedores(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'inventario_motor_contenedor_fk') THEN
+    ALTER TABLE public.inventario_motor
+      ADD CONSTRAINT inventario_motor_contenedor_fk
+      FOREIGN KEY (contenedor_id) REFERENCES public.contenedores(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- 2.2 · Columnas que la app necesita y no existen
+ALTER TABLE public.inventario_chasis
+  ADD COLUMN IF NOT EXISTS motocarro_id        uuid REFERENCES public.motocarros(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS fecha_importacion   timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS fecha_configuracion timestamptz,
+  ADD COLUMN IF NOT EXISTS notas               text,
+  ADD COLUMN IF NOT EXISTS updated_at          timestamptz NOT NULL DEFAULT now();
+
+ALTER TABLE public.inventario_motor
+  ADD COLUMN IF NOT EXISTS motocarro_id        uuid REFERENCES public.motocarros(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS fecha_importacion   timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS fecha_configuracion timestamptz,
+  ADD COLUMN IF NOT EXISTS notas               text,
+  ADD COLUMN IF NOT EXISTS updated_at          timestamptz NOT NULL DEFAULT now();
+
 ALTER TABLE public.contenedores
   ADD COLUMN IF NOT EXISTS total_chasis  integer NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS total_motores integer NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS estatus_carga text NOT NULL DEFAULT 'completa'
-    CHECK (estatus_carga IN ('completa', 'incompleta'));
+  ADD COLUMN IF NOT EXISTS estatus_carga text    NOT NULL DEFAULT 'completa';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'contenedores_estatus_carga_chk') THEN
+    ALTER TABLE public.contenedores
+      ADD CONSTRAINT contenedores_estatus_carga_chk
+      CHECK (estatus_carga IN ('completa','incompleta'));
+  END IF;
+END $$;
 
 COMMENT ON COLUMN public.contenedores.total_unidades IS
-  'Unidades (chasis+motor pareados). NO es chasis + motores.';
+  'Unidades (chasis + motor pareados). NO es chasis + motores.';
 
--- Backfill: recalcular con lo que realmente hay en inventario
-UPDATE public.contenedores c SET
-  total_chasis  = COALESCE((SELECT count(*) FROM inventario_chasis ic WHERE ic.contenedor_id = c.id), 0),
-  total_motores = COALESCE((SELECT count(*) FROM inventario_motor  im WHERE im.contenedor_id = c.id), 0);
-
--- A2 · Garantizar el 1:1 a nivel de base
+-- 2.3 · El 1:1 a nivel de base. Sólo estos dos índices son nuevos:
+-- motocarros_ns_chasis_key y motocarros_ns_motor_key YA EXISTEN como UNIQUE
+-- totales, así que no se recrean (el repo creaba versiones parciales redundantes).
 CREATE UNIQUE INDEX IF NOT EXISTS ux_inventario_chasis_motocarro
   ON public.inventario_chasis (motocarro_id) WHERE motocarro_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_inventario_motor_motocarro
   ON public.inventario_motor (motocarro_id) WHERE motocarro_id IS NOT NULL;
 
--- Los seriales de la unidad no se repiten
-CREATE UNIQUE INDEX IF NOT EXISTS ux_motocarros_ns_chasis
-  ON public.motocarros (ns_chasis) WHERE ns_chasis IS NOT NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS ux_motocarros_ns_motor
-  ON public.motocarros (ns_motor) WHERE ns_motor IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_inventario_chasis_contenedor ON public.inventario_chasis (contenedor_id);
+CREATE INDEX IF NOT EXISTS idx_inventario_motor_contenedor  ON public.inventario_motor  (contenedor_id);
 
--- A3 · Arreglar importar_motores_inventario (P5: distingue insert vs update)
-DROP FUNCTION IF EXISTS public.importar_motores_inventario(uuid, TEXT, JSONB);
+-- 2.4 · Triggers de updated_at (set_updated_at ya existe en la base)
+DROP TRIGGER IF EXISTS trg_inventario_chasis_updated ON public.inventario_chasis;
+CREATE TRIGGER trg_inventario_chasis_updated BEFORE UPDATE ON public.inventario_chasis
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
-CREATE OR REPLACE FUNCTION public.importar_motores_inventario(
-  _contenedor_id uuid,
-  _modelo text,
-  _motores jsonb
-)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+DROP TRIGGER IF EXISTS trg_inventario_motor_updated ON public.inventario_motor;
+CREATE TRIGGER trg_inventario_motor_updated BEFORE UPDATE ON public.inventario_motor
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+-- ============================================================================
+-- BLOQUE 3 · Limpiar el contenedor fantasma
+-- ============================================================================
+
+DELETE FROM public.contenedores
+WHERE (folio_contenedor IS NULL OR trim(folio_contenedor) = '')
+  AND NOT EXISTS (SELECT 1 FROM motocarros m WHERE m.contenedor_id = contenedores.id)
+  AND NOT EXISTS (SELECT 1 FROM inventario_chasis ic WHERE ic.contenedor_id = contenedores.id)
+  AND NOT EXISTS (SELECT 1 FROM inventario_motor im WHERE im.contenedor_id = contenedores.id);
+
+-- Impedir que vuelva a entrar un folio vacío
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'contenedores_folio_no_vacio_chk') THEN
+    ALTER TABLE public.contenedores
+      ADD CONSTRAINT contenedores_folio_no_vacio_chk
+      CHECK (folio_contenedor IS NOT NULL AND length(trim(folio_contenedor)) > 0);
+  END IF;
+END $$;
+
+-- Cuadrar los contenedores buenos con lo que de verdad tienen ligado
+UPDATE public.contenedores c SET
+  total_chasis   = COALESCE((SELECT count(*) FROM inventario_chasis ic WHERE ic.contenedor_id = c.id),0),
+  total_motores  = COALESCE((SELECT count(*) FROM inventario_motor  im WHERE im.contenedor_id = c.id),0),
+  total_unidades = COALESCE((SELECT count(*) FROM motocarros m WHERE m.contenedor_id = c.id),0);
+
+
+-- ============================================================================
+-- BLOQUE 4 · Contador de colores
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.incrementar_inventario_color(
+  _modelo text, _color text, _cantidad integer DEFAULT 1)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+BEGIN
+  INSERT INTO inventario_colores (modelo, color, cantidad_disponible, umbral_alerta, updated_at)
+  VALUES (_modelo, upper(_color), _cantidad, 3, now())
+  ON CONFLICT (modelo, color) DO UPDATE
+    SET cantidad_disponible = inventario_colores.cantidad_disponible + _cantidad,
+        updated_at = now();
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.decrementar_inventario_color(
+  _modelo text, _color text, _cantidad integer DEFAULT 1)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+BEGIN
+  UPDATE inventario_colores
+     SET cantidad_disponible = GREATEST(0, cantidad_disponible - _cantidad),
+         updated_at = now()
+   WHERE modelo = _modelo AND color = upper(_color);
+END; $$;
+
+GRANT EXECUTE ON FUNCTION public.incrementar_inventario_color(text,text,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.decrementar_inventario_color(text,text,integer) TO authenticated;
+
+
+-- ============================================================================
+-- BLOQUE 5 · Importación de chasis
+-- ============================================================================
+
+DROP FUNCTION IF EXISTS public.importar_vins_inventario(uuid, text, text, jsonb);
+
+CREATE OR REPLACE FUNCTION public.importar_vins_inventario(
+  _contenedor_id uuid, _folio_contenedor text, _modelo text, _vins jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 DECLARE
-  _m jsonb; _num text; _mod text;
+  _v jsonb; _num text; _col text; _mod text; _es_nuevo boolean; _new_id uuid;
   _insertados int := 0; _actualizados int := 0; _invalidos int := 0;
-  _es_nuevo boolean;
+  _ids uuid[] := ARRAY[]::uuid[];
 BEGIN
   IF NOT (has_role(auth.uid(),'admin'::app_role) OR has_role(auth.uid(),'fabrica'::app_role)) THEN
-    RAISE EXCEPTION 'Solo admin/fábrica puede importar motores';
+    RAISE EXCEPTION 'Solo admin/fábrica puede importar VINs';
   END IF;
+  IF _contenedor_id IS NULL THEN RAISE EXCEPTION 'ID de contenedor requerido'; END IF;
   IF NOT EXISTS (SELECT 1 FROM contenedores WHERE id = _contenedor_id) THEN
     RAISE EXCEPTION 'Contenedor no encontrado';
   END IF;
 
-  FOR _m IN SELECT * FROM jsonb_array_elements(_motores) LOOP
-    _num := upper(NULLIF(trim(COALESCE(_m->>'numero_motor', _m->>'engine_number')), ''));
-    _mod := COALESCE(NULLIF(trim(COALESCE(_m->>'modelo', _m->>'model_no')),''), _modelo, '200cc 2025');
+  IF _folio_contenedor IS NOT NULL AND length(trim(_folio_contenedor)) > 0 THEN
+    UPDATE contenedores SET folio_contenedor = trim(_folio_contenedor) WHERE id = _contenedor_id;
+  END IF;
+
+  FOR _v IN SELECT * FROM jsonb_array_elements(_vins) LOOP
+    _num := upper(NULLIF(trim(COALESCE(_v->>'numero_chasis', _v->>'frame_number')),''));
+    _col := upper(COALESCE(NULLIF(trim(_v->>'color'),''), 'SIN COLOR'));
+    _mod := COALESCE(NULLIF(trim(COALESCE(_v->>'modelo', _v->>'model_no')),''), _modelo, '200cc 2025');
 
     IF _num IS NULL OR length(_num) < 4 THEN
       _invalidos := _invalidos + 1;
       CONTINUE;
     END IF;
 
-    INSERT INTO inventario_motor (numero_motor, contenedor_id, modelo, estatus, created_at)
-    VALUES (_num, _contenedor_id, _mod, 'disponible', NOW())
-    ON CONFLICT (numero_motor) DO UPDATE
-      SET contenedor_id = _contenedor_id, modelo = _mod, updated_at = now()
-    RETURNING (xmax = 0) INTO _es_nuevo;
-
-    IF _es_nuevo THEN
-      _insertados := _insertados + 1;
-    ELSE
-      _actualizados := _actualizados + 1;
-    END IF;
-  END LOOP;
-
-  RETURN jsonb_build_object('ok', true, 'insertados', _insertados,
-                            'actualizados', _actualizados, 'invalidos', _invalidos);
-END;
-$$;
-GRANT EXECUTE ON FUNCTION public.importar_motores_inventario(uuid, text, jsonb) TO authenticated;
-
--- A4 · importar_vins_inventario: llaves alternas, conteo real y sin inflar colores
-DROP FUNCTION IF EXISTS public.importar_vins_inventario(uuid, TEXT, TEXT, JSONB);
-
-CREATE OR REPLACE FUNCTION public.importar_vins_inventario(
-  _contenedor_id uuid,
-  _folio_contenedor text,
-  _modelo text,
-  _vins jsonb
-)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
-DECLARE
-  _v jsonb; _num_chasis text; _col text; _mod text;
-  _insertados int := 0; _actualizados int := 0; _invalidos int := 0;
-  _new_id uuid; _es_nuevo boolean;
-  _ids uuid[] := ARRAY[]::uuid[];
-BEGIN
-  IF NOT (has_role(auth.uid(),'admin'::app_role) OR has_role(auth.uid(),'fabrica'::app_role)) THEN
-    RAISE EXCEPTION 'Solo admin/fábrica puede importar VINs';
-  END IF;
-
-  IF _contenedor_id IS NULL THEN
-    RAISE EXCEPTION 'ID de contenedor requerido';
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM contenedores WHERE id = _contenedor_id) THEN
-    RAISE EXCEPTION 'Contenedor no encontrado';
-  END IF;
-
-  IF _folio_contenedor IS NOT NULL THEN
-    UPDATE contenedores SET folio_contenedor = _folio_contenedor WHERE id = _contenedor_id;
-  END IF;
-
-  FOR _v IN SELECT * FROM jsonb_array_elements(_vins) LOOP
-    _num_chasis := upper(NULLIF(trim(COALESCE(_v->>'numero_chasis', _v->>'frame_number')), ''));
-    _col        := upper(COALESCE(NULLIF(trim(_v->>'color'),''), 'SIN COLOR'));
-    _mod        := COALESCE(NULLIF(trim(COALESCE(_v->>'modelo', _v->>'model_no')),''), _modelo, '200cc 2025');
-
-    IF _num_chasis IS NULL OR length(_num_chasis) < 4 THEN
-      _invalidos := _invalidos + 1;
-      CONTINUE;
-    END IF;
-
-    INSERT INTO inventario_chasis (numero_chasis, contenedor_id, modelo, color, estatus, created_at)
-    VALUES (_num_chasis, _contenedor_id, _mod, _col, 'disponible', NOW())
-    ON CONFLICT (numero_chasis) DO UPDATE SET
-      contenedor_id = _contenedor_id,
-      modelo = _mod,
-      color = _col,
-      updated_at = now()
+    INSERT INTO inventario_chasis (numero_chasis, contenedor_id, modelo, color, estatus)
+    VALUES (_num, _contenedor_id, _mod, _col, 'disponible')
+    ON CONFLICT (numero_chasis) DO UPDATE
+      SET contenedor_id = _contenedor_id, modelo = _mod, color = _col
     RETURNING id, (xmax = 0) INTO _new_id, _es_nuevo;
 
     _ids := array_append(_ids, _new_id);
@@ -142,53 +203,103 @@ BEGIN
   END LOOP;
 
   RETURN jsonb_build_object('ok', true, 'contenedor_id', _contenedor_id,
-                            'insertados', _insertados, 'actualizados', _actualizados,
-                            'invalidos', _invalidos, 'chasis_ids', _ids);
-END;
-$$;
+    'insertados', _insertados, 'actualizados', _actualizados,
+    'invalidos', _invalidos, 'chasis_ids', _ids);
+END; $$;
+
 GRANT EXECUTE ON FUNCTION public.importar_vins_inventario(uuid, text, text, jsonb) TO authenticated;
 
--- A5 · Función interna de pareo (P1, P2, P3)
-DROP FUNCTION IF EXISTS public._parear_unidades_contenedor_internal(uuid);
+
+-- ============================================================================
+-- BLOQUE 6 · Importación de motores
+-- ============================================================================
+
+DROP FUNCTION IF EXISTS public.importar_motores_inventario(text, jsonb);
+DROP FUNCTION IF EXISTS public.importar_motores_inventario(uuid, text, jsonb);
+
+CREATE OR REPLACE FUNCTION public.importar_motores_inventario(
+  _contenedor_id uuid, _modelo text, _motores jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE
+  _m jsonb; _num text; _mod text; _es_nuevo boolean;
+  _insertados int := 0; _actualizados int := 0; _invalidos int := 0;
+BEGIN
+  IF NOT (has_role(auth.uid(),'admin'::app_role) OR has_role(auth.uid(),'fabrica'::app_role)) THEN
+    RAISE EXCEPTION 'Solo admin/fábrica puede importar motores';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM contenedores WHERE id = _contenedor_id) THEN
+    RAISE EXCEPTION 'Contenedor no encontrado';
+  END IF;
+
+  FOR _m IN SELECT * FROM jsonb_array_elements(_motores) LOOP
+    _num := upper(NULLIF(trim(COALESCE(_m->>'numero_motor', _m->>'engine_number')),''));
+    _mod := COALESCE(NULLIF(trim(COALESCE(_m->>'modelo', _m->>'model_no')),''), _modelo, '200cc 2025');
+
+    IF _num IS NULL OR length(_num) < 4 THEN
+      _invalidos := _invalidos + 1;
+      CONTINUE;
+    END IF;
+
+    INSERT INTO inventario_motor (numero_motor, contenedor_id, modelo, estatus)
+    VALUES (_num, _contenedor_id, _mod, 'disponible')
+    ON CONFLICT (numero_motor) DO UPDATE
+      SET contenedor_id = _contenedor_id, modelo = _mod
+    RETURNING (xmax = 0) INTO _es_nuevo;
+
+    IF _es_nuevo THEN _insertados := _insertados + 1;
+    ELSE _actualizados := _actualizados + 1; END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true, 'insertados', _insertados,
+    'actualizados', _actualizados, 'invalidos', _invalidos);
+END; $$;
+
+GRANT EXECUTE ON FUNCTION public.importar_motores_inventario(uuid, text, jsonb) TO authenticated;
+
+
+-- ============================================================================
+-- BLOQUE 7 · El pareo 1:1
+-- ============================================================================
 
 CREATE OR REPLACE FUNCTION public._parear_unidades_contenedor_internal(_contenedor_id uuid)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 DECLARE
-  _n_chasis int; _n_motores int; _pareadas int := 0; _unidades int;
+  _n_chasis int; _n_motores int; _unidades int; _pareadas int := 0;
   _r record; _moto_id uuid; _orden int;
   _sin_motor text[] := '{}'; _sin_chasis text[] := '{}';
 BEGIN
-  SELECT count(*) INTO _n_chasis  FROM inventario_chasis
-   WHERE contenedor_id = _contenedor_id;
-  SELECT count(*) INTO _n_motores FROM inventario_motor
-   WHERE contenedor_id = _contenedor_id;
+  SELECT count(*) INTO _n_chasis  FROM inventario_chasis WHERE contenedor_id = _contenedor_id;
+  SELECT count(*) INTO _n_motores FROM inventario_motor  WHERE contenedor_id = _contenedor_id;
 
-  SELECT COALESCE(max(orden_armado), 0) INTO _orden FROM motocarros;
+  SELECT COALESCE(max(orden_armado),0) INTO _orden FROM motocarros;
 
   FOR _r IN
     WITH ch AS (
       SELECT id, numero_chasis, modelo, color,
              row_number() OVER (ORDER BY created_at, numero_chasis) AS rn
-      FROM inventario_chasis
-      WHERE contenedor_id = _contenedor_id AND motocarro_id IS NULL
+        FROM inventario_chasis
+       WHERE contenedor_id = _contenedor_id AND motocarro_id IS NULL
     ), mo AS (
-      SELECT id, numero_motor, modelo,
+      SELECT id, numero_motor,
              row_number() OVER (ORDER BY created_at, numero_motor) AS rn
-      FROM inventario_motor
-      WHERE contenedor_id = _contenedor_id AND motocarro_id IS NULL
+        FROM inventario_motor
+       WHERE contenedor_id = _contenedor_id AND motocarro_id IS NULL
     )
     SELECT ch.id AS chasis_id, ch.numero_chasis, ch.modelo, ch.color,
            mo.id AS motor_id, mo.numero_motor
-    FROM ch JOIN mo ON mo.rn = ch.rn
-    ORDER BY ch.rn
+      FROM ch JOIN mo ON mo.rn = ch.rn
+     ORDER BY ch.rn
   LOOP
     _orden := _orden + 1;
 
-    INSERT INTO motocarros (orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado, estatus_entrega, created_at)
-    VALUES (_orden, _r.modelo, _r.color, _r.numero_chasis, _r.numero_motor, 'PENDIENTE', 'NO_APLICA', NOW())
-    ON CONFLICT (ns_chasis) WHERE ns_chasis IS NOT NULL DO UPDATE
-      SET ns_motor = EXCLUDED.ns_motor, updated_at = now()
+    INSERT INTO motocarros (orden_armado, modelo, color, ns_chasis, ns_motor,
+                            contenedor_id, estatus_armado, estatus_entrega)
+    VALUES (_orden, _r.modelo, _r.color, _r.numero_chasis, _r.numero_motor,
+            _contenedor_id, 'PENDIENTE', 'NO_APLICA')
+    ON CONFLICT (ns_chasis) DO UPDATE
+      SET ns_motor = EXCLUDED.ns_motor,
+          contenedor_id = EXCLUDED.contenedor_id,
+          updated_at = now()
     RETURNING id INTO _moto_id;
 
     UPDATE inventario_chasis SET motocarro_id = _moto_id, estatus = 'configurado',
@@ -216,46 +327,24 @@ BEGIN
                           THEN 'completa' ELSE 'incompleta' END
   WHERE id = _contenedor_id;
 
-  RETURN jsonb_build_object(
-    'ok', true,
-    'unidades', _unidades,
-    'unidades_nuevas', _pareadas,
-    'chasis_recibidos', _n_chasis,
-    'motores_recibidos', _n_motores,
-    'chasis_sin_motor', _sin_motor,
-    'motores_sin_chasis', _sin_chasis,
-    'completa', (array_length(_sin_motor,1) IS NULL AND array_length(_sin_chasis,1) IS NULL)
-  );
-END;
-$$;
+  RETURN jsonb_build_object('ok', true,
+    'unidades', _unidades, 'unidades_nuevas', _pareadas,
+    'chasis_recibidos', _n_chasis, 'motores_recibidos', _n_motores,
+    'chasis_sin_motor', _sin_motor, 'motores_sin_chasis', _sin_chasis,
+    'completa', (array_length(_sin_motor,1) IS NULL AND array_length(_sin_chasis,1) IS NULL));
+END; $$;
 
--- P3 · No exponer la función interna por PostgREST
-REVOKE EXECUTE ON FUNCTION public._parear_unidades_contenedor_internal(uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public._parear_unidades_contenedor_internal(uuid) FROM anon, authenticated;
-
--- A5b · Función pública: sólo validación de rol y envoltorio
-DROP FUNCTION IF EXISTS public.parear_unidades_contenedor(uuid);
+-- La interna NO se expone: es SECURITY DEFINER sin chequeo de rol.
+REVOKE ALL ON FUNCTION public._parear_unidades_contenedor_internal(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public._parear_unidades_contenedor_internal(uuid) FROM anon, authenticated;
 
 CREATE OR REPLACE FUNCTION public.parear_unidades_contenedor(_contenedor_id uuid)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
 BEGIN
   IF NOT (has_role(auth.uid(),'admin'::app_role) OR has_role(auth.uid(),'fabrica'::app_role)) THEN
     RAISE EXCEPTION 'Solo admin/fábrica puede parear unidades';
   END IF;
   RETURN public._parear_unidades_contenedor_internal(_contenedor_id);
-END;
-$$;
-GRANT EXECUTE ON FUNCTION public.parear_unidades_contenedor(uuid) TO authenticated;
+END; $$;
 
--- A6 · Reagrupar lo ya cargado (backfill)
-DO $$
-DECLARE _c record;
-BEGIN
-  FOR _c IN SELECT id FROM contenedores
-            WHERE EXISTS (SELECT 1 FROM inventario_chasis ic WHERE ic.contenedor_id = contenedores.id
-                          AND ic.motocarro_id IS NULL)
-  LOOP
-    PERFORM public._parear_unidades_contenedor_internal(_c.id);
-  END LOOP;
-END $$;
+GRANT EXECUTE ON FUNCTION public.parear_unidades_contenedor(uuid) TO authenticated;
