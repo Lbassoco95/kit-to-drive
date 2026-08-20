@@ -17,6 +17,7 @@ type PareoReport = {
   folio: string;
   ok: boolean;
   unidades: number;
+  unidades_nuevas: number;
   chasis_recibidos: number;
   motores_recibidos: number;
   chasis_sin_motor: string[];
@@ -130,6 +131,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
     setBusy(true);
     try {
       let totalUnidades = 0;
+      let totalNuevas = 0;
       const reportesPareo: PareoReport[] = [];
 
       for (const sheet of parsedContainerSheets) {
@@ -209,6 +211,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           folio: sheet.folio_contenedor,
           ok: pareoData?.ok ?? true,
           unidades: pareoData?.unidades ?? 0,
+          unidades_nuevas: pareoData?.unidades_nuevas ?? 0,
           chasis_recibidos: pareoData?.chasis_recibidos ?? 0,
           motores_recibidos: pareoData?.motores_recibidos ?? 0,
           chasis_sin_motor: pareoData?.chasis_sin_motor ?? [],
@@ -217,6 +220,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
         };
         reportesPareo.push(reporte);
         totalUnidades += reporte.unidades;
+        totalNuevas += reporte.unidades_nuevas;
       }
 
       setReportes(reportesPareo);
@@ -227,7 +231,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       if (incompletos > 0) {
         toast.warning(`⚠ ${completos} contenedor(es) completo(s), ${incompletos} incompleto(s) — revisa el reporte`);
       } else {
-        toast.success(`✓ ${reportesPareo.length} contenedor(es) — ${totalUnidades} unidades creadas`);
+        toast.success(`✓ ${reportesPareo.length} contenedor(es) — ${totalNuevas} unidades creadas (total: ${totalUnidades})`);
       }
 
       if (incompletos > 0) {
