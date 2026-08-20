@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike } from "lucide-react";
 import { toast } from "sonner";
 
 type Chasis = {
@@ -24,6 +24,17 @@ type Motor = {
   estatus: string;
   contenedor_id: string | null;
   motocarro_id: string | null;
+};
+
+type Unidad = {
+  id: string;
+  orden_armado: number;
+  modelo: string;
+  color: string;
+  ns_chasis: string | null;
+  ns_motor: string | null;
+  estatus_armado: string;
+  remision_id: string | null;
 };
 
 type Parte = {
@@ -46,6 +57,7 @@ type ColorInventario = {
 export default function Inventario() {
   const [chasis, setChasis] = useState<Chasis[]>([]);
   const [motores, setMotores] = useState<Motor[]>([]);
+  const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [partes, setPartes] = useState<Parte[]>([]);
   const [colores, setColores] = useState<ColorInventario[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,20 +69,23 @@ export default function Inventario() {
   const cargarInventario = async () => {
     setLoading(true);
     try {
-      const [chasisData, motoresData, partesData, coloresData] = await Promise.all([
+      const [chasisData, motoresData, unidadesData, partesData, coloresData] = await Promise.all([
         supabase.from("inventario_chasis").select("*").order("fecha_importacion", { ascending: false }),
         supabase.from("inventario_motor").select("*").order("fecha_importacion", { ascending: false }),
+        supabase.from("motocarros").select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado, remision_id").order("orden_armado"),
         supabase.from("inventario_partes").select("*").order("descripcion"),
         supabase.from("inventario_colores").select("*").order("modelo, color"),
       ]);
 
       if (chasisData.error) throw chasisData.error;
       if (motoresData.error) throw motoresData.error;
+      if (unidadesData.error) throw unidadesData.error;
       if (partesData.error) throw partesData.error;
       if (coloresData.error) throw coloresData.error;
 
       setChasis(chasisData.data || []);
       setMotores(motoresData.data || []);
+      setUnidades(unidadesData.data || []);
       setPartes(partesData.data || []);
       setColores(coloresData.data || []);
     } catch (error) {
@@ -79,6 +94,12 @@ export default function Inventario() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getUnidadOrden = (motocarro_id: string | null) => {
+    if (!motocarro_id) return <span className="text-amber-600 text-xs">sin parear</span>;
+    const u = unidades.find(m => m.id === motocarro_id);
+    return <span className="font-medium">#{u?.orden_armado ?? motocarro_id.slice(0, 8)}</span>;
   };
 
   const getParteDiferencia = (esperada: number, recibida: number) => {
@@ -103,23 +124,78 @@ export default function Inventario() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Inventario de Contenedores</h1>
-        <p className="text-muted-foreground mt-1">Gestión de chasis, motores, partes y colores</p>
+        <p className="text-muted-foreground mt-1">Gestión de unidades, chasis, motores, partes y colores</p>
       </div>
 
-      <Tabs defaultValue="chasis" className="w-full">
-        <TabsList className="grid grid-cols-4 h-12">
+      <Tabs defaultValue="unidades" className="w-full">
+        <TabsList className="grid grid-cols-5 h-12">
+          <TabsTrigger value="unidades" className="text-base"><Bike className="h-4 w-4 mr-2" />Unidades</TabsTrigger>
           <TabsTrigger value="chasis" className="text-base"><Truck className="h-4 w-4 mr-2" />Chasis</TabsTrigger>
           <TabsTrigger value="motores" className="text-base"><Wrench className="h-4 w-4 mr-2" />Motores</TabsTrigger>
           <TabsTrigger value="partes" className="text-base"><Package className="h-4 w-4 mr-2" />Partes</TabsTrigger>
           <TabsTrigger value="colores" className="text-base"><Palette className="h-4 w-4 mr-2" />Colores</TabsTrigger>
         </TabsList>
 
+        <TabsContent value="unidades" className="space-y-4 mt-4">
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-lg">Unidades</h3>
+              <div className="text-sm text-muted-foreground">
+                Total: {unidades.length} unidades
+              </div>
+            </div>
+            <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+              <Table>
+                <TableHeader className="bg-slate-50 sticky top-0">
+                  <TableRow>
+                    <TableHead>Orden</TableHead>
+                    <TableHead>Modelo</TableHead>
+                    <TableHead>Color</TableHead>
+                    <TableHead>Chasis</TableHead>
+                    <TableHead>Motor</TableHead>
+                    <TableHead>Estatus</TableHead>
+                    <TableHead>Remisión</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unidades.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="font-bold">#{u.orden_armado}</TableCell>
+                      <TableCell>{u.modelo}</TableCell>
+                      <TableCell>{u.color}</TableCell>
+                      <TableCell className="font-mono text-xs">{u.ns_chasis ?? '-'}</TableCell>
+                      <TableCell className="font-mono text-xs">{u.ns_motor ?? '-'}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          u.estatus_armado === 'PENDIENTE' ? 'bg-gray-100 text-gray-700' :
+                          u.estatus_armado === 'ARMADO' || u.estatus_armado === 'LISTO' ? 'bg-green-100 text-green-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {u.estatus_armado}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{u.remision_id ? u.remision_id.slice(0, 8) + '...' : 'sin asignar'}</TableCell>
+                    </TableRow>
+                  ))}
+                  {unidades.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No hay unidades en inventario
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="chasis" className="space-y-4 mt-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Inventario de Chasis</h3>
               <div className="text-sm text-muted-foreground">
-                Total: {chasis.length} | Disponibles: {chasis.filter(c => c.estatus === 'disponible').length}
+                Total: {chasis.length} piezas | Disponibles: {chasis.filter(c => c.estatus === 'disponible').length}
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
@@ -130,6 +206,7 @@ export default function Inventario() {
                     <TableHead>Modelo</TableHead>
                     <TableHead>Color</TableHead>
                     <TableHead>Estatus</TableHead>
+                    <TableHead>Unidad</TableHead>
                     <TableHead>Contenedor ID</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -148,12 +225,13 @@ export default function Inventario() {
                           {c.estatus}
                         </span>
                       </TableCell>
+                      <TableCell>{getUnidadOrden(c.motocarro_id)}</TableCell>
                       <TableCell className="text-muted-foreground">{c.contenedor_id?.slice(0, 8)}...</TableCell>
                     </TableRow>
                   ))}
                   {chasis.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No hay chasis en inventario
                       </TableCell>
                     </TableRow>
@@ -169,7 +247,7 @@ export default function Inventario() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Inventario de Motores</h3>
               <div className="text-sm text-muted-foreground">
-                Total: {motores.length} | Disponibles: {motores.filter(m => m.estatus === 'disponible').length}
+                Total: {motores.length} piezas | Disponibles: {motores.filter(m => m.estatus === 'disponible').length}
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
@@ -179,6 +257,7 @@ export default function Inventario() {
                     <TableHead>Motor</TableHead>
                     <TableHead>Modelo</TableHead>
                     <TableHead>Estatus</TableHead>
+                    <TableHead>Unidad</TableHead>
                     <TableHead>Contenedor ID</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -196,12 +275,13 @@ export default function Inventario() {
                           {m.estatus}
                         </span>
                       </TableCell>
+                      <TableCell>{getUnidadOrden(m.motocarro_id)}</TableCell>
                       <TableCell className="text-muted-foreground">{m.contenedor_id?.slice(0, 8)}...</TableCell>
                     </TableRow>
                   ))}
                   {motores.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                         No hay motores en inventario
                       </TableCell>
                     </TableRow>
