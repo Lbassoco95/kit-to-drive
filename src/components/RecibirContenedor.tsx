@@ -25,6 +25,8 @@ type PareoReport = {
   completa: boolean;
 };
 
+type RpcResult = { ok: boolean; error?: string; creados?: number };
+
 const cabeceraSchema = z.object({
   folio_contenedor: z.string().trim().min(1, "Folio requerido").max(50),
   fecha_arribo: z.string().min(1, "Fecha requerida"),
@@ -59,7 +61,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       return;
     }
 
-    const r = cabeceraSchema.safeParse(cab); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const r = cabeceraSchema.safeParse(cab);
     if (!r.success) { toast.error(r.error.issues[0].message); return; }
     setUnidades(Array.from({ length: r.data.cantidad }, () => ({ ns_chasis: "", ns_motor: "", chasis_asignado: "" })));
     setStep(2);
@@ -159,15 +161,15 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
             _contenedor_id: containerId,
             _folio_contenedor: sheet.folio_contenedor.trim(),
             _modelo: sheet.modelo,
-            _vins: sheet.chasis.map(c => ({ numero_chasis: c.numero_chasis, color: c.color, modelo: c.modelo })) as any,
+            _vins: sheet.chasis.map(c => ({ numero_chasis: c.numero_chasis, color: c.color, modelo: c.modelo })),
           });
 
           if (chassisError) {
             toast.error(`Chasis ${sheet.folio_contenedor}: ${chassisError.message}`);
             continue;
           }
-          if (!(chassisData as any)?.ok) {
-            toast.error(`Chasis ${sheet.folio_contenedor}: ${(chassisData as any)?.error ?? 'no se importó'}`);
+          if (!(chassisData as RpcResult | null)?.ok) {
+            toast.error(`Chasis ${sheet.folio_contenedor}: ${(chassisData as RpcResult | null)?.error ?? 'no se importó'}`);
             continue;
           }
         }
@@ -177,15 +179,15 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           const { data: motorsData, error: motorsError } = await supabase.rpc("importar_motores_inventario", {
             _contenedor_id: containerId,
             _modelo: sheet.modelo,
-            _motores: sheet.motores.map(m => ({ numero_motor: m.numero_motor, modelo: m.modelo || sheet.modelo })) as any,
+            _motores: sheet.motores.map(m => ({ numero_motor: m.numero_motor, modelo: m.modelo || sheet.modelo })),
           });
 
           if (motorsError) {
             toast.error(`Motores ${sheet.folio_contenedor}: ${motorsError.message}`);
             continue;
           }
-          if (!(motorsData as any)?.ok) {
-            toast.error(`Motores ${sheet.folio_contenedor}: ${(motorsData as any)?.error ?? 'no se importó'}`);
+          if (!(motorsData as RpcResult | null)?.ok) {
+            toast.error(`Motores ${sheet.folio_contenedor}: ${(motorsData as RpcResult | null)?.error ?? 'no se importó'}`);
             continue;
           }
         }
@@ -198,7 +200,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           toast.error(`Pareo ${sheet.folio_contenedor}: ${pareoErr.message}`);
           continue;
         }
-        const pareoData = pareo as any;
+        const pareoData = pareo as Partial<PareoReport> | null;
         const reporte: PareoReport = {
           folio: sheet.folio_contenedor,
           ok: pareoData?.ok ?? true,
@@ -281,11 +283,11 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       _fecha_arribo: cab.fecha_arribo,
       _modelo: cab.modelo,
       _color: cab.color,
-      _unidades: payload as any, // Supabase RPC requires JSON type
+      _unidades: payload,
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(`✓ Contenedor recibido — ${(data as any)?.creados ?? unidades.length} motocarros creados`);
+    toast.success(`✓ Contenedor recibido — ${(data as { creados?: number } | null)?.creados ?? unidades.length} motocarros creados`);
     setOpen(false); reset(); onDone?.();
   };
 
@@ -331,7 +333,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
           {step === 1 && (
             <div className="space-y-4 mt-4">
-              <Tabs value={importMode} onValueChange={v => setImportMode(v as any)} className="w-full">
+              <Tabs value={importMode} onValueChange={v => setImportMode(v as "single" | "multiple")} className="w-full">
                 <TabsList className="grid grid-cols-2 h-12">
                   <TabsTrigger value="single" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />Capturar manual</TabsTrigger>
                   <TabsTrigger value="multiple" className="text-base"><FileSpreadsheet className="h-4 w-4 mr-2" />Importar contenedores</TabsTrigger>
@@ -353,7 +355,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                     </div>
                     <div>
                       <Label>Color *</Label>
-                      <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as any })} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
+                      <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as typeof cab.color })} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
                         {["BLANCO","AZUL","ROJO","NEGRO","VERDE"].map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
@@ -430,7 +432,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           )}
 
           {step === 2 && (
-            <Tabs value={tab} onValueChange={v => setTab(v as any)} className="mt-2">
+            <Tabs value={tab} onValueChange={v => setTab(v as "manual" | "pegar")} className="mt-2">
               <TabsList className="grid grid-cols-2 h-12">
                 <TabsTrigger value="manual" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />Capturar uno por uno</TabsTrigger>
                 <TabsTrigger value="pegar" className="text-base"><ClipboardPaste className="h-4 w-4 mr-2" />Pegar desde Excel</TabsTrigger>
@@ -566,7 +568,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           )}
 
           <DialogFooter className="gap-2">
-            {step > 1 && step < 4 && <Button variant="outline" onClick={() => setStep((step - 1) as any)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
+            {step > 1 && step < 4 && <Button variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
             {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContainerSheets.length} contenedor(es) — ${parsedContainerSheets.reduce((a,s)=>a+s.chasis.length,0)} unidades esperadas`}</Button>}
             {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">Revisar<ArrowRight className="h-4 w-4 ml-2" /></Button>}

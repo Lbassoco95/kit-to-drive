@@ -659,29 +659,66 @@ export type Database = {
           contenedor_id: string | null
           created_at: string | null
           estatus: string | null
+          fecha_configuracion: string | null
+          fecha_importacion: string
           id: string
           modelo: string
+          motocarro_id: string | null
+          notas: string | null
           numero_chasis: string
+          updated_at: string
         }
         Insert: {
           color?: string | null
           contenedor_id?: string | null
           created_at?: string | null
           estatus?: string | null
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
           id?: string
           modelo: string
+          motocarro_id?: string | null
+          notas?: string | null
           numero_chasis: string
+          updated_at?: string
         }
         Update: {
           color?: string | null
           contenedor_id?: string | null
           created_at?: string | null
           estatus?: string | null
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
           id?: string
           modelo?: string
+          motocarro_id?: string | null
+          notas?: string | null
           numero_chasis?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventario_chasis_contenedor_fk"
+            columns: ["contenedor_id"]
+            isOneToOne: false
+            referencedRelation: "contenedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_chasis_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "motocarros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_chasis_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_produccion"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventario_colores: {
         Row: {
@@ -715,27 +752,64 @@ export type Database = {
           contenedor_id: string | null
           created_at: string | null
           estatus: string | null
+          fecha_configuracion: string | null
+          fecha_importacion: string
           id: string
           modelo: string
+          motocarro_id: string | null
+          notas: string | null
           numero_motor: string
+          updated_at: string
         }
         Insert: {
           contenedor_id?: string | null
           created_at?: string | null
           estatus?: string | null
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
           id?: string
           modelo: string
+          motocarro_id?: string | null
+          notas?: string | null
           numero_motor: string
+          updated_at?: string
         }
         Update: {
           contenedor_id?: string | null
           created_at?: string | null
           estatus?: string | null
+          fecha_configuracion?: string | null
+          fecha_importacion?: string
           id?: string
           modelo?: string
+          motocarro_id?: string | null
+          notas?: string | null
           numero_motor?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "inventario_motor_contenedor_fk"
+            columns: ["contenedor_id"]
+            isOneToOne: false
+            referencedRelation: "contenedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_motor_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "motocarros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventario_motor_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_produccion"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inventario_partes: {
         Row: {
@@ -1269,6 +1343,10 @@ export type Database = {
       }
     }
     Functions: {
+      _parear_unidades_contenedor_internal: {
+        Args: { _contenedor_id: string }
+        Returns: Json
+      }
       asignar_chasis_remision: {
         Args: {
           _cantidad: number
@@ -1280,6 +1358,10 @@ export type Database = {
       }
       confirmar_fecha_entrega: {
         Args: { _area: string; _motocarro_id: string }
+        Returns: undefined
+      }
+      decrementar_inventario_color: {
+        Args: { _cantidad?: number; _color: string; _modelo: string }
         Returns: undefined
       }
       get_my_role: {
@@ -1297,10 +1379,6 @@ export type Database = {
         Args: { _contenedor_id: string; _modelo: string; _motores: Json }
         Returns: Json
       }
-      parear_unidades_contenedor: {
-        Args: { _contenedor_id: string }
-        Returns: Json
-      }
       importar_vins_inventario: {
         Args: {
           _contenedor_id: string
@@ -1308,6 +1386,14 @@ export type Database = {
           _modelo: string
           _vins: Json
         }
+        Returns: Json
+      }
+      incrementar_inventario_color: {
+        Args: { _cantidad?: number; _color: string; _modelo: string }
+        Returns: undefined
+      }
+      parear_unidades_contenedor: {
+        Args: { _contenedor_id: string }
         Returns: Json
       }
       proponer_fecha_entrega: {
