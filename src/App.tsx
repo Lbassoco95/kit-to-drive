@@ -29,6 +29,7 @@ import CrmRutas from "./pages/crm/CrmRutas";
 import CrmEquipo from "./pages/crm/CrmEquipo";
 import CrmTracker from "./pages/crm/CrmTracker";
 import Inventario from "./pages/Inventario";
+import Incidencias from "./pages/Incidencias";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/produccion" element={<ProtectedRoute roles={["admin","fabrica","logistica","coordinador"]}><Produccion /></ProtectedRoute>} />
               <Route path="/inventario" element={<ProtectedRoute roles={["admin","fabrica","coordinador"]}><Inventario /></ProtectedRoute>} />
+              <Route path="/incidencias" element={<ProtectedRoute roles={["admin","fabrica","coordinador"]}><Incidencias /></ProtectedRoute>} />
               <Route path="/reportes-turno" element={<ProtectedRoute roles={["admin","fabrica","logistica","coordinador"]}><ReportesTurno /></ProtectedRoute>} />
               <Route path="/remisiones" element={<Remisiones />} />
               <Route path="/entregas" element={<ProtectedRoute roles={["admin","logistica","coordinador"]}><Entregas /></ProtectedRoute>} />

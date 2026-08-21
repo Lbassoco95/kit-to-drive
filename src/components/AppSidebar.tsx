@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2 } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -15,6 +15,7 @@ const ITEMS: Item[] = [
   { key: "dashboard",      url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador","director_ventas","coordinador_ventas","auxiliar_ventas"], group: "Inicio" },
   { key: "produccion",     url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
   { key: "inventario",     url: "/inventario",    icon: Package,         roles: ["admin","fabrica","coordinador"],                      group: "Operación" },
+  { key: "incidencias",    url: "/incidencias",   icon: TriangleAlert,   roles: ["admin","fabrica","coordinador"],                      group: "Operación" },
   { key: "reportesTurno",  url: "/reportes-turno",icon: ClipboardList,   roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
   { key: "remisiones",     url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Operación" },
   { key: "entregas",       url: "/entregas",      icon: Truck,           roles: ["admin","logistica","coordinador"],                    group: "Operación" },

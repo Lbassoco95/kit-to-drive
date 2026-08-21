@@ -1,6 +1,6 @@
 -- ============================================================
 -- Control Financiero v2 — Libro mayor de INGRESOS y EGRESOS
--- 2026-08-23
+-- 2026-08-23 · KIT-4d
 --
 -- Reemplaza la tabla plana `pagos` (solo egresos, beneficiario en
 -- texto libre, una sola factura) por un libro mayor único que:

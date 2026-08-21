@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Inbox, RefreshCw, FileDown, Package, Settings2 } from "lucide-react";
+import { Inbox, RefreshCw, FileDown, Package, Settings2, TriangleAlert, Wrench } from "lucide-react";
 import { fmtDate, COLORES } from "@/lib/dazon";
 import { toast } from "sonner";
 
@@ -26,6 +26,17 @@ const tipoBadge: Record<string, string> = {
   activacion: "bg-amber-50 text-amber-700 border-amber-200",
   flete: "bg-blue-50 text-blue-700 border-blue-200",
 };
+
+type StockColor = {
+  piezas_disponibles: number;
+  unidades_libres: number;
+  unidades_sin_serial: number;
+  unidades_detenidas: number;
+  demanda_pendiente: number;
+};
+
+const claveStock = (modelo?: string | null, color?: string | null) =>
+  `${(modelo ?? "").trim().toUpperCase()}__${(color ?? "").trim().toUpperCase()}`;
 
 type RemisionCard = {
   id: string;
@@ -60,9 +71,26 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [configDialog, setConfigDialog] = useState<RemisionCard | null>(null);
   const [configForm, setConfigForm] = useState(defaultConfigForm());
   const [savingConfig, setSavingConfig] = useState(false);
+  const [stock, setStock] = useState<Map<string, StockColor>>(new Map());
 
   const load = async () => {
     setLoading(true);
+
+    // Lo que de verdad hay por modelo comercial y color — para que la bandeja
+    // no ofrezca "asignar 5" cuando de ese color sólo hay 1.
+    const { data: stockData } = await supabase
+      .from("v_stock_modelo_color")
+      .select("modelo_comercial, color, piezas_disponibles, unidades_libres, unidades_sin_serial, unidades_detenidas, demanda_pendiente");
+    setStock(new Map((stockData ?? []).map((s: any) => [
+      claveStock(s.modelo_comercial, s.color),
+      {
+        piezas_disponibles: s.piezas_disponibles ?? 0,
+        unidades_libres: s.unidades_libres ?? 0,
+        unidades_sin_serial: s.unidades_sin_serial ?? 0,
+        unidades_detenidas: s.unidades_detenidas ?? 0,
+        demanda_pendiente: s.demanda_pendiente ?? 0,
+      },
+    ])));
 
     // ── Query mínimo garantizado ──────────────────────────────────────────────
     const { data: base } = await supabase
@@ -134,11 +162,37 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
 
   const asignar = async (id: string, faltan: number) => {
     setBusy(id);
-    const { data, error } = await supabase.rpc("reintentar_asignar_remision", { _remision_id: id });
+    // asignar_remision_items respeta la configuración del pedido (modelo
+    // comercial + color de cada línea) y sólo toma unidades que ya tienen
+    // NS chasis y NS motor y cuyo chasis no está detenido por una incidencia.
+    const { data, error } = await supabase.rpc("asignar_remision_items", { _remision_id: id });
     setBusy(null);
     if (error) { toast.error(error.message); return; }
-    if ((data ?? 0) > 0) toast.success(`✓ ${data} motocarro(s) asignado(s)`);
-    else toast.info("No hay motocarros disponibles con esas características");
+
+    const r = data as { asignadas?: number; pedido_capturado?: boolean; detalle?: any[] } | null;
+    const asignadas = r?.asignadas ?? 0;
+
+    if (asignadas > 0) toast.success(`✓ ${asignadas} motocarro(s) asignado(s)`);
+
+    // Explicar el faltante línea por línea: de qué color, cuántas faltan y si
+    // el problema es que no hay piezas o que fábrica no las ha configurado.
+    (r?.detalle ?? []).filter((d: any) => (d?.faltan ?? 0) > 0).forEach((d: any) => {
+      const que = [d.modelo, d.color].filter(Boolean).join(" ") || "sin modelo/color";
+      const detalle = d.piezas_por_configurar > 0
+        ? `hay ${d.piezas_por_configurar} chasis por configurar en Producción`
+        : d.unidades_sin_serial > 0
+        ? `hay ${d.unidades_sin_serial} unidad(es) sin NS chasis/NS motor — fábrica tiene que capturarlos`
+        : d.unidades_detenidas > 0
+        ? `hay ${d.unidades_detenidas} unidad(es) detenidas por una incidencia de chasis`
+        : "no hay inventario de ese color";
+      toast.warning(`Faltan ${d.faltan} de ${que}: ${detalle}`);
+    });
+
+    if (!asignadas && !(r?.detalle ?? []).length) toast.info("Nada por asignar en esta remisión");
+    if (r?.pedido_capturado === false) {
+      toast.info("Esta remisión no tiene configuración del pedido — captúrala para asignar por modelo y color");
+    }
+
     await load(); onChange?.();
   };
 
@@ -237,6 +291,26 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             const vendedorDisplay = rem.nombre_vendedor || rem.vendedor;
             const tieneConfig = rem.items.length > 0;
 
+            // Cobertura real de lo que pide el pedido: cuántas unidades con
+            // serial hay de ese modelo comercial y ese color, y cuántas piezas
+            // quedan por configurar. Es lo que hacía falta para saber si el
+            // "Asignar" va a lograr algo.
+            const lineas = rem.items.filter((it: any) => it.tipo_servicio === "motocarro");
+            const cobertura = lineas.map((it: any) => {
+              const st = stock.get(claveStock(it.modelo, it.color));
+              return {
+                id: it.id,
+                etiqueta: [it.modelo, it.color].filter(Boolean).join(" ") || "sin modelo/color",
+                pedidas: it.cantidad ?? 1,
+                libres: st?.unidades_libres ?? 0,
+                porConfigurar: st?.piezas_disponibles ?? 0,
+                sinSerial: st?.unidades_sin_serial ?? 0,
+                detenidas: st?.unidades_detenidas ?? 0,
+              };
+            });
+            const libresTotales = cobertura.reduce((acc, c) => acc + c.libres, 0);
+            const asignables = cobertura.length ? Math.min(faltan, libresTotales) : faltan;
+
             return (
               <div key={rem.id} className="bg-white rounded-xl border border-[#E8A30D]/25 flex flex-col overflow-hidden shadow-sm">
                 {/* Header */}
@@ -301,6 +375,40 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   )}
                 </div>
 
+                {/* Disponibilidad real de lo que pide el pedido */}
+                {cobertura.length > 0 && (
+                  <div className="px-4 py-2 border-t bg-white space-y-1">
+                    {cobertura.map(c => {
+                      const alcanza = c.libres >= c.pedidas;
+                      return (
+                        <div key={c.id} className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="font-medium text-slate-700">{c.etiqueta}</span>
+                          <span className="flex items-center gap-2">
+                            <span className={alcanza ? "text-[#065F46] font-semibold" : "text-[#991B1B] font-semibold"}>
+                              {c.libres} con serial
+                            </span>
+                            {c.porConfigurar > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-[#92400E]" title="Chasis sanos que fábrica todavía puede configurar">
+                                <Wrench size={9} /> {c.porConfigurar} por configurar
+                              </span>
+                            )}
+                            {c.sinSerial > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-[#92400E]" title="Unidades sin NS chasis / NS motor: no se pueden asignar">
+                                <TriangleAlert size={9} /> {c.sinSerial} sin NS
+                              </span>
+                            )}
+                            {c.detenidas > 0 && (
+                              <span className="inline-flex items-center gap-0.5 text-[#991B1B]" title="Unidades detenidas por una incidencia de chasis">
+                                <TriangleAlert size={9} /> {c.detenidas} detenidas
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Notas */}
                 {rem.notas && (
                   <div className="px-4 py-2 bg-blue-50/50 border-t text-xs text-[#1E40AF]">
@@ -312,10 +420,19 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 <div className="px-4 py-3 mt-auto border-t flex gap-2">
                   <Button
                     onClick={() => asignar(rem.id, faltan)}
-                    disabled={busy === rem.id || faltan <= 0}
+                    disabled={busy === rem.id || faltan <= 0 || (cobertura.length > 0 && asignables <= 0)}
                     className="flex-1 h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold text-sm"
+                    title={cobertura.length > 0 && asignables <= 0
+                      ? "No hay unidades con serial de ese modelo y color — configura chasis + motor en Producción"
+                      : undefined}
                   >
-                    {busy === rem.id ? "Asignando…" : `Asignar ${faltan} disponibles`}
+                    {busy === rem.id
+                      ? "Asignando…"
+                      : cobertura.length > 0 && asignables <= 0
+                      ? "Sin unidades de ese modelo/color"
+                      : cobertura.length > 0 && asignables < faltan
+                      ? `Asignar ${asignables} de ${faltan}`
+                      : `Asignar ${faltan} disponibles`}
                   </Button>
                   {rem.documento_url && (
                     <Button

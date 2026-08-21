@@ -334,26 +334,30 @@ export default function Remisiones() {
 
   // ── Assign chasis ──────────────────────────────────────────────────────────
   const asignarChasis = async (r:any) => {
-    const items:any[] = (r.remision_items??[]).filter((i:any)=>i.tipo_servicio==="motocarro");
-    const motos_:any[] = r.motocarros??[];
-    if (!items.length) {
-      const cant = (r.total_unidades_solicitadas||1) - motos_.length;
-      if (cant<=0) { toast.info("Ya están todos asignados"); return; }
-      const { data, error } = await supabase.rpc("asignar_chasis_remision",{_remision_id:r.id,_cantidad:cant,_color:r.color_solicitado||null});
-      if (error) return toast.error(error.message);
-      toast.success(`✓ ${data} chasis asignados`);
-    } else {
-      let total=0;
-      for (const item of items) {
-        const ya = motos_.filter((m:any)=>(m.color||"").toUpperCase()===item.color?.toUpperCase()).length;
-        const rest = item.cantidad-ya; if (rest<=0) continue;
-        const { data, error } = await supabase.rpc("asignar_chasis_remision",{_remision_id:r.id,_cantidad:rest,_color:item.color});
-        if (error) { console.error(error.message); continue; }
-        total += (data||0);
-      }
-      if (total>0) toast.success(`✓ ${total} chasis asignados`);
-      else toast.info("No hay inventario con esos colores");
-    }
+    // Una sola RPC resuelve todo el pedido: cruza cada línea de
+    // remision_items por modelo comercial + color, exige NS chasis y NS motor,
+    // y salta unidades cuyo chasis está detenido por una incidencia.
+    const { data, error } = await supabase.rpc("asignar_remision_items",{_remision_id:r.id});
+    if (error) return toast.error(error.message);
+
+    const res = data as { asignadas?:number; detalle?:any[] } | null;
+    const asignadas = res?.asignadas ?? 0;
+    if (asignadas>0) toast.success(`✓ ${asignadas} chasis asignados`);
+
+    const faltantes = (res?.detalle ?? []).filter((d:any)=>(d?.faltan??0)>0);
+    faltantes.forEach((d:any)=>{
+      const que = [d.modelo,d.color].filter(Boolean).join(" ") || "sin modelo/color";
+      const porque = d.piezas_por_configurar>0
+        ? `hay ${d.piezas_por_configurar} chasis por configurar`
+        : d.unidades_sin_serial>0
+        ? `hay ${d.unidades_sin_serial} unidad(es) sin NS chasis/NS motor`
+        : d.unidades_detenidas>0
+        ? `hay ${d.unidades_detenidas} unidad(es) detenidas por incidencia de chasis`
+        : "no hay inventario de ese color";
+      toast.warning(`Faltan ${d.faltan} de ${que}: ${porque}`);
+    });
+    if (!asignadas && !faltantes.length) toast.info("Ya están todos asignados");
+
     load();
   };
 

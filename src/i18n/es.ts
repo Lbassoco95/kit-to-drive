@@ -8,6 +8,7 @@ export const es = {
     dashboard: "Dashboard",
     produccion: "Producción",
     inventario: "Inventario",
+    incidencias: "Incidencias de chasis",
     reportesTurno: "Reportes de turno",
     remisiones: "Remisiones",
     entregas: "Entregas",
