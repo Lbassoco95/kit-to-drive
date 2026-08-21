@@ -10,6 +10,7 @@ import { PackagePlus, Trash2, ClipboardPaste, KeyboardIcon, ArrowRight, ArrowLef
 import { toast } from "sonner";
 import { z } from "zod";
 import { parseContenedoresExcel, ContainerSheetData, ContenedorFromExcel } from "@/lib/excelParser";
+import { normSerial } from "@/lib/dazon";
 
 type Unidad = { ns_chasis: string; ns_motor: string; chasis_asignado?: string };
 
@@ -164,7 +165,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
             _contenedor_id: containerId,
             _folio_contenedor: sheet.folio_contenedor.trim(),
             _modelo: sheet.modelo,
-            _vins: sheet.chasis.map(c => ({ numero_chasis: c.numero_chasis, color: c.color, modelo: c.modelo })),
+            _vins: sheet.chasis.map(c => ({ numero_chasis: normSerial(c.numero_chasis), color: c.color, modelo: c.modelo })),
           });
 
           if (chassisError) {
@@ -186,7 +187,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           const { data: motorsData, error: motorsError } = await supabase.rpc("importar_motores_inventario", {
             _contenedor_id: containerId,
             _modelo: sheet.modelo,
-            _motores: sheet.motores.map(m => ({ numero_motor: m.numero_motor, modelo: m.modelo || sheet.modelo })),
+            _motores: sheet.motores.map(m => ({ numero_motor: normSerial(m.numero_motor), modelo: m.modelo || sheet.modelo })),
           });
 
           if (motorsError) {
