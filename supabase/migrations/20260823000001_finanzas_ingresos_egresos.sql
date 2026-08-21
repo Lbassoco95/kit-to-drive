@@ -617,28 +617,46 @@ FOR SELECT USING (
 );
 
 -- ── 11. Storage: expedientes financieros ────────────────────
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'finanzas-docs', 'finanzas-docs', false, 20971520,  -- 20 MB
-  ARRAY['application/pdf','application/xml','text/xml',
-        'image/jpeg','image/png','image/webp','image/heic','image/heif']
-)
-ON CONFLICT (id) DO NOTHING;
+--
+-- `storage.buckets` y `storage.objects` son de supabase_storage_admin, no del
+-- usuario que corre esta migración. Como el SQL Editor manda todo el archivo en
+-- una sola transacción, un error de permisos aquí revertiría el módulo
+-- completo. Por eso va aislado: si no hay permiso, avisa y sigue, y el bucket
+-- y sus políticas se crean desde el dashboard (Storage → New bucket).
+DO $$
+BEGIN
+  INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+  VALUES (
+    'finanzas-docs', 'finanzas-docs', false, 20971520,  -- 20 MB
+    ARRAY['application/pdf','application/xml','text/xml',
+          'image/jpeg','image/png','image/webp','image/heic','image/heif']
+  )
+  ON CONFLICT (id) DO NOTHING;
+EXCEPTION
+  WHEN insufficient_privilege OR undefined_table THEN
+    RAISE NOTICE 'PENDIENTE MANUAL: crea el bucket privado «finanzas-docs» en Storage → New bucket (20 MB, PDF/XML/imágenes).';
+END $$;
 
-DROP POLICY IF EXISTS finanzas_docs_select ON storage.objects;
-CREATE POLICY finanzas_docs_select ON storage.objects
-  FOR SELECT TO authenticated
-  USING (bucket_id = 'finanzas-docs' AND public.es_finanzas(auth.uid()));
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS finanzas_docs_select ON storage.objects;
+  CREATE POLICY finanzas_docs_select ON storage.objects
+    FOR SELECT TO authenticated
+    USING (bucket_id = 'finanzas-docs' AND public.es_finanzas(auth.uid()));
 
-DROP POLICY IF EXISTS finanzas_docs_insert ON storage.objects;
-CREATE POLICY finanzas_docs_insert ON storage.objects
-  FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'finanzas-docs' AND public.es_finanzas(auth.uid()));
+  DROP POLICY IF EXISTS finanzas_docs_insert ON storage.objects;
+  CREATE POLICY finanzas_docs_insert ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'finanzas-docs' AND public.es_finanzas(auth.uid()));
 
-DROP POLICY IF EXISTS finanzas_docs_delete ON storage.objects;
-CREATE POLICY finanzas_docs_delete ON storage.objects
-  FOR DELETE TO authenticated
-  USING (bucket_id = 'finanzas-docs' AND public.es_finanzas(auth.uid()));
+  DROP POLICY IF EXISTS finanzas_docs_delete ON storage.objects;
+  CREATE POLICY finanzas_docs_delete ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = 'finanzas-docs' AND public.es_finanzas(auth.uid()));
+EXCEPTION
+  WHEN insufficient_privilege OR undefined_table THEN
+    RAISE NOTICE 'PENDIENTE MANUAL: las políticas del bucket «finanzas-docs» se crean desde Storage → Policies (lectura, subida y borrado para el rol authenticated).';
+END $$;
 
 -- ── 12. Migración de los `pagos` existentes ─────────────────
 ALTER TABLE public.pagos ADD COLUMN IF NOT EXISTS migrado_a_movimiento uuid
