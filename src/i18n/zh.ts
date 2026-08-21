@@ -10,6 +10,7 @@ export const zh: Translations = {
     dashboard: "仪表盘",
     produccion: "生产",
     inventario: "库存",
+    incidencias: "车架异常",
     reportesTurno: "班次报告",
     remisiones: "提货单",
     entregas: "交付",
