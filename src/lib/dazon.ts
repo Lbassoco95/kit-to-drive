@@ -48,13 +48,39 @@ export const ESTATUS_REMISION_COLOR: Record<string, string> = {
 export const fmtDate = (d?: string | null) =>
   d ? new Date(d + (d.length === 10 ? "T12:00:00" : "")).toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 
-// Normalize color variants → BLANCO | AZUL
-export function normColor(c?: string | null): "BLANCO" | "AZUL" | string {
+// Catálogo único de colores — usado en captura manual, filtros y validación.
+// Si aparece un color nuevo, agrégalo aquí (y a MAPA_COLOR si trae variantes en inglés).
+export const COLORES = ["BLANCO", "AZUL", "ROJO", "NEGRO", "VERDE", "GRIS", "AMARILLO", "NARANJA", "PLATA"] as const;
+
+const MAPA_COLOR: Record<string, string> = {
+  WHITE: "BLANCO", BLANC: "BLANCO", BLANCO: "BLANCO",
+  BLUE: "AZUL", AZUL: "AZUL",
+  ORANGE: "NARANJA", NARANJA: "NARANJA",
+  RED: "ROJO", ROJO: "ROJO",
+  BLACK: "NEGRO", NEGRO: "NEGRO",
+  GREEN: "VERDE", VERDE: "VERDE",
+  SILVER: "PLATA", PLATA: "PLATA",
+  GRAY: "GRIS", GREY: "GRIS", GRIS: "GRIS",
+  YELLOW: "AMARILLO", AMARILLO: "AMARILLO",
+};
+
+// Normaliza variantes de color (incluyendo inglés) a su equivalente en español.
+export function normColor(c?: string | null): string {
   if (!c) return "—";
   const s = c.toString().toUpperCase().replace(/[^A-Z]/g, "");
-  if (s.includes("AZUL")) return "AZUL";
-  if (s.includes("BLANC")) return "BLANCO";
-  return c;
+  for (const [clave, valor] of Object.entries(MAPA_COLOR)) {
+    if (s.includes(clave)) return valor;
+  }
+  return c.toString().toUpperCase();
+}
+
+// Línea de producto de un modelo, a partir del catálogo `modelos_producto`.
+// Un modelo que no está en el catálogo se trata como "otro" — nunca se asume
+// "motocarro" por default para no meter una línea desconocida al armado.
+export type LineaProducto = "motocarro" | "mototaxi" | "otro";
+export function lineaDe(modelo: string | null | undefined, catalogo: Map<string, LineaProducto>): LineaProducto {
+  if (!modelo) return "otro";
+  return catalogo.get(modelo) ?? "otro";
 }
 
 // Compute effective estatus armado (mark ATRASADO if overdue and not built)

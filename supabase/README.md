@@ -25,6 +25,14 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
 
 - `supabase/migrations/20260821000001_unidad_chasis_motor.sql` — KIT-1:
   esquema, contadores, funciones de importación y pareo 1:1 de chasis + motor.
+  El pareo automático (`parear_unidades_contenedor`) quedó sin usarse desde
+  KIT-3: la importación deja chasis y motores como piezas sueltas, y la
+  unidad se configura a mano (ver siguiente script).
+- `supabase/migrations/20260822000001_configuracion_manual_unidades.sql` —
+  KIT-3: catálogo `modelos_producto` (línea motocarro/mototaxi/otro),
+  normalización de colores ya cargados en inglés, `configurar_unidad` /
+  `desconfigurar_unidad` (chasis + motor a mano, por fábrica) y
+  `cambiar_orden_armado` con bitácora (`bitacora_orden_armado`).
 
 ## Verificación manual recomendada
 
@@ -36,4 +44,15 @@ SELECT count(*) FROM inventario_motor;
 SELECT count(*) FROM motocarros;
 SELECT id, folio_contenedor, total_chasis, total_motores, total_unidades, estatus_carga
   FROM contenedores ORDER BY fecha_arribo DESC;
+```
+
+Después de aplicar KIT-3:
+
+```sql
+SELECT modelo, linea FROM modelos_producto ORDER BY linea, modelo;
+SELECT DISTINCT color FROM inventario_chasis;             -- no debe quedar WHITE/BLUE/ORANGE
+SELECT DISTINCT color FROM inventario_colores;
+SELECT count(*) FROM inventario_chasis WHERE motocarro_id IS NULL;   -- "por configurar"
+SELECT count(*) FROM motocarros m JOIN modelos_producto mp
+  ON mp.modelo = m.modelo AND mp.linea = 'motocarro';                -- "programadas"
 ```

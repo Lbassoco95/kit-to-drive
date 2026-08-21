@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { fmtDate, effEstatusArmado } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, COLORES } from "@/lib/dazon";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,7 +23,6 @@ import { FileOrCamera } from "@/components/FileOrCamera";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
 const MODELOS = ["200cc 2026", "300cc 2026"];
-const COLORES = ["BLANCO", "AZUL", "ROJO", "NEGRO", "GRIS", "VERDE", "AMARILLO"];
 const colorLabel = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 
 const tipoBadgeClass: Record<string, string> = {

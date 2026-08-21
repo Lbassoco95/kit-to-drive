@@ -50,6 +50,51 @@ export type Database = {
         }
         Relationships: []
       }
+      bitacora_orden_armado: {
+        Row: {
+          cambiado_at: string
+          cambiado_por: string | null
+          id: string
+          motivo: string | null
+          motocarro_id: string
+          orden_anterior: number | null
+          orden_nuevo: number
+        }
+        Insert: {
+          cambiado_at?: string
+          cambiado_por?: string | null
+          id?: string
+          motivo?: string | null
+          motocarro_id: string
+          orden_anterior?: number | null
+          orden_nuevo: number
+        }
+        Update: {
+          cambiado_at?: string
+          cambiado_por?: string | null
+          id?: string
+          motivo?: string | null
+          motocarro_id?: string
+          orden_anterior?: number | null
+          orden_nuevo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bitacora_orden_armado_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "motocarros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bitacora_orden_armado_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "v_reporte_produccion"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           activo: boolean
@@ -956,6 +1001,30 @@ export type Database = {
           },
         ]
       }
+      modelos_producto: {
+        Row: {
+          activo: boolean
+          created_at: string
+          descripcion: string | null
+          linea: string
+          modelo: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          linea?: string
+          modelo: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          descripcion?: string | null
+          linea?: string
+          modelo?: string
+        }
+        Relationships: []
+      }
       pagos: {
         Row: {
           aprobado_por: string | null
@@ -1356,6 +1425,14 @@ export type Database = {
         }
         Returns: number
       }
+      cambiar_orden_armado: {
+        Args: { _motivo?: string; _motocarro_id: string; _orden_nuevo: number }
+        Returns: Json
+      }
+      configurar_unidad: {
+        Args: { _chasis_id: string; _motor_id: string; _orden?: number }
+        Returns: Json
+      }
       confirmar_fecha_entrega: {
         Args: { _area: string; _motocarro_id: string }
         Returns: undefined
@@ -1363,6 +1440,10 @@ export type Database = {
       decrementar_inventario_color: {
         Args: { _cantidad?: number; _color: string; _modelo: string }
         Returns: undefined
+      }
+      desconfigurar_unidad: {
+        Args: { _motivo: string; _motocarro_id: string }
+        Returns: Json
       }
       get_my_role: {
         Args: never

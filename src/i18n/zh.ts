@@ -177,6 +177,8 @@ export const zh: Translations = {
       misRemisiones: "我的提货单",
       unidadesAsignadas: "已分配单元",
       listasEntrega: "可交付",
+      porConfigurar: "待配置",
+      stockLibre: "可用库存",
     },
     tooltips: {
       totalPlan: "计划内三轮车总数",
@@ -185,11 +187,14 @@ export const zh: Translations = {
       pasadosFecha: "超过预计组装日期",
       entregadosCliente: "已交付给客户",
       armadosTotal: "已组装 / 总计",
+      chasisSinUnidad: "已收货但尚未配置为整车的车架",
+      stockLibre: "已组装或待出库且未分配提货单的整车",
     },
     capacidad: {
       title: "今日产能",
       armadosHoy: (n: number, cap: number) => `今日已组装 ${n} / ${cap} 辆`,
     },
+    avisoStockViejo: (n: number) => `${n} 辆整车库存超过60天`,
     atrasados: (n: number) => `延误三轮车 (${n})`,
     planVsReal: "计划 vs 实际（累计）",
     topVendedores: "销售排行",
