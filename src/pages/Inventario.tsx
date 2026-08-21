@@ -3,9 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike, Layers, Boxes } from "lucide-react";
+import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike, Layers, Boxes, TriangleAlert } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { lineaDe, LineaProducto, CatalogoModelos, displayFabrica, nombreComercial } from "@/lib/dazon";
+import {
+  lineaDe, LineaProducto, CatalogoModelos, displayFabrica, nombreComercial,
+  ESTATUS_CHASIS, ESTATUS_INCIDENCIA, EstatusIncidencia, chasisDetenido,
+} from "@/lib/dazon";
 
 type Chasis = {
   id: string;
@@ -55,6 +59,43 @@ type ColorInventario = {
   color: string;
   cantidad_disponible: number;
   umbral_alerta: number;
+  piezas_total?: number | null;
+  piezas_en_revision?: number | null;
+  piezas_garantia?: number | null;
+  piezas_no_util?: number | null;
+  unidades_configuradas?: number | null;
+  unidades_libres?: number | null;
+  unidades_comprometidas?: number | null;
+  unidades_entregadas?: number | null;
+};
+
+// Foto por modelo comercial y color: lo que hay, lo que está detenido, lo que
+// ya se debe. Es la vista v_stock_modelo_color, calculada de los datos reales.
+type StockColor = {
+  modelo_comercial: string;
+  color: string;
+  piezas_disponibles: number;
+  piezas_en_revision: number;
+  piezas_garantia: number;
+  piezas_no_util: number;
+  unidades_libres: number;
+  unidades_sin_serial: number;
+  unidades_detenidas: number;
+  unidades_comprometidas: number;
+  unidades_entregadas: number;
+  solicitadas: number;
+  asignadas: number;
+  demanda_pendiente: number;
+  holgura_con_serial: number;
+  holgura_con_piezas: number;
+};
+
+type IncidenciaChasis = {
+  chasis_id: string;
+  folio: string | null;
+  estatus: EstatusIncidencia;
+  parte_afectada: string | null;
+  retiene_chasis: boolean;
 };
 
 const LINEA_LABEL: Record<LineaProducto, string> = { motocarro: "Motocarro", mototaxi: "Mototaxi", otro: "Otro" };
@@ -94,6 +135,8 @@ export default function Inventario() {
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [partes, setPartes] = useState<Parte[]>([]);
   const [colores, setColores] = useState<ColorInventario[]>([]);
+  const [stock, setStock] = useState<StockColor[]>([]);
+  const [incidencias, setIncidencias] = useState<Map<string, IncidenciaChasis>>(new Map());
   const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [loading, setLoading] = useState(true);
   const [lineaFiltro, setLineaFiltro] = useState<"TODAS" | LineaProducto>("TODAS");
@@ -105,13 +148,17 @@ export default function Inventario() {
   const cargarInventario = async () => {
     setLoading(true);
     try {
-      const [chasisData, motoresData, unidadesData, partesData, coloresData, catalogoData] = await Promise.all([
+      const [chasisData, motoresData, unidadesData, partesData, coloresData, catalogoData, stockData, incData] = await Promise.all([
         supabase.from("inventario_chasis").select("*").order("fecha_importacion", { ascending: false }),
         supabase.from("inventario_motor").select("*").order("fecha_importacion", { ascending: false }),
         supabase.from("motocarros").select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado, estatus_entrega, fecha_real_armado, remision_id, contenedor_id").order("orden_armado"),
         supabase.from("inventario_partes").select("*").order("descripcion"),
         supabase.from("inventario_colores").select("*").order("modelo, color"),
         supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
+        supabase.from("v_stock_modelo_color").select("*"),
+        supabase.from("incidencias_chasis")
+          .select("chasis_id, folio, estatus, parte_afectada, retiene_chasis")
+          .order("reportado_at", { ascending: false }),
       ]);
 
       if (chasisData.error) throw chasisData.error;
@@ -127,7 +174,36 @@ export default function Inventario() {
       setMotores(motoresData.data || []);
       setUnidades((unidadesData.data as any) || []);
       setPartes(partesData.data || []);
-      setColores(coloresData.data || []);
+      setColores((coloresData.data as any) || []);
+      // Vistas/tablas nuevas (KIT-4): si la migración aún no se aplicó, el
+      // resto del inventario sigue funcionando.
+      if (stockData.error) console.warn("v_stock_modelo_color no disponible:", stockData.error.message);
+      if (incData.error) console.warn("incidencias_chasis no disponible:", incData.error.message);
+      setStock(((stockData.data as any) ?? []).map((r: any) => ({
+        modelo_comercial: r.modelo_comercial ?? "—",
+        color: r.color ?? "—",
+        piezas_disponibles: r.piezas_disponibles ?? 0,
+        piezas_en_revision: r.piezas_en_revision ?? 0,
+        piezas_garantia: r.piezas_garantia ?? 0,
+        piezas_no_util: r.piezas_no_util ?? 0,
+        unidades_libres: r.unidades_libres ?? 0,
+        unidades_sin_serial: r.unidades_sin_serial ?? 0,
+        unidades_detenidas: r.unidades_detenidas ?? 0,
+        unidades_comprometidas: r.unidades_comprometidas ?? 0,
+        unidades_entregadas: r.unidades_entregadas ?? 0,
+        solicitadas: r.solicitadas ?? 0,
+        asignadas: r.asignadas ?? 0,
+        demanda_pendiente: r.demanda_pendiente ?? 0,
+        holgura_con_serial: r.holgura_con_serial ?? 0,
+        holgura_con_piezas: r.holgura_con_piezas ?? 0,
+      })));
+      // Un chasis puede tener varias incidencias en su historia: se muestra la
+      // más reciente (la consulta viene ordenada desc).
+      const incMap = new Map<string, IncidenciaChasis>();
+      ((incData.data as any) ?? []).forEach((i: any) => {
+        if (!incMap.has(i.chasis_id)) incMap.set(i.chasis_id, i);
+      });
+      setIncidencias(incMap);
       setCatalogo(new Map((catalogoData.data ?? []).map((c: any) => [c.modelo, { linea: c.linea as LineaProducto, nombre_comercial: c.nombre_comercial }])));
     } catch (error) {
       console.error("Error loading inventory:", error);
@@ -167,10 +243,13 @@ export default function Inventario() {
   const armadas = useMemo(() => unidadesMotocarro.filter(u => u.estatus_armado === "ARMADO" || u.estatus_armado === "LISTO"), [unidadesMotocarro]);
   const stockLibre = useMemo(() => armadas.filter(u => !u.remision_id), [armadas]);
   const stockComprometido = useMemo(() => armadas.filter(u => u.remision_id && u.estatus_entrega !== "ENTREGADA"), [armadas]);
+  // Un chasis detenido por una incidencia (retenido, en garantía o no útil)
+  // sigue en inventario pero no cuenta como configurable.
   const chasisPorConfigurar = useMemo(
-    () => chasis.filter(c => !c.motocarro_id && lineaDe(c.modelo, catalogo) === "motocarro"),
+    () => chasis.filter(c => !c.motocarro_id && !chasisDetenido(c.estatus) && lineaDe(c.modelo, catalogo) === "motocarro"),
     [chasis, catalogo]
   );
+  const chasisDetenidos = useMemo(() => chasis.filter(c => chasisDetenido(c.estatus)), [chasis]);
 
   const hoy = new Date();
   const arrastre = useMemo(() => {
@@ -296,8 +375,13 @@ export default function Inventario() {
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">Inventario de Chasis</h3>
-              <div className="text-sm text-muted-foreground">
-                Total: {chasisFiltrado.length} piezas | Disponibles: {chasisFiltrado.filter(c => c.estatus === 'disponible').length}
+              <div className="text-sm text-muted-foreground flex items-center gap-3">
+                <span>Total: {chasisFiltrado.length} piezas | Disponibles: {chasisFiltrado.filter(c => c.estatus === 'disponible').length}</span>
+                {chasisDetenidos.length > 0 && (
+                  <Link to="/incidencias" className="inline-flex items-center gap-1 text-[#991B1B] font-medium hover:underline">
+                    <TriangleAlert className="h-4 w-4" /> {chasisDetenidos.length} detenidos por incidencia
+                  </Link>
+                )}
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
@@ -309,33 +393,45 @@ export default function Inventario() {
                     <TableHead>Línea</TableHead>
                     <TableHead>Color</TableHead>
                     <TableHead>Estatus</TableHead>
+                    <TableHead>Incidencia</TableHead>
                     <TableHead>Unidad</TableHead>
                     <TableHead>Contenedor ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {chasisFiltrado.map((c) => (
+                  {chasisFiltrado.map((c) => {
+                    const est = ESTATUS_CHASIS[c.estatus] ?? { label: c.estatus, cls: "bg-gray-100 text-gray-700" };
+                    const inc = incidencias.get(c.id);
+                    const incMeta = inc ? ESTATUS_INCIDENCIA[inc.estatus] : null;
+                    return (
                     <TableRow key={c.id}>
                       <TableCell className="font-mono">{c.numero_chasis}</TableCell>
                       <TableCell>{displayFabrica(c.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={c.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>{c.color}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          c.estatus === 'disponible' ? 'bg-green-100 text-green-700' :
-                          c.estatus === 'configurado' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {c.estatus}
-                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs ${est.cls}`}>{est.label}</span>
+                      </TableCell>
+                      <TableCell>
+                        {inc ? (
+                          <Link to="/incidencias" className="inline-flex flex-col gap-0.5 hover:underline" title={inc.parte_afectada ?? undefined}>
+                            <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${incMeta?.cls ?? ""}`}>
+                              {inc.folio} · {incMeta?.label ?? inc.estatus}
+                            </span>
+                            {inc.parte_afectada && <span className="text-[10px] text-muted-foreground">{inc.parte_afectada}</span>}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
                       </TableCell>
                       <TableCell>{getUnidadOrden(c.motocarro_id)}</TableCell>
                       <TableCell className="text-muted-foreground">{c.contenedor_id?.slice(0, 8)}...</TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                   {chasisFiltrado.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No hay chasis en inventario
                       </TableCell>
                     </TableRow>
@@ -448,21 +544,110 @@ export default function Inventario() {
         </TabsContent>
 
         <TabsContent value="colores" className="space-y-4 mt-4">
+          {/* Lo que ventas y dirección necesitan ver: por modelo comercial y
+              color, qué hay disponible, qué está comprometido y qué se debe. */}
           <Card className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg">Inventario de Colores</h3>
-              <div className="text-sm text-muted-foreground">
-                Alerta cuando disponible ≤ umbral
+            <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
+              <div>
+                <h3 className="font-semibold text-lg">Disponible y comprometido por color</h3>
+                <p className="text-sm text-muted-foreground">
+                  Se calcula de los chasis y las unidades reales — no de un contador. La demanda sale
+                  de las remisiones NUEVA y PARCIAL.
+                </p>
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-lg overflow-x-auto max-h-[60vh] overflow-y-auto">
+              <Table>
+                <TableHeader className="bg-slate-50 sticky top-0">
+                  <TableRow>
+                    <TableHead>Modelo (comercial)</TableHead>
+                    <TableHead>Color</TableHead>
+                    <TableHead className="text-right" title="Chasis sanos sin unidad">Piezas disponibles</TableHead>
+                    <TableHead className="text-right" title="Unidades con NS chasis y NS motor, sin remisión">Unidades libres</TableHead>
+                    <TableHead className="text-right" title="Unidades sin NS chasis / NS motor: no se pueden asignar">Sin NS</TableHead>
+                    <TableHead className="text-right" title="Con remisión, aún no entregadas">Comprometidas</TableHead>
+                    <TableHead className="text-right" title="Detenidas por incidencia: en revisión, garantía o no útiles">Detenidas</TableHead>
+                    <TableHead className="text-right" title="Unidades pendientes de asignar en remisiones activas">Demanda</TableHead>
+                    <TableHead className="text-right" title="Unidades libres menos demanda pendiente">Holgura</TableHead>
+                    <TableHead>Estatus</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stock.map((r, i) => {
+                    // Detenidas = piezas + unidades que una incidencia saca de
+                    // circulación (siguen en inventario, no se venden).
+                    const detenidas = r.piezas_en_revision + r.piezas_garantia + r.piezas_no_util + r.unidades_detenidas;
+                    const cubierta = r.demanda_pendiente === 0;
+                    const cubiertaConPiezas = !cubierta && r.holgura_con_piezas >= 0;
+                    return (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{r.modelo_comercial}</TableCell>
+                        <TableCell>{r.color}</TableCell>
+                        <TableCell className="text-right font-bold">{r.piezas_disponibles}</TableCell>
+                        <TableCell className="text-right font-bold text-[#065F46]">{r.unidades_libres}</TableCell>
+                        <TableCell className={`text-right ${r.unidades_sin_serial > 0 ? "text-[#92400E] font-semibold" : "text-muted-foreground"}`}>
+                          {r.unidades_sin_serial}
+                        </TableCell>
+                        <TableCell className="text-right text-[#5B21B6]">{r.unidades_comprometidas}</TableCell>
+                        <TableCell className={`text-right ${detenidas > 0 ? "text-[#991B1B] font-semibold" : "text-muted-foreground"}`}>
+                          {detenidas}
+                        </TableCell>
+                        <TableCell className="text-right font-bold">{r.demanda_pendiente}</TableCell>
+                        <TableCell className={`text-right font-bold ${r.holgura_con_serial < 0 ? "text-[#991B1B]" : "text-[#065F46]"}`}>
+                          {r.holgura_con_serial > 0 ? `+${r.holgura_con_serial}` : r.holgura_con_serial}
+                        </TableCell>
+                        <TableCell>
+                          {cubierta ? (
+                            <span className="px-2 py-1 rounded-full text-xs bg-green-50 text-green-700 inline-flex items-center gap-1">
+                              <CheckCircle2 className="h-4 w-4" /> Sin demanda
+                            </span>
+                          ) : r.holgura_con_serial >= 0 ? (
+                            <span className="px-2 py-1 rounded-full text-xs bg-green-50 text-green-700 inline-flex items-center gap-1">
+                              <CheckCircle2 className="h-4 w-4" /> Cubierta
+                            </span>
+                          ) : cubiertaConPiezas ? (
+                            <span className="px-2 py-1 rounded-full text-xs bg-amber-50 text-amber-700 inline-flex items-center gap-1">
+                              <Wrench className="h-4 w-4" /> Falta configurar
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-xs bg-red-50 text-red-600 inline-flex items-center gap-1">
+                              <AlertTriangle className="h-4 w-4" /> Faltan piezas
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {stock.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        Sin movimientos de color todavía
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+
+          {/* La misma información por código de fábrica, que es como llega la
+              mercancía y como la cuenta fábrica, con su umbral de alerta. */}
+          <Card className="p-4">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h3 className="font-semibold text-lg">Por código de fábrica</h3>
+              <div className="text-sm text-muted-foreground">Alerta cuando el disponible ≤ umbral</div>
+            </div>
+            <div className="border rounded-lg overflow-x-auto max-h-[50vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
                     <TableHead>Modelo</TableHead>
                     <TableHead>Color</TableHead>
-                    <TableHead className="text-right">Disponible</TableHead>
-                    <TableHead className="text-right">Umbral Alerta</TableHead>
+                    <TableHead className="text-right">Piezas totales</TableHead>
+                    <TableHead className="text-right">Disponibles</TableHead>
+                    <TableHead className="text-right">En unidades</TableHead>
+                    <TableHead className="text-right">Entregadas</TableHead>
+                    <TableHead className="text-right">Umbral</TableHead>
                     <TableHead>Estatus</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -473,7 +658,10 @@ export default function Inventario() {
                       <TableRow key={c.id}>
                         <TableCell>{displayFabrica(c.modelo, catalogo)}</TableCell>
                         <TableCell>{c.color}</TableCell>
+                        <TableCell className="text-right">{c.piezas_total ?? "—"}</TableCell>
                         <TableCell className="text-right font-bold">{c.cantidad_disponible}</TableCell>
+                        <TableCell className="text-right">{c.unidades_configuradas ?? "—"}</TableCell>
+                        <TableCell className="text-right">{c.unidades_entregadas ?? "—"}</TableCell>
                         <TableCell className="text-right">{c.umbral_alerta}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 ${status.color}`}>
@@ -486,7 +674,7 @@ export default function Inventario() {
                   })}
                   {colores.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No hay colores en inventario
                       </TableCell>
                     </TableRow>

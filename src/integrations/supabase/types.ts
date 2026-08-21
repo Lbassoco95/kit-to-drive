@@ -698,6 +698,140 @@ export type Database = {
           },
         ]
       }
+      incidencias_chasis: {
+        Row: {
+          chasis_id: string
+          color: string | null
+          created_at: string
+          descripcion: string
+          estatus: string
+          evidencia_url: string | null
+          folio: string | null
+          folio_garantia: string | null
+          id: string
+          modelo: string | null
+          motocarro_id: string | null
+          ns_chasis: string
+          parte_afectada: string | null
+          reportado_at: string
+          reportado_por: string | null
+          resolucion: string | null
+          resuelto_at: string | null
+          resuelto_por: string | null
+          retiene_chasis: boolean
+          revisado_at: string | null
+          revisado_por: string | null
+          severidad: string
+          tipo_falla: string
+          updated_at: string
+        }
+        Insert: {
+          chasis_id: string
+          color?: string | null
+          created_at?: string
+          descripcion: string
+          estatus?: string
+          evidencia_url?: string | null
+          folio?: string | null
+          folio_garantia?: string | null
+          id?: string
+          modelo?: string | null
+          motocarro_id?: string | null
+          ns_chasis: string
+          parte_afectada?: string | null
+          reportado_at?: string
+          reportado_por?: string | null
+          resolucion?: string | null
+          resuelto_at?: string | null
+          resuelto_por?: string | null
+          retiene_chasis?: boolean
+          revisado_at?: string | null
+          revisado_por?: string | null
+          severidad?: string
+          tipo_falla: string
+          updated_at?: string
+        }
+        Update: {
+          chasis_id?: string
+          color?: string | null
+          created_at?: string
+          descripcion?: string
+          estatus?: string
+          evidencia_url?: string | null
+          folio?: string | null
+          folio_garantia?: string | null
+          id?: string
+          modelo?: string | null
+          motocarro_id?: string | null
+          ns_chasis?: string
+          parte_afectada?: string | null
+          reportado_at?: string
+          reportado_por?: string | null
+          resolucion?: string | null
+          resuelto_at?: string | null
+          resuelto_por?: string | null
+          retiene_chasis?: boolean
+          revisado_at?: string | null
+          revisado_por?: string | null
+          severidad?: string
+          tipo_falla?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidencias_chasis_chasis_id_fkey"
+            columns: ["chasis_id"]
+            isOneToOne: false
+            referencedRelation: "inventario_chasis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidencias_chasis_motocarro_id_fkey"
+            columns: ["motocarro_id"]
+            isOneToOne: false
+            referencedRelation: "motocarros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incidencias_chasis_eventos: {
+        Row: {
+          actor: string | null
+          creado_at: string
+          estatus_anterior: string | null
+          estatus_nuevo: string
+          id: string
+          incidencia_id: string
+          nota: string | null
+        }
+        Insert: {
+          actor?: string | null
+          creado_at?: string
+          estatus_anterior?: string | null
+          estatus_nuevo: string
+          id?: string
+          incidencia_id: string
+          nota?: string | null
+        }
+        Update: {
+          actor?: string | null
+          creado_at?: string
+          estatus_anterior?: string | null
+          estatus_nuevo?: string
+          id?: string
+          incidencia_id?: string
+          nota?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidencias_chasis_eventos_incidencia_id_fkey"
+            columns: ["incidencia_id"]
+            isOneToOne: false
+            referencedRelation: "incidencias_chasis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventario_chasis: {
         Row: {
           color: string | null
@@ -771,7 +905,17 @@ export type Database = {
           color: string
           id: string
           modelo: string
+          nombre_comercial: string | null
+          piezas_en_revision: number | null
+          piezas_garantia: number | null
+          piezas_no_util: number | null
+          piezas_total: number | null
+          recalculado_at: string | null
           umbral_alerta: number | null
+          unidades_comprometidas: number | null
+          unidades_configuradas: number | null
+          unidades_entregadas: number | null
+          unidades_libres: number | null
           updated_at: string | null
         }
         Insert: {
@@ -779,7 +923,17 @@ export type Database = {
           color: string
           id?: string
           modelo: string
+          nombre_comercial?: string | null
+          piezas_en_revision?: number | null
+          piezas_garantia?: number | null
+          piezas_no_util?: number | null
+          piezas_total?: number | null
+          recalculado_at?: string | null
           umbral_alerta?: number | null
+          unidades_comprometidas?: number | null
+          unidades_configuradas?: number | null
+          unidades_entregadas?: number | null
+          unidades_libres?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -787,7 +941,17 @@ export type Database = {
           color?: string
           id?: string
           modelo?: string
+          nombre_comercial?: string | null
+          piezas_en_revision?: number | null
+          piezas_garantia?: number | null
+          piezas_no_util?: number | null
+          piezas_total?: number | null
+          recalculado_at?: string | null
           umbral_alerta?: number | null
+          unidades_comprometidas?: number | null
+          unidades_configuradas?: number | null
+          unidades_entregadas?: number | null
+          unidades_libres?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1303,6 +1467,27 @@ export type Database = {
       }
     }
     Views: {
+      v_stock_modelo_color: {
+        Row: {
+          asignadas: number | null
+          color: string | null
+          demanda_pendiente: number | null
+          holgura_con_piezas: number | null
+          holgura_con_serial: number | null
+          modelo_comercial: string | null
+          piezas_disponibles: number | null
+          piezas_en_revision: number | null
+          piezas_garantia: number | null
+          piezas_no_util: number | null
+          solicitadas: number | null
+          unidades_comprometidas: number | null
+          unidades_detenidas: number | null
+          unidades_entregadas: number | null
+          unidades_libres: number | null
+          unidades_sin_serial: number | null
+        }
+        Relationships: []
+      }
       v_reporte_pagos: {
         Row: {
           aprobado_por: string | null
@@ -1428,6 +1613,14 @@ export type Database = {
         }
         Returns: number
       }
+      asignar_remision_items: {
+        Args: { _remision_id: string }
+        Returns: Json
+      }
+      chasis_bloqueado: {
+        Args: { _chasis_id: string }
+        Returns: boolean
+      }
       cambiar_orden_armado: {
         Args: { _motivo?: string; _motocarro_id: string; _orden_nuevo: number }
         Returns: Json
@@ -1475,6 +1668,39 @@ export type Database = {
       incrementar_inventario_color: {
         Args: { _cantidad?: number; _color: string; _modelo: string }
         Returns: undefined
+      }
+      reabrir_incidencia_chasis: {
+        Args: { _incidencia_id: string; _motivo: string }
+        Returns: Json
+      }
+      recalcular_inventario_colores: {
+        Args: never
+        Returns: Json
+      }
+      reportar_incidencia_chasis: {
+        Args: {
+          _chasis_id: string
+          _descripcion: string
+          _evidencia_url?: string
+          _parte_afectada?: string
+          _retiene?: boolean
+          _severidad?: string
+          _tipo_falla: string
+        }
+        Returns: Json
+      }
+      resolver_incidencia_chasis: {
+        Args: {
+          _folio_garantia?: string
+          _incidencia_id: string
+          _resolucion: string
+          _resultado: string
+        }
+        Returns: Json
+      }
+      revisar_incidencia_chasis: {
+        Args: { _incidencia_id: string; _nota?: string; _retiene?: boolean }
+        Returns: Json
       }
       parear_unidades_contenedor: {
         Args: { _contenedor_id: string }

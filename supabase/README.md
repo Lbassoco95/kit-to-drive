@@ -39,6 +39,40 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
   fábrica), `cambiar_orden_armado` con bitácora (`bitacora_orden_armado`)
   y `asignar_chasis_remision` corregida para cruzar por nombre comercial +
   color en vez de código de fábrica.
+- `supabase/migrations/20260823000001_incidencias_chasis_colores_cierre.sql` —
+  KIT-4, tres cosas que no cerraban el ciclo:
+  1. **Colores registrados, no contados.** `inventario_colores` dejó de ser un
+     contador que se incrementaba en la importación y se decrementaba a mano:
+     ahora se recalcula de los datos reales (`recalcular_inventario_colores()`,
+     disparada por triggers en `inventario_chasis` y `motocarros`) y lleva
+     columnas nuevas (piezas detenidas, unidades configuradas / libres /
+     comprometidas / entregadas). `incrementar_inventario_color` y
+     `decrementar_inventario_color` quedan como envoltura del recálculo.
+     La vista `v_stock_modelo_color` da la foto por **nombre comercial +
+     color**: piezas disponibles, unidades libres (con serial), detenidas,
+     comprometidas, demanda pendiente de remisiones NUEVA/PARCIAL y holgura.
+  2. **El proceso no cierra sin serial.** El trigger
+     `exigir_serial_para_cerrar` en `motocarros` impide pasar a ARMADO/LISTO,
+     marcar ENTREGADA o asignar a una remisión sin NS chasis **y** NS motor.
+     Se valida en la transición, así que las unidades legadas que ya están
+     ARMADO sin serial siguen editables para poder capturárselo.
+     `asignar_remision_items(_remision_id)` reemplaza el criterio viejo de
+     asignación: cruza **línea por línea de `remision_items`** (modelo
+     comercial + color), exige serial, salta chasis detenidos y devuelve el
+     detalle del faltante. `reintentar_asignar_remision` y
+     `asignar_chasis_remision` delegan / aplican los mismos filtros, y el
+     trigger de alta de remisión ya no amarra unidades a ciegas cuando la
+     remisión todavía no tiene modelo/color.
+  3. **Incidencias de chasis.** `incidencias_chasis` +
+     `incidencias_chasis_eventos` con folio `INC-####`: se levanta el reporte
+     (`reportar_incidencia_chasis`), el chasis **no** se deshabilita salvo que
+     se pida retenerlo, pasa a revisión (`revisar_incidencia_chasis`) y se
+     cierra (`resolver_incidencia_chasis`) como *adaptación* (vuelve a servir,
+     con el registro pegado a la pieza y a la unidad), *garantía* (identificado
+     y fuera del disponible, con folio) o *no útil* (deja de contar, **nunca se
+     elimina**). `reabrir_incidencia_chasis` permite que un chasis no útil al
+     que después le dan garantía —o que sí se pudo adaptar— vuelva a revisión
+     sin perder su historia.
 
 ## Verificación manual recomendada
 
@@ -69,4 +103,40 @@ SELECT count(*) FROM motocarros m JOIN modelos_producto mp
 SELECT m.id, m.modelo, mp.nombre_comercial, m.color
   FROM motocarros m LEFT JOIN modelos_producto mp ON mp.modelo = m.modelo
  WHERE m.remision_id IS NULL AND upper(coalesce(mp.nombre_comercial, m.modelo)) = '300CC 2026' AND m.color = 'BLANCO';
+```
+
+Después de aplicar KIT-4:
+
+```sql
+-- 1. Colores: el conteo tiene que cuadrar con los datos reales.
+SELECT public.recalcular_inventario_colores();
+SELECT modelo, color, cantidad_disponible, piezas_en_revision, piezas_garantia,
+       piezas_no_util, unidades_configuradas, unidades_libres, unidades_comprometidas
+  FROM inventario_colores ORDER BY modelo, color;
+
+-- Debe dar 0 filas: el disponible por color siempre es el conteo de chasis sanos.
+SELECT ic.modelo, ic.color, ic.cantidad_disponible, c.reales
+  FROM inventario_colores ic
+  JOIN (SELECT modelo, upper(color) AS color, count(*) AS reales
+          FROM inventario_chasis
+         WHERE motocarro_id IS NULL AND estatus = 'disponible'
+         GROUP BY 1,2) c ON c.modelo = ic.modelo AND c.color = ic.color
+ WHERE ic.cantidad_disponible <> c.reales;
+
+-- 2. La foto por color que ve dirección (disponible vs. comprometido vs. demanda).
+SELECT * FROM v_stock_modelo_color ORDER BY modelo_comercial, color;
+
+-- 3. Cierre de proceso: no debe existir una unidad cerrada sin los dos seriales.
+SELECT orden_armado, estatus_armado, estatus_entrega, ns_chasis, ns_motor
+  FROM motocarros
+ WHERE (estatus_armado IN ('ARMADO','LISTO') OR estatus_entrega = 'ENTREGADA'
+        OR remision_id IS NOT NULL)
+   AND (ns_chasis IS NULL OR ns_motor IS NULL);
+-- (Las filas que salgan aquí son de antes de KIT-4: el trigger sólo valida
+--  la transición. Captúrales el serial desde Producción → Editar.)
+
+-- 4. Incidencias abiertas y chasis detenidos.
+SELECT folio, ns_chasis, parte_afectada, estatus, retiene_chasis, folio_garantia
+  FROM incidencias_chasis ORDER BY reportado_at DESC;
+SELECT estatus, count(*) FROM inventario_chasis GROUP BY estatus ORDER BY 1;
 ```

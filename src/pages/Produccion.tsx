@@ -3,9 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor, lineaDe, displayFabrica, CatalogoModelos } from "@/lib/dazon";
+import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor, lineaDe, displayFabrica, CatalogoModelos, normSerial, NS_REGEX, serialesCompletos, ESTATUS_INCIDENCIA, EstatusIncidencia } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
-import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X, Package, Unlock, History, ArrowUpDown } from "lucide-react";
+import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X, Package, Unlock, History, ArrowUpDown, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
@@ -170,6 +170,7 @@ export default function Produccion() {
   const [historial, setHistorial] = useState<Map<string, number>>(new Map());
   const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [verHistorial, setVerHistorial] = useState<{ id: string; orden: number; items: any[] } | null>(null);
+  const [incidencias, setIncidencias] = useState<Map<string, any[]>>(new Map());
 
   const load = async () => {
     // ── -1. Catálogo de líneas de producto — sólo línea "motocarro" entra aquí ─
@@ -214,6 +215,23 @@ export default function Produccion() {
       (hist ?? []).forEach((h: any) => histMap.set(h.motocarro_id, (histMap.get(h.motocarro_id) ?? 0) + 1));
       setHistorial(histMap);
     }
+
+    // ── 1c. Incidencias del chasis pegadas a la unidad ───────────────────────
+    // Una unidad puede venir de un chasis que llegó mal y se adaptó: eso viaja
+    // con ella para siempre (garantías, reclamos, seguimiento).
+    try {
+      const { data: incs } = await supabase
+        .from("incidencias_chasis")
+        .select("motocarro_id, folio, estatus, parte_afectada, retiene_chasis, ns_chasis")
+        .not("motocarro_id", "is", null);
+      const incMap = new Map<string, any[]>();
+      (incs ?? []).forEach((i: any) => {
+        const arr = incMap.get(i.motocarro_id) ?? [];
+        arr.push(i);
+        incMap.set(i.motocarro_id, arr);
+      });
+      setIncidencias(incMap);
+    } catch (_) {}
 
     if (!baseFiltrado.length) return;
 
@@ -315,6 +333,17 @@ export default function Produccion() {
     if (!confirm) return;
     const { moto, action } = confirm;
     const today = new Date().toISOString().slice(0,10);
+
+    // El proceso no cierra sin los dos seriales — mismo criterio que la base.
+    if (["ARMADO","LISTO","ENTREGADA"].includes(action) && !serialesCompletos(moto)) {
+      const faltan = [!moto.ns_chasis && "NS chasis", !moto.ns_motor && "NS motor"].filter(Boolean).join(" y ");
+      toast.error(`Falta capturar ${faltan} de la unidad #${moto.orden_armado} antes de cerrar el proceso`);
+      setConfirm(null);
+      setEditing(moto);
+      setEditForm({ ns_chasis: moto.ns_chasis || "", ns_motor: moto.ns_motor || "", chasis_asignado: moto.chasis_asignado || "", observaciones_paro: moto.observaciones_paro || "", fecha_estimada_armado: moto.fecha_estimada_armado || "", orden_armado: moto.orden_armado });
+      return;
+    }
+
     if (action === "EN_PROCESO") await updateMoto(moto.id, { estatus_armado: "EN_PROCESO" });
     else if (action === "ARMADO") await updateMoto(moto.id, { estatus_armado: "ARMADO", fecha_real_armado: today });
     else if (action === "LISTO") await updateMoto(moto.id, { estatus_armado: "LISTO" });
@@ -450,6 +479,7 @@ export default function Produccion() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
             catalogo={catalogo}
+            incidencias={incidencias.get(r.id) ?? []}
             historialCount={historial.get(r.id) ?? 0}
             onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "", orden_armado: r.orden_armado }); }}
             onAction={(action) => setConfirm({ moto: r, action })}
@@ -499,8 +529,20 @@ export default function Produccion() {
         <DialogContent>
           <DialogHeader><DialogTitle>{t.produccion.editarTitulo(editing?.orden_armado)}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>{t.produccion.nsChasis}</Label><Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: e.target.value })} /></div>
-            <div><Label>{t.produccion.nsMot}</Label><Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: e.target.value })} /></div>
+            <div>
+              <Label>{t.produccion.nsChasis}</Label>
+              <Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: normSerial(e.target.value) })} placeholder="Sin espacios — ej. LDZ4B2P1XRA000123" />
+            </div>
+            <div>
+              <Label>{t.produccion.nsMot}</Label>
+              <Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: normSerial(e.target.value) })} placeholder="Sin espacios — ej. DZ164FMLT2M00654" />
+            </div>
+            {(!editForm.ns_chasis || !editForm.ns_motor) && (
+              <div className="rounded-md p-2.5 text-sm bg-[#FEF3C7] text-[#92400E] flex items-start gap-2">
+                <TriangleAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                Sin los dos seriales la unidad no puede marcarse armada, entregarse ni asignarse a una remisión.
+              </div>
+            )}
             <div><Label>{t.produccion.chasisAsignado}</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
             <div><Label>{t.produccion.fechaEstimadaArmado}</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
             <div><Label>{t.produccion.observaciones}</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
@@ -524,6 +566,10 @@ export default function Produccion() {
             <Button onClick={async () => {
               const patch = { ...editForm };
               delete patch.orden_armado;
+              for (const [campo, etiqueta] of [["ns_chasis", t.produccion.nsChasis], ["ns_motor", t.produccion.nsMot]] as const) {
+                const v = (patch as any)[campo];
+                if (v && !NS_REGEX.test(v)) { toast.error(`${etiqueta} inválido: usa 4 a 30 caracteres (letras, números o guion)`); return; }
+              }
               Object.keys(patch).forEach(k => { if (patch[k] === "") patch[k] = null; });
               await updateMoto(editing.id, patch);
               setEditing(null);
@@ -612,10 +658,15 @@ export default function Produccion() {
   );
 }
 
-function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, t }: any) {
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, incidencias = [], t }: any) {
   const desv = diasDesvio(r);
   const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
   const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
+
+  // El proceso no cierra sin los dos seriales: la tarjeta lo dice y bloquea
+  // los botones que cerrarían etapa.
+  const conSerial = serialesCompletos(r);
+  const faltaSerial = [!r.ns_chasis && "NS chasis", !r.ns_motor && "NS motor"].filter(Boolean).join(" y ");
 
   const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
   const colorBg   = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";
@@ -718,6 +769,43 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         <div className="text-xs text-muted-foreground">
           {t.produccion.estimadaArmado} <strong className="text-foreground">{fmtDate(r.fecha_estimada_armado)}</strong>
         </div>
+
+        {/* Seriales: sin ellos no cierra proceso */}
+        <div className={`rounded-md px-2.5 py-2 text-xs ${conSerial ? "bg-slate-50 text-slate-600" : "bg-[#FEF3C7] text-[#92400E]"}`}>
+          {conSerial ? (
+            <div className="space-y-0.5 font-mono">
+              <div>Chasis: <strong>{r.ns_chasis}</strong></div>
+              <div>Motor: <strong>{r.ns_motor}</strong></div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2">
+              <TriangleAlert className="h-4 w-4 shrink-0 mt-0.5" />
+              <span className="flex-1">
+                Falta registrar <strong>{faltaSerial}</strong> — sin eso no se puede marcar armada,
+                entregar ni asignar a una remisión.
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Incidencias del chasis que viajan con la unidad */}
+        {(incidencias as any[]).length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {(incidencias as any[]).map((i: any, idx: number) => {
+              const meta = ESTATUS_INCIDENCIA[i.estatus as EstatusIncidencia];
+              return (
+                <span
+                  key={idx}
+                  title={`${i.parte_afectada ?? "Incidencia de chasis"} — ${meta?.ayuda ?? ""}`}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${meta?.cls ?? "bg-slate-100 text-slate-600 border-slate-200"}`}
+                >
+                  <TriangleAlert size={9} /> {i.folio} · {meta?.label ?? i.estatus}
+                  {i.parte_afectada ? ` · ${i.parte_afectada}` : ""}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="border-t p-3 flex gap-2 items-stretch flex-wrap">
@@ -727,17 +815,23 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
           </Button>
         )}
         {canEditFabrica && r._eff === "EN_PROCESO" && (
-          <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base min-w-[120px]">
-            <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarArmado}
-          </Button>
+          conSerial ? (
+            <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base min-w-[120px]">
+              <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarArmado}
+            </Button>
+          ) : (
+            <Button onClick={onEdit} className="flex-1 h-12 bg-[#D97706] hover:bg-[#b45309] text-base min-w-[120px]">
+              <Pencil className="h-5 w-5 mr-2" /> Capturar {faltaSerial}
+            </Button>
+          )
         )}
         {canEditFabrica && r._eff === "ARMADO" && (
-          <Button onClick={() => onAction("LISTO")} className="flex-1 h-12 bg-[#065F46] hover:bg-[#054c38] text-base">
+          <Button onClick={() => onAction("LISTO")} disabled={!conSerial} className="flex-1 h-12 bg-[#065F46] hover:bg-[#054c38] text-base">
             <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarListo}
           </Button>
         )}
         {canEditEntrega && r._eff === "LISTO" && r.estatus_entrega !== "ENTREGADA" && (
-          <Button onClick={() => onAction("ENTREGADA")} className="flex-1 h-12 bg-[#5B21B6] hover:bg-[#4c1d95] text-base">
+          <Button onClick={() => onAction("ENTREGADA")} disabled={!conSerial} className="flex-1 h-12 bg-[#5B21B6] hover:bg-[#4c1d95] text-base">
             <TruckIcon className="h-5 w-5 mr-2" /> {t.produccion.marcarEntregado}
           </Button>
         )}
