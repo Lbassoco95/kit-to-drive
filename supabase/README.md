@@ -30,9 +30,12 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
   unidad se configura a mano (ver siguiente script).
 - `supabase/migrations/20260822000001_configuracion_manual_unidades.sql` —
   KIT-3: catálogo `modelos_producto` (línea motocarro/mototaxi/otro),
-  normalización de colores ya cargados en inglés, `configurar_unidad` /
-  `desconfigurar_unidad` (chasis + motor a mano, por fábrica) y
-  `cambiar_orden_armado` con bitácora (`bitacora_orden_armado`).
+  normalización de datos ya cargados (colores en inglés, seriales de motor
+  con espacios) y de la propia importación (`importar_vins_inventario` /
+  `importar_motores_inventario` ahora sanean el serial con la misma regla
+  que la captura manual), `configurar_unidad` / `desconfigurar_unidad`
+  (chasis + motor a mano, por fábrica) y `cambiar_orden_armado` con
+  bitácora (`bitacora_orden_armado`).
 
 ## Verificación manual recomendada
 
@@ -52,6 +55,8 @@ Después de aplicar KIT-3:
 SELECT modelo, linea FROM modelos_producto ORDER BY linea, modelo;
 SELECT DISTINCT color FROM inventario_chasis;             -- no debe quedar WHITE/BLUE/ORANGE
 SELECT DISTINCT color FROM inventario_colores;
+SELECT count(*) FROM inventario_motor
+  WHERE numero_motor <> regexp_replace(upper(numero_motor),'[^A-Z0-9-]','','g');  -- debe ser 0
 SELECT count(*) FROM inventario_chasis WHERE motocarro_id IS NULL;   -- "por configurar"
 SELECT count(*) FROM motocarros m JOIN modelos_producto mp
   ON mp.modelo = m.modelo AND mp.linea = 'motocarro';                -- "programadas"

@@ -74,6 +74,15 @@ export function normColor(c?: string | null): string {
   return c.toString().toUpperCase();
 }
 
+// Sanea un número de serie (chasis o motor) al mismo criterio que valida la
+// captura manual (NS_REGEX = ^[A-Z0-9-]{4,30}$): mayúsculas, sin espacios ni
+// otros caracteres. Un serial con espacio ("DZ164FML T2M00654") no se puede
+// ni teclear ni buscar, así que tiene que entrar limpio desde la importación.
+export function normSerial(s?: string | null): string {
+  if (!s) return "";
+  return s.toString().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+}
+
 // Línea de producto de un modelo, a partir del catálogo `modelos_producto`.
 // Un modelo que no está en el catálogo se trata como "otro" — nunca se asume
 // "motocarro" por default para no meter una línea desconocida al armado.

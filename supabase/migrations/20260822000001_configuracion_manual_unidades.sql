@@ -43,7 +43,7 @@ CREATE POLICY "admin escribe modelos_producto" ON public.modelos_producto
 
 -- Modelos del embarque 260316DZ. El DZ-K1 es un mototaxi: no entra al flujo
 -- de armado de motocarros, pero sí se puede configurar como unidad y
--- remisionar/entregar (ver BLOQUE 3 y la app).
+-- remisionar/entregar (ver BLOQUE 4 y la app).
 INSERT INTO public.modelos_producto (modelo, linea, descripcion) VALUES
   ('DZ200Q1','motocarro','Motocarro 200cc'),
   ('DZ300Q7','motocarro','Motocarro 300cc'),
@@ -60,47 +60,170 @@ ON CONFLICT (modelo) DO NOTHING;
 
 
 -- ============================================================================
--- BLOQUE 2 · Normalizar colores ya cargados en inglés
+-- BLOQUE 2 · Normalizar datos ya cargados del embarque 260316DZ
 -- ============================================================================
+-- [ESTADO VERIFICADO — 2026-08-22, dmhzhyeivvuliumcgsmm]
+--   chasis: 125 · motores: 125 · motocarros: 2 (legacy, sin tocar)
+--   motores con espacio en el serial: 125 (100%)
+--   chasis por modelo/color: DZ200Q1 31 AZUL + 31 BLANCO,
+--     DZ300Q7 31 AZUL + 31 BLANCO, DZ-K1 1 ORANGE
+-- No se corre el script de carga (KitDrive-Carga-Embarque-260316DZ.sql):
+-- duplicaría los motores por la diferencia de espacios en el serial.
 
+-- 2.1 · Colores en inglés que llegaron directo por SQL (sin pasar por
+-- normColor/RecibirContenedor).
 UPDATE public.inventario_chasis SET color = 'BLANCO'  WHERE upper(color) IN ('WHITE','BLANC');
 UPDATE public.inventario_chasis SET color = 'AZUL'    WHERE upper(color) = 'BLUE';
 UPDATE public.inventario_chasis SET color = 'NARANJA' WHERE upper(color) = 'ORANGE';
 
--- inventario_colores queda con el contador viejo en inglés y el nuevo en
--- español duplicados (p.ej. AZUL y BLUE del mismo modelo). Se fusionan.
+-- 2.2 · Seriales de motor con espacios ("DZ164FML T2M00654"). La captura
+-- manual valida con ^[A-Z0-9-]{4,30}$ y un serial con espacio no se puede
+-- ni teclear ni buscar. Esto corre ANTES de que fábrica configure unidades:
+-- si un motor ya quedó ligado a un motocarro (motocarro_id NOT NULL),
+-- cambiarle el serial aquí lo desincroniza de motocarros.ns_motor, así que
+-- esos se dejan intactos y sólo se avisa.
 DO $$
-DECLARE _r record;
+DECLARE _afectados int;
 BEGIN
-  FOR _r IN
-    SELECT modelo, upper_color, array_agg(id) AS ids, sum(cantidad_disponible) AS total
-    FROM (
-      SELECT id, modelo, cantidad_disponible,
-             CASE upper(color)
-               WHEN 'WHITE' THEN 'BLANCO' WHEN 'BLANC' THEN 'BLANCO'
-               WHEN 'BLUE'  THEN 'AZUL'
-               WHEN 'ORANGE' THEN 'NARANJA'
-               ELSE upper(color)
-             END AS upper_color
-      FROM public.inventario_colores
-    ) x
-    GROUP BY modelo, upper_color
-    HAVING count(*) > 1
-  LOOP
-    UPDATE public.inventario_colores
-       SET color = _r.upper_color, cantidad_disponible = _r.total, updated_at = now()
-     WHERE id = _r.ids[1];
-    DELETE FROM public.inventario_colores WHERE id = ANY(_r.ids[2:]);
-  END LOOP;
+  UPDATE public.inventario_motor
+     SET numero_motor = regexp_replace(upper(numero_motor), '[^A-Z0-9-]', '', 'g')
+   WHERE motocarro_id IS NULL
+     AND numero_motor <> regexp_replace(upper(numero_motor), '[^A-Z0-9-]', '', 'g');
+  GET DIAGNOSTICS _afectados = ROW_COUNT;
+  RAISE NOTICE 'Seriales de motor normalizados: %', _afectados;
+
+  IF EXISTS (
+    SELECT 1 FROM public.inventario_motor
+     WHERE motocarro_id IS NOT NULL
+       AND numero_motor <> regexp_replace(upper(numero_motor), '[^A-Z0-9-]', '', 'g')
+  ) THEN
+    RAISE WARNING 'Hay motores YA CONFIGURADOS en una unidad con el serial sin normalizar. No se tocaron para no desincronizar motocarros.ns_motor — revísalos a mano.';
+  END IF;
 END $$;
 
-UPDATE public.inventario_colores SET color = 'BLANCO'  WHERE upper(color) IN ('WHITE','BLANC');
-UPDATE public.inventario_colores SET color = 'AZUL'    WHERE upper(color) = 'BLUE';
-UPDATE public.inventario_colores SET color = 'NARANJA' WHERE upper(color) = 'ORANGE';
+-- 2.3 · inventario_colores se reconstruye desde cero: más simple y confiable
+-- que fusionar filas duplicadas (inglés vs español) una por una.
+DELETE FROM public.inventario_colores;
+INSERT INTO public.inventario_colores (modelo, color, cantidad_disponible, umbral_alerta, updated_at)
+SELECT modelo, color, count(*), 3, now()
+  FROM public.inventario_chasis
+ WHERE motocarro_id IS NULL
+ GROUP BY modelo, color;
+
+-- 2.4 · Recontar lo que de verdad tiene ligado cada contenedor.
+UPDATE public.contenedores c SET
+  total_chasis  = (SELECT count(*) FROM public.inventario_chasis ic WHERE ic.contenedor_id = c.id),
+  total_motores = (SELECT count(*) FROM public.inventario_motor  im WHERE im.contenedor_id = c.id);
 
 
 -- ============================================================================
--- BLOQUE 3 · Configurar unidad (chasis + motor, a mano, por fábrica)
+-- BLOQUE 3 · Sanear seriales en la importación (no sólo en la limpieza)
+-- ============================================================================
+-- El BLOQUE 2 limpia lo que ya está cargado, pero el problema real está en
+-- la importación: si un serial entra con espacios (como los del packing
+-- list de motores), se queda así para siempre. Se redefinen las RPC de
+-- importación para que el serial entre ya saneado — mismo criterio que
+-- NS_REGEX en la captura manual del frontend (^[A-Z0-9-]{4,30}$).
+
+CREATE OR REPLACE FUNCTION public.importar_vins_inventario(
+  _contenedor_id uuid, _folio_contenedor text, _modelo text, _vins jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE
+  _v jsonb; _num text; _col text; _mod text; _es_nuevo boolean; _new_id uuid;
+  _insertados int := 0; _actualizados int := 0; _invalidos int := 0;
+  _ids uuid[] := ARRAY[]::uuid[];
+BEGIN
+  IF NOT (has_role(auth.uid(),'admin'::app_role) OR has_role(auth.uid(),'fabrica'::app_role)) THEN
+    RAISE EXCEPTION 'Solo admin/fábrica puede importar VINs';
+  END IF;
+  IF _contenedor_id IS NULL THEN RAISE EXCEPTION 'ID de contenedor requerido'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM contenedores WHERE id = _contenedor_id) THEN
+    RAISE EXCEPTION 'Contenedor no encontrado';
+  END IF;
+
+  IF _folio_contenedor IS NOT NULL AND length(trim(_folio_contenedor)) > 0 THEN
+    UPDATE contenedores SET folio_contenedor = trim(_folio_contenedor) WHERE id = _contenedor_id;
+  END IF;
+
+  FOR _v IN SELECT * FROM jsonb_array_elements(_vins) LOOP
+    _num := regexp_replace(
+              upper(NULLIF(trim(COALESCE(_v->>'numero_chasis', _v->>'frame_number')),'')),
+              '[^A-Z0-9-]', '', 'g');
+    _col := upper(COALESCE(NULLIF(trim(_v->>'color'),''), 'SIN COLOR'));
+    _mod := COALESCE(NULLIF(trim(COALESCE(_v->>'modelo', _v->>'model_no')),''), _modelo, '200cc 2025');
+
+    IF _num IS NULL OR length(_num) < 4 THEN
+      _invalidos := _invalidos + 1;
+      CONTINUE;
+    END IF;
+
+    INSERT INTO inventario_chasis (numero_chasis, contenedor_id, modelo, color, estatus)
+    VALUES (_num, _contenedor_id, _mod, _col, 'disponible')
+    ON CONFLICT (numero_chasis) DO UPDATE
+      SET contenedor_id = _contenedor_id, modelo = _mod, color = _col
+    RETURNING id, (xmax = 0) INTO _new_id, _es_nuevo;
+
+    _ids := array_append(_ids, _new_id);
+
+    IF _es_nuevo THEN
+      _insertados := _insertados + 1;
+      PERFORM public.incrementar_inventario_color(_mod, _col, 1);
+    ELSE
+      _actualizados := _actualizados + 1;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true, 'contenedor_id', _contenedor_id,
+    'insertados', _insertados, 'actualizados', _actualizados,
+    'invalidos', _invalidos, 'chasis_ids', _ids);
+END; $$;
+
+GRANT EXECUTE ON FUNCTION public.importar_vins_inventario(uuid, text, text, jsonb) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.importar_motores_inventario(
+  _contenedor_id uuid, _modelo text, _motores jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE
+  _m jsonb; _num text; _mod text; _es_nuevo boolean;
+  _insertados int := 0; _actualizados int := 0; _invalidos int := 0;
+BEGIN
+  IF NOT (has_role(auth.uid(),'admin'::app_role) OR has_role(auth.uid(),'fabrica'::app_role)) THEN
+    RAISE EXCEPTION 'Solo admin/fábrica puede importar motores';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM contenedores WHERE id = _contenedor_id) THEN
+    RAISE EXCEPTION 'Contenedor no encontrado';
+  END IF;
+
+  FOR _m IN SELECT * FROM jsonb_array_elements(_motores) LOOP
+    _num := regexp_replace(
+              upper(NULLIF(trim(COALESCE(_m->>'numero_motor', _m->>'engine_number')),'')),
+              '[^A-Z0-9-]', '', 'g');
+    _mod := COALESCE(NULLIF(trim(COALESCE(_m->>'modelo', _m->>'model_no')),''), _modelo, '200cc 2025');
+
+    IF _num IS NULL OR length(_num) < 4 THEN
+      _invalidos := _invalidos + 1;
+      CONTINUE;
+    END IF;
+
+    INSERT INTO inventario_motor (numero_motor, contenedor_id, modelo, estatus)
+    VALUES (_num, _contenedor_id, _mod, 'disponible')
+    ON CONFLICT (numero_motor) DO UPDATE
+      SET contenedor_id = _contenedor_id, modelo = _mod
+    RETURNING (xmax = 0) INTO _es_nuevo;
+
+    IF _es_nuevo THEN _insertados := _insertados + 1;
+    ELSE _actualizados := _actualizados + 1; END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('ok', true, 'insertados', _insertados,
+    'actualizados', _actualizados, 'invalidos', _invalidos);
+END; $$;
+
+GRANT EXECUTE ON FUNCTION public.importar_motores_inventario(uuid, text, jsonb) TO authenticated;
+
+
+-- ============================================================================
+-- BLOQUE 4 · Configurar unidad (chasis + motor, a mano, por fábrica)
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.configurar_unidad(
@@ -155,7 +278,7 @@ GRANT EXECUTE ON FUNCTION public.configurar_unidad(uuid, uuid, integer) TO authe
 
 
 -- ============================================================================
--- BLOQUE 4 · Desconfigurar unidad (corregir un error de captura)
+-- BLOQUE 5 · Desconfigurar unidad (corregir un error de captura)
 -- ============================================================================
 
 -- [VERIFICADO EN INFORMATION_SCHEMA — 2026-08-20] bitacora_eliminaciones NO
@@ -201,7 +324,7 @@ GRANT EXECUTE ON FUNCTION public.desconfigurar_unidad(uuid, text) TO authenticat
 
 
 -- ============================================================================
--- BLOQUE 5 · Reordenar el armado, con el cambio registrado
+-- BLOQUE 6 · Reordenar el armado, con el cambio registrado
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.bitacora_orden_armado (
