@@ -7,11 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Inbox, RefreshCw, FileDown, Package, Settings2 } from "lucide-react";
-import { fmtDate } from "@/lib/dazon";
+import { fmtDate, COLORES } from "@/lib/dazon";
 import { toast } from "sonner";
 
 const MODELOS = ["200cc 2026", "300cc 2026"];
-const COLORES = ["BLANCO", "AZUL", "ROJO", "NEGRO", "GRIS", "VERDE", "AMARILLO"];
 
 const tipoIcon: Record<string, string> = {
   motocarro: "🏍️", cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",

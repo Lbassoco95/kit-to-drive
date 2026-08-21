@@ -177,6 +177,8 @@ export const es = {
       misRemisiones: "Mis remisiones",
       unidadesAsignadas: "Unidades asignadas",
       listasEntrega: "Listas para entrega",
+      porConfigurar: "Por configurar",
+      stockLibre: "Stock libre",
     },
     tooltips: {
       totalPlan: "Unidades programadas en el embarque",
@@ -185,11 +187,14 @@ export const es = {
       pasadosFecha: "Unidades pasadas de fecha estimada",
       entregadosCliente: "Unidades entregadas a cliente",
       armadosTotal: "Unidades armadas / total programado",
+      chasisSinUnidad: "Chasis recibidos sin unidad configurada",
+      stockLibre: "Unidades armadas o listas sin remisión",
     },
     capacidad: {
       title: "Capacidad de hoy",
       armadosHoy: (n: number, cap: number) => `${n} de ${cap} motocarros armados hoy`,
     },
+    avisoStockViejo: (n: number) => `${n} unidad(es) con más de 60 días en stock`,
     atrasados: (n: number) => `Motocarros atrasados (${n})`,
     planVsReal: "Plan vs Real (acumulado)",
     topVendedores: "Top vendedores",

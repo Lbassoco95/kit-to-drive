@@ -48,13 +48,30 @@ export const ESTATUS_REMISION_COLOR: Record<string, string> = {
 export const fmtDate = (d?: string | null) =>
   d ? new Date(d + (d.length === 10 ? "T12:00:00" : "")).toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
 
-// Normalize color variants → BLANCO | AZUL
-export function normColor(c?: string | null): "BLANCO" | "AZUL" | string {
+// Catálogo único de colores — usado en captura manual, filtros y validación.
+// Si aparece un color nuevo, agrégalo aquí (y a MAPA_COLOR si trae variantes en inglés).
+export const COLORES = ["BLANCO", "AZUL", "ROJO", "NEGRO", "VERDE", "GRIS", "AMARILLO", "NARANJA", "PLATA"] as const;
+
+const MAPA_COLOR: Record<string, string> = {
+  WHITE: "BLANCO", BLANC: "BLANCO", BLANCO: "BLANCO",
+  BLUE: "AZUL", AZUL: "AZUL",
+  ORANGE: "NARANJA", NARANJA: "NARANJA",
+  RED: "ROJO", ROJO: "ROJO",
+  BLACK: "NEGRO", NEGRO: "NEGRO",
+  GREEN: "VERDE", VERDE: "VERDE",
+  SILVER: "PLATA", PLATA: "PLATA",
+  GRAY: "GRIS", GREY: "GRIS", GRIS: "GRIS",
+  YELLOW: "AMARILLO", AMARILLO: "AMARILLO",
+};
+
+// Normaliza variantes de color (incluyendo inglés) a su equivalente en español.
+export function normColor(c?: string | null): string {
   if (!c) return "—";
   const s = c.toString().toUpperCase().replace(/[^A-Z]/g, "");
-  if (s.includes("AZUL")) return "AZUL";
-  if (s.includes("BLANC")) return "BLANCO";
-  return c;
+  for (const [clave, valor] of Object.entries(MAPA_COLOR)) {
+    if (s.includes(clave)) return valor;
+  }
+  return c.toString().toUpperCase();
 }
 
 // Sanea un número de serie (chasis o motor) al mismo criterio que valida la
@@ -64,6 +81,34 @@ export function normColor(c?: string | null): "BLANCO" | "AZUL" | string {
 export function normSerial(s?: string | null): string {
   if (!s) return "";
   return s.toString().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+}
+
+// Línea de producto de un modelo, a partir del catálogo `modelos_producto`.
+// Un modelo que no está en el catálogo se trata como "otro" — nunca se asume
+// "motocarro" por default para no meter una línea desconocida al armado.
+export type LineaProducto = "motocarro" | "mototaxi" | "otro";
+export type ModeloInfo = { linea: LineaProducto; nombre_comercial: string | null };
+export type CatalogoModelos = Map<string, ModeloInfo>;
+
+export function lineaDe(modelo: string | null | undefined, catalogo: CatalogoModelos): LineaProducto {
+  if (!modelo) return "otro";
+  return catalogo.get(modelo)?.linea ?? "otro";
+}
+
+// Nombre comercial de un modelo (lo que habla ventas y dirección — Remisiones,
+// Entregas, Clientes, Dashboard, Stock). Si el modelo no está en el catálogo
+// o no tiene nombre comercial, cae de vuelta al código de fábrica.
+export function nombreComercial(modelo: string | null | undefined, catalogo: CatalogoModelos): string {
+  if (!modelo) return "—";
+  return catalogo.get(modelo)?.nombre_comercial || modelo;
+}
+
+// Texto para pantallas de fábrica (Producción, Inventario, configurar unidad):
+// código de fábrica con el comercial como secundario, p.ej. "DZ300Q7 · 300cc 2026".
+export function displayFabrica(modelo: string | null | undefined, catalogo: CatalogoModelos): string {
+  if (!modelo) return "—";
+  const nc = catalogo.get(modelo)?.nombre_comercial;
+  return nc && nc !== modelo ? `${modelo} · ${nc}` : modelo;
 }
 
 // Compute effective estatus armado (mark ATRASADO if overdue and not built)

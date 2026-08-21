@@ -10,7 +10,7 @@ import { PackagePlus, Trash2, ClipboardPaste, KeyboardIcon, ArrowRight, ArrowLef
 import { toast } from "sonner";
 import { z } from "zod";
 import { parseContenedoresExcel, ContainerSheetData, ContenedorFromExcel } from "@/lib/excelParser";
-import { normSerial } from "@/lib/dazon";
+import { COLORES, normColor, normSerial } from "@/lib/dazon";
 
 type Unidad = { ns_chasis: string; ns_motor: string; chasis_asignado?: string };
 
@@ -30,7 +30,7 @@ const cabeceraSchema = z.object({
   folio_contenedor: z.string().trim().min(1, "Folio requerido").max(50),
   fecha_arribo: z.string().min(1, "Fecha requerida"),
   modelo: z.string().trim().min(1).max(50),
-  color: z.enum(["BLANCO", "AZUL", "ROJO", "NEGRO", "VERDE"]),
+  color: z.enum(COLORES),
   cantidad: z.coerce.number().int().min(1).max(500),
 });
 
@@ -165,7 +165,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
             _contenedor_id: containerId,
             _folio_contenedor: sheet.folio_contenedor.trim(),
             _modelo: sheet.modelo,
-            _vins: sheet.chasis.map(c => ({ numero_chasis: normSerial(c.numero_chasis), color: c.color, modelo: c.modelo })),
+            _vins: sheet.chasis.map(c => ({ numero_chasis: normSerial(c.numero_chasis), color: normColor(c.color), modelo: c.modelo })),
           });
 
           if (chassisError) {
@@ -339,7 +339,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                     <div>
                       <Label>Color *</Label>
                       <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as typeof cab.color })} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
-                        {["BLANCO","AZUL","ROJO","NEGRO","VERDE"].map(c => <option key={c} value={c}>{c}</option>)}
+                        {COLORES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
                     <div>

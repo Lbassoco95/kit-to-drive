@@ -4,11 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fmtDate, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, CatalogoModelos, nombreComercial, displayFabrica } from "@/lib/dazon";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
-import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const CAPACIDAD = 4;
@@ -69,7 +69,7 @@ export default function Dashboard() {
   const { role, user, profileName } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
-  const [data, setData] = useState<{ motos: any[]; rems: any[] } | null>(null);
+  const [data, setData] = useState<{ motos: any[]; rems: any[]; catalogo: CatalogoModelos; chasisPorConfigurar: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -80,7 +80,7 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [{ data: motos, error: errM }, { data: rems, error: errR }] = await Promise.all([
+        const [{ data: motos, error: errM }, { data: rems, error: errR }, { data: catalogo }, { data: chasisDisp }] = await Promise.all([
           supabase
             .from("motocarros")
             .select(
@@ -91,15 +91,21 @@ export default function Dashboard() {
             .select(
               "id, folio_remision, estatus, vendedor_id, total_unidades_solicitadas, notas, profiles:vendedor_id(nombre_completo)"
             ),
+          supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
+          supabase.from("inventario_chasis").select("modelo").is("motocarro_id", null),
         ]);
         if (cancelled) return;
         if (errM || errR) {
           setError([errM?.message, errR?.message].filter(Boolean).join("; ") || "Error al consultar Supabase");
           setData(null);
         } else {
+          const catMap: CatalogoModelos = new Map((catalogo ?? []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }]));
+          const chasisPorConfigurar = (chasisDisp ?? []).filter((c: any) => lineaDe(c.modelo, catMap) === "motocarro").length;
           setData({
             motos: (motos ?? []).map((m: any) => ({ ...m, color: normColor(m.color), _eff: effEstatusArmado(m) })),
             rems: rems ?? [],
+            catalogo: catMap,
+            chasisPorConfigurar,
           });
         }
       } catch (e) {
@@ -165,7 +171,10 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  const motos: any[] = data.motos;
+  // "Programadas", "Armadas", "Pendientes", "Atrasadas" y "Entregadas" cuentan
+  // sólo línea motocarro — los mototaxis y otras líneas no entran al plan de
+  // producción (ver KIT-3, Parte 5).
+  const motos: any[] = data.motos.filter((m: any) => lineaDe(m.modelo, data.catalogo) === "motocarro");
   const rems: any[] = data.rems;
   const total = motos.length;
   const armados = motos.filter(m => m._eff === "ARMADO" || m._eff === "LISTO").length;
@@ -174,6 +183,15 @@ export default function Dashboard() {
   const entregados = motos.filter(m => m.estatus_entrega === "ENTREGADA").length;
   const listosEntrega = motos.filter(m => (m._eff === "ARMADO" || m._eff === "LISTO") && m.chasis_asignado && m.estatus_entrega !== "ENTREGADA").length;
   const avance = total ? Math.round((armados / total) * 100) : 0;
+
+  // Stock terminado (línea motocarro): libre = armado/listo sin remisión.
+  const stockLibre = motos.filter(m => (m._eff === "ARMADO" || m._eff === "LISTO") && !m.remision_id);
+  const stockLibreViejo = stockLibre.filter(m => {
+    if (!m.fecha_real_armado) return false;
+    const dias = Math.floor((Date.now() - new Date(m.fecha_real_armado + "T00:00:00").getTime()) / 86400000);
+    return dias > 60;
+  }).length;
+  const chasisPorConfigurar = data.chasisPorConfigurar;
 
   // Capacidad de hoy
   const today = new Date().toISOString().slice(0, 10);
@@ -226,11 +244,20 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="#1F3864" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
+              <KpiCard label={t.dashboard.kpi.porConfigurar} value={chasisPorConfigurar} icon={Wrench} color="#D97706" tooltip={t.dashboard.tooltips.chasisSinUnidad} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" tooltip={t.dashboard.tooltips.armadosLisots} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" tooltip={t.dashboard.tooltips.porArmar} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" tooltip={t.dashboard.tooltips.pasadosFecha} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={Truck} color="#5B21B6" tooltip={t.dashboard.tooltips.entregadosCliente} onClick={() => nav("/entregas")} />
+              <KpiCard label={t.dashboard.kpi.stockLibre} value={stockLibre.length} icon={Boxes} color="#2E75B6" tooltip={t.dashboard.tooltips.stockLibre} onClick={() => nav("/inventario")} />
             </div>
+
+            {stockLibreViejo > 0 && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-[#FEF3C7] text-[#92400E] text-sm font-medium">
+                <AlertTriangle className="h-5 w-5 shrink-0" />
+                {t.dashboard.avisoStockViejo(stockLibreViejo)}
+              </div>
+            )}
 
             {/* Capacidad de hoy */}
             <Card className="p-6">
@@ -271,7 +298,7 @@ export default function Dashboard() {
                   {atrasados.slice(0, 8).map(m => (
                     <button key={m.id} onClick={() => nav("/produccion")} className="text-left p-3 bg-white rounded-md border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {m.modelo} {m.color}</div>
+                        <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {nombreComercial(m.modelo, data.catalogo)} {m.color}</div>
                         <div className="text-xs text-muted-foreground">{t.dashboard.fechaEstimada}: {fmtDate(m.fecha_estimada_armado)}</div>
                       </div>
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">{t.dashboard.diasAtraso(diasDesvio(m) ?? 0)}</span>
@@ -334,7 +361,7 @@ export default function Dashboard() {
           </div>
           <Card className="p-6">
             <h3 className="mb-3">{t.dashboard.proximasOrdenes}</h3>
-            <ProximasOrdenes motos={motos} t={t} />
+            <ProximasOrdenes motos={motos} catalogo={data.catalogo} t={t} />
           </Card>
         </>
       )}
@@ -391,7 +418,7 @@ function TopVendedores({ rems }: { rems: any[] }) {
   );
 }
 
-function ProximasOrdenes({ motos, t }: { motos: any[]; t: any }) {
+function ProximasOrdenes({ motos, catalogo, t }: { motos: any[]; catalogo: CatalogoModelos; t: any }) {
   const proximas = motos
     .filter(m => m._eff === "PENDIENTE" || m._eff === "EN_PROCESO" || m._eff === "ATRASADO")
     .sort((a, b) => (a.orden_armado - b.orden_armado))
@@ -404,7 +431,7 @@ function ProximasOrdenes({ motos, t }: { motos: any[]; t: any }) {
         {proximas.map(m => (
           <tr key={m.id}>
             <td className="font-semibold">{m.orden_armado}</td>
-            <td>{m.modelo}</td>
+            <td>{displayFabrica(m.modelo, catalogo)}</td>
             <td>{m.color}</td>
             <td>{fmtDate(m.fecha_estimada_armado)}</td>
             <td><EstatusBadge estatus={m._eff} size="sm" /></td>

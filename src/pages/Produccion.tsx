@@ -3,9 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor } from "@/lib/dazon";
+import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor, lineaDe, displayFabrica, CatalogoModelos } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
-import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X, Package } from "lucide-react";
+import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X, Package, Unlock, History, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BandejaRemisiones } from "@/components/BandejaRemisiones";
 import { RecibirContenedor } from "@/components/RecibirContenedor";
+import { ConfigurarUnidad } from "@/components/ConfigurarUnidad";
 import { InventarioStatus } from "@/components/InventarioStatus";
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { ContenedorPartes } from "@/components/ContenedorPartes";
@@ -164,8 +165,18 @@ export default function Produccion() {
   const [confirm, setConfirm] = useState<{ moto: any; action: "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
   const [comentariosMoto, setComentariosMoto] = useState<{ id: string; orden: number } | null>(null);
   const [contenedorPartes, setContenedorPartes] = useState<{ id: string; folio: string } | null>(null);
+  const [liberar, setLiberar] = useState<{ id: string; orden: number } | null>(null);
+  const [motivoLiberar, setMotivoLiberar] = useState("");
+  const [historial, setHistorial] = useState<Map<string, number>>(new Map());
+  const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
+  const [verHistorial, setVerHistorial] = useState<{ id: string; orden: number; items: any[] } | null>(null);
 
   const load = async () => {
+    // ── -1. Catálogo de líneas de producto — sólo línea "motocarro" entra aquí ─
+    const { data: catalogoData } = await supabase.from("modelos_producto").select("modelo, linea, nombre_comercial");
+    const catMap: CatalogoModelos = new Map((catalogoData ?? []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }]));
+    setCatalogo(catMap);
+
     // ── 0. Load containers for folio mapping ─────────────────────────────────
     const { data: conts } = await supabase
       .from("contenedores")
@@ -180,7 +191,12 @@ export default function Produccion() {
       .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
       .order("orden_armado", { ascending: true });
 
-    const mapped = (base ?? []).map((r: any) => ({
+    // Producción sólo lista línea "motocarro" — mototaxis y otras líneas
+    // viven en Inventario → Otras líneas, fuera del plan de armado.
+    const baseAll = base ?? [];
+    const baseFiltrado = baseAll.filter((r: any) => catMap.size === 0 || lineaDe(r.modelo, catMap) === "motocarro");
+
+    const mapped = baseFiltrado.map((r: any) => ({
       ...r, color: normColor(r.color), _eff: effEstatusArmado(r),
       // defaults para columnas extendidas
       fecha_propuesta_entrega: null, propuesta_entrega_notas: null,
@@ -188,11 +204,22 @@ export default function Produccion() {
       remision_items: [],
     }));
     setRows(mapped);
-    if (!base?.length) return;
+
+    // ── 1b. Bitácora de cambios de orden — sólo para saber quién tiene historial ─
+    if (mapped.length) {
+      const { data: hist } = await supabase
+        .from("bitacora_orden_armado")
+        .select("motocarro_id");
+      const histMap = new Map<string, number>();
+      (hist ?? []).forEach((h: any) => histMap.set(h.motocarro_id, (histMap.get(h.motocarro_id) ?? 0) + 1));
+      setHistorial(histMap);
+    }
+
+    if (!baseFiltrado.length) return;
 
     // ── 2. Columnas extendidas de motocarros (agregadas en migraciones) ───────
     try {
-      const ids = base.map((r: any) => r.id);
+      const ids = baseFiltrado.map((r: any) => r.id);
       const { data: ext } = await supabase
         .from("motocarros")
         .select("id,fecha_propuesta_entrega,propuesta_entrega_notas,confirmada_fabrica_at,confirmada_logistica_at,con_caja")
@@ -205,7 +232,7 @@ export default function Produccion() {
 
     // ── 3. tipo_pago / pagado de remisiones (columnas nuevas) ─────────────────
     try {
-      const remIds = [...new Set(base.map((r: any) => r.remision_id).filter(Boolean))];
+      const remIds = [...new Set(baseFiltrado.map((r: any) => r.remision_id).filter(Boolean))];
       if (remIds.length) {
         const { data: remExt } = await supabase
           .from("remisiones")
@@ -223,7 +250,7 @@ export default function Produccion() {
 
     // ── 4. remision_items — configuración del pedido por motocarro ────────────
     try {
-      const remIds = [...new Set(base.map((r: any) => r.remision_id).filter(Boolean))];
+      const remIds = [...new Set(baseFiltrado.map((r: any) => r.remision_id).filter(Boolean))];
       if (remIds.length) {
         const { data: remItems } = await supabase
           .from("remision_items")
@@ -295,6 +322,37 @@ export default function Produccion() {
     setConfirm(null);
   };
 
+  const doLiberar = async () => {
+    if (!liberar) return;
+    if (motivoLiberar.trim().length < 5) { toast.error("Se requiere un motivo (mínimo 5 caracteres)"); return; }
+    const { data, error } = await supabase.rpc("desconfigurar_unidad", {
+      _motocarro_id: liberar.id, _motivo: motivoLiberar.trim(),
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`✓ Unidad #${(data as any)?.liberada ?? liberar.orden} liberada — chasis y motor vuelven a disponibles`);
+    setLiberar(null); setMotivoLiberar(""); load();
+  };
+
+  const guardarOrden = async (moto: any, ordenNuevo: number) => {
+    if (ordenNuevo === moto.orden_armado) return;
+    const { data, error } = await supabase.rpc("cambiar_orden_armado", {
+      _motocarro_id: moto.id, _orden_nuevo: ordenNuevo,
+    });
+    if (error) { toast.error(error.message); return; }
+    const r = data as { intercambio_con?: string } | null;
+    toast.success(r?.intercambio_con ? "✓ Orden actualizado — se intercambió con la otra unidad" : "✓ Orden actualizado");
+    load();
+  };
+
+  const abrirHistorial = async (moto: any) => {
+    const { data } = await supabase
+      .from("bitacora_orden_armado")
+      .select("orden_anterior, orden_nuevo, motivo, cambiado_at")
+      .eq("motocarro_id", moto.id)
+      .order("cambiado_at", { ascending: false });
+    setVerHistorial({ id: moto.id, orden: moto.orden_armado, items: data ?? [] });
+  };
+
   const canEditFabrica = role === "admin" || role === "fabrica";
   const canEditEntrega = role === "admin" || role === "logistica";
   type ConfirmAction = "EN_PROCESO" | "ARMADO" | "LISTO" | "ENTREGADA";
@@ -323,6 +381,7 @@ export default function Produccion() {
               <TableIcon size={18}/> {t.produccion.vista.tabla}
             </button>
           </div>
+          {(role === "admin" || role === "fabrica") && <ConfigurarUnidad onDone={load} />}
           {(role === "admin" || role === "fabrica") && <RecibirContenedor onDone={load} />}
           <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> {t.produccion.exportarCsv}</Button>
         </div>
@@ -390,9 +449,13 @@ export default function Produccion() {
       {view === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
-            onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "" }); }}
+            catalogo={catalogo}
+            historialCount={historial.get(r.id) ?? 0}
+            onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "", orden_armado: r.orden_armado }); }}
             onAction={(action) => setConfirm({ moto: r, action })}
             onComentarios={() => setComentariosMoto({ id: r.id, orden: r.orden_armado })}
+            onLiberar={() => setLiberar({ id: r.id, orden: r.orden_armado })}
+            onVerHistorial={() => abrirHistorial(r)}
             t={t}
           />)}
           {!filtered.length && <div className="col-span-full text-center text-muted-foreground py-12 bg-card rounded-lg border">{t.produccion.sinResultados}</div>}
@@ -410,7 +473,7 @@ export default function Produccion() {
                 {filtered.map(r => (
                   <tr key={r.id}>
                     <td className="font-semibold text-primary">{r.orden_armado}</td>
-                    <td>{r.modelo}</td><td>{r.color}</td>
+                    <td>{displayFabrica(r.modelo, catalogo)}</td><td>{r.color}</td>
                     <td>{fmtDate(r.fecha_estimada_armado)}</td>
                     <td><EstatusBadge estatus={r._eff} size="sm" /></td>
                     <td>{fmtDate(r.fecha_real_armado)}</td>
@@ -441,10 +504,26 @@ export default function Produccion() {
             <div><Label>{t.produccion.chasisAsignado}</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
             <div><Label>{t.produccion.fechaEstimadaArmado}</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
             <div><Label>{t.produccion.observaciones}</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
+            {(editing?._eff === "PENDIENTE" || editing?._eff === "EN_PROCESO") && (
+              <div className="flex items-end gap-2 pt-2 border-t">
+                <div className="flex-1">
+                  <Label className="flex items-center gap-1"><ArrowUpDown className="h-3.5 w-3.5" /> Orden de armado</Label>
+                  <Input type="number" min={1} value={editForm.orden_armado} onChange={e => setEditForm({ ...editForm, orden_armado: Number(e.target.value) })} />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => { await guardarOrden(editing, Number(editForm.orden_armado)); setEditing(null); }}
+                  disabled={Number(editForm.orden_armado) === editing?.orden_armado}
+                >
+                  Guardar orden
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button onClick={async () => {
               const patch = { ...editForm };
+              delete patch.orden_armado;
               Object.keys(patch).forEach(k => { if (patch[k] === "") patch[k] = null; });
               await updateMoto(editing.id, patch);
               setEditing(null);
@@ -493,11 +572,47 @@ export default function Produccion() {
           onOpenChange={(open) => { if (!open) setContenedorPartes(null); }}
         />
       )}
+
+      {/* Liberar unidad */}
+      <Dialog open={!!liberar} onOpenChange={(o) => { if (!o) { setLiberar(null); setMotivoLiberar(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Unlock className="h-5 w-5 text-amber-700" /> Liberar unidad #{liberar?.orden}</DialogTitle>
+            <DialogDescription>El chasis y el motor vuelven a disponibles. Se requiere un motivo.</DialogDescription>
+          </DialogHeader>
+          <div>
+            <Label>Motivo *</Label>
+            <Textarea value={motivoLiberar} onChange={e => setMotivoLiberar(e.target.value)} placeholder="Ej. Se capturó el motor equivocado" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setLiberar(null); setMotivoLiberar(""); }}>{t.actions.cancel}</Button>
+            <Button onClick={doLiberar} className="bg-amber-600 hover:bg-amber-700">Liberar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Historial de orden */}
+      <Dialog open={!!verHistorial} onOpenChange={(o) => { if (!o) setVerHistorial(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-[#1F3864]" /> Historial de orden — #{verHistorial?.orden}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {(verHistorial?.items ?? []).map((h: any, i: number) => (
+              <div key={i} className="border rounded-md p-2 text-sm">
+                <div className="font-medium">#{h.orden_anterior ?? "—"} → #{h.orden_nuevo}</div>
+                <div className="text-xs text-muted-foreground">{h.motivo || "sin motivo registrado"} · {new Date(h.cambiado_at).toLocaleString("es-MX")}</div>
+              </div>
+            ))}
+            {!(verHistorial?.items ?? []).length && <div className="text-sm text-muted-foreground text-center py-4">Sin cambios registrados</div>}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, t }: any) {
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, t }: any) {
   const desv = diasDesvio(r);
   const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
   const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
@@ -521,7 +636,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
           </div>
           <div>
             <div className="text-sm text-muted-foreground font-medium">{r.color}</div>
-            <div className="text-base font-semibold text-[#1F3864]">{r.modelo}</div>
+            <div className="text-base font-semibold text-[#1F3864]">{displayFabrica(r.modelo, catalogo)}</div>
           </div>
         </div>
         <div className="px-3 py-1.5 rounded-md bg-[#1F3864] text-white font-bold text-xl tracking-tight">
@@ -633,6 +748,17 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         )}
         {canEditFabrica && (
           <Button variant="outline" onClick={onEdit} className="h-12 w-12 p-0" title="Editar"><Pencil className="h-5 w-5" /></Button>
+        )}
+        {canEditFabrica && r._eff === "PENDIENTE" && !r.remision_id && (
+          <Button variant="outline" onClick={onLiberar} className="h-12 w-12 p-0 border-amber-300 text-amber-700 hover:bg-amber-50" title="Liberar unidad">
+            <Unlock className="h-5 w-5" />
+          </Button>
+        )}
+        {historialCount > 0 && (
+          <Button variant="outline" onClick={onVerHistorial} className="h-12 w-12 p-0 relative" title="Historial de orden">
+            <History className="h-5 w-5 text-[#1F3864]" />
+            <span className="absolute -top-1.5 -right-1.5 bg-[#1F3864] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{historialCount}</span>
+          </Button>
         )}
         <Button variant="outline" onClick={onComentarios} className="h-12 w-12 p-0" title={t.produccion.comentarios.title}>
           <MessageSquare className="h-5 w-5 text-[#1F3864]" />
