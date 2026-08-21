@@ -313,8 +313,11 @@ export default function Dashboard() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="mb-0">{t.dashboard.planVsReal}</h3>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-[#2E75B6]/10 text-[#2E75B6]">
-                  {avance}% avance
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-[#2E75B6]/10 text-[#2E75B6]"
+                  title="Armadas / unidades configuradas por fábrica. No incluye los chasis y motores que aún no se han configurado en una unidad — ver 'Por configurar' arriba."
+                >
+                  {avance}% avance sobre configuradas
                 </span>
               </div>
               <div className="h-72">
