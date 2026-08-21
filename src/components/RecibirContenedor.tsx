@@ -13,19 +13,17 @@ import { parseContenedoresExcel, ContainerSheetData, ContenedorFromExcel } from 
 
 type Unidad = { ns_chasis: string; ns_motor: string; chasis_asignado?: string };
 
-type PareoReport = {
+type RecepcionReport = {
   folio: string;
-  ok: boolean;
-  unidades: number;
-  unidades_nuevas: number;
-  chasis_recibidos: number;
-  motores_recibidos: number;
-  chasis_sin_motor: string[];
-  motores_sin_chasis: string[];
-  completa: boolean;
+  chasis_insertados: number;
+  chasis_actualizados: number;
+  chasis_invalidos: number;
+  motores_insertados: number;
+  motores_actualizados: number;
+  motores_invalidos: number;
 };
 
-type RpcResult = { ok: boolean; error?: string; creados?: number };
+type RpcResult = { ok: boolean; error?: string; creados?: number; insertados?: number; actualizados?: number; invalidos?: number };
 
 const cabeceraSchema = z.object({
   folio_contenedor: z.string().trim().min(1, "Folio requerido").max(50),
@@ -50,7 +48,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   const [parsedContenedores, setParsedContenedores] = useState<ContenedorFromExcel[]>([]);
   const [parsedContainerSheets, setParsedContainerSheets] = useState<ContainerSheetData[]>([]);
   const [importMode, setImportMode] = useState<"single" | "multiple">("single");
-  const [reportes, setReportes] = useState<PareoReport[]>([]);
+  const [reportes, setReportes] = useState<RecepcionReport[]>([]);
 
   const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setParsedContainerSheets([]); setImportMode("single"); setReportes([]); };
 
@@ -100,14 +98,8 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
       const totalChasis = containerSheets.reduce((sum, sheet) => sum + sheet.chasis.length, 0);
       const totalMotores = containerSheets.reduce((sum, sheet) => sum + sheet.motores.length, 0);
-      const totalUnidadesEsperadas = Math.min(totalChasis, totalMotores);
-      const desbalanceados = containerSheets.filter(s => s.chasis.length !== s.motores.length);
 
-      if (desbalanceados.length > 0) {
-        toast.warning(`⚠ ${desbalanceados.length} contenedor(es) con chasis ≠ motores`);
-      }
-
-      toast.success(`✓ ${containerSheets.length} contenedor(es) detectado(s): ${totalUnidadesEsperadas} unidades esperadas (${totalChasis} chasis / ${totalMotores} motores)`);
+      toast.success(`✓ ${containerSheets.length} contenedor(es) detectado(s): ${totalChasis} chasis y ${totalMotores} motores`);
     } catch (error) {
       console.error("Error parsing containers Excel:", error);
       toast.error("Error al procesar el archivo Excel. Verifica el formato.");
@@ -124,14 +116,11 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
     setBusy(true);
     try {
-      let totalUnidades = 0;
-      let totalNuevas = 0;
-      const reportesPareo: PareoReport[] = [];
+      const reportesRecepcion: RecepcionReport[] = [];
 
       for (const sheet of parsedContainerSheets) {
-        // Validate counts match
         if (sheet.chasis.length !== sheet.motores.length) {
-          toast.warning(`${sheet.folio_contenedor}: ${sheet.chasis.length} chasis y ${sheet.motores.length} motores. El pareo quedará incompleto.`);
+          toast.info(`${sheet.folio_contenedor}: ${sheet.chasis.length} chasis y ${sheet.motores.length} motores recibidos`);
         }
 
         // Create container record
@@ -162,6 +151,13 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           containerId = existente.id;
         }
 
+        const reporte: RecepcionReport = {
+          folio: sheet.folio_contenedor,
+          chasis_insertados: 0, chasis_actualizados: 0, chasis_invalidos: 0,
+          motores_insertados: 0, motores_actualizados: 0, motores_invalidos: 0,
+        };
+        let huboError = false;
+
         // Import chassis if present
         if (sheet.chasis.length > 0) {
           const { data: chassisData, error: chassisError } = await supabase.rpc("importar_vins_inventario", {
@@ -173,11 +169,15 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
           if (chassisError) {
             toast.error(`Chasis ${sheet.folio_contenedor}: ${chassisError.message}`);
-            continue;
-          }
-          if (!(chassisData as RpcResult | null)?.ok) {
+            huboError = true;
+          } else if (!(chassisData as RpcResult | null)?.ok) {
             toast.error(`Chasis ${sheet.folio_contenedor}: ${(chassisData as RpcResult | null)?.error ?? 'no se importó'}`);
-            continue;
+            huboError = true;
+          } else {
+            const r = chassisData as RpcResult;
+            reporte.chasis_insertados = r.insertados ?? 0;
+            reporte.chasis_actualizados = r.actualizados ?? 0;
+            reporte.chasis_invalidos = r.invalidos ?? 0;
           }
         }
 
@@ -191,55 +191,30 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
           if (motorsError) {
             toast.error(`Motores ${sheet.folio_contenedor}: ${motorsError.message}`);
-            continue;
-          }
-          if (!(motorsData as RpcResult | null)?.ok) {
+            huboError = true;
+          } else if (!(motorsData as RpcResult | null)?.ok) {
             toast.error(`Motores ${sheet.folio_contenedor}: ${(motorsData as RpcResult | null)?.error ?? 'no se importó'}`);
-            continue;
+            huboError = true;
+          } else {
+            const r = motorsData as RpcResult;
+            reporte.motores_insertados = r.insertados ?? 0;
+            reporte.motores_actualizados = r.actualizados ?? 0;
+            reporte.motores_invalidos = r.invalidos ?? 0;
           }
         }
 
-        // Parear unidades
-        const { data: pareo, error: pareoErr } = await supabase.rpc("parear_unidades_contenedor", {
-          _contenedor_id: containerId,
-        });
-        if (pareoErr) {
-          toast.error(`Pareo ${sheet.folio_contenedor}: ${pareoErr.message}`);
-          continue;
-        }
-        const pareoData = pareo as Partial<PareoReport> | null;
-        const reporte: PareoReport = {
-          folio: sheet.folio_contenedor,
-          ok: pareoData?.ok ?? true,
-          unidades: pareoData?.unidades ?? 0,
-          unidades_nuevas: pareoData?.unidades_nuevas ?? 0,
-          chasis_recibidos: pareoData?.chasis_recibidos ?? 0,
-          motores_recibidos: pareoData?.motores_recibidos ?? 0,
-          chasis_sin_motor: pareoData?.chasis_sin_motor ?? [],
-          motores_sin_chasis: pareoData?.motores_sin_chasis ?? [],
-          completa: pareoData?.completa ?? false,
-        };
-        reportesPareo.push(reporte);
-        totalUnidades += reporte.unidades;
-        totalNuevas += reporte.unidades_nuevas;
+        if (huboError) continue;
+        reportesRecepcion.push(reporte);
       }
 
-      setReportes(reportesPareo);
+      setReportes(reportesRecepcion);
 
-      const completos = reportesPareo.filter(r => r.completa).length;
-      const incompletos = reportesPareo.length - completos;
+      const totalChasisRecibidos = reportesRecepcion.reduce((a, r) => a + r.chasis_insertados + r.chasis_actualizados, 0);
+      const totalMotoresRecibidos = reportesRecepcion.reduce((a, r) => a + r.motores_insertados + r.motores_actualizados, 0);
 
-      if (incompletos > 0) {
-        toast.warning(`⚠ ${completos} contenedor(es) completo(s), ${incompletos} incompleto(s) — revisa el reporte`);
-      } else {
-        toast.success(`✓ ${reportesPareo.length} contenedor(es) — ${totalNuevas} unidades creadas (total: ${totalUnidades})`);
-      }
+      toast.success(`✓ ${reportesRecepcion.length} contenedor(es) recibido(s) — ${totalChasisRecibidos} chasis y ${totalMotoresRecibidos} motores en inventario`);
 
-      if (incompletos > 0) {
-        setStep(4);
-      } else {
-        setStep(4);
-      }
+      setStep(4);
     } catch (error) {
       console.error("Error importing containers:", error);
       toast.error("Error al importar contenedores");
@@ -300,9 +275,9 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
   const copyReport = () => {
     const text = reportes.map(r =>
-      `${r.folio}: ${r.unidades} unidades | chasis: ${r.chasis_recibidos} | motores: ${r.motores_recibidos} | ${r.completa ? 'completa' : 'incompleta'}\n` +
-      (r.chasis_sin_motor?.length ? `  Chasis sin motor: ${r.chasis_sin_motor.join(', ')}\n` : '') +
-      (r.motores_sin_chasis?.length ? `  Motores sin chasis: ${r.motores_sin_chasis.join(', ')}\n` : '')
+      `${r.folio}\n` +
+      `  Chasis: ${r.chasis_insertados} insertados, ${r.chasis_actualizados} actualizados, ${r.chasis_invalidos} inválidos\n` +
+      `  Motores: ${r.motores_insertados} insertados, ${r.motores_actualizados} actualizados, ${r.motores_invalidos} inválidos\n`
     ).join('\n');
     navigator.clipboard.writeText(text).then(() => toast.success("Reporte copiado"));
   };
@@ -324,7 +299,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
               {step === 1 && "Datos generales del packing list"}
               {step === 2 && "Captura los números de motor y chasis (manual o pegando desde Excel)"}
               {step === 3 && "Confirma y crea los motocarros en producción"}
-              {step === 4 && "Reporte de importación"}
+              {step === 4 && "Reporte de recepción"}
             </DialogDescription>
           </DialogHeader>
 
@@ -530,7 +505,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           {step === 4 && (
             <div className="space-y-4 mt-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-lg">Reporte de importación</h3>
+                <h3 className="font-semibold text-lg">Reporte de recepción</h3>
                 <Button size="sm" variant="outline" onClick={copyReport}><Copy className="h-4 w-4 mr-2" />Copiar reporte</Button>
               </div>
               <div className="space-y-3">
@@ -538,33 +513,11 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                   <div key={i} className="border rounded-lg p-4 bg-white">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-bold text-[#1F3864]">{r.folio}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${r.completa ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                        {r.completa ? 'completa' : 'incompleta'}
-                      </span>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      <strong>{r.unidades} unidades</strong> · {r.chasis_recibidos} chasis recibidos · {r.motores_recibidos} motores recibidos
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <div><strong>Chasis:</strong> {r.chasis_insertados} insertados · {r.chasis_actualizados} actualizados{r.chasis_invalidos > 0 && <span className="text-amber-700"> · {r.chasis_invalidos} inválidos</span>}</div>
+                      <div><strong>Motores:</strong> {r.motores_insertados} insertados · {r.motores_actualizados} actualizados{r.motores_invalidos > 0 && <span className="text-amber-700"> · {r.motores_invalidos} inválidos</span>}</div>
                     </div>
-                    {!r.completa && (
-                      <div className="mt-2 space-y-1 text-sm">
-                        {r.chasis_sin_motor?.length > 0 && (
-                          <div className="text-amber-700">
-                            <strong>Chasis sin motor:</strong>
-                            <ul className="font-mono text-xs mt-1">
-                              {r.chasis_sin_motor.map((ns, j) => <li key={j}>{ns}</li>)}
-                            </ul>
-                          </div>
-                        )}
-                        {r.motores_sin_chasis?.length > 0 && (
-                          <div className="text-amber-700">
-                            <strong>Motores sin chasis:</strong>
-                            <ul className="font-mono text-xs mt-1">
-                              {r.motores_sin_chasis.map((ns, j) => <li key={j}>{ns}</li>)}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 ))}
                 {reportes.length === 0 && (
@@ -577,7 +530,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           <DialogFooter className="gap-2">
             {step > 1 && step < 4 && <Button variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
             {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
-            {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContainerSheets.length} contenedor(es) — ${parsedContainerSheets.reduce((a,s)=>a+s.chasis.length,0)} unidades esperadas`}</Button>}
+            {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContainerSheets.length} contenedor(es) — ${parsedContainerSheets.reduce((a,s)=>a+s.chasis.length,0)} chasis y ${parsedContainerSheets.reduce((a,s)=>a+s.motores.length,0)} motores`}</Button>}
             {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">Revisar<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? "Guardando…" : `Crear ${unidades.length} motocarros`}</Button>}
             {step === 4 && <Button onClick={() => { setOpen(false); reset(); onDone?.(); }} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />Cerrar</Button>}
