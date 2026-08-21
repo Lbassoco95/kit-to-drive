@@ -8,6 +8,7 @@ import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, CatalogoMode
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
+import { DisponibilidadColores } from "@/components/DisponibilidadColores";
 import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -242,6 +243,8 @@ export default function Dashboard() {
           <SeccionDashboard titulo="Operación" subtitulo="Producción y entregas de las unidades del embarque">
             <InventarioStatus />
 
+            <DisponibilidadColores />
+
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="#1F3864" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.porConfigurar} value={chasisPorConfigurar} icon={Wrench} color="#D97706" tooltip={t.dashboard.tooltips.chasisSinUnidad} onClick={() => nav("/produccion")} />
@@ -362,6 +365,7 @@ export default function Dashboard() {
             <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" />
             <KpiCard label={t.dashboard.kpi.capacidadDiaria} value={CAPACIDAD} icon={Factory} color="#1F3864" />
           </div>
+          <DisponibilidadColores />
           <Card className="p-6">
             <h3 className="mb-3">{t.dashboard.proximasOrdenes}</h3>
             <ProximasOrdenes motos={motos} catalogo={data.catalogo} t={t} />
@@ -370,22 +374,30 @@ export default function Dashboard() {
       )}
 
       {role === "logistica" && (
+        <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard label={t.dashboard.kpi.listosEntrega} value={listosEntrega} icon={Truck} color="#1F3864" onClick={() => nav("/entregas")} />
           <KpiCard label={t.dashboard.kpi.enRuta} value={motos.filter(m => m.estatus_entrega === "EN_RUTA").length} icon={Truck} color="#92400E" />
           <KpiCard label={t.dashboard.kpi.programadasHoy} value={motos.filter(m => m.estatus_entrega === "PROGRAMADA").length} icon={BarChart3} color="#2E75B6" />
           <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
+        <DisponibilidadColores compacto />
+        </div>
       )}
 
       {isVendedor && (
+        <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard label={t.dashboard.kpi.misRemisiones} value={rems.length} icon={BarChart3} color="#1F3864" onClick={() => nav("/remisiones")} />
           <KpiCard label={t.dashboard.kpi.unidadesAsignadas} value={motos.filter(m => m.remision_id).length} icon={Bike} color="#2E75B6" onClick={() => nav("/mis-motocarros")} />
           <KpiCard label={t.dashboard.kpi.listasEntrega} value={listosEntrega} icon={Truck} color="#065F46" />
           <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
+        <DisponibilidadColores />
+        </div>
       )}
+
+      {role === "coordinador" && <DisponibilidadColores />}
     </div>
   );
 }

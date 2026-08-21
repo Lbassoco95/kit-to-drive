@@ -50,6 +50,54 @@ export type Database = {
         }
         Relationships: []
       }
+      bitacora_configuracion: {
+        Row: {
+          actor: string | null
+          color: string | null
+          contenedor_id: string | null
+          creado_at: string
+          estatus_armado: string | null
+          fecha_armado: string | null
+          id: string
+          modelo: string | null
+          motivo: string
+          ns_chasis: string | null
+          ns_motor: string | null
+          orden_armado: number | null
+          tipo: string
+        }
+        Insert: {
+          actor?: string | null
+          color?: string | null
+          contenedor_id?: string | null
+          creado_at?: string
+          estatus_armado?: string | null
+          fecha_armado?: string | null
+          id?: string
+          modelo?: string | null
+          motivo: string
+          ns_chasis?: string | null
+          ns_motor?: string | null
+          orden_armado?: number | null
+          tipo: string
+        }
+        Update: {
+          actor?: string | null
+          color?: string | null
+          contenedor_id?: string | null
+          creado_at?: string
+          estatus_armado?: string | null
+          fecha_armado?: string | null
+          id?: string
+          modelo?: string | null
+          motivo?: string
+          ns_chasis?: string | null
+          ns_motor?: string | null
+          orden_armado?: number | null
+          tipo?: string
+        }
+        Relationships: []
+      }
       bitacora_color: {
         Row: {
           actor: string | null
@@ -1726,6 +1774,10 @@ export type Database = {
       decrementar_inventario_color: {
         Args: { _cantidad?: number; _color: string; _modelo: string }
         Returns: undefined
+      }
+      deshacer_configuracion: {
+        Args: { _motivo: string; _motocarro_id: string; _tipo?: string }
+        Returns: Json
       }
       desconfigurar_unidad: {
         Args: { _motivo: string; _motocarro_id: string }

@@ -103,6 +103,16 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
     chasis que juegos.
   · `v_stock_modelo_color` agrega `capacidad_color`, `juegos_usados`,
     `capacidad_libre` y `piezas_recoloreadas`.
+- `supabase/migrations/20260824000001_deshacer_configuracion_admin.sql` —
+  KIT-4d: `deshacer_configuracion(_motocarro_id, _motivo, _tipo)`. Fábrica se
+  equivoca al capturar la pareja chasis + motor y el error se detecta después;
+  antes "liberar unidad" lo podía hacer fábrica y sólo en PENDIENTE, así que un
+  error tardío quedaba atorado. Ahora **sólo admin**, se puede deshacer aunque
+  la unidad ya esté EN_PROCESO / ARMADO / LISTO (nunca si está en una remisión o
+  entregada), el tipo se clasifica (`equivocacion` / `cambio_plan` / `otro`) y
+  queda un snapshot de la unidad borrada en `bitacora_configuracion` — porque al
+  deshacer desaparece la fila de `motocarros` y con ella su historia.
+  `desconfigurar_unidad` se conserva como envoltura y hereda la regla de admin.
 
 ## Verificación manual recomendada
 
@@ -211,4 +221,19 @@ SELECT im.numero_motor, im.estatus, m.orden_armado
   FROM inventario_motor im
   JOIN motocarros m ON m.ns_motor = im.numero_motor
  WHERE im.motocarro_id IS NULL;
+```
+
+Después de aplicar KIT-4d:
+
+```sql
+-- Lo que se ha deshecho, con quién y por qué.
+SELECT orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado,
+       tipo, motivo, creado_at
+  FROM bitacora_configuracion ORDER BY creado_at DESC;
+
+-- Debe dar 0 filas: una pieza liberada no puede seguir apuntando a una unidad
+-- que ya no existe.
+SELECT numero_chasis FROM inventario_chasis ic
+ WHERE ic.motocarro_id IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM motocarros m WHERE m.id = ic.motocarro_id);
 ```

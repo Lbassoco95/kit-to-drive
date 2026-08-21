@@ -165,8 +165,9 @@ export default function Produccion() {
   const [confirm, setConfirm] = useState<{ moto: any; action: "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
   const [comentariosMoto, setComentariosMoto] = useState<{ id: string; orden: number } | null>(null);
   const [contenedorPartes, setContenedorPartes] = useState<{ id: string; folio: string } | null>(null);
-  const [liberar, setLiberar] = useState<{ id: string; orden: number } | null>(null);
+  const [liberar, setLiberar] = useState<{ id: string; orden: number; estatus: string } | null>(null);
   const [motivoLiberar, setMotivoLiberar] = useState("");
+  const [tipoLiberar, setTipoLiberar] = useState<"equivocacion" | "cambio_plan" | "otro">("equivocacion");
   const [historial, setHistorial] = useState<Map<string, number>>(new Map());
   const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [verHistorial, setVerHistorial] = useState<{ id: string; orden: number; items: any[] } | null>(null);
@@ -354,12 +355,14 @@ export default function Produccion() {
   const doLiberar = async () => {
     if (!liberar) return;
     if (motivoLiberar.trim().length < 5) { toast.error("Se requiere un motivo (mínimo 5 caracteres)"); return; }
-    const { data, error } = await supabase.rpc("desconfigurar_unidad", {
-      _motocarro_id: liberar.id, _motivo: motivoLiberar.trim(),
+    // Sólo admin: deshacer borra la unidad y devuelve las piezas al pool.
+    const { data, error } = await supabase.rpc("deshacer_configuracion", {
+      _motocarro_id: liberar.id, _motivo: motivoLiberar.trim(), _tipo: tipoLiberar,
     });
     if (error) { toast.error(error.message); return; }
-    toast.success(`✓ Unidad #${(data as any)?.liberada ?? liberar.orden} liberada — chasis y motor vuelven a disponibles`);
-    setLiberar(null); setMotivoLiberar(""); load();
+    const r = data as any;
+    toast.success(`✓ Configuración de la unidad #${r?.orden_armado ?? liberar.orden} deshecha — ${r?.ns_chasis ?? "chasis"} y ${r?.ns_motor ?? "motor"} vuelven a disponibles`);
+    setLiberar(null); setMotivoLiberar(""); setTipoLiberar("equivocacion"); load();
   };
 
   const guardarOrden = async (moto: any, ordenNuevo: number) => {
@@ -477,14 +480,14 @@ export default function Produccion() {
 
       {view === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
+          {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega} esAdmin={role === "admin"}
             catalogo={catalogo}
             incidencias={incidencias.get(r.id) ?? []}
             historialCount={historial.get(r.id) ?? 0}
             onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "", orden_armado: r.orden_armado }); }}
             onAction={(action) => setConfirm({ moto: r, action })}
             onComentarios={() => setComentariosMoto({ id: r.id, orden: r.orden_armado })}
-            onLiberar={() => setLiberar({ id: r.id, orden: r.orden_armado })}
+            onLiberar={() => setLiberar({ id: r.id, orden: r.orden_armado, estatus: r._eff })}
             onVerHistorial={() => abrirHistorial(r)}
             t={t}
           />)}
@@ -649,16 +652,55 @@ export default function Produccion() {
       <Dialog open={!!liberar} onOpenChange={(o) => { if (!o) { setLiberar(null); setMotivoLiberar(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Unlock className="h-5 w-5 text-amber-700" /> Liberar unidad #{liberar?.orden}</DialogTitle>
-            <DialogDescription>El chasis y el motor vuelven a disponibles. Se requiere un motivo.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <Unlock className="h-5 w-5 text-amber-700" /> Deshacer configuración — unidad #{liberar?.orden}
+            </DialogTitle>
+            <DialogDescription>
+              El chasis y el motor vuelven al inventario y la unidad deja de existir. Queda el
+              registro de quién la deshizo y por qué. Sólo un administrador puede hacerlo.
+            </DialogDescription>
           </DialogHeader>
+
+          <div className="space-y-2">
+            <Label>¿Qué pasó? *</Label>
+            {[
+              { key: "equivocacion", label: "Equivocación al capturar", ayuda: "Se armó con el chasis o el motor equivocado." },
+              { key: "cambio_plan",  label: "Cambio de plan",           ayuda: "La unidad ya no se va a armar así." },
+              { key: "otro",         label: "Otro",                     ayuda: "Explícalo en el motivo." },
+            ].map(o => (
+              <label
+                key={o.key}
+                className={`flex items-start gap-3 rounded-lg border-2 p-3 cursor-pointer ${tipoLiberar === o.key ? "border-[#1F3864] bg-[#EFF6FF]" : "hover:bg-slate-50"}`}
+              >
+                <input
+                  type="radio" className="mt-1 accent-[#1F3864]"
+                  checked={tipoLiberar === o.key}
+                  onChange={() => setTipoLiberar(o.key as any)}
+                />
+                <span className="text-sm">
+                  <span className="font-semibold">{o.label}</span>
+                  <span className="block text-xs text-muted-foreground">{o.ayuda}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+
+          {liberar && liberar.estatus !== "PENDIENTE" && (
+            <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
+              <TriangleAlert className="h-5 w-5 shrink-0" />
+              Esta unidad ya avanzó a {liberar.estatus}. Al deshacerla se pierde su avance de armado
+              (queda en la bitácora) y las piezas regresan al inventario.
+            </div>
+          )}
+
           <div>
             <Label>Motivo *</Label>
-            <Textarea value={motivoLiberar} onChange={e => setMotivoLiberar(e.target.value)} placeholder="Ej. Se capturó el motor equivocado" />
+            <Textarea value={motivoLiberar} onChange={e => setMotivoLiberar(e.target.value)} placeholder="Ej. Se capturó el motor de otra unidad; se corrige la pareja" />
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => { setLiberar(null); setMotivoLiberar(""); }}>{t.actions.cancel}</Button>
-            <Button onClick={doLiberar} className="bg-amber-600 hover:bg-amber-700">Liberar</Button>
+            <Button onClick={doLiberar} className="bg-amber-600 hover:bg-amber-700">Deshacer configuración</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -684,7 +726,7 @@ export default function Produccion() {
   );
 }
 
-function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, incidencias = [], t }: any) {
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, esAdmin, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, incidencias = [], t }: any) {
   const desv = diasDesvio(r);
   const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
   const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
@@ -869,8 +911,10 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         {canEditFabrica && (
           <Button variant="outline" onClick={onEdit} className="h-12 w-12 p-0" title="Editar"><Pencil className="h-5 w-5" /></Button>
         )}
-        {canEditFabrica && r._eff === "PENDIENTE" && !r.remision_id && (
-          <Button variant="outline" onClick={onLiberar} className="h-12 w-12 p-0 border-amber-300 text-amber-700 hover:bg-amber-50" title="Liberar unidad">
+        {/* Deshacer una configuración equivocada: sólo admin, y sólo mientras
+            la unidad no esté comprometida con un cliente. */}
+        {esAdmin && !r.remision_id && r.estatus_entrega !== "ENTREGADA" && (
+          <Button variant="outline" onClick={onLiberar} className="h-12 w-12 p-0 border-amber-300 text-amber-700 hover:bg-amber-50" title="Deshacer configuración (equivocación)">
             <Unlock className="h-5 w-5" />
           </Button>
         )}

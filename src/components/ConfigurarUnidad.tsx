@@ -51,12 +51,30 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
         (catalogoData ?? []).filter((c: any) => lineaDe(c.modelo, catMap) === "motocarro").map((c: any) => c.modelo)
       );
 
-      const { data: chasisData, error: chErr } = await supabase
-        .from("inventario_chasis")
-        .select("id, numero_chasis, modelo, color, color_original, estatus, contenedor_id, contenedores(folio_contenedor)")
-        .is("motocarro_id", null)
-        .order("numero_chasis");
-      if (chErr) throw chErr;
+      // color_original llega con KIT-4c. Si esa migración todavía no está
+      // aplicada, se consulta sin ella en vez de dejar el diálogo en blanco:
+      // configurar unidades no puede depender del orden de despliegue.
+      const COLS_CHASIS = "id, numero_chasis, modelo, color, estatus, contenedor_id, contenedores(folio_contenedor)";
+      let chasisData: any[] | null = null;
+      {
+        const conVin = await supabase
+          .from("inventario_chasis")
+          .select(`${COLS_CHASIS}, color_original`)
+          .is("motocarro_id", null)
+          .order("numero_chasis");
+        if (conVin.error && /color_original/i.test(conVin.error.message)) {
+          const sinVin = await supabase
+            .from("inventario_chasis")
+            .select(COLS_CHASIS)
+            .is("motocarro_id", null)
+            .order("numero_chasis");
+          if (sinVin.error) throw sinVin.error;
+          chasisData = sinVin.data as any[];
+        } else {
+          if (conVin.error) throw conVin.error;
+          chasisData = conVin.data as any[];
+        }
+      }
 
       // Reportes abiertos: se muestran como aviso. Los que retienen la pieza
       // ya vienen con estatus distinto de 'disponible' y quedan fuera del pool.
@@ -64,6 +82,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
         .from("incidencias_chasis")
         .select("chasis_id, folio, parte_afectada, estatus")
         .in("estatus", ["abierta", "en_revision"]);
+      // (si la tabla no existiera, incData viene null y simplemente no hay avisos)
       const incMap = new Map<string, IncidenciaAbierta>(
         (incData ?? []).map((i: any) => [i.chasis_id, { folio: i.folio, parte_afectada: i.parte_afectada }])
       );

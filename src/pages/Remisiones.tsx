@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { fmtDate, effEstatusArmado, COLORES } from "@/lib/dazon";
+import { DisponibilidadColores } from "@/components/DisponibilidadColores";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -787,6 +788,9 @@ export default function Remisiones() {
           )}
         </div>
       )}
+
+      {/* ── Qué se puede prometer hoy, por color ──────────────────────────── */}
+      <DisponibilidadColores compacto />
 
       {/* ── Tabs Activas / Canceladas ─────────────────────────────────────── */}
       <div className="flex gap-0 border-b border-slate-200">

@@ -231,3 +231,11 @@ export type CapacidadColor = { juegos: number; usados: number; libres: number };
 
 export const claveCapacidad = (modelo: string, color: string) =>
   `${modelo}__${normColor(color)}`;
+
+// Muestra de color para los tableros. Un color que no esté aquí cae a gris.
+export const COLOR_HEX: Record<string, string> = {
+  BLANCO: "#F1F5F9", AZUL: "#2E75B6", ROJO: "#C0392B", NEGRO: "#1F2937",
+  VERDE: "#065F46", GRIS: "#94A3B8", AMARILLO: "#F59E0B", NARANJA: "#EA580C",
+  PLATA: "#CBD5E1",
+};
+export const colorHex = (c?: string | null) => COLOR_HEX[normColor(c)] ?? "#94A3B8";
