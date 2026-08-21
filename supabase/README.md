@@ -103,6 +103,47 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
     chasis que juegos.
   · `v_stock_modelo_color` agrega `capacidad_color`, `juegos_usados`,
     `capacidad_libre` y `piezas_recoloreadas`.
+- `supabase/migrations/20260823000004_finanzas_ingresos_egresos.sql` — KIT-4d:
+  Control Financiero deja de ser una lista de gastos y pasa a ser un libro
+  mayor de caja. `pagos` queda **obsoleta** (se conserva de respaldo, con
+  `migrado_a_movimiento` apuntando al registro nuevo).
+  · `movimientos_financieros` lleva ingresos y egresos en la misma línea de
+    tiempo: folio `ING-######` / `EGR-######`, estatus
+    (BORRADOR → PENDIENTE → CONFIRMADO / CANCELADO — solo lo CONFIRMADO afecta
+    saldo) y `monto_mxn` como columna generada para poder sumar monedas.
+  · **La contraparte se amarra al catálogo**, no es texto libre:
+    `contraparte_tipo` + el FK que corresponda (`cliente_id`, `proveedor_id`,
+    `empleado_id`) o «OTRO» con el nombre a mano. El CHECK `chk_contraparte`
+    impide declarar un tipo y apuntar al catálogo equivocado.
+  · **Quién pagó ≠ quién trajo el dinero.** `via` distingue DIRECTO (el cliente
+    vino a caja / le pagamos al proveedor) de INTERMEDIARIO (alguien trajo el
+    efectivo o alguien lo llevó a pagar), con `intermediario_id` /
+    `intermediario_nombre` y `recibido_por`.
+  · **Comprobación de efectivo.** `marcar_comprobacion_movimiento` enciende
+    `requiere_comprobacion` cuando es EGRESO + EFECTIVO + INTERMEDIARIO: el
+    movimiento queda abierto hasta que hay `monto_comprobado` y
+    `monto_devuelto`. Es la cuenta que se le lleva a quien se le dio el
+    efectivo para que fuera a pagar.
+  · `proveedores` (RFC, banco, CLABE, días de crédito) y
+    `cuentas_financieras` + `v_saldos_cuentas` (saldo real por caja y banco).
+    `validar_moneda_cuenta` impide meter un movimiento en dólares a una caja
+    en pesos, que si no el saldo mezcla monedas.
+  · `movimiento_adjuntos`: expediente de N documentos por movimiento
+    clasificados por tipo (factura, recibo, comprobante, vale de efectivo,
+    foto del efectivo…) en el bucket privado `finanzas-docs`. Un trigger
+    mantiene `tiene_factura` al día. Las sentencias de `storage` van aisladas
+    en bloques `DO` que atrapan `insufficient_privilege`: el SQL editor manda
+    todo en una transacción, y sin aislarlas un error de permisos sobre
+    `storage.objects` revertía el módulo completo.
+  · `movimiento_bitacora`: trigger que registra alta, edición, confirmación,
+    cancelación y comprobación. Los borrados van a `bitacora_eliminaciones`.
+  · RLS con **separación de funciones**: `finanzas` captura y edita lo suyo
+    mientras esté PENDIENTE, pero **no** puede confirmar ni cancelar; eso es de
+    `admin_financiero`. Las vistas llevan `security_invoker = true` para que
+    respeten el RLS de las tablas base en lugar de saltárselo.
+  · Los folios usan secuencia, así que **pueden tener huecos** si un insert se
+    rechaza. Es a propósito: un contador sin huecos obliga a serializar la
+    captura.
 
 ## Verificación manual recomendada
 
@@ -211,4 +252,47 @@ SELECT im.numero_motor, im.estatus, m.orden_armado
   FROM inventario_motor im
   JOIN motocarros m ON m.ns_motor = im.numero_motor
  WHERE im.motocarro_id IS NULL;
+```
+
+Después de aplicar KIT-4d (Control Financiero):
+
+```sql
+-- 1. Cajas y catálogo sembrados.
+SELECT nombre, tipo, moneda, saldo_inicial, saldo_actual
+  FROM v_saldos_cuentas ORDER BY orden;
+SELECT tipo, count(*) FROM categorias_financieras GROUP BY tipo;   -- 8 ingreso / 10 egreso
+
+-- 2. El bucket del expediente y sus políticas (si dio 0, créalos en Storage
+--    → New bucket: «finanzas-docs», privado, 20 MB).
+SELECT (SELECT count(*) FROM storage.buckets WHERE id = 'finanzas-docs') AS bucket,
+       (SELECT count(*) FROM pg_policies
+         WHERE tablename = 'objects' AND policyname LIKE 'finanzas_docs%') AS politicas;
+
+-- 3. Los `pagos` viejos quedaron migrados: no debe haber ninguno sin su
+--    movimiento equivalente.
+SELECT count(*) FROM pagos WHERE migrado_a_movimiento IS NULL;      -- debe ser 0
+
+-- 4. Efectivo entregado que nadie ha comprobado (la cuenta abierta).
+SELECT folio, fecha_movimiento, concepto, contraparte_nombre,
+       COALESCE(intermediario_nombre, '(del equipo)') AS se_le_dio_a, monto
+  FROM movimientos_financieros
+ WHERE requiere_comprobacion AND NOT comprobado AND estatus <> 'CANCELADO'
+ ORDER BY fecha_movimiento;
+
+-- 5. Debe dar 0 filas: una comprobación cerrada tiene que cuadrar.
+SELECT folio, monto, monto_comprobado, monto_devuelto,
+       monto - COALESCE(monto_comprobado,0) - COALESCE(monto_devuelto,0) AS diferencia
+  FROM movimientos_financieros
+ WHERE comprobado
+   AND monto - COALESCE(monto_comprobado,0) - COALESCE(monto_devuelto,0) <> 0;
+
+-- 6. Debe dar 0 filas: ningún movimiento en una cuenta de otra moneda.
+SELECT m.folio, m.moneda, c.nombre, c.moneda
+  FROM movimientos_financieros m JOIN cuentas_financieras c ON c.id = m.cuenta_id
+ WHERE m.moneda <> c.moneda;
+
+-- 7. Estado de cuenta por cliente (lo que nos ha pagado cada uno).
+SELECT nombre_comercial, pagos_registrados, total_pagado_mxn, ultimo_pago
+  FROM v_estado_cuenta_cliente
+ WHERE pagos_registrados > 0 ORDER BY total_pagado_mxn DESC;
 ```

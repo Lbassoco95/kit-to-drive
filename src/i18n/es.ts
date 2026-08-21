@@ -25,6 +25,7 @@ export const es = {
     crmDashboard: "Monitor equipo",
     crmTracker: "Tracker Vendedores",
     finanzas: "Control Financiero",
+    proveedores: "Proveedores",
   },
   groups: {
     Inicio: "Inicio",

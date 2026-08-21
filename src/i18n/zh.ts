@@ -24,7 +24,10 @@ export const zh: Translations = {
     crmActividades: "活动",
     crmRutas: "路线",
     crmDashboard: "团队监控",
+    crmEquipo: "销售团队",
+    crmTracker: "销售员追踪",
     finanzas: "财务管理",
+    proveedores: "供应商",
   },
   groups: {
     Inicio: "首页",

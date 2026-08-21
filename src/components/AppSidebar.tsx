@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, TriangleAlert } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -28,6 +28,7 @@ const ITEMS: Item[] = [
   { key: "crmRutas",        url: "/crm/rutas",        icon: MapPin,         roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
   { key: "crmTracker",      url: "/crm/tracker",      icon: BarChart2,      roles: ["admin","director_ventas","coordinador_ventas"], group: "CRM" },
   { key: "finanzas",       url: "/finanzas",      icon: Wallet,          roles: ["admin","finanzas","admin_financiero"],              group: "Finanzas" },
+  { key: "proveedores",    url: "/proveedores",   icon: Building2,       roles: ["admin","finanzas","admin_financiero"],              group: "Finanzas" },
   { key: "importar",       url: "/importar",      icon: Upload,          roles: ["admin"],                                              group: "Sistema" },
   { key: "usuarios",       url: "/usuarios",      icon: Database,        roles: ["admin"],                                              group: "Sistema" },
   { key: "bitacora",       url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                              group: "Sistema" },
@@ -66,7 +67,9 @@ export function AppSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {list.map(item => {
-                    const active = pathname === item.url;
+                    const active = item.url === "/"
+                      ? pathname === "/"
+                      : pathname === item.url || pathname.startsWith(item.url + "/");
                     return (
                       <SidebarMenuItem key={item.url}>
                         <SidebarMenuButton asChild isActive={active} className="h-12 my-0.5">
