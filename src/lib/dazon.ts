@@ -57,6 +57,15 @@ export function normColor(c?: string | null): "BLANCO" | "AZUL" | string {
   return c;
 }
 
+// Sanea un número de serie (chasis o motor) al mismo criterio que valida la
+// captura manual (NS_REGEX = ^[A-Z0-9-]{4,30}$): mayúsculas, sin espacios ni
+// otros caracteres. Un serial con espacio ("DZ164FML T2M00654") no se puede
+// ni teclear ni buscar, así que tiene que entrar limpio desde la importación.
+export function normSerial(s?: string | null): string {
+  if (!s) return "";
+  return s.toString().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+}
+
 // Compute effective estatus armado (mark ATRASADO if overdue and not built)
 export function effEstatusArmado(m: any): string {
   const e = m.estatus_armado;
