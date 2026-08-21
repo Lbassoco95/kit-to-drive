@@ -50,6 +50,25 @@ export const zh: Translations = {
   },
 
   // Roles
+  // 用户类型（级别）与部门
+  niveles: {
+    operador: "操作员",
+    supervisor: "主管",
+    admin: "管理员",
+  },
+  nivelDesc: {
+    operador: "在本部门内录入并跟进自己的工作。",
+    supervisor: "查看并更正本部门的全部内容，审批并查看团队指标。",
+    admin: "完全掌管本部门，包括管理本部门的用户。",
+  },
+  areas: {
+    comercial: "商务",
+    fabrica: "工厂",
+    almacen_logistica: "仓储与物流",
+    administracion: "行政财务",
+    direccion: "管理层",
+  },
+
   roles: {
     direccion: "管理层",
     admin: "管理员",

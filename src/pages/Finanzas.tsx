@@ -42,7 +42,7 @@ const fmt = (n: number, moneda: string) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: moneda, minimumFractionDigits: 2 }).format(n);
 
 export default function Finanzas() {
-  const { user, role } = useAuth();
+  const { user, perms } = useAuth();
   const [rows, setRows] = useState<Pago[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -59,8 +59,8 @@ export default function Finanzas() {
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const canDelete = role === "admin" || role === "admin_financiero";
-  const canEdit = role === "admin" || role === "admin_financiero" || role === "finanzas";
+  const canDelete = perms.puedeEliminar("finanzas");
+  const canEdit = perms.puedeCrear("finanzas");
 
   // ── Load ──────────────────────────────────────────────────────────────
   const load = async () => {

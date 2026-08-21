@@ -15,7 +15,7 @@ import { ArrowLeft, Plus, Pencil, User, Building2, TrendingUp, DollarSign, Calen
 export default function CrmOportunidadDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { role, user } = useAuth();
+  const { perms, user } = useAuth();
   const [oportunidad, setOportunidad] = useState<any>(null);
   const [cliente, setCliente] = useState<any>(null);
   const [vendedor, setVendedor] = useState<any>(null);
@@ -84,8 +84,8 @@ export default function CrmOportunidadDetail() {
     load();
   };
 
-  const canEdit = role === "admin" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
-  const canCreateActivity = role === "admin" || role === "ventas" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
+  const canEdit = perms.puedeEditar("crm");
+  const canCreateActivity = perms.puedeCrear("crm");
 
   if (loading) {
     return (

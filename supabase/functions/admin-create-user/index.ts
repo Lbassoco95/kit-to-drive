@@ -31,31 +31,59 @@ serve(async (req) => {
 
     const { data: roleRow } = await supabaseAdmin
       .from("user_roles")
-      .select("role")
+      .select("role, nivel, area")
       .eq("user_id", caller.id)
       .single();
 
-    if (roleRow?.role !== "admin") {
-      return new Response(JSON.stringify({ error: "Forbidden: solo admin puede crear usuarios" }), {
+    // Solo un administrador (de cualquier área) puede crear usuarios.
+    const callerNivel = roleRow?.nivel ?? (roleRow?.role === "admin" ? "admin" : null);
+    const callerArea = roleRow?.area ?? (roleRow?.role === "admin" ? "direccion" : null);
+    const esAdminGlobal = callerNivel === "admin" && callerArea === "direccion";
+
+    if (callerNivel !== "admin") {
+      return new Response(JSON.stringify({ error: "Forbidden: solo un administrador puede crear usuarios" }), {
         status: 403, headers: { ...CORS, "Content-Type": "application/json" }
       });
     }
 
     // 2. Parsear body
-    const { email, password, nombre_completo, role, codigo_vendedor } = await req.json();
+    const { email, password, nombre_completo, area, nivel, codigo_vendedor } = await req.json();
 
-    if (!email || !password || !nombre_completo || !role) {
-      return new Response(JSON.stringify({ error: "email, password, nombre_completo y role son obligatorios" }), {
+    if (!email || !password || !nombre_completo || !area || !nivel) {
+      return new Response(JSON.stringify({ error: "email, password, nombre_completo, area y nivel son obligatorios" }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" }
       });
     }
 
-    const validRoles = ["admin", "fabrica", "logistica", "ventas", "coordinador"];
-    if (!validRoles.includes(role)) {
-      return new Response(JSON.stringify({ error: "Rol inválido" }), {
+    const AREAS = ["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"];
+    const NIVELES = ["operador", "supervisor", "admin"];
+    if (!AREAS.includes(area)) {
+      return new Response(JSON.stringify({ error: "Área inválida" }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" }
       });
     }
+    if (!NIVELES.includes(nivel)) {
+      return new Response(JSON.stringify({ error: "Tipo de usuario inválido" }), {
+        status: 400, headers: { ...CORS, "Content-Type": "application/json" }
+      });
+    }
+
+    // Un admin de área solo puede crear usuarios dentro de su propia área.
+    if (!esAdminGlobal && area !== callerArea) {
+      return new Response(JSON.stringify({ error: "Solo puedes crear usuarios de tu propia área" }), {
+        status: 403, headers: { ...CORS, "Content-Type": "application/json" }
+      });
+    }
+
+    // Rol legacy derivado de (área, nivel) — el trigger de la BD lo recalcula igual.
+    const rolLegacy = (a: string, n: string) => {
+      if (a === "comercial") return n === "admin" ? "director_ventas" : n === "supervisor" ? "coordinador_ventas" : "ventas";
+      if (a === "fabrica") return "fabrica";
+      if (a === "almacen_logistica") return "logistica";
+      if (a === "administracion") return n === "operador" ? "finanzas" : "admin_financiero";
+      return n === "admin" ? "admin" : "coordinador"; // direccion
+    };
+    const rolDerivado = rolLegacy(area, nivel);
 
     // 3. Crear usuario en Supabase Auth
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -84,10 +112,12 @@ serve(async (req) => {
     // 5. Asignar rol
     await supabaseAdmin.from("user_roles").upsert({
       user_id: uid,
-      role,
-    });
+      area,
+      nivel,
+      role: rolDerivado,
+    }, { onConflict: "user_id" });
 
-    return new Response(JSON.stringify({ user_id: uid, email, nombre_completo, role }), {
+    return new Response(JSON.stringify({ user_id: uid, email, nombre_completo, area, nivel, role: rolDerivado }), {
       status: 200, headers: { ...CORS, "Content-Type": "application/json" }
     });
 

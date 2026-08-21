@@ -152,7 +152,7 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
 }
 
 export default function Produccion() {
-  const { role } = useAuth();
+  const { perms, area } = useAuth();
   const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [contenedores, setContenedores] = useState<Map<string, string>>(new Map()); // contenedor_id -> folio
@@ -353,8 +353,8 @@ export default function Produccion() {
     setVerHistorial({ id: moto.id, orden: moto.orden_armado, items: data ?? [] });
   };
 
-  const canEditFabrica = role === "admin" || role === "fabrica";
-  const canEditEntrega = role === "admin" || role === "logistica";
+  const canEditFabrica = perms.puedeCrear("produccion") && (area === "fabrica" || perms.esAdminGlobal);
+  const canEditEntrega = perms.puedeCrear("produccion") && (area === "almacen_logistica" || perms.esAdminGlobal);
   type ConfirmAction = "EN_PROCESO" | "ARMADO" | "LISTO" | "ENTREGADA";
 
   const FILTERS: { key: FilterKey; label: string; }[] = [
@@ -381,19 +381,19 @@ export default function Produccion() {
               <TableIcon size={18}/> {t.produccion.vista.tabla}
             </button>
           </div>
-          {(role === "admin" || role === "fabrica") && <ConfigurarUnidad onDone={load} />}
-          {(role === "admin" || role === "fabrica") && <RecibirContenedor onDone={load} />}
+          {canEditFabrica && <ConfigurarUnidad onDone={load} />}
+          {canEditFabrica && <RecibirContenedor onDone={load} />}
           <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> {t.produccion.exportarCsv}</Button>
         </div>
       </div>
 
       {/* InventarioStatus (alertas de déficit): solo admin/coordinador */}
-      {(role === "admin" || role === "coordinador") && <InventarioStatus refreshKey={rows.length} />}
+      {perms.puedeVer("inventario") && <InventarioStatus refreshKey={rows.length} />}
       {/* BandejaRemisiones: fábrica la necesita para asignar, ver docs y características */}
-      {(role === "admin" || role === "fabrica" || role === "coordinador") && <BandejaRemisiones onChange={load} />}
+      {perms.puedeVer("remisiones") && <BandejaRemisiones onChange={load} />}
       
       {/* Contenedor parts inventory button */}
-      {(role === "admin" || role === "fabrica") && contenedores.size > 0 && (
+      {canEditFabrica && contenedores.size > 0 && (
         <Card className="p-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>

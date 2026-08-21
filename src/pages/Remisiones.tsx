@@ -74,7 +74,13 @@ function suggestNextFolio(folios: string[]): string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
 export default function Remisiones() {
-  const { role, user } = useAuth();
+  const { perms, area, user } = useAuth();
+  // Operador de Comercial: solo trabaja con sus propias remisiones.
+  const esVendedor = area === "comercial" && perms.soloPropios("remisiones");
+  const veTodas = perms.puedeEditar("remisiones");
+  // La confirmación de fechas la hace cada área operativa.
+  const confirmaFabrica   = perms.esAdminGlobal || (area === "fabrica" && perms.puedeCrear("produccion"));
+  const confirmaLogistica = perms.esAdminGlobal || (area === "almacen_logistica" && perms.puedeCrear("produccion"));
   const { t } = useLang();
   const [rows, setRows]             = useState<any[]>([]);
   const [clientes, setClientes]     = useState<any[]>([]);
@@ -106,7 +112,7 @@ export default function Remisiones() {
   const [activeTab, setActiveTab]             = useState<'activas'|'canceladas'>('activas');
   const [notifOpen, setNotifOpen]             = useState(false);
 
-  const canAssignVendedor = role === "admin" || role === "coordinador";
+  const canAssignVendedor = veTodas;
   const totalUnidades = motos.reduce((s,m) => s + Number(m.cantidad||0), 0);
 
   // ── Loaders ────────────────────────────────────────────────────────────────
@@ -115,7 +121,7 @@ export default function Remisiones() {
     setClientes(data ?? []);
   };
   const loadVendedores = async () => {
-    const { data: roles } = await supabase.from("user_roles").select("user_id,role").in("role",["ventas","coordinador"]);
+    const { data: roles } = await supabase.from("user_roles").select("user_id,area").eq("area","comercial");
     if (!roles?.length) return;
     const { data } = await supabase.from("profiles").select("id,nombre_completo,codigo_vendedor,activo").in("id", roles.map(r=>r.user_id)).eq("activo",true).order("nombre_completo");
     setVendedores(data ?? []);
@@ -160,7 +166,7 @@ export default function Remisiones() {
       color_solicitado:null, total_unidades_solicitadas:null,
     }));
     setRows(baseRows);
-    const propios = baseRows.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
+    const propios = baseRows.filter((r:any) => veTodas||r.vendedor_id===user?.id);
     setRecentFolios(propios.slice(0,5).map((r:any)=>r.folio_remision));
 
     if (!base?.length) return;
@@ -211,22 +217,22 @@ export default function Remisiones() {
     } catch (_) { /* cache stale — ignorar */ }
   };
 
-  useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, role]);
+  useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, perms.nivel, perms.area]);
   useEffect(() => {
     if (user?.id) supabase.from("profiles").select("nombre_completo").eq("id",user.id).single().then(({data})=>{ if(data) setMyProfile(data); });
   }, [user?.id]);
 
-  const canCreate = role==="admin"||role==="ventas"||role==="coordinador";
+  const canCreate = perms.puedeCrear("remisiones");
 
   // ── Computed rows ────────────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
   const activeRows   = rows.filter(r => r.estatus !== 'CANCELADA');
-  const canceledRows = rows.filter(r => r.estatus === 'CANCELADA' && (role==='admin' || r.vendedor_id===user?.id));
+  const canceledRows = rows.filter(r => r.estatus === 'CANCELADA' && (veTodas || r.vendedor_id===user?.id));
   const displayRows  = activeTab === 'activas' ? activeRows : canceledRows;
 
   // Motocarros atrasados — solo para remisiones activas del usuario actual
   const motocarrosAtrasados = activeRows
-    .filter(r => role==='admin'||role==='coordinador'||r.vendedor_id===user?.id)
+    .filter(r => veTodas||r.vendedor_id===user?.id)
     .filter(r => r.estatus!=='COMPLETA')
     .flatMap(r => (r.motocarros??[]).map((m:any)=>({...m, folio:r.folio_remision})))
     .filter((m:any) => {
@@ -252,7 +258,7 @@ export default function Remisiones() {
 
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
-    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(recentFolios), nombre_vendedor: role==="ventas"?(myProfile?.nombre_completo||""):"" }));
+    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(recentFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
     setMotos([defaultMoto()]); setConFlete(false); setFormFile(null); setOpen(true);
   };
   const resetForm = () => {
@@ -499,7 +505,7 @@ export default function Remisiones() {
         <div>
           <h1>{t.remisiones.title}</h1>
           <p className="text-muted-foreground text-base mt-1">
-            {t.remisiones.subtitle(rows.length)} {role==="ventas"?"(solo las tuyas)":""}
+            {t.remisiones.subtitle(rows.length)} {esVendedor?"(solo las tuyas)":""}
           </p>
         </div>
 
@@ -571,7 +577,7 @@ export default function Remisiones() {
 
                 {/* Nombre vendedor — todos */}
                 <div>
-                  <Label className="text-base">Nombre del vendedor{role==="ventas"&&<span className="ml-1 text-xs text-muted-foreground font-normal">(tu nombre)</span>}</Label>
+                  <Label className="text-base">Nombre del vendedor{esVendedor&&<span className="ml-1 text-xs text-muted-foreground font-normal">(tu nombre)</span>}</Label>
                   <Input value={form.nombre_vendedor} onChange={e=>setForm({...form,nombre_vendedor:e.target.value})} placeholder="Nombre completo del vendedor" className="h-12 text-base"/>
                 </div>
 
@@ -792,7 +798,7 @@ export default function Remisiones() {
         >
           Activas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{activeRows.length}</span>
         </button>
-        {(role==='admin'||role==='ventas'||role==='coordinador') && (
+        {canCreate && (
           <button
             onClick={() => setActiveTab('canceladas')}
             className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='canceladas' ? 'border-red-500 text-red-600' : 'border-transparent text-muted-foreground hover:text-red-500'}`}
@@ -822,7 +828,7 @@ export default function Remisiones() {
                 <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}</div>
                 <div>Fecha: {fmtDate(r.fecha_remision)}</div>
               </div>
-              {role === 'admin' && (
+              {perms.puedeEliminar('remisiones') && (
                 <Button
                   variant="outline"
                   onClick={() => restaurarRemision(r.id)}
@@ -844,9 +850,10 @@ export default function Remisiones() {
           const pct        = Math.round((listas/total)*100);
           const pctColor   = pct===100?"#065F46":pct>=50?"#92400E":"#991B1B";
           const isOwner    = r.vendedor_id===user?.id;
-          const canAssign  = role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner);
-          const canUpload  = role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner);
-          const canPropose = role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner);
+          const puedeGestionar = veTodas||(canCreate&&isOwner);
+          const canAssign  = puedeGestionar;
+          const canUpload  = puedeGestionar;
+          const canPropose = puedeGestionar;
           const vendedorNombre = r.nombre_vendedor||r.profiles?.nombre_completo||"—";
           const initials = vendedorNombre.split(" ").map((s:string)=>s[0]).slice(0,2).join("").toUpperCase();
 
@@ -928,7 +935,7 @@ export default function Remisiones() {
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id]?"rotate-180":""}`}/>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-2">
-                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} canPropose={canPropose} role={role} onChange={load}/>)}
+                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} canPropose={canPropose} canConfirmFab={confirmaFabrica} canConfirmLog={confirmaLogistica} onChange={load}/>)}
                   </CollapsibleContent>
                 </Collapsible>
               )}
@@ -956,7 +963,7 @@ export default function Remisiones() {
                     <FileText className="h-5 w-5 mr-2 opacity-40"/> Sin PDF
                   </div>
                 )}
-                {r.tipo_pago==="contra_entrega"&&!r.pagado&&(role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner))&&(
+                {r.tipo_pago==="contra_entrega"&&!r.pagado&&puedeGestionar&&(
                   <Button onClick={()=>{setPagoDialog(r);setComprobanteFile(null);}} className="flex-1 h-12 text-base bg-emerald-600 hover:bg-emerald-700 min-w-[100px]">
                     <DollarSign className="h-5 w-5 mr-2"/> {t.pago.confirmar}
                   </Button>
@@ -966,8 +973,8 @@ export default function Remisiones() {
                     <FileDown className="h-5 w-5 mr-2"/> {t.pago.verComprobante}
                   </Button>
                 )}
-                {/* Marcar entregada — admin/coordinador, solo si está activa */}
-                {(role==="admin"||role==="coordinador")&&(r.estatus==="NUEVA"||r.estatus==="PARCIAL")&&(
+                {/* Marcar entregada — supervisor/admin del área, solo si está activa */}
+                {veTodas&&(r.estatus==="NUEVA"||r.estatus==="PARCIAL")&&(
                   <Button
                     onClick={()=>setCierreConfirm(r)}
                     className="flex-1 h-12 text-base bg-emerald-700 hover:bg-emerald-800 min-w-[120px]"
@@ -975,8 +982,8 @@ export default function Remisiones() {
                     <CheckCheck className="h-5 w-5 mr-2"/> Entregar
                   </Button>
                 )}
-                {/* Eliminar — admin o ventas (solo sus propias) */}
-                {(role==="admin"||(role==="ventas"&&isOwner))&&(
+                {/* Cancelar — supervisor/admin del área, u operador en las propias */}
+                {(veTodas||(canCreate&&isOwner))&&(
                   <Button
                     variant="outline"
                     onClick={()=>setDeleteConfirm(r)}
@@ -986,8 +993,8 @@ export default function Remisiones() {
                     <Trash2 className="h-5 w-5"/>
                   </Button>
                 )}
-                {/* Eliminar definitivamente — solo admin */}
-                {role==="admin"&&(
+                {/* Eliminar definitivamente — solo admin del área */}
+                {perms.puedeEliminar("remisiones")&&(
                   <Button
                     variant="outline"
                     onClick={()=>setHardDeleteConfirm(r)}
@@ -1111,7 +1118,7 @@ export default function Remisiones() {
 }
 
 // ─── MotoRow ──────────────────────────────────────────────────────────────────
-function MotoRow({ m, canPropose, role, onChange }:{m:any;canPropose:boolean;role:string|null;onChange:()=>void}) {
+function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:any;canPropose:boolean;canConfirmFab:boolean;canConfirmLog:boolean;onChange:()=>void}) {
   const [editing, setEditing] = useState(false);
   const [fecha, setFecha]     = useState<string>(m.fecha_propuesta_entrega||"");
   const [notas, setNotas]     = useState<string>(m.propuesta_entrega_notas||"");
@@ -1128,8 +1135,6 @@ function MotoRow({ m, canPropose, role, onChange }:{m:any;canPropose:boolean;rol
     toast.success(`✓ Confirmado por ${area}`); onChange();
   };
 
-  const canConfirmFab = role==="admin"||role==="fabrica";
-  const canConfirmLog = role==="admin"||role==="logistica";
   const tieneFab = !!m.confirmada_fabrica_at;
   const tieneLog = !!m.confirmada_logistica_at;
 

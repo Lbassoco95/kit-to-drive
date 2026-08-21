@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Search, TrendingUp, DollarSign, Calendar, User, Building2, AlertTriangle } from "lucide-react";
 
 export default function CrmOportunidades() {
-  const { role, user } = useAuth();
+  const { perms, user } = useAuth();
   const { t } = useLang();
   const navigate = useNavigate();
   const [oportunidades, setOportunidades] = useState<any[]>([]);
@@ -77,9 +77,9 @@ export default function CrmOportunidades() {
     return filtered;
   }, [oportunidades, clientes, vendedores, q, selectedEtapa]);
 
-  const canEdit = role === "admin" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
-  const canCreate = role === "admin" || role === "ventas" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
-  const canDelete = role === "admin" || role === "coordinador_ventas";
+  const canEdit = perms.puedeEditar("crm");
+  const canCreate = perms.puedeCrear("crm");
+  const canDelete = perms.puedeEliminar("crm");
 
   const save = async () => {
     const payload = {
