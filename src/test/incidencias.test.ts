@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   chasisDetenido, serialesCompletos, normSerial, NS_REGEX,
-  ESTATUS_INCIDENCIA, ESTATUS_CHASIS, TIPOS_FALLA,
+  ESTATUS_INCIDENCIA, ESTATUS_CHASIS, TIPOS_FALLA, claveCapacidad,
 } from "@/lib/dazon";
 
 describe("chasisDetenido", () => {
@@ -74,5 +74,17 @@ describe("catálogos de incidencias", () => {
     expect(TIPOS_FALLA.map(t => t.key)).toEqual(
       ["falta_parte", "parte_danada", "defecto_fabrica", "documental", "otro"]
     );
+  });
+});
+
+describe("claveCapacidad — la llave de capacidad de color", () => {
+  it("normaliza el color, así que BLUE y AZUL caen en la misma llave", () => {
+    expect(claveCapacidad("DZ300Q7", "azul")).toBe("DZ300Q7__AZUL");
+    expect(claveCapacidad("DZ300Q7", "BLUE")).toBe("DZ300Q7__AZUL");
+    expect(claveCapacidad("DZ300Q7", "WHITE")).toBe("DZ300Q7__BLANCO");
+  });
+
+  it("separa por modelo: los juegos de piezas no se comparten entre modelos", () => {
+    expect(claveCapacidad("DZ200Q1", "AZUL")).not.toBe(claveCapacidad("DZ300Q7", "AZUL"));
   });
 });

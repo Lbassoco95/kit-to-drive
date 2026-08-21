@@ -3,19 +3,23 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike, Layers, Boxes, TriangleAlert } from "lucide-react";
+import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike, Layers, Boxes, TriangleAlert, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   lineaDe, LineaProducto, CatalogoModelos, displayFabrica, nombreComercial,
-  ESTATUS_CHASIS, ESTATUS_INCIDENCIA, EstatusIncidencia, chasisDetenido,
+  ESTATUS_CHASIS, ESTATUS_INCIDENCIA, EstatusIncidencia, chasisDetenido, normColor,
 } from "@/lib/dazon";
+import { useAuth } from "@/contexts/AuthContext";
+import { ColorChasis, ChasisColor, AjustarCapacidadColor } from "@/components/ColorChasis";
 
 type Chasis = {
   id: string;
   numero_chasis: string;
   modelo: string;
   color: string;
+  color_original: string | null;
   estatus: string;
   contenedor_id: string | null;
   motocarro_id: string | null;
@@ -67,6 +71,9 @@ type ColorInventario = {
   unidades_libres?: number | null;
   unidades_comprometidas?: number | null;
   unidades_entregadas?: number | null;
+  piezas_recibidas?: number | null;
+  piezas_extra?: number | null;
+  juegos_usados?: number | null;
 };
 
 // Foto por modelo comercial y color: lo que hay, lo que está detenido, lo que
@@ -82,6 +89,10 @@ type StockColor = {
   unidades_sin_serial: number;
   unidades_detenidas: number;
   unidades_comprometidas: number;
+  capacidad_color: number;
+  juegos_usados: number;
+  capacidad_libre: number;
+  piezas_recoloreadas: number;
   unidades_entregadas: number;
   solicitadas: number;
   asignadas: number;
@@ -130,6 +141,10 @@ function agruparModeloColor<T extends { modelo: string; color?: string }>(items:
 }
 
 export default function Inventario() {
+  const { role } = useAuth();
+  const puedeEditarColor = role === "admin" || role === "fabrica";
+  const [colorChasis, setColorChasis] = useState<ChasisColor | null>(null);
+  const [capacidadEdit, setCapacidadEdit] = useState<{ modelo: string; color: string; juegos: number } | null>(null);
   const [chasis, setChasis] = useState<Chasis[]>([]);
   const [motores, setMotores] = useState<Motor[]>([]);
   const [unidades, setUnidades] = useState<Unidad[]>([]);
@@ -190,6 +205,10 @@ export default function Inventario() {
         unidades_sin_serial: r.unidades_sin_serial ?? 0,
         unidades_detenidas: r.unidades_detenidas ?? 0,
         unidades_comprometidas: r.unidades_comprometidas ?? 0,
+        capacidad_color: r.capacidad_color ?? 0,
+        juegos_usados: r.juegos_usados ?? 0,
+        capacidad_libre: r.capacidad_libre ?? 0,
+        piezas_recoloreadas: r.piezas_recoloreadas ?? 0,
         unidades_entregadas: r.unidades_entregadas ?? 0,
         solicitadas: r.solicitadas ?? 0,
         asignadas: r.asignadas ?? 0,
@@ -408,7 +427,31 @@ export default function Inventario() {
                       <TableCell className="font-mono">{c.numero_chasis}</TableCell>
                       <TableCell>{displayFabrica(c.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={c.modelo} catalogo={catalogo} /></TableCell>
-                      <TableCell>{c.color}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <span>{normColor(c.color)}</span>
+                          {normColor(c.color_original ?? c.color) !== normColor(c.color) && (
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E]"
+                              title={`El VIN declaró ${normColor(c.color_original)}; se armó en ${normColor(c.color)}`}
+                            >
+                              VIN: {normColor(c.color_original)}
+                            </span>
+                          )}
+                          {puedeEditarColor && (
+                            <button
+                              onClick={() => setColorChasis({
+                                id: c.id, numero_chasis: c.numero_chasis, modelo: c.modelo,
+                                color: c.color, color_original: c.color_original, motocarro_id: c.motocarro_id,
+                              })}
+                              className="text-muted-foreground hover:text-[#1F3864]"
+                              title="Cambiar el color con el que se arma"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs ${est.cls}`}>{est.label}</span>
                       </TableCell>
@@ -552,7 +595,9 @@ export default function Inventario() {
                 <h3 className="font-semibold text-lg">Disponible y comprometido por color</h3>
                 <p className="text-sm text-muted-foreground">
                   Se calcula de los chasis y las unidades reales — no de un contador. La demanda sale
-                  de las remisiones NUEVA y PARCIAL.
+                  de las remisiones NUEVA y PARCIAL. <strong>Juegos</strong> es cuántas piezas de ese
+                  color llegaron: aunque haya chasis de sobra, no se pueden armar más unidades de un
+                  color que juegos de ese color.
                 </p>
               </div>
             </div>
@@ -567,6 +612,8 @@ export default function Inventario() {
                     <TableHead className="text-right" title="Unidades sin NS chasis / NS motor: no se pueden asignar">Sin NS</TableHead>
                     <TableHead className="text-right" title="Con remisión, aún no entregadas">Comprometidas</TableHead>
                     <TableHead className="text-right" title="Detenidas por incidencia: en revisión, garantía o no útiles">Detenidas</TableHead>
+                    <TableHead className="text-right" title="Juegos de piezas de ese color que llegaron (VIN + extras registradas)">Juegos</TableHead>
+                    <TableHead className="text-right" title="Juegos libres para armar otro chasis en este color">Juegos libres</TableHead>
                     <TableHead className="text-right" title="Unidades pendientes de asignar en remisiones activas">Demanda</TableHead>
                     <TableHead className="text-right" title="Unidades libres menos demanda pendiente">Holgura</TableHead>
                     <TableHead>Estatus</TableHead>
@@ -591,6 +638,17 @@ export default function Inventario() {
                         <TableCell className="text-right text-[#5B21B6]">{r.unidades_comprometidas}</TableCell>
                         <TableCell className={`text-right ${detenidas > 0 ? "text-[#991B1B] font-semibold" : "text-muted-foreground"}`}>
                           {detenidas}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {r.capacidad_color}
+                          {r.piezas_recoloreadas > 0 && (
+                            <span className="text-[10px] text-[#92400E] ml-1" title={`${r.piezas_recoloreadas} chasis se armaron en un color distinto al del VIN`}>
+                              ↺{r.piezas_recoloreadas}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className={`text-right font-semibold ${r.capacidad_libre > 0 ? "text-[#065F46]" : "text-muted-foreground"}`}>
+                          {r.capacidad_libre}
                         </TableCell>
                         <TableCell className="text-right font-bold">{r.demanda_pendiente}</TableCell>
                         <TableCell className={`text-right font-bold ${r.holgura_con_serial < 0 ? "text-[#991B1B]" : "text-[#065F46]"}`}>
@@ -620,7 +678,7 @@ export default function Inventario() {
                   })}
                   {stock.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                         Sin movimientos de color todavía
                       </TableCell>
                     </TableRow>
@@ -647,6 +705,7 @@ export default function Inventario() {
                     <TableHead className="text-right">Disponibles</TableHead>
                     <TableHead className="text-right">En unidades</TableHead>
                     <TableHead className="text-right">Entregadas</TableHead>
+                    <TableHead className="text-right">Juegos de color</TableHead>
                     <TableHead className="text-right">Umbral</TableHead>
                     <TableHead>Estatus</TableHead>
                   </TableRow>
@@ -662,6 +721,19 @@ export default function Inventario() {
                         <TableCell className="text-right font-bold">{c.cantidad_disponible}</TableCell>
                         <TableCell className="text-right">{c.unidades_configuradas ?? "—"}</TableCell>
                         <TableCell className="text-right">{c.unidades_entregadas ?? "—"}</TableCell>
+                        <TableCell className="text-right">
+                          <span className="font-semibold">{c.piezas_recibidas ?? "—"}</span>
+                          <span className="text-muted-foreground text-xs"> / {c.juegos_usados ?? 0} usados</span>
+                          {puedeEditarColor && (
+                            <button
+                              onClick={() => setCapacidadEdit({ modelo: c.modelo, color: c.color, juegos: c.piezas_recibidas ?? 0 })}
+                              className="ml-1.5 text-muted-foreground hover:text-[#1F3864]"
+                              title="Registrar juegos de este color que llegaron fuera del VIN"
+                            >
+                              <Pencil className="h-3.5 w-3.5 inline" />
+                            </button>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{c.umbral_alerta}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded-full text-xs flex items-center gap-1 ${status.color}`}>
@@ -674,7 +746,7 @@ export default function Inventario() {
                   })}
                   {colores.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No hay colores en inventario
                       </TableCell>
                     </TableRow>
@@ -842,6 +914,24 @@ export default function Inventario() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ColorChasis
+        chasis={colorChasis}
+        open={!!colorChasis}
+        onOpenChange={o => { if (!o) setColorChasis(null); }}
+        onDone={() => { setColorChasis(null); cargarInventario(); }}
+      />
+
+      {capacidadEdit && (
+        <AjustarCapacidadColor
+          modelo={capacidadEdit.modelo}
+          color={capacidadEdit.color}
+          juegosActuales={capacidadEdit.juegos}
+          open={!!capacidadEdit}
+          onOpenChange={o => { if (!o) setCapacidadEdit(null); }}
+          onDone={() => { setCapacidadEdit(null); cargarInventario(); }}
+        />
+      )}
     </div>
   );
 }

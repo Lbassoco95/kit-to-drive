@@ -221,3 +221,13 @@ export const chasisDetenido = (estatus?: string | null) =>
 export const NS_REGEX = /^[A-Z0-9-]{4,30}$/;
 export const serialesCompletos = (m: any) =>
   !!(m?.ns_chasis && String(m.ns_chasis).trim() && m?.ns_motor && String(m.ns_motor).trim());
+
+// ── Capacidad de color ──────────────────────────────────────────────────────
+// El VIN puede decir que un chasis es BLANCO y fábrica armarlo AZUL: eso está
+// bien. Lo que no puede pasar es que existan más unidades de un color que
+// juegos de piezas de ese color llegaron. La capacidad se lleva por
+// (modelo de fábrica, color) — una cabina de 200cc no va en un 300cc.
+export type CapacidadColor = { juegos: number; usados: number; libres: number };
+
+export const claveCapacidad = (modelo: string, color: string) =>
+  `${modelo}__${normColor(color)}`;

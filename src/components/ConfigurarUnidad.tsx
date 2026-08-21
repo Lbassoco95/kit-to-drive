@@ -4,15 +4,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Wrench, AlertTriangle, CheckCircle2, Search, TriangleAlert } from "lucide-react";
+import { Wrench, AlertTriangle, CheckCircle2, Search, TriangleAlert, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { CatalogoModelos, displayFabrica, lineaDe } from "@/lib/dazon";
+import { CatalogoModelos, displayFabrica, lineaDe, COLORES, normColor, CapacidadColor, claveCapacidad } from "@/lib/dazon";
 import { ReportarIncidencia } from "@/components/ReportarIncidencia";
+import { cargarCapacidadColor } from "@/components/ColorChasis";
 
 type IncidenciaAbierta = { folio: string | null; parte_afectada: string | null };
 type ChasisDisponible = {
   id: string; numero_chasis: string; modelo: string; color: string;
+  color_original: string | null;
   folio: string | null; estatus: string; incidencia?: IncidenciaAbierta;
 };
 type MotorDisponible = { id: string; numero_motor: string; modelo: string };
@@ -32,6 +34,10 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
   const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [detenidos, setDetenidos] = useState(0);
   const [reportar, setReportar] = useState<ChasisDisponible | null>(null);
+  // Color con el que se va a armar. Arranca en el del chasis; fábrica lo puede
+  // cambiar si hay juegos de piezas libres de ese color.
+  const [colorSel, setColorSel] = useState<string>("");
+  const [capacidad, setCapacidad] = useState<Map<string, CapacidadColor>>(new Map());
   const nav = useNavigate();
 
   const load = async () => {
@@ -47,7 +53,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
 
       const { data: chasisData, error: chErr } = await supabase
         .from("inventario_chasis")
-        .select("id, numero_chasis, modelo, color, estatus, contenedor_id, contenedores(folio_contenedor)")
+        .select("id, numero_chasis, modelo, color, color_original, estatus, contenedor_id, contenedores(folio_contenedor)")
         .is("motocarro_id", null)
         .order("numero_chasis");
       if (chErr) throw chErr;
@@ -69,6 +75,8 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
         .order("numero_motor");
       if (moErr) throw moErr;
 
+      setCapacidad(await cargarCapacidadColor());
+
       const { data: ultimoOrden } = await supabase
         .from("motocarros")
         .select("orden_armado")
@@ -84,6 +92,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
           .filter((c: any) => c.estatus === "disponible")
           .map((c: any) => ({
             id: c.id, numero_chasis: c.numero_chasis, modelo: c.modelo, color: c.color,
+            color_original: c.color_original ?? null,
             estatus: c.estatus,
             folio: c.contenedores?.folio_contenedor ?? null,
             incidencia: incMap.get(c.id),
@@ -112,17 +121,31 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
     return motores.filter(m => m.numero_motor.includes(q) || m.modelo.toUpperCase().includes(q));
   }, [motores, qMotor]);
 
+  useEffect(() => { setColorSel(chasisSel ? normColor(chasisSel.color) : ""); }, [chasisSel]);
+
   const modelosCoinciden = chasisSel && motorSel ? chasisSel.modelo === motorSel.modelo : true;
+
+  const libresDe = (color: string) =>
+    capacidad.get(claveCapacidad(chasisSel?.modelo ?? "", color))?.libres ?? 0;
+
+  const colorPropio = chasisSel ? normColor(chasisSel.color) : "";
+  const colorCambia = !!chasisSel && !!colorSel && colorSel !== colorPropio;
+  const colorSinJuegos = colorCambia && libresDe(colorSel) <= 0;
+  const colorVin = chasisSel ? normColor(chasisSel.color_original ?? chasisSel.color) : "";
 
   const guardar = async () => {
     if (!chasisSel || !motorSel) { toast.error("Selecciona un chasis y un motor"); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("configurar_unidad", {
       _chasis_id: chasisSel.id, _motor_id: motorSel.id, _orden: orden,
+      _color: colorCambia ? colorSel : undefined,
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    const r = data as { ok?: boolean; orden_armado?: number; modelos_coinciden?: boolean } | null;
+    const r = data as { ok?: boolean; orden_armado?: number; modelos_coinciden?: boolean; color_cambiado?: boolean; color?: string; color_vin?: string } | null;
+    if (r?.color_cambiado) {
+      toast.info(`Unidad #${r?.orden_armado} armada en ${r?.color} — el VIN decía ${r?.color_vin}. Queda registrado.`);
+    }
     if (r?.modelos_coinciden === false) {
       toast.warning(`Unidad #${r.orden_armado} creada, pero el chasis (${chasisSel.modelo}) y el motor (${motorSel.modelo}) son de modelos distintos.`);
     } else {
@@ -133,6 +156,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
     setMotores(prev => prev.filter(m => m.id !== motorSel.id));
     setChasisSel(null); setMotorSel(null); setQChasis(""); setQMotor("");
     setOrden(o => o + 1);
+    setCapacidad(await cargarCapacidadColor());
     onDone?.();
   };
 
@@ -244,13 +268,60 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
             </div>
           )}
 
+          {chasisSel && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Palette className="h-4 w-4" /> Color con el que se arma
+                {colorVin !== colorPropio && (
+                  <span className="text-xs font-normal text-muted-foreground">(el VIN decía {colorVin})</span>
+                )}
+              </Label>
+              <div className="flex flex-wrap gap-1.5">
+                {[colorPropio, ...COLORES.filter(c => c !== colorPropio)].map(c => {
+                  const libres = libresDe(c);
+                  const propio = c === colorPropio;
+                  const activo = colorSel === c;
+                  const agotado = !propio && libres <= 0;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      disabled={agotado}
+                      onClick={() => setColorSel(c)}
+                      className={`text-xs px-2.5 py-1.5 rounded-full border ${
+                        activo ? "bg-[#1F3864] text-white border-[#1F3864]"
+                        : agotado ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+                        : "bg-white text-slate-700 hover:border-[#2E75B6]"}`}
+                      title={propio ? "El color que trae el chasis"
+                        : agotado ? `No quedan juegos ${c} libres de este modelo`
+                        : `${libres} juego(s) ${c} libres`}
+                    >
+                      {c}{propio ? " · del chasis" : ` · ${libres}`}
+                    </button>
+                  );
+                })}
+              </div>
+              {colorCambia && !colorSinJuegos && (
+                <p className="text-xs text-[#92400E]">
+                  Se va a usar un juego de piezas {colorSel}; queda registrado que el VIN decía {colorVin}.
+                </p>
+              )}
+              {colorSinJuegos && (
+                <p className="text-xs text-[#991B1B]">
+                  No quedan juegos {colorSel} libres. Intercambia el color con otro chasis desde
+                  Inventario → Chasis, o registra las piezas extra que llegaron.
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
             <Label className="shrink-0">Orden de armado</Label>
             <Input type="number" min={1} className="h-10 w-32" value={orden} onChange={e => setOrden(Number(e.target.value))} />
           </div>
 
           <DialogFooter>
-            <Button onClick={guardar} disabled={busy || !chasisSel || !motorSel} className="h-12 bg-[#065F46] hover:bg-[#054c38]">
+            <Button onClick={guardar} disabled={busy || !chasisSel || !motorSel || colorSinJuegos} className="h-12 bg-[#065F46] hover:bg-[#054c38]">
               <CheckCircle2 className="h-5 w-5 mr-2" /> {busy ? "Guardando…" : "Configurar unidad"}
             </Button>
           </DialogFooter>

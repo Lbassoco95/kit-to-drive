@@ -73,6 +73,36 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
      elimina**). `reabrir_incidencia_chasis` permite que un chasis no útil al
      que después le dan garantía —o que sí se pudo adaptar— vuelva a revisión
      sin perder su historia.
+- `supabase/migrations/20260823000002_capturar_seriales_unidad.sql` — KIT-4b:
+  `capturar_seriales_unidad()`. KIT-4 exige los dos seriales para cerrar el
+  proceso, pero la captura manual escribía nada más en `motocarros`: si el
+  serial teclado SÍ estaba en el embarque, la pieza se quedaba en `disponible` y
+  fábrica podía volver a configurarla en otra unidad (inventario contado doble).
+  Ahora la captura liga la pieza, libera la anterior si se corrigió un serial
+  mal capturado, respeta el estatus de una pieza en garantía (no la "lava" a
+  `configurado`) y recalcula colores. Producción → Editar ya usa esta RPC.
+
+- `supabase/migrations/20260823000003_color_efectivo_capacidad.sql` — KIT-4c:
+  el color se puede cambiar en fábrica, pero no se puede inventar.
+  · `inventario_chasis.color_original` guarda lo que declaró el VIN (un trigger
+    lo llena en cada importación) y `color` es el color efectivo con el que se
+    arma.
+  · La **capacidad** de un color son los juegos de piezas que llegaron:
+    se deriva del VIN + `inventario_colores.piezas_extra` (ajuste manual con
+    bitácora), así que una importación futura la sube sola.
+  · `cambiar_color_chasis()` usa un juego libre; `intercambiar_color_chasis()`
+    permuta el color de dos chasis del mismo modelo (neutro en capacidad — es
+    la operación de piso cuando todos los colores están a tope);
+    `ajustar_capacidad_color()` registra juegos que llegaron fuera del VIN.
+    Ninguna deja cambiar el color de una unidad ya remisionada o entregada: ahí
+    el color es parte del pedido.
+  · `configurar_unidad()` recibe un 4º parámetro opcional `_color` para armar en
+    otro color en ese momento (valida la capacidad igual).
+  · Red de seguridad: el trigger `trg_verificar_capacidad_color` tumba cualquier
+    movimiento —incluido un UPDATE directo por RLS— que deje un color con más
+    chasis que juegos.
+  · `v_stock_modelo_color` agrega `capacidad_color`, `juegos_usados`,
+    `capacidad_libre` y `piezas_recoloreadas`.
 
 ## Verificación manual recomendada
 
@@ -139,4 +169,46 @@ SELECT orden_armado, estatus_armado, estatus_entrega, ns_chasis, ns_motor
 SELECT folio, ns_chasis, parte_afectada, estatus, retiene_chasis, folio_garantia
   FROM incidencias_chasis ORDER BY reportado_at DESC;
 SELECT estatus, count(*) FROM inventario_chasis GROUP BY estatus ORDER BY 1;
+```
+
+Después de aplicar KIT-4b y KIT-4c:
+
+```sql
+-- 1. Capacidad de color: cuántos juegos llegaron, cuántos se usan, cuántos quedan.
+SELECT modelo, color, piezas_recibidas AS juegos, piezas_extra AS extra,
+       juegos_usados AS usados, piezas_recibidas - juegos_usados AS libres
+  FROM inventario_colores ORDER BY modelo, color;
+
+-- 2. Debe dar 0 filas: ningún color puede tener más chasis que juegos.
+WITH usados AS (SELECT modelo, upper(color) AS color, count(*) n FROM inventario_chasis GROUP BY 1,2),
+     vin    AS (SELECT modelo, upper(COALESCE(color_original,color)) AS color, count(*) n
+                  FROM inventario_chasis GROUP BY 1,2)
+SELECT u.modelo, u.color, u.n AS usados,
+       COALESCE(v.n,0) + COALESCE(ic.piezas_extra,0) AS capacidad
+  FROM usados u
+  LEFT JOIN vin v ON v.modelo = u.modelo AND v.color = u.color
+  LEFT JOIN inventario_colores ic ON ic.modelo = u.modelo AND ic.color = u.color
+ WHERE u.n > COALESCE(v.n,0) + COALESCE(ic.piezas_extra,0);
+
+-- 3. Chasis que se armaron en un color distinto al del VIN (con su bitácora).
+SELECT numero_chasis, color_original AS vin, color AS efectivo
+  FROM inventario_chasis
+ WHERE upper(COALESCE(color_original, color)) <> upper(color)
+ ORDER BY numero_chasis;
+
+SELECT tipo, ns_chasis, modelo, color_anterior, color_nuevo,
+       cantidad_antes, cantidad_nueva, motivo, creado_at
+  FROM bitacora_color ORDER BY creado_at DESC;
+
+-- 4. Debe dar 0 filas: ninguna pieza usada por una unidad puede seguir
+--    contándose como disponible (lo que arregla KIT-4b).
+SELECT ic.numero_chasis, ic.estatus, m.orden_armado
+  FROM inventario_chasis ic
+  JOIN motocarros m ON m.ns_chasis = ic.numero_chasis
+ WHERE ic.motocarro_id IS NULL;
+
+SELECT im.numero_motor, im.estatus, m.orden_armado
+  FROM inventario_motor im
+  JOIN motocarros m ON m.ns_motor = im.numero_motor
+ WHERE im.motocarro_id IS NULL;
 ```

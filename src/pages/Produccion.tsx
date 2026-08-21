@@ -570,6 +570,32 @@ export default function Produccion() {
                 const v = (patch as any)[campo];
                 if (v && !NS_REGEX.test(v)) { toast.error(`${etiqueta} inválido: usa 4 a 30 caracteres (letras, números o guion)`); return; }
               }
+
+              // Los seriales NO se guardan con un update directo: van por
+              // capturar_seriales_unidad, que además liga la pieza del
+              // inventario para que no siga contándose como disponible.
+              const cambioChasis = (patch.ns_chasis || null) !== (editing.ns_chasis || null);
+              const cambioMotor  = (patch.ns_motor  || null) !== (editing.ns_motor  || null);
+              if (cambioChasis || cambioMotor) {
+                const { data, error } = await supabase.rpc("capturar_seriales_unidad", {
+                  _motocarro_id: editing.id,
+                  _ns_chasis: cambioChasis ? (patch.ns_chasis || undefined) : undefined,
+                  _ns_motor:  cambioMotor  ? (patch.ns_motor  || undefined) : undefined,
+                });
+                if (error) { toast.error(error.message); return; }
+                const r = data as any;
+                const ligadas = [r?.chasis_vinculado && "chasis", r?.motor_vinculado && "motor"].filter(Boolean).join(" y ");
+                toast.success(ligadas
+                  ? `✓ Seriales capturados — se ligó el ${ligadas} del inventario`
+                  : "✓ Seriales capturados");
+                if (r?.chasis_detenido) toast.warning("Ojo: ese chasis tiene una incidencia que lo mantiene detenido.");
+                if ((r?.piezas_liberadas ?? []).length) {
+                  toast.info(`Volvieron al inventario: ${(r.piezas_liberadas as string[]).join(", ")}`);
+                }
+              }
+              delete patch.ns_chasis;
+              delete patch.ns_motor;
+
               Object.keys(patch).forEach(k => { if (patch[k] === "") patch[k] = null; });
               await updateMoto(editing.id, patch);
               setEditing(null);
