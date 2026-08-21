@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike, Layers, Boxes } from "lucide-react";
 import { toast } from "sonner";
-import { lineaDe, LineaProducto } from "@/lib/dazon";
+import { lineaDe, LineaProducto, CatalogoModelos, displayFabrica, nombreComercial } from "@/lib/dazon";
 
 type Chasis = {
   id: string;
@@ -64,7 +64,7 @@ const LINEA_BADGE: Record<LineaProducto, string> = {
   otro: "bg-amber-100 text-amber-700",
 };
 
-function LineaBadge({ modelo, catalogo }: { modelo: string; catalogo: Map<string, LineaProducto> }) {
+function LineaBadge({ modelo, catalogo }: { modelo: string; catalogo: CatalogoModelos }) {
   const linea = lineaDe(modelo, catalogo);
   const sinClasificar = catalogo.size > 0 && !catalogo.has(modelo);
   return (
@@ -74,11 +74,14 @@ function LineaBadge({ modelo, catalogo }: { modelo: string; catalogo: Map<string
   );
 }
 
-function agruparModeloColor<T extends { modelo: string; color?: string }>(items: T[]) {
+// Agrupa por nombre comercial (no por código de fábrica): un DZ300Q7 y un
+// legacy "300cc 2026" son la misma línea para ventas/dirección.
+function agruparModeloColor<T extends { modelo: string; color?: string }>(items: T[], catalogo: CatalogoModelos) {
   const map = new Map<string, { modelo: string; color: string; n: number }>();
   items.forEach(i => {
-    const key = `${i.modelo}__${i.color ?? "-"}`;
-    const cur = map.get(key) ?? { modelo: i.modelo, color: i.color ?? "-", n: 0 };
+    const modelo = nombreComercial(i.modelo, catalogo);
+    const key = `${modelo}__${i.color ?? "-"}`;
+    const cur = map.get(key) ?? { modelo, color: i.color ?? "-", n: 0 };
     cur.n++;
     map.set(key, cur);
   });
@@ -91,7 +94,7 @@ export default function Inventario() {
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [partes, setPartes] = useState<Parte[]>([]);
   const [colores, setColores] = useState<ColorInventario[]>([]);
-  const [catalogo, setCatalogo] = useState<Map<string, LineaProducto>>(new Map());
+  const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [loading, setLoading] = useState(true);
   const [lineaFiltro, setLineaFiltro] = useState<"TODAS" | LineaProducto>("TODAS");
 
@@ -108,7 +111,7 @@ export default function Inventario() {
         supabase.from("motocarros").select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado, estatus_entrega, fecha_real_armado, remision_id, contenedor_id").order("orden_armado"),
         supabase.from("inventario_partes").select("*").order("descripcion"),
         supabase.from("inventario_colores").select("*").order("modelo, color"),
-        supabase.from("modelos_producto").select("modelo, linea"),
+        supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
       ]);
 
       if (chasisData.error) throw chasisData.error;
@@ -125,7 +128,7 @@ export default function Inventario() {
       setUnidades((unidadesData.data as any) || []);
       setPartes(partesData.data || []);
       setColores(coloresData.data || []);
-      setCatalogo(new Map((catalogoData.data ?? []).map((c: any) => [c.modelo, c.linea as LineaProducto])));
+      setCatalogo(new Map((catalogoData.data ?? []).map((c: any) => [c.modelo, { linea: c.linea as LineaProducto, nombre_comercial: c.nombre_comercial }])));
     } catch (error) {
       console.error("Error loading inventory:", error);
       toast.error("Error al cargar inventario");
@@ -259,7 +262,7 @@ export default function Inventario() {
                   {unidadesFiltrado.map((u) => (
                     <TableRow key={u.id}>
                       <TableCell className="font-bold">#{u.orden_armado}</TableCell>
-                      <TableCell>{u.modelo}</TableCell>
+                      <TableCell>{displayFabrica(u.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={u.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>{u.color}</TableCell>
                       <TableCell className="font-mono text-xs">{u.ns_chasis ?? '-'}</TableCell>
@@ -314,7 +317,7 @@ export default function Inventario() {
                   {chasisFiltrado.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-mono">{c.numero_chasis}</TableCell>
-                      <TableCell>{c.modelo}</TableCell>
+                      <TableCell>{displayFabrica(c.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={c.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>{c.color}</TableCell>
                       <TableCell>
@@ -367,7 +370,7 @@ export default function Inventario() {
                   {motoresFiltrado.map((m) => (
                     <TableRow key={m.id}>
                       <TableCell className="font-mono">{m.numero_motor}</TableCell>
-                      <TableCell>{m.modelo}</TableCell>
+                      <TableCell>{displayFabrica(m.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={m.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs ${
@@ -468,7 +471,7 @@ export default function Inventario() {
                     const status = getColorStatus(c.cantidad_disponible, c.umbral_alerta);
                     return (
                       <TableRow key={c.id}>
-                        <TableCell>{c.modelo}</TableCell>
+                        <TableCell>{displayFabrica(c.modelo, catalogo)}</TableCell>
                         <TableCell>{c.color}</TableCell>
                         <TableCell className="text-right font-bold">{c.cantidad_disponible}</TableCell>
                         <TableCell className="text-right">{c.umbral_alerta}</TableCell>
@@ -519,7 +522,7 @@ export default function Inventario() {
                     <TableRow key={`u-${u.id}`}>
                       <TableCell><span className="px-2 py-1 rounded-full text-xs bg-slate-100">Unidad #{u.orden_armado}</span></TableCell>
                       <TableCell className="font-mono text-xs">{u.ns_chasis} / {u.ns_motor}</TableCell>
-                      <TableCell>{u.modelo}</TableCell>
+                      <TableCell>{displayFabrica(u.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={u.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>{u.color}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{u.remision_id ? `Remisión ${u.remision_id.slice(0, 8)}...` : "sin remisión"}</TableCell>
@@ -529,7 +532,7 @@ export default function Inventario() {
                     <TableRow key={`c-${c.id}`}>
                       <TableCell><span className="px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">Chasis</span></TableCell>
                       <TableCell className="font-mono text-xs">{c.numero_chasis}</TableCell>
-                      <TableCell>{c.modelo}</TableCell>
+                      <TableCell>{displayFabrica(c.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={c.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>{c.color}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{c.contenedor_id ? c.contenedor_id.slice(0, 8) + "..." : "-"} {c.motocarro_id ? "· configurado" : "· disponible"}</TableCell>
@@ -539,7 +542,7 @@ export default function Inventario() {
                     <TableRow key={`m-${m.id}`}>
                       <TableCell><span className="px-2 py-1 rounded-full text-xs bg-purple-50 text-purple-700">Motor</span></TableCell>
                       <TableCell className="font-mono text-xs">{m.numero_motor}</TableCell>
-                      <TableCell>{m.modelo}</TableCell>
+                      <TableCell>{displayFabrica(m.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={m.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>-</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{m.contenedor_id ? m.contenedor_id.slice(0, 8) + "..." : "-"} {m.motocarro_id ? "· configurado" : "· disponible"}</TableCell>
@@ -586,7 +589,7 @@ export default function Inventario() {
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Libre por modelo y color</h3>
               <div className="space-y-1 text-sm">
-                {agruparModeloColor(stockLibre).map((g, i) => (
+                {agruparModeloColor(stockLibre, catalogo).map((g, i) => (
                   <div key={i} className="flex justify-between border-b py-1 last:border-0">
                     <span>{g.modelo} · {g.color}</span>
                     <span className="font-bold">{g.n}</span>
@@ -598,7 +601,7 @@ export default function Inventario() {
             <Card className="p-4">
               <h3 className="font-semibold mb-3">Por configurar por modelo y color</h3>
               <div className="space-y-1 text-sm">
-                {agruparModeloColor(chasisPorConfigurar).map((g, i) => (
+                {agruparModeloColor(chasisPorConfigurar, catalogo).map((g, i) => (
                   <div key={i} className="flex justify-between border-b py-1 last:border-0">
                     <span>{g.modelo} · {g.color}</span>
                     <span className="font-bold">{g.n}</span>
@@ -634,7 +637,7 @@ export default function Inventario() {
                   {arrastre.slice(0, 20).map(u => (
                     <TableRow key={u.id}>
                       <TableCell className="font-bold">#{u.orden_armado}</TableCell>
-                      <TableCell>{u.modelo}</TableCell>
+                      <TableCell>{nombreComercial(u.modelo, catalogo)}</TableCell>
                       <TableCell>{u.color}</TableCell>
                       <TableCell>{u.fecha_real_armado}</TableCell>
                       <TableCell className={`text-right font-bold ${u.dias > 60 ? "text-[#991B1B]" : u.dias > 30 ? "text-[#92400E]" : ""}`}>{u.dias}</TableCell>

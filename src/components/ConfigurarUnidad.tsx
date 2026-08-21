@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Wrench, AlertTriangle, CheckCircle2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { LineaProducto } from "@/lib/dazon";
+import { CatalogoModelos, displayFabrica, lineaDe } from "@/lib/dazon";
 
 type ChasisDisponible = { id: string; numero_chasis: string; modelo: string; color: string; folio: string | null };
 type MotorDisponible = { id: string; numero_motor: string; modelo: string };
@@ -23,14 +23,17 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
   const [chasisSel, setChasisSel] = useState<ChasisDisponible | null>(null);
   const [motorSel, setMotorSel] = useState<MotorDisponible | null>(null);
   const [orden, setOrden] = useState<number>(1);
+  const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
 
   const load = async () => {
     setLoading(true);
     try {
-      const { data: catalogo, error: catErr } = await supabase.from("modelos_producto").select("modelo, linea");
+      const { data: catalogoData, error: catErr } = await supabase.from("modelos_producto").select("modelo, linea, nombre_comercial");
       if (catErr) throw catErr;
+      const catMap: CatalogoModelos = new Map((catalogoData ?? []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }]));
+      setCatalogo(catMap);
       const modelosMotocarro = new Set(
-        (catalogo ?? []).filter((c: any) => (c.linea as LineaProducto) === "motocarro").map((c: any) => c.modelo)
+        (catalogoData ?? []).filter((c: any) => lineaDe(c.modelo, catMap) === "motocarro").map((c: any) => c.modelo)
       );
 
       const { data: chasisData, error: chErr } = await supabase
@@ -140,7 +143,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${chasisSel?.id === c.id ? "bg-[#DBEAFE]" : ""}`}
                   >
                     <div className="font-mono font-semibold">{c.numero_chasis}</div>
-                    <div className="text-xs text-muted-foreground">{c.modelo} · {c.color} · {c.folio ?? "sin contenedor"}</div>
+                    <div className="text-xs text-muted-foreground">{displayFabrica(c.modelo, catalogo)} · {c.color} · {c.folio ?? "sin contenedor"}</div>
                   </button>
                 ))}
                 {!loading && chasisFiltrados.length === 0 && <div className="p-4 text-sm text-center text-muted-foreground">Sin chasis disponibles</div>}
@@ -161,7 +164,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${motorSel?.id === m.id ? "bg-[#DBEAFE]" : ""}`}
                   >
                     <div className="font-mono font-semibold">{m.numero_motor}</div>
-                    <div className="text-xs text-muted-foreground">{m.modelo}</div>
+                    <div className="text-xs text-muted-foreground">{displayFabrica(m.modelo, catalogo)}</div>
                   </button>
                 ))}
                 {!loading && motoresFiltrados.length === 0 && <div className="p-4 text-sm text-center text-muted-foreground">Sin motores disponibles</div>}

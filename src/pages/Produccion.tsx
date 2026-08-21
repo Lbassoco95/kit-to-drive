@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor, lineaDe, LineaProducto } from "@/lib/dazon";
+import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor, lineaDe, displayFabrica, CatalogoModelos } from "@/lib/dazon";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X, Package, Unlock, History, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -168,12 +168,14 @@ export default function Produccion() {
   const [liberar, setLiberar] = useState<{ id: string; orden: number } | null>(null);
   const [motivoLiberar, setMotivoLiberar] = useState("");
   const [historial, setHistorial] = useState<Map<string, number>>(new Map());
+  const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [verHistorial, setVerHistorial] = useState<{ id: string; orden: number; items: any[] } | null>(null);
 
   const load = async () => {
     // ── -1. Catálogo de líneas de producto — sólo línea "motocarro" entra aquí ─
-    const { data: catalogo } = await supabase.from("modelos_producto").select("modelo, linea");
-    const catMap = new Map<string, LineaProducto>((catalogo ?? []).map((c: any) => [c.modelo, c.linea]));
+    const { data: catalogoData } = await supabase.from("modelos_producto").select("modelo, linea, nombre_comercial");
+    const catMap: CatalogoModelos = new Map((catalogoData ?? []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }]));
+    setCatalogo(catMap);
 
     // ── 0. Load containers for folio mapping ─────────────────────────────────
     const { data: conts } = await supabase
@@ -447,6 +449,7 @@ export default function Produccion() {
       {view === "cards" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
+            catalogo={catalogo}
             historialCount={historial.get(r.id) ?? 0}
             onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "", orden_armado: r.orden_armado }); }}
             onAction={(action) => setConfirm({ moto: r, action })}
@@ -470,7 +473,7 @@ export default function Produccion() {
                 {filtered.map(r => (
                   <tr key={r.id}>
                     <td className="font-semibold text-primary">{r.orden_armado}</td>
-                    <td>{r.modelo}</td><td>{r.color}</td>
+                    <td>{displayFabrica(r.modelo, catalogo)}</td><td>{r.color}</td>
                     <td>{fmtDate(r.fecha_estimada_armado)}</td>
                     <td><EstatusBadge estatus={r._eff} size="sm" /></td>
                     <td>{fmtDate(r.fecha_real_armado)}</td>
@@ -609,7 +612,7 @@ export default function Produccion() {
   );
 }
 
-function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, t }: any) {
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, t }: any) {
   const desv = diasDesvio(r);
   const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
   const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
@@ -633,7 +636,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
           </div>
           <div>
             <div className="text-sm text-muted-foreground font-medium">{r.color}</div>
-            <div className="text-base font-semibold text-[#1F3864]">{r.modelo}</div>
+            <div className="text-base font-semibold text-[#1F3864]">{displayFabrica(r.modelo, catalogo)}</div>
           </div>
         </div>
         <div className="px-3 py-1.5 rounded-md bg-[#1F3864] text-white font-bold text-xl tracking-tight">

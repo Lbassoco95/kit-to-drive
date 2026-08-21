@@ -393,3 +393,90 @@ BEGIN
 END; $$;
 
 GRANT EXECUTE ON FUNCTION public.cambiar_orden_armado(uuid, integer, text) TO authenticated;
+
+
+-- ============================================================================
+-- BLOQUE 7 · Nomenclatura comercial (código de fábrica vs. nombre comercial)
+-- ============================================================================
+-- El embarque trae DZ200Q1 / DZ300Q7 (código de fábrica, lo que viene en la
+-- mercancía y el packing list) y las remisiones piden "200cc 2026" /
+-- "300cc 2026" (nombre comercial, lo que habla ventas). Se resuelve en el
+-- catálogo — nadie cambia cómo captura ni cómo habla.
+--
+-- Reglas de despliegue (las aplica el frontend, este bloque sólo da los
+-- datos y corrige el cruce):
+--   Fábrica (Producción, Inventario, configurar unidad): código de fábrica
+--     con el comercial como secundario — "DZ300Q7 · 300cc 2026".
+--   Ventas y dirección (Remisiones, Entregas, Clientes, Dashboard, Stock):
+--     sólo el nombre comercial.
+--   Un modelo sin nombre_comercial cae de vuelta al código.
+--
+-- No se reescriben remisiones existentes: el mapeo vive en el catálogo y en
+-- el cruce de asignar_chasis_remision, no en los datos de remision_items.
+
+ALTER TABLE public.modelos_producto ADD COLUMN IF NOT EXISTS nombre_comercial text;
+
+UPDATE public.modelos_producto SET nombre_comercial = CASE modelo
+  WHEN 'DZ200Q1' THEN '200cc 2026'
+  WHEN 'DZ300Q7' THEN '300cc 2026'
+  ELSE nombre_comercial END;
+
+-- Los legacy ya son su propio nombre comercial.
+UPDATE public.modelos_producto SET nombre_comercial = modelo WHERE nombre_comercial IS NULL;
+
+-- El cruce unidad ↔ remisión compara por nombre comercial + color, no por
+-- código de fábrica: hoy hay demanda pendiente pidiendo "300cc 2026" y las
+-- unidades configuradas por fábrica traen "DZ300Q7". Si el modelo no está en
+-- el catálogo (o no tiene nombre_comercial), cae de vuelta al código — mismo
+-- comportamiento que antes de este bloque para lo que no está clasificado.
+CREATE OR REPLACE FUNCTION public.asignar_chasis_remision(
+  _remision_id uuid, _cantidad integer, _color text DEFAULT NULL::text, _modelo text DEFAULT NULL::text)
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE
+  asignados integer := 0;
+BEGIN
+  IF NOT (
+    public.has_role(auth.uid(), 'admin') OR
+    EXISTS (SELECT 1 FROM public.remisiones r WHERE r.id = _remision_id AND r.vendedor_id = auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'No autorizado para asignar chasis a esta remisión';
+  END IF;
+
+  WITH candidatos AS (
+    SELECT m.id
+      FROM public.motocarros m
+      LEFT JOIN public.modelos_producto mp ON mp.modelo = m.modelo
+     WHERE m.remision_id IS NULL
+       AND m.estatus_armado IN ('PENDIENTE','EN_PROCESO','ARMADO','LISTO')
+       AND (_color  IS NULL OR upper(m.color)  = upper(_color))
+       AND (_modelo IS NULL OR upper(COALESCE(mp.nombre_comercial, m.modelo)) = upper(_modelo))
+     ORDER BY m.orden_armado ASC
+     LIMIT _cantidad
+     FOR UPDATE SKIP LOCKED
+  )
+  UPDATE public.motocarros m
+  SET remision_id = _remision_id,
+      estatus_entrega = CASE
+        WHEN m.estatus_entrega = 'NO_APLICA' THEN 'PROGRAMADA'
+        ELSE m.estatus_entrega
+      END
+  FROM candidatos c
+  WHERE m.id = c.id;
+
+  GET DIAGNOSTICS asignados = ROW_COUNT;
+
+  UPDATE public.remisiones r
+  SET estatus = CASE
+    WHEN (SELECT COUNT(*) FROM public.motocarros mm WHERE mm.remision_id = r.id) >= r.total_unidades_solicitadas
+      THEN 'COMPLETA'::estatus_remision
+    WHEN (SELECT COUNT(*) FROM public.motocarros mm WHERE mm.remision_id = r.id) > 0
+      THEN 'PARCIAL'::estatus_remision
+    ELSE 'NUEVA'::estatus_remision
+  END
+  WHERE r.id = _remision_id;
+
+  RETURN asignados;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.asignar_chasis_remision(uuid, integer, text, text) TO authenticated;

@@ -87,9 +87,28 @@ export function normSerial(s?: string | null): string {
 // Un modelo que no está en el catálogo se trata como "otro" — nunca se asume
 // "motocarro" por default para no meter una línea desconocida al armado.
 export type LineaProducto = "motocarro" | "mototaxi" | "otro";
-export function lineaDe(modelo: string | null | undefined, catalogo: Map<string, LineaProducto>): LineaProducto {
+export type ModeloInfo = { linea: LineaProducto; nombre_comercial: string | null };
+export type CatalogoModelos = Map<string, ModeloInfo>;
+
+export function lineaDe(modelo: string | null | undefined, catalogo: CatalogoModelos): LineaProducto {
   if (!modelo) return "otro";
-  return catalogo.get(modelo) ?? "otro";
+  return catalogo.get(modelo)?.linea ?? "otro";
+}
+
+// Nombre comercial de un modelo (lo que habla ventas y dirección — Remisiones,
+// Entregas, Clientes, Dashboard, Stock). Si el modelo no está en el catálogo
+// o no tiene nombre comercial, cae de vuelta al código de fábrica.
+export function nombreComercial(modelo: string | null | undefined, catalogo: CatalogoModelos): string {
+  if (!modelo) return "—";
+  return catalogo.get(modelo)?.nombre_comercial || modelo;
+}
+
+// Texto para pantallas de fábrica (Producción, Inventario, configurar unidad):
+// código de fábrica con el comercial como secundario, p.ej. "DZ300Q7 · 300cc 2026".
+export function displayFabrica(modelo: string | null | undefined, catalogo: CatalogoModelos): string {
+  if (!modelo) return "—";
+  const nc = catalogo.get(modelo)?.nombre_comercial;
+  return nc && nc !== modelo ? `${modelo} · ${nc}` : modelo;
 }
 
 // Compute effective estatus armado (mark ATRASADO if overdue and not built)

@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, LineaProducto } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, CatalogoModelos, nombreComercial, displayFabrica } from "@/lib/dazon";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
@@ -69,7 +69,7 @@ export default function Dashboard() {
   const { role, user, profileName } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
-  const [data, setData] = useState<{ motos: any[]; rems: any[]; catalogo: Map<string, LineaProducto>; chasisPorConfigurar: number } | null>(null);
+  const [data, setData] = useState<{ motos: any[]; rems: any[]; catalogo: CatalogoModelos; chasisPorConfigurar: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -91,7 +91,7 @@ export default function Dashboard() {
             .select(
               "id, folio_remision, estatus, vendedor_id, total_unidades_solicitadas, notas, profiles:vendedor_id(nombre_completo)"
             ),
-          supabase.from("modelos_producto").select("modelo, linea"),
+          supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
           supabase.from("inventario_chasis").select("modelo").is("motocarro_id", null),
         ]);
         if (cancelled) return;
@@ -99,7 +99,7 @@ export default function Dashboard() {
           setError([errM?.message, errR?.message].filter(Boolean).join("; ") || "Error al consultar Supabase");
           setData(null);
         } else {
-          const catMap = new Map<string, LineaProducto>((catalogo ?? []).map((c: any) => [c.modelo, c.linea]));
+          const catMap: CatalogoModelos = new Map((catalogo ?? []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }]));
           const chasisPorConfigurar = (chasisDisp ?? []).filter((c: any) => lineaDe(c.modelo, catMap) === "motocarro").length;
           setData({
             motos: (motos ?? []).map((m: any) => ({ ...m, color: normColor(m.color), _eff: effEstatusArmado(m) })),
@@ -298,7 +298,7 @@ export default function Dashboard() {
                   {atrasados.slice(0, 8).map(m => (
                     <button key={m.id} onClick={() => nav("/produccion")} className="text-left p-3 bg-white rounded-md border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {m.modelo} {m.color}</div>
+                        <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {nombreComercial(m.modelo, data.catalogo)} {m.color}</div>
                         <div className="text-xs text-muted-foreground">{t.dashboard.fechaEstimada}: {fmtDate(m.fecha_estimada_armado)}</div>
                       </div>
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">{t.dashboard.diasAtraso(diasDesvio(m) ?? 0)}</span>
@@ -361,7 +361,7 @@ export default function Dashboard() {
           </div>
           <Card className="p-6">
             <h3 className="mb-3">{t.dashboard.proximasOrdenes}</h3>
-            <ProximasOrdenes motos={motos} t={t} />
+            <ProximasOrdenes motos={motos} catalogo={data.catalogo} t={t} />
           </Card>
         </>
       )}
@@ -418,7 +418,7 @@ function TopVendedores({ rems }: { rems: any[] }) {
   );
 }
 
-function ProximasOrdenes({ motos, t }: { motos: any[]; t: any }) {
+function ProximasOrdenes({ motos, catalogo, t }: { motos: any[]; catalogo: CatalogoModelos; t: any }) {
   const proximas = motos
     .filter(m => m._eff === "PENDIENTE" || m._eff === "EN_PROCESO" || m._eff === "ATRASADO")
     .sort((a, b) => (a.orden_armado - b.orden_armado))
@@ -431,7 +431,7 @@ function ProximasOrdenes({ motos, t }: { motos: any[]; t: any }) {
         {proximas.map(m => (
           <tr key={m.id}>
             <td className="font-semibold">{m.orden_armado}</td>
-            <td>{m.modelo}</td>
+            <td>{displayFabrica(m.modelo, catalogo)}</td>
             <td>{m.color}</td>
             <td>{fmtDate(m.fecha_estimada_armado)}</td>
             <td><EstatusBadge estatus={m._eff} size="sm" /></td>

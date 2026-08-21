@@ -1008,6 +1008,7 @@ export type Database = {
           descripcion: string | null
           linea: string
           modelo: string
+          nombre_comercial: string | null
         }
         Insert: {
           activo?: boolean
@@ -1015,6 +1016,7 @@ export type Database = {
           descripcion?: string | null
           linea?: string
           modelo: string
+          nombre_comercial?: string | null
         }
         Update: {
           activo?: boolean
@@ -1022,6 +1024,7 @@ export type Database = {
           descripcion?: string | null
           linea?: string
           modelo?: string
+          nombre_comercial?: string | null
         }
         Relationships: []
       }
