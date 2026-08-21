@@ -47,16 +47,50 @@ serve(async (req) => {
     }
 
     // 2. Parsear body
-    const { email, password, nombre_completo, area, nivel, codigo_vendedor } = await req.json();
+    const body = await req.json();
+    const { email, password, nombre_completo, codigo_vendedor } = body;
 
-    if (!email || !password || !nombre_completo || !area || !nivel) {
-      return new Response(JSON.stringify({ error: "email, password, nombre_completo, area y nivel son obligatorios" }), {
+    if (!email || !password || !nombre_completo) {
+      return new Response(JSON.stringify({ error: "email, password y nombre_completo son obligatorios" }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" }
       });
     }
 
     const AREAS = ["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"];
     const NIVELES = ["operador", "supervisor", "admin"];
+
+    // Traduce un rol del enum legacy al par (área, nivel), para clientes que
+    // todavía no se han actualizado al modelo nuevo.
+    const desdeRolLegacy = (role: string) => {
+      switch (role) {
+        case "admin":              return { area: "direccion",         nivel: "admin"      };
+        case "director_ventas":    return { area: "comercial",         nivel: "admin"      };
+        case "coordinador_ventas":
+        case "coordinador":        return { area: "comercial",         nivel: "supervisor" };
+        case "ventas":
+        case "auxiliar_ventas":    return { area: "comercial",         nivel: "operador"   };
+        case "fabrica":            return { area: "fabrica",           nivel: "operador"   };
+        case "logistica":          return { area: "almacen_logistica", nivel: "operador"   };
+        case "admin_financiero":   return { area: "administracion",    nivel: "admin"      };
+        case "finanzas":           return { area: "administracion",    nivel: "operador"   };
+        default:                   return null;
+      }
+    };
+
+    // El modelo vigente es (área, nivel); `role` se acepta solo por compatibilidad.
+    let area = body.area;
+    let nivel = body.nivel;
+    if (!area || !nivel) {
+      const equivalente = body.role ? desdeRolLegacy(body.role) : null;
+      if (!equivalente) {
+        return new Response(JSON.stringify({ error: "area y nivel son obligatorios" }), {
+          status: 400, headers: { ...CORS, "Content-Type": "application/json" }
+        });
+      }
+      area = area ?? equivalente.area;
+      nivel = nivel ?? equivalente.nivel;
+    }
+
     if (!AREAS.includes(area)) {
       return new Response(JSON.stringify({ error: "Área inválida" }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" }
