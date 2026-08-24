@@ -163,6 +163,23 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
     selector **Todo el equipo / Solo las mías** y marca con la etiqueta «Tuya»
     las remisiones del usuario en sesión.
 
+## Cómo se propaga un cambio de permisos
+
+Los dos lados no se comportan igual, y conviene tenerlo claro antes de tocar
+roles o políticas:
+
+- **La base es inmediata.** El rol no viaja en el JWT: `has_role()` consulta
+  `user_roles` en cada query. Un cambio de política o de rol aplica en la
+  siguiente petición, sin cerrar sesión ni recargar.
+- **La app revisa sola.** `AuthContext` vuelve a leer el rol al recuperar el
+  foco de la pestaña, al volver a ella y cada dos minutos mientras está
+  visible. Si detecta un cambio actualiza el menú y avisa con un toast
+  («Tus permisos cambiaron»). Antes el rol se leía una sola vez por sesión y
+  había que pedirle a la persona que recargara a mano.
+- Un error de red en esa revisión **no** borra el rol vigente: se conserva y se
+  reintenta en el siguiente ciclo, para no degradar permisos por un tropiezo
+  de conexión.
+
 ## Verificación manual recomendada
 
 Después de aplicar KIT-1 o importar datos:
