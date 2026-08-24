@@ -225,3 +225,36 @@ export type CapacidadColor = { juegos: number; usados: number; libres: number };
 
 export const claveCapacidad = (modelo: string, color: string) =>
   `${modelo}__${normColor(color)}`;
+
+// ── Cuando la base va atrás del código ──────────────────────────────────────
+// Los scripts de supabase/migrations/ se aplican a mano en el SQL editor de
+// Supabase; no hay tabla de migraciones que diga cuáles corrieron. Si uno se
+// quedó sin aplicar, la app le pide a la base una columna que no existe y
+// Postgres contesta 42703: «column inventario_chasis.color_original does not
+// exist». Ese texto no le dice a nadie qué hacer, y el hueco se ve como si se
+// hubiera perdido la información. Esto lo traduce al archivo que falta correr.
+const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
+  [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color/,
+    "20260823000003_color_efectivo_capacidad.sql"],
+  [/incidencias_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at/,
+    "20260823000001_incidencias_chasis_colores_cierre.sql"],
+  [/nombre_comercial|modelos_producto|bitacora_orden_armado/,
+    "20260822000001_configuracion_manual_unidades.sql"],
+];
+
+/**
+ * Mensaje de error para el usuario. Si la base viene atrás del código, dice
+ * qué script hay que correr en vez de repetir el error crudo de Postgres.
+ */
+export function explicarError(e: unknown, fallback: string): string {
+  const err = (e ?? {}) as { code?: string; message?: string };
+  const crudo = err.message ?? "";
+  // 42703 = undefined_column, 42P01 = undefined_table, 42883 = undefined_function.
+  if (["42703", "42P01", "42883"].includes(err.code ?? "")) {
+    const script = SCRIPT_DE_OBJETO.find(([re]) => re.test(crudo))?.[1];
+    return script
+      ? `La base de datos va atrás del sistema: falta correr supabase/migrations/${script} en el SQL editor de Supabase. (${crudo})`
+      : `La base de datos va atrás del sistema. Corre supabase/diagnostico_esquema.sql en el SQL editor para ver qué script falta. (${crudo})`;
+  }
+  return crudo || fallback;
+}

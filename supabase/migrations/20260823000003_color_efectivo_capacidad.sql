@@ -27,6 +27,65 @@
 
 
 -- ============================================================================
+-- BLOQUE 0 · Antes de tocar nada: ¿están los cimientos?
+-- ============================================================================
+-- El SQL editor manda el archivo completo en UNA transacción: si algo revienta
+-- a media página, se revierte TODO y no queda ni la primera columna. Cuando eso
+-- pasa por una dependencia que falta, el error que sale es de la línea que la
+-- usó —a 400 líneas de aquí— y no dice qué script hay que correr antes.
+-- Este bloque revisa los cimientos primero y, si falta alguno, dice cuál es y
+-- qué archivo lo trae.
+
+DO $preflight$
+DECLARE _faltan text[] := ARRAY[]::text[];
+BEGIN
+  IF to_regclass('public.inventario_chasis') IS NULL THEN
+    _faltan := _faltan || 'tabla inventario_chasis (20260819000004_inventario_chasis.sql)'::text;
+  END IF;
+  IF to_regclass('public.inventario_colores') IS NULL THEN
+    _faltan := _faltan || 'tabla inventario_colores (20260819000007_inventario_colores.sql)'::text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                  WHERE conrelid = to_regclass('public.inventario_colores')
+                    AND contype = 'u'
+                    AND pg_get_constraintdef(oid) = 'UNIQUE (modelo, color)') THEN
+    _faltan := _faltan || 'UNIQUE (modelo,color) en inventario_colores (20260819000007_inventario_colores.sql)'::text;
+  END IF;
+  IF to_regclass('public.modelos_producto') IS NULL
+     OR NOT EXISTS (SELECT 1 FROM information_schema.columns
+                     WHERE table_schema='public' AND table_name='modelos_producto'
+                       AND column_name='nombre_comercial') THEN
+    _faltan := _faltan || 'modelos_producto.nombre_comercial (KIT-3 · 20260822000001_configuracion_manual_unidades.sql)'::text;
+  END IF;
+  IF to_regprocedure('public.configurar_unidad(uuid,uuid,integer)') IS NULL
+     AND to_regprocedure('public.configurar_unidad(uuid,uuid,integer,text)') IS NULL THEN
+    _faltan := _faltan || 'configurar_unidad() (KIT-3 · 20260822000001_configuracion_manual_unidades.sql)'::text;
+  END IF;
+  IF to_regclass('public.incidencias_chasis') IS NULL
+     OR to_regprocedure('public.chasis_bloqueado(uuid)') IS NULL THEN
+    _faltan := _faltan || 'incidencias_chasis / chasis_bloqueado() (KIT-4 · 20260823000001_incidencias_chasis_colores_cierre.sql)'::text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='inventario_colores'
+                    AND column_name='piezas_total') THEN
+    _faltan := _faltan || 'inventario_colores.piezas_total y compañía (KIT-4 · 20260823000001_incidencias_chasis_colores_cierre.sql)'::text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='remision_items'
+                    AND column_name='tipo_servicio') THEN
+    _faltan := _faltan || 'remision_items.tipo_servicio (20260629000005_remision_items_tipo_servicio.sql)'::text;
+  END IF;
+
+  IF array_length(_faltan, 1) > 0 THEN
+    RAISE EXCEPTION E'KIT-4c no se puede aplicar: falta lo que va antes.\n  · %\nCorre primero esos archivos (en orden de nombre) y vuelve a intentar. No se modificó nada.',
+      array_to_string(_faltan, E'\n  · ');
+  END IF;
+
+  RAISE NOTICE 'KIT-4c · cimientos completos, aplicando.';
+END $preflight$;
+
+
+-- ============================================================================
 -- BLOQUE 1 · Color declarado vs. color efectivo
 -- ============================================================================
 
@@ -781,3 +840,67 @@ BEGIN
       _r.modelo, _r.color, _r.cap, _r.juegos_usados, _r.cap - _r.juegos_usados;
   END LOOP;
 END $$;
+
+
+-- ============================================================================
+-- BLOQUE 11 · Comprobación: o quedó todo, o no quedó nada
+-- ============================================================================
+-- Un COMMIT sin errores no basta como prueba de que el módulo quedó: la última
+-- vez el script no llegó a correrse y nadie se enteró hasta que Producción →
+-- Configurar unidad dejó de listar chasis. Esto revisa objeto por objeto y
+-- tumba la transacción si falta alguno, para que el resultado del SQL editor
+-- sea inequívoco.
+
+DO $postflight$
+DECLARE _faltan text[] := ARRAY[]::text[];
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='inventario_chasis'
+                    AND column_name='color_original') THEN
+    _faltan := _faltan || 'inventario_chasis.color_original'::text;
+  -- El conteo va anidado: si la columna no existe, preguntarle por sus NULLs
+  -- reventaría con «column does not exist» y taparía la lista de faltantes.
+  ELSIF EXISTS (SELECT 1 FROM public.inventario_chasis WHERE color_original IS NULL) THEN
+    _faltan := _faltan || 'hay chasis con color_original en NULL (no se sembró)'::text;
+  END IF;
+  IF to_regclass('public.bitacora_color') IS NULL THEN
+    _faltan := _faltan || 'tabla bitacora_color'::text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='inventario_colores'
+                    AND column_name='piezas_recibidas') THEN
+    _faltan := _faltan || 'inventario_colores.piezas_recibidas / piezas_extra / juegos_usados'::text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='v_stock_modelo_color'
+                    AND column_name='capacidad_color') THEN
+    _faltan := _faltan || 'v_stock_modelo_color.capacidad_color'::text;
+  END IF;
+  IF to_regprocedure('public.norm_color(text)') IS NULL THEN
+    _faltan := _faltan || 'norm_color(text)'::text; END IF;
+  IF to_regprocedure('public.capacidad_color_libre(text,text)') IS NULL THEN
+    _faltan := _faltan || 'capacidad_color_libre(text,text)'::text; END IF;
+  IF to_regprocedure('public.cambiar_color_chasis(uuid,text,text)') IS NULL THEN
+    _faltan := _faltan || 'cambiar_color_chasis(uuid,text,text)'::text; END IF;
+  IF to_regprocedure('public.intercambiar_color_chasis(uuid,uuid,text)') IS NULL THEN
+    _faltan := _faltan || 'intercambiar_color_chasis(uuid,uuid,text)'::text; END IF;
+  IF to_regprocedure('public.ajustar_capacidad_color(text,text,integer,text)') IS NULL THEN
+    _faltan := _faltan || 'ajustar_capacidad_color(text,text,integer,text)'::text; END IF;
+  IF to_regprocedure('public.configurar_unidad(uuid,uuid,integer,text)') IS NULL THEN
+    _faltan := _faltan || 'configurar_unidad(uuid,uuid,integer,text) — el 4º parámetro _color'::text; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                  WHERE tgrelid = to_regclass('public.inventario_chasis')
+                    AND tgname = 'trg_chasis_color_original') THEN
+    _faltan := _faltan || 'trigger trg_chasis_color_original'::text; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                  WHERE tgrelid = to_regclass('public.inventario_chasis')
+                    AND tgname = 'trg_verificar_capacidad_color') THEN
+    _faltan := _faltan || 'trigger trg_verificar_capacidad_color'::text; END IF;
+
+  IF array_length(_faltan, 1) > 0 THEN
+    RAISE EXCEPTION E'KIT-4c quedó incompleto, se revierte:\n  · %',
+      array_to_string(_faltan, E'\n  · ');
+  END IF;
+
+  RAISE NOTICE 'KIT-4c · aplicado completo. Producción → Configurar unidad ya puede leer color_original.';
+END $postflight$;

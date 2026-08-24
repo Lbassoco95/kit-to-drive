@@ -11,6 +11,74 @@ esquema real, no migraciones ejecutables en secuencia. Si necesitas reproducir
 el esquema en otro proyecto, copia el contenido del script al SQL editor y
 ejecútalo de arriba a abajo revisando que no falle por objetos previos.
 
+### El riesgo de este modelo, y cómo se revisa
+
+El SQL editor manda el archivo completo en **una sola transacción**. Si algo
+revienta en la línea 400, no queda ni la línea 1: es todo o nada. Y como no hay
+tabla de migraciones, un script que no se corrió —o que se corrió y se
+revirtió— **no deja rastro**: el repo lo tiene, la app se compila igual, y el
+hueco sale semanas después como `column ... does not exist` en una pantalla
+cualquiera. Ya pasó dos veces (ver «Qué se perdió y por qué» más abajo).
+
+Por eso, antes de dar por buena una base:
+
+```
+supabase/diagnostico_esquema.sql
+```
+
+Se pega completo en el SQL editor, es de **sólo lectura**, y por cada script
+dice `APLICADO`, `PARCIAL` o `FALTA` buscando los objetos que ese script
+debería haber dejado. Es la única forma que hay hoy de saber qué corrió de
+verdad. Córrelo después de aplicar cualquier script y cuando una pantalla
+empiece a comportarse como si le faltaran datos.
+
+En la app, los errores `42703 / 42P01 / 42883` ya no se muestran crudos:
+`explicarError()` (en `src/lib/dazon.ts`) los traduce a «falta correr
+supabase/migrations/<archivo> en el SQL editor», que es la acción real.
+
+### Qué se perdió y por qué
+
+1. **KIT-4c (`20260823000003_color_efectivo_capacidad.sql`) nunca se aplicó.**
+   El script se mergeó al repo en `44814ce`, pero no llegó a correrse en
+   producción. Como `inventario_chasis.color_original` es lo primero que crea,
+   no quedó nada del módulo: ni la columna, ni `bitacora_color`, ni
+   `cambiar_color_chasis`, ni el 4º parámetro `_color` de `configurar_unidad`.
+   Se notó en Producción → **Configurar unidad**: el modal pide
+   `color_original` en la consulta de chasis y todo el `load()` va en un solo
+   `try/catch`, así que un 42703 dejaba la pantalla sin chasis, **sin motores**
+   y sin catálogo — parecía pérdida de datos y era una columna que faltaba.
+   Los datos nunca se tocaron.
+
+2. **`20260717000004_crm_fixes.sql` no podía aplicarse.** Traía tres
+   `ALTER TYPE crm_actividad_tipo ADD VALUE ...` sobre un enum que en esta base
+   no existe (`crm_actividades.tipo` es `text` con CHECK). En una transacción
+   eso revierte el archivo entero, así que las columnas `limitante_*` y la
+   vista `v_reporte_pipeline` tampoco existían. Se sustituyó por la ampliación
+   del CHECK, que es lo que de verdad hacía falta.
+
+Para que no se repita, los scripts de la era KIT ahora se pueden volver a pegar
+completos sin miedo, y **KIT-4c se revisa a sí mismo**: abre con un preflight
+que nombra el archivo que falta si no están los cimientos (y no toca nada), y
+cierra con un postflight que tumba la transacción si el módulo quedó a medias.
+Un `COMMIT` limpio ahora sí es prueba de que quedó.
+
+Se corrigieron además tres scripts que no se podían volver a correr y que, al
+abortar, se llevaban todo su archivo por delante:
+
+- `20260714000001_fix_asignar_chasis_modelo.sql` — `GRANT` sin firma explícita
+  («function name is not unique» cuando conviven dos versiones de la función).
+- `20260821000001_unidad_chasis_motor.sql` — `ALTER COLUMN ... TYPE uuid` con
+  un `~*` que truena en la segunda corrida, cuando la columna ya es `uuid`.
+- `20260717000003_clientes_expediente_digital.sql` — faltaban los
+  `DROP POLICY IF EXISTS` de dos políticas que el propio archivo vuelve a crear.
+
+**Pendiente conocido:** los scripts legados de finanzas y CRM
+(`20260713000001`, `20260714000002`) agregan un valor a `app_role` y lo usan en
+el mismo archivo. Postgres no permite usar un valor de enum recién agregado
+dentro de la misma transacción, así que si algún día se reconstruye la base
+desde cero hay que correr esos `ALTER TYPE` aparte, en una primera pasada. En
+producción ya están aplicados y no estorban.
+
 ## Proyecto correcto
 
 Producción: `dmhzhyeivvuliumcgsmm`.
@@ -103,6 +171,12 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
     chasis que juegos.
   · `v_stock_modelo_color` agrega `capacidad_color`, `juegos_usados`,
     `capacidad_libre` y `piezas_recoloreadas`.
+  · **BLOQUE 0 (preflight)** revisa los cimientos (KIT-3, KIT-4,
+    `remision_items.tipo_servicio`, el UNIQUE de `inventario_colores`) y, si
+    falta alguno, aborta diciendo qué archivo correr antes — sin tocar nada.
+    **BLOQUE 11 (postflight)** verifica los 13 objetos del módulo y revierte si
+    quedó incompleto. Correrlo de nuevo es inocuo: es idempotente y respeta los
+    colores ya cambiados y las piezas extra registradas.
 - `supabase/migrations/20260823000004_finanzas_ingresos_egresos.sql` — KIT-4d:
   Control Financiero deja de ser una lista de gastos y pasa a ser un libro
   mayor de caja. `pagos` queda **obsoleta** (se conserva de respaldo, con

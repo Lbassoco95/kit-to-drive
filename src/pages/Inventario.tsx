@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import {
   lineaDe, LineaProducto, CatalogoModelos, displayFabrica, nombreComercial,
   ESTATUS_CHASIS, ESTATUS_INCIDENCIA, EstatusIncidencia, chasisDetenido, normColor,
+  explicarError,
 } from "@/lib/dazon";
 import { useAuth } from "@/contexts/AuthContext";
 import { ColorChasis, ChasisColor, AjustarCapacidadColor } from "@/components/ColorChasis";
@@ -226,7 +227,7 @@ export default function Inventario() {
       setCatalogo(new Map((catalogoData.data ?? []).map((c: any) => [c.modelo, { linea: c.linea as LineaProducto, nombre_comercial: c.nombre_comercial }])));
     } catch (error) {
       console.error("Error loading inventory:", error);
-      toast.error("Error al cargar inventario");
+      toast.error(explicarError(error, "Error al cargar inventario"));
     } finally {
       setLoading(false);
     }
