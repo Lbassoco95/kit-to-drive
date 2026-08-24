@@ -105,6 +105,9 @@ export default function Remisiones() {
   const [deleteMotivo, setDeleteMotivo]       = useState("");
   const [activeTab, setActiveTab]             = useState<'activas'|'canceladas'>('activas');
   const [notifOpen, setNotifOpen]             = useState(false);
+  // Alcance de la bandeja: todo el equipo comercial comparte la misma información,
+  // pero cada quien puede acotar la vista a lo suyo sin perder el panorama.
+  const [scope, setScope]                     = useState<'todas'|'mias'>('todas');
 
   const canAssignVendedor = role === "admin" || role === "coordinador";
   const totalUnidades = motos.reduce((s,m) => s + Number(m.cantidad||0), 0);
@@ -160,8 +163,10 @@ export default function Remisiones() {
       color_solicitado:null, total_unidades_solicitadas:null,
     }));
     setRows(baseRows);
-    const propios = baseRows.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
-    setRecentFolios(propios.slice(0,5).map((r:any)=>r.folio_remision));
+    // Folios sugeridos: primero los propios; si el usuario aún no tiene, los del equipo
+    const propios = baseRows.filter((r:any) => r.vendedor_id===user?.id);
+    const fuenteFolios = propios.length ? propios : baseRows;
+    setRecentFolios(fuenteFolios.slice(0,5).map((r:any)=>r.folio_remision));
 
     if (!base?.length) return;
     const ids = base.map((r:any) => r.id);
@@ -220,13 +225,14 @@ export default function Remisiones() {
 
   // ── Computed rows ────────────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const activeRows   = rows.filter(r => r.estatus !== 'CANCELADA');
-  const canceledRows = rows.filter(r => r.estatus === 'CANCELADA' && (role==='admin' || r.vendedor_id===user?.id));
-  const displayRows  = activeTab === 'activas' ? activeRows : canceledRows;
+  // Todos los roles ven la bandeja completa; `scope` sólo acota la vista localmente.
+  const inScope      = (r: { vendedor_id?: string | null }) => scope === 'todas' || r.vendedor_id === user?.id;
+  const misRemisiones = rows.filter(r => r.vendedor_id === user?.id).length;
+  const activeRows   = rows.filter(r => r.estatus !== 'CANCELADA' && inScope(r));
+  const canceledRows = rows.filter(r => r.estatus === 'CANCELADA' && inScope(r));
 
-  // Motocarros atrasados — solo para remisiones activas del usuario actual
+  // Motocarros atrasados — de las remisiones activas visibles en el alcance actual
   const motocarrosAtrasados = activeRows
-    .filter(r => role==='admin'||role==='coordinador'||r.vendedor_id===user?.id)
     .filter(r => r.estatus!=='COMPLETA')
     .flatMap(r => (r.motocarros??[]).map((m:any)=>({...m, folio:r.folio_remision})))
     .filter((m:any) => {
@@ -503,7 +509,10 @@ export default function Remisiones() {
         <div>
           <h1>{t.remisiones.title}</h1>
           <p className="text-muted-foreground text-base mt-1">
-            {t.remisiones.subtitle(rows.length)} {role==="ventas"?"(solo las tuyas)":""}
+            {t.remisiones.subtitle(activeRows.length + canceledRows.length)}
+            {scope === 'todas'
+              ? <> — todo el equipo{misRemisiones>0 ? <> · {misRemisiones} {misRemisiones===1?"tuya":"tuyas"}</> : null}</>
+              : <> — solo las tuyas</>}
           </p>
         </div>
 
@@ -788,6 +797,28 @@ export default function Remisiones() {
         </div>
       )}
 
+      {/* ── Alcance: todo el equipo comercial / solo las mías ─────────────── */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Ver</span>
+        <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+          {([
+            { key: 'todas', label: 'Todo el equipo' },
+            { key: 'mias',  label: 'Solo las mías' },
+          ] as const).map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setScope(opt.key)}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                scope===opt.key ? 'bg-white text-[#1F3864] shadow-sm' : 'text-muted-foreground hover:text-[#1F3864]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Tabs Activas / Canceladas ─────────────────────────────────────── */}
       <div className="flex gap-0 border-b border-slate-200">
         <button
@@ -796,7 +827,7 @@ export default function Remisiones() {
         >
           Activas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{activeRows.length}</span>
         </button>
-        {(role==='admin'||role==='ventas'||role==='coordinador') && (
+        {(role==='admin'||role==='ventas'||role==='coordinador'||role==='logistica'||role==='fabrica') && (
           <button
             onClick={() => setActiveTab('canceladas')}
             className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='canceladas' ? 'border-red-500 text-red-600' : 'border-transparent text-muted-foreground hover:text-red-500'}`}
@@ -823,7 +854,7 @@ export default function Remisiones() {
               </div>
               <div className="text-sm text-muted-foreground">
                 <div>👤 {r.clientes?.codigo_erp || "—"}{r.clientes?.nombre_comercial ? ` — ${r.clientes.nombre_comercial}` : ""}</div>
-                <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}</div>
+                <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}{r.vendedor_id===user?.id ? " (tuya)" : ""}</div>
                 <div>Fecha: {fmtDate(r.fecha_remision)}</div>
               </div>
               {role === 'admin' && (
@@ -837,8 +868,7 @@ export default function Remisiones() {
               )}
             </Card>
           ))
-        ) : rows.map(r => {
-          if (r.estatus === 'CANCELADA') return null;
+        ) : activeRows.map(r => {
           const motos_   = r.motocarros??[];
           const items:any[] = r.remision_items??[];
           const motoItems  = items.filter((i:any)=>i.tipo_servicio==="motocarro");
@@ -871,6 +901,9 @@ export default function Remisiones() {
                   <span className="w-5 h-5 rounded-full bg-[#2E75B6] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{initials||"?"}</span>
                   {vendedorNombre.split(" ")[0]}
                 </span>
+                {isOwner && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#1F3864] text-white text-[10px] font-bold uppercase tracking-wide">Tuya</span>
+                )}
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
                   👤 {r.clientes?.codigo_erp||"—"}
                 </span>
