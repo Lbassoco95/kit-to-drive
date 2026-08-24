@@ -144,6 +144,41 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
   · Los folios usan secuencia, así que **pueden tener huecos** si un insert se
     rechaza. Es a propósito: un contador sin huecos obliga a serializar la
     captura.
+- `supabase/migrations/20260824000001_remisiones_visibles_equipo_comercial.sql` —
+  **Bandeja de remisiones compartida para el equipo comercial.** Antes el rol
+  `ventas` sólo podía leer las remisiones con `vendedor_id = auth.uid()`: un
+  vendedor recién dado de alta abría Remisiones y veía la bandeja vacía, y dos
+  vendedores nunca veían la misma información.
+  · `leer remisiones por rol` y `leer motocarros por rol` ahora incluyen
+    `has_role(auth.uid(),'ventas')`, igual que admin / coordinador / fábrica /
+    logística / finanzas. Se conserva el `OR vendedor_id = auth.uid()` para
+    cualquier usuario sin rol operativo.
+  · **La escritura no cambia**: `crear remisiones` y `actualizar remisiones`
+    siguen exigiendo `vendedor_id = auth.uid()` para `ventas`, así que cada
+    vendedor sólo captura, edita, cancela y sube comprobantes de lo suyo. La
+    lectura es compartida; la responsabilidad sigue siendo individual.
+  · `remision_items_select` se re-crea (`USING (true)`, sólo `authenticated`)
+    por idempotencia, en caso de que se hubiera endurecido a mano.
+  · En la app, `src/pages/Remisiones.tsx` muestra la bandeja completa con un
+    selector **Todo el equipo / Solo las mías** y marca con la etiqueta «Tuya»
+    las remisiones del usuario en sesión.
+
+## Cómo se propaga un cambio de permisos
+
+Los dos lados no se comportan igual, y conviene tenerlo claro antes de tocar
+roles o políticas:
+
+- **La base es inmediata.** El rol no viaja en el JWT: `has_role()` consulta
+  `user_roles` en cada query. Un cambio de política o de rol aplica en la
+  siguiente petición, sin cerrar sesión ni recargar.
+- **La app revisa sola.** `AuthContext` vuelve a leer el rol al recuperar el
+  foco de la pestaña, al volver a ella y cada dos minutos mientras está
+  visible. Si detecta un cambio actualiza el menú y avisa con un toast
+  («Tus permisos cambiaron»). Antes el rol se leía una sola vez por sesión y
+  había que pedirle a la persona que recargara a mano.
+- Un error de red en esa revisión **no** borra el rol vigente: se conserva y se
+  reintenta en el siguiente ciclo, para no degradar permisos por un tropiezo
+  de conexión.
 
 ## Verificación manual recomendada
 
@@ -296,3 +331,36 @@ SELECT nombre_comercial, pagos_registrados, total_pagado_mxn, ultimo_pago
   FROM v_estado_cuenta_cliente
  WHERE pagos_registrados > 0 ORDER BY total_pagado_mxn DESC;
 ```
+
+Después de aplicar `20260824000001_remisiones_visibles_equipo_comercial.sql`
+(entrar con un usuario de `ventas`, p. ej. Atenea / Marco / Ana Karen):
+
+```sql
+-- 1. Las tres políticas de lectura deben mencionar 'ventas'.
+SELECT tablename, policyname, qual LIKE '%ventas%' AS incluye_ventas
+  FROM pg_policies
+ WHERE schemaname = 'public'
+   AND tablename IN ('remisiones','motocarros','remision_items')
+   AND cmd = 'SELECT';
+
+-- 2. La escritura NO debe haberse abierto: 'crear remisiones' y
+--    'actualizar remisiones' siguen amarradas a vendedor_id = auth.uid().
+SELECT policyname, cmd, qual, with_check
+  FROM pg_policies
+ WHERE schemaname = 'public' AND tablename = 'remisiones' AND cmd <> 'SELECT';
+
+-- 3. Cuántas remisiones debería ver el equipo comercial (todas las no
+--    canceladas) contra cuántas son de un vendedor en particular.
+SELECT count(*) FILTER (WHERE estatus <> 'CANCELADA') AS activas_totales,
+       count(*) FILTER (WHERE estatus <> 'CANCELADA'
+                          AND vendedor_id = (SELECT id FROM profiles
+                                              WHERE nombre_completo ILIKE '%Atenea%')) AS activas_de_atenea
+  FROM remisiones;
+```
+
+En la app, con sesión de `ventas`: la cabecera debe decir
+«N remisiones registradas — todo el equipo · M tuyas», el selector **Ver**
+debe alternar entre *Todo el equipo* y *Solo las mías*, y en las remisiones de
+otro vendedor **no** deben aparecer los botones de asignar chasis / subir PDF /
+proponer fecha / cancelar: la tarjeta queda de sólo lectura (folio, cliente,
+avance, chasis y entregas).
