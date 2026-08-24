@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useLang } from "@/contexts/LangContext";
 
 export default function AppLayout() {
-  const { profileName, role, signOut, user } = useAuth();
+  const { profileName, area, nivel, signOut, user } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
   const [q, setQ] = useState("");
@@ -35,7 +35,7 @@ export default function AppLayout() {
             <Button variant="ghost" size="icon"><Bell className="h-4 w-4" /></Button>
             <div className="text-right text-xs leading-tight hidden sm:block">
               <div className="font-semibold text-foreground">{profileName || user?.email}</div>
-              <div className="text-muted-foreground">{role ? t.roles[role] : ""}</div>
+              <div className="text-muted-foreground">{area && nivel ? `${t.areas[area]} · ${t.niveles[nivel]}` : ""}</div>
             </div>
             <Button variant="outline" size="sm" onClick={async () => { await signOut(); nav("/auth"); }}>
               <LogOut className="h-4 w-4 mr-1" /> {t.layout.signOut}

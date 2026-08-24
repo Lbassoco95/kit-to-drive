@@ -1506,20 +1506,26 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          area: Database["public"]["Enums"]["user_area"]
           created_at: string
           id: string
+          nivel: Database["public"]["Enums"]["user_nivel"]
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          area?: Database["public"]["Enums"]["user_area"]
           created_at?: string
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
+          nivel?: Database["public"]["Enums"]["user_nivel"]
+          role?: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          area?: Database["public"]["Enums"]["user_area"]
           created_at?: string
           id?: string
+          nivel?: Database["public"]["Enums"]["user_nivel"]
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
@@ -1842,6 +1848,13 @@ export type Database = {
         | "LISTO"
         | "ATRASADO"
       estatus_entrega: "NO_APLICA" | "PROGRAMADA" | "EN_RUTA" | "ENTREGADA"
+      user_area:
+        | "comercial"
+        | "fabrica"
+        | "almacen_logistica"
+        | "administracion"
+        | "direccion"
+      user_nivel: "operador" | "supervisor" | "admin"
       estatus_remision: "NUEVA" | "PARCIAL" | "COMPLETA" | "CANCELADA"
     }
     CompositeTypes: {
@@ -1991,6 +2004,14 @@ export const Constants = {
       ],
       estatus_entrega: ["NO_APLICA", "PROGRAMADA", "EN_RUTA", "ENTREGADA"],
       estatus_remision: ["NUEVA", "PARCIAL", "COMPLETA", "CANCELADA"],
+      user_area: [
+        "comercial",
+        "fabrica",
+        "almacen_logistica",
+        "administracion",
+        "direccion",
+      ],
+      user_nivel: ["operador", "supervisor", "admin"],
     },
   },
 } as const

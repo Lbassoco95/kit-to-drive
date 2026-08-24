@@ -163,6 +163,37 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
     selector **Todo el equipo / Solo las mías** y marca con la etiqueta «Tuya»
     las remisiones del usuario en sesión.
 
+- `supabase/migrations/20260823000005_usuarios_niveles_areas.sql` —
+  **Modelo de usuarios: ÁREA × NIVEL.** Columnas `user_roles.area` y
+  `user_roles.nivel`, sus enums (`user_area`, `user_nivel`), los helpers de RLS
+  (`es_area`, `nivel_al_menos`, `es_admin_area`, `es_admin_global`,
+  `supervisa_area`) y políticas por área. La columna histórica
+  `user_roles.role` se conserva y se **deriva por trigger** de (área, nivel),
+  para que el RLS y los scripts de carga anteriores sigan funcionando.
+  El detalle del modelo está en `docs/usuarios-y-permisos.md`.
+  · **Ojo con el historial:** este script se aplicó a la base de producción
+    pero su rama (`claude/user-types-permissions-zg25y5`) nunca se mergeó, así
+    que durante semanas la base corrió el modelo nuevo mientras `main` seguía
+    con el enum plano `app_role` — de ahí que la pantalla de Usuarios siguiera
+    ofreciendo la lista vieja de roles. Se renumeró de `20260823000001` a
+    `20260823000005` porque colisionaba con
+    `20260823000001_incidencias_chasis_colores_cierre.sql`.
+- `supabase/migrations/20260824000002_comercial_lee_toda_la_bandeja.sql` —
+  **Leer es del área; escribir es del nivel.** El script anterior dejó
+  `comercial lee remisiones` amarrada a `supervisa_area('comercial')`, o sea
+  supervisor para arriba, con lo que un **operador** volvía a ver sólo lo suyo
+  — el mismo problema que `20260824000001` había resuelto para el rol `ventas`.
+  · `comercial lee remisiones` pasa a `es_area(...,'comercial')`: cualquier
+    nivel del área lee la bandeja completa, más Dirección y Administración.
+  · Se agrega `comercial lee motocarros`. Este hueco no era sólo del operador:
+    como el rol legacy se deriva de (área, nivel), un supervisor de Comercial
+    queda con `coordinador_ventas` y un administrador con `director_ventas`, y
+    ninguno aparece en `leer motocarros por rol`; `direccion lee motocarros`
+    sólo cubre Dirección y Administración. Veían la remisión pero no sus
+    unidades.
+  · No se toca ninguna política de escritura: el operador edita lo suyo, el
+    supervisor lo de su área, el administrador borra.
+
 ## Cómo se propaga un cambio de permisos
 
 Los dos lados no se comportan igual, y conviene tenerlo claro antes de tocar
@@ -171,11 +202,11 @@ roles o políticas:
 - **La base es inmediata.** El rol no viaja en el JWT: `has_role()` consulta
   `user_roles` en cada query. Un cambio de política o de rol aplica en la
   siguiente petición, sin cerrar sesión ni recargar.
-- **La app revisa sola.** `AuthContext` vuelve a leer el rol al recuperar el
-  foco de la pestaña, al volver a ella y cada dos minutos mientras está
-  visible. Si detecta un cambio actualiza el menú y avisa con un toast
-  («Tus permisos cambiaron»). Antes el rol se leía una sola vez por sesión y
-  había que pedirle a la persona que recargara a mano.
+- **La app revisa sola.** `AuthContext` vuelve a leer el área y el nivel al
+  recuperar el foco de la pestaña, al volver a ella y cada dos minutos mientras
+  está visible. Si detecta un cambio actualiza el menú y avisa con un toast
+  («Tus permisos cambiaron»). Antes se leía una sola vez por sesión y había que
+  pedirle a la persona que recargara a mano.
 - Un error de red en esa revisión **no** borra el rol vigente: se conserva y se
   reintenta en el siguiente ciclo, para no degradar permisos por un tropiezo
   de conexión.

@@ -1,10 +1,4 @@
-export const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrador",
-  fabrica: "Fábrica",
-  logistica: "Logística",
-  ventas: "Ventas",
-  coordinador: "Coordinador comercial",
-};
+// Las etiquetas de área y tipo de usuario viven en src/lib/permissions.ts
 
 // Semáforo system shared
 export const SEMAFORO = {

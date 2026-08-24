@@ -15,14 +15,14 @@ export default function Bitacora() {
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [selectedDeletion, setSelectedDeletion] = useState<any>(null);
   const { t, lang } = useLang();
-  const { role } = useAuth();
+  const { perms } = useAuth();
 
   useEffect(() => {
     loadEventos();
-    if (role === "admin") {
+    if (perms.esAdminGlobal) {
       loadEliminaciones();
     }
-  }, [role]);
+  }, [perms.esAdminGlobal]);
 
   const loadEventos = async () => {
     const { data } = await supabase.from("bitacora_eventos").select("*").order("created_at", { ascending: false }).limit(200);
@@ -53,7 +53,7 @@ export default function Bitacora() {
       <Tabs defaultValue="eventos" className="w-full">
         <TabsList>
           <TabsTrigger value="eventos">Eventos del sistema</TabsTrigger>
-          {role === "admin" && (
+          {perms.esAdminGlobal && (
             <TabsTrigger value="eliminaciones">Eliminaciones (solo admin)</TabsTrigger>
           )}
         </TabsList>
@@ -88,7 +88,7 @@ export default function Bitacora() {
           </Card>
         </TabsContent>
 
-        {role === "admin" && (
+        {perms.esAdminGlobal && (
           <TabsContent value="eliminaciones" className="space-y-4 mt-4">
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
