@@ -29,6 +29,8 @@ interface AuthCtx {
   perms: Permisos;
   /** @deprecated usar `perms`. Rol legacy derivado de (área, nivel). */
   role: AppRole | null;
+  /** `profiles.activo`. Un usuario dado de baja no entra a ningún módulo. */
+  activo: boolean;
   profileName: string;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -43,6 +45,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [nivel, setNivel] = useState<Nivel | null>(null);
   const [area, setArea] = useState<Area | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  // Se arranca en `true`: mientras no sepamos lo contrario, nadie se queda
+  // fuera por un perfil que todavía no ha cargado.
+  const [activo, setActivo] = useState(true);
   const [profileName, setProfileName] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -78,8 +83,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const cambio = permsRef.current !== null && permsRef.current !== firma;
     permsRef.current = firma;
 
-    const { data: p } = await supabase.from("profiles").select("nombre_completo").eq("id", uid).maybeSingle();
+    const { data: p } = await supabase.from("profiles").select("nombre_completo, activo").eq("id", uid).maybeSingle();
     setProfileName(p?.nombre_completo ?? "");
+    // Igual que en la base (`usuario_activo`): sólo cuenta como baja el FALSE
+    // explícito. Un perfil ausente o nulo no deja a nadie fuera.
+    setActivo(p?.activo !== false);
 
     // Sólo se avisa en las revisiones automáticas, no en el arranque de sesión.
     if (cambio && notificar) {
@@ -91,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const clear = () => {
-    setRole(null); setNivel(null); setArea(null); setProfileName("");
+    setRole(null); setNivel(null); setArea(null); setProfileName(""); setActivo(true);
     permsRef.current = null;
   };
 
@@ -145,7 +153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshRole = async () => { if (uidRef.current) await loadRole(uidRef.current); };
 
   return (
-    <Ctx.Provider value={{ user, session, nivel, area, perms, role, profileName, loading, signOut, refreshRole }}>
+    <Ctx.Provider value={{ user, session, nivel, area, perms, role, activo, profileName, loading, signOut, refreshRole }}>
       {children}
     </Ctx.Provider>
   );
