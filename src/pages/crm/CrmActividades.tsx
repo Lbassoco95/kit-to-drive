@@ -15,7 +15,7 @@ import { Plus, Pencil, Search, BookOpen, Calendar, User, Building2, CheckCircle,
 import { FileOrCamera } from "@/components/FileOrCamera";
 
 export default function CrmActividades() {
-  const { role, user } = useAuth();
+  const { perms, user } = useAuth();
   const { t } = useLang();
   const [actividades, setActividades] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
@@ -139,9 +139,9 @@ export default function CrmActividades() {
     });
   }, [actividades, clientes, vendedores, oportunidades, q]);
 
-  const canEdit = role === "admin" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
-  const canCreate = role === "admin" || role === "ventas" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
-  const canDelete = role === "admin" || role === "coordinador_ventas";
+  const canEdit = perms.puedeEditar("crm");
+  const canCreate = perms.puedeCrear("crm");
+  const canDelete = perms.puedeEliminar("crm");
 
   const saveProgramar = async () => {
     const payload = {

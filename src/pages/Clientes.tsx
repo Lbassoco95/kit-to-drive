@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History } from "lucide-react";
 
 export default function Clientes() {
-  const { role, user } = useAuth();
+  const { perms, area, user } = useAuth();
   const { t } = useLang();
   const [rows, setRows] = useState<any[]>([]);
   const [motos, setMotos] = useState<any[]>([]);
@@ -101,13 +101,13 @@ export default function Clientes() {
     return base.filter(c => [c.codigo_erp, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(qLower));
   }, [rows, q, listTab]);
 
-  const canEdit = role === "admin" || role === "director_ventas" || role === "coordinador_ventas";
-  const canCreate = role === "admin" || role === "director_ventas" || role === "coordinador_ventas" || role === "ventas" || role === "auxiliar_ventas";
-  const canViewOnly = role === "fabrica" || role === "finanzas";
+  const canEdit = perms.puedeEditar("clientes");
+  const canCreate = perms.puedeCrear("clientes");
+  const canViewOnly = perms.puedeVer("clientes") && !perms.puedeCrear("clientes");
   const isOwnCliente = (c: any) => c.vendedor_id === user?.id;
   const canEditCliente = (c: any) => {
     if (canEdit) return true;
-    if ((role === "ventas" || role === "auxiliar_ventas") && isOwnCliente(c)) return true;
+    if (perms.soloPropios("clientes") && isOwnCliente(c)) return true;
     return false;
   };
 
@@ -135,7 +135,7 @@ export default function Clientes() {
       calle: "", num_exterior: "", num_interior: "", colonia: "",
       municipio: "", estado: "", codigo_postal: "", pais: "México",
       limite_credito: "", dias_credito: 0, moneda_credito: "MXN",
-      vendedor_id: (role === "ventas" || role === "director_ventas" || role === "coordinador_ventas") ? user?.id : null,
+      vendedor_id: area === "comercial" ? user?.id : null,
       notas: ""
     });
   };
@@ -428,7 +428,7 @@ export default function Clientes() {
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
-                  {role === "admin" && !isArchived && (
+                  {perms.puedeEliminar("clientes") && !isArchived && (
                     <Button size="icon" variant="ghost" onClick={() => setArchiveConfirm(c)} className="h-9 w-9 text-amber-600 hover:text-amber-700" title="Archivar cliente">
                       <Archive className="h-4 w-4" />
                     </Button>

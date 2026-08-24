@@ -27,7 +27,7 @@ import {
 type FiltroTipo = "TODOS" | MovTipo;
 
 export default function Finanzas() {
-  const { user, role } = useAuth();
+  const { user, perms } = useAuth();
   const navigate = useNavigate();
 
   const [movs, setMovs] = useState<Movimiento[]>([]);
@@ -51,7 +51,7 @@ export default function Finanzas() {
   const [altaAbierta, setAltaAbierta] = useState(false);
   const [form, setForm] = useState<FormState>(formVacio("INGRESO"));
 
-  const puedeCapturar = role === "admin" || role === "admin_financiero" || role === "finanzas";
+  const puedeCapturar = perms.puedeCrear("finanzas");
 
   // ── Carga ─────────────────────────────────────────────────
   const cargar = async () => {
