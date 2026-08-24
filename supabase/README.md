@@ -194,6 +194,29 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
   · No se toca ninguna política de escritura: el operador edita lo suyo, el
     supervisor lo de su área, el administrador borra.
 
+- `supabase/migrations/20260824000003_usuario_activo_se_aplica.sql` —
+  **`profiles.activo` deja de ser decorativo.** Hasta aquí, desactivar a alguien
+  desde Sistema → Usuarios sólo lo pintaba en gris en esa lista: no se validaba
+  en el login, ni en `ProtectedRoute`, ni en ninguna política. Un usuario
+  «inactivo» entraba y leía igual.
+  · En vez de tocar cada política, se corta en el punto de paso: todas pasan por
+    `has_role`, `es_area`, `nivel_al_menos`, `es_admin_area`, `es_admin_global`
+    y `supervisa_area`. Los seis ahora exigen `usuario_activo(uid)`, así que la
+    baja aplica en todo el sistema sin reescribir una sola política.
+  · `usuario_activo` es deliberadamente conservador: bloquea **sólo** a quien
+    está marcado explícitamente como inactivo. Un `profiles` inexistente o un
+    `activo` nulo cuentan como activo — un hueco de datos no debe convertirse
+    en alguien que no puede trabajar.
+  · Las políticas que caían a `vendedor_id = auth.uid()` (leer y actualizar
+    remisiones, leer motocarros) llevan el chequeo aparte: sin eso, un vendedor
+    dado de baja seguía leyendo y editando lo suyo.
+  · En la app, `ProtectedRoute` muestra una pantalla que explica el motivo
+    —cuenta desactivada, o sin área y tipo asignados— en vez de dejar a la
+    persona en un tablero vacío que parece descompuesto.
+  · Para dar de baja las cuentas de demostración hay un script aparte en la raíz
+    del repo: `desactivar_usuarios_demo.sql`. **No filtres por `@dazon.demo`**:
+    las cuentas reales del equipo usan ese mismo dominio.
+
 ## Cómo se propaga un cambio de permisos
 
 Los dos lados no se comportan igual, y conviene tenerlo claro antes de tocar
