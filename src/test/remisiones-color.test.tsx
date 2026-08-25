@@ -93,4 +93,16 @@ describe("Remisiones · disponibilidad por color", () => {
     // La línea 2 ya sólo ve 6 (10 − los 4 que apartó la línea 1).
     expect(await screen.findByText(/6 disponibles de Blanco/)).toBeInTheDocument();
   });
+
+  it("ofrece los modelos del catálogo, no una lista escrita a mano", async () => {
+    // DZ-K1 existe en inventario pero no tiene nombre comercial. Con la lista
+    // escrita a mano quedaba fuera del selector y esa unidad no se podía vender.
+    filas.modelos_producto = [
+      { modelo: "DZ-K1", linea: "motocarro", nombre_comercial: null, activo: true },
+    ];
+    const cuerpo = await abrirNueva();
+    // Una línea nueva arranca con el primer modelo del catálogo cargado.
+    await act(async () => { fireEvent.click(boton(/Agregar motocarro/i)!); });
+    expect(cuerpo.textContent).toContain("DZ-K1");
+  });
 });

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, StockColor } from "@/lib/dazon";
+import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +23,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileOrCamera } from "@/components/FileOrCamera";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
-const MODELOS = ["200cc 2026", "300cc 2026"];
+// Los modelos se leen del catálogo (ver cargarModelosMotocarro); esta lista
+// sólo se usa como valor inicial mientras carga.
 
 // Radix reserva la cadena vacía para «sin selección», y un <SelectItem value="">
 // truena al abrir el desplegable: la excepción ocurre al DIBUJAR, así que se
@@ -56,9 +58,9 @@ interface MotoItem {
   con_activacion: boolean;
 }
 
-const defaultMoto = (): MotoItem => ({
+const defaultMoto = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
   _key: crypto.randomUUID(),
-  modelo: "200cc 2026",
+  modelo,
   color: "BLANCO",
   cantidad: 1,
   con_caja: false,
@@ -109,6 +111,7 @@ export default function Remisiones() {
     fecha_remision: new Date().toISOString().slice(0,10),
     notas:"", tipo_pago:"anticipado", pagado:true,
   });
+  const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
   const [motos, setMotos]     = useState<MotoItem[]>([defaultMoto()]);
   const [conFlete, setConFlete] = useState(false);
   const [formFile, setFormFile] = useState<File|null>(null);
@@ -200,6 +203,7 @@ export default function Remisiones() {
   const load = async () => {
     // Disponibilidad por color, para el selector de la remisión
     loadStockColor();
+    cargarModelosMotocarro().then(setModelos);
 
     // ── 1. Query mínimo garantizado (solo tablas/columnas originales) ──────────
     const { data: base } = await supabase
@@ -294,7 +298,7 @@ export default function Remisiones() {
     });
 
   // ── Moto helpers ────────────────────────────────────────────────────────────
-  const addMoto   = () => setMotos(m => [...m, defaultMoto()]);
+  const addMoto   = () => setMotos(m => [...m, defaultMoto(modelos[0])]);
   const removeMoto = (idx:number) => setMotos(m => m.filter((_,i)=>i!==idx));
   const updateMoto = (idx:number, field:keyof MotoItem, val:any) =>
     setMotos(m => m.map((item,i) => {
@@ -333,12 +337,12 @@ export default function Remisiones() {
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
     setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(recentFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
-    setMotos([defaultMoto()]); setConFlete(false); setFormFile(null); setOpen(true);
+    setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null); setOpen(true);
   };
   const resetForm = () => {
     setForm({ folio_remision:"",cliente_id:"",vendedor_asignado_id:"",nombre_vendedor:"",
       fecha_remision:new Date().toISOString().slice(0,10),notas:"",tipo_pago:"anticipado",pagado:true });
-    setMotos([defaultMoto()]); setConFlete(false); setFormFile(null);
+    setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null);
   };
 
   // ── Nuevo cliente ───────────────────────────────────────────────────────────
@@ -687,7 +691,7 @@ export default function Remisiones() {
                             <Label className="text-xs text-muted-foreground">Modelo</Label>
                             <Select value={moto.modelo} onValueChange={v=>updateMoto(idx,"modelo",v)}>
                               <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
-                              <SelectContent>{MODELOS.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                              <SelectContent>{modelos.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
                           <div>

@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Inbox, RefreshCw, FileDown, Package, Settings2, TriangleAlert, Wrench } from "lucide-react";
-import { fmtDate, COLORES } from "@/lib/dazon";
+import { fmtDate, COLORES, claveStock } from "@/lib/dazon";
+import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { toast } from "sonner";
 
-const MODELOS = ["200cc 2026", "300cc 2026"];
+
 
 const tipoIcon: Record<string, string> = {
   motocarro: "🏍️", cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",
@@ -34,9 +35,6 @@ type StockColor = {
   unidades_detenidas: number;
   demanda_pendiente: number;
 };
-
-const claveStock = (modelo?: string | null, color?: string | null) =>
-  `${(modelo ?? "").trim().toUpperCase()}__${(color ?? "").trim().toUpperCase()}`;
 
 type RemisionCard = {
   id: string;
@@ -72,9 +70,11 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [configForm, setConfigForm] = useState(defaultConfigForm());
   const [savingConfig, setSavingConfig] = useState(false);
   const [stock, setStock] = useState<Map<string, StockColor>>(new Map());
+  const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
 
   const load = async () => {
     setLoading(true);
+    cargarModelosMotocarro().then(setModelos);
 
     // Lo que de verdad hay por modelo comercial y color — para que la bandeja
     // no ofrezca "asignar 5" cuando de ese color sólo hay 1.
@@ -468,7 +468,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 <Label className="text-sm">Modelo</Label>
                 <Select value={configForm.modelo} onValueChange={v => setConfigForm(f => ({ ...f, modelo: v }))}>
                   <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
-                  <SelectContent>{MODELOS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                  <SelectContent>{modelos.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div>

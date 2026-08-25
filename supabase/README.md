@@ -72,6 +72,40 @@ abortar, se llevaban todo su archivo por delante:
 - `20260717000003_clientes_expediente_digital.sql` — faltaban los
   `DROP POLICY IF EXISTS` de dos políticas que el propio archivo vuelve a crear.
 
+### Qué salió del diagnóstico del 2026-08-25
+
+Con KIT-4c ya aplicado, el diagnóstico destapó **seis scripts que nunca
+llegaron a producción**. Tres estaban rompiendo cosas en vivo:
+
+| Script | Qué rompía |
+|---|---|
+| `20260819000010_bitacora_eliminaciones` | Borrar una remisión fallaba y **ni siquiera borraba**: el código inserta en esa tabla y salía «Error al registrar la eliminación». KIT-4d construyó encima un trigger de borrado que apunta a la misma tabla. |
+| `20260823000002_capturar_seriales_unidad` | KIT-4b. Producción → Editar llama a esa RPC. Además es la que liga la pieza a la unidad: sin ella un chasis con serial capturado se queda `disponible` y fábrica lo puede volver a configurar en otra unidad — **inventario contado doble**. |
+| `20260824000003_usuario_activo_se_aplica` | Sin `usuario_activo()`, dar de baja a alguien no significaba nada en la base: la app lo cortaba del lado del cliente, el RLS lo seguía dejando leer. |
+| `20260824000002_comercial_lee_toda_la_bandeja` | Faltaba `comercial lee motocarros`: el equipo veía la remisión pero no sus unidades. |
+| `20260717000003_clientes_expediente_digital` | Columnas del expediente (`rfc`, `codigo_postal`, `razon_social`, `email_cobranza`) que la pantalla de Clientes ya captura. |
+| `20260819000001_parts_inventory` | `contenedor_partes`. El frontend no la usa; `importar_partes_excel` sí. |
+
+Los seis van juntos en **`supabase/reparar_pendientes.sql`**: se pega completo
+en el SQL editor y aplica los seis en el orden correcto, en una sola
+transacción. Es idempotente — correrlo de más no hace daño — y cierra
+comprobando los seis objetos. Verificado sobre una base que reproduce el estado
+exacto de producción, corriéndolo tres veces seguidas.
+
+De paso se volvieron re-ejecutables `20260819000001` y `20260819000010`
+(`CREATE TABLE`/`CREATE INDEX` sin `IF NOT EXISTS`, `CREATE POLICY` y
+`CREATE TRIGGER` sin `DROP` previo): al abortar por «already exists» se
+llevaban su archivo completo por delante.
+
+**Un modelo que no se podía vender:** el diagnóstico de colores sacó a
+`DZ-K1 / NARANJA`, un código de fábrica crudo sin fila en `modelos_producto`.
+Remisiones tenía la lista de modelos escrita a mano (`["200cc 2026",
+"300cc 2026"]`), así que esa unidad existía en inventario y era invisible para
+ventas. Ahora el selector lee `modelos_producto` como el resto del sistema, y
+un modelo sin nombre comercial entra con su código de fábrica en vez de
+perderse. Si la consulta falla, se cae a la lista vieja para no dejar el
+selector vacío.
+
 **Pendiente conocido:** los scripts legados de finanzas y CRM
 (`20260713000001`, `20260714000002`) agregan un valor a `app_role` y lo usan en
 el mismo archivo. Postgres no permite usar un valor de enum recién agregado
