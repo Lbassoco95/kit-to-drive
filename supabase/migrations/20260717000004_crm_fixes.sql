@@ -25,10 +25,25 @@ ALTER TABLE public.crm_actividades
   ADD COLUMN IF NOT EXISTS limitante_precio boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS limitante_notas text;
 
--- Add missing activity types
-ALTER TYPE crm_actividad_tipo ADD VALUE IF NOT EXISTS 'email';
-ALTER TYPE crm_actividad_tipo ADD VALUE IF NOT EXISTS 'whatsapp';
-ALTER TYPE crm_actividad_tipo ADD VALUE IF NOT EXISTS 'nota';
+-- Más tipos de actividad.
+--
+-- Esto decía `ALTER TYPE crm_actividad_tipo ADD VALUE ...`, pero ese enum no
+-- existe en esta base: `crm_actividades.tipo` es text con un CHECK
+-- (20260714000002_crm_ventas.sql). El SQL editor manda el archivo completo en
+-- UNA transacción, así que esas tres líneas reventaban con «type
+-- crm_actividad_tipo does not exist» y se revertía TODO lo de arriba (las
+-- columnas limitante_*) y TODO lo de abajo (la vista v_reporte_pipeline).
+-- Se sustituye por lo que de verdad hacía falta: ampliar el CHECK.
+DO $tipos$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint
+              WHERE conrelid = 'public.crm_actividades'::regclass
+                AND conname  = 'crm_actividades_tipo_check') THEN
+    ALTER TABLE public.crm_actividades DROP CONSTRAINT crm_actividades_tipo_check;
+  END IF;
+  ALTER TABLE public.crm_actividades ADD CONSTRAINT crm_actividades_tipo_check
+    CHECK (tipo IN ('visita','llamada','demo','seguimiento','cotizacion','email','whatsapp','nota'));
+END $tipos$;
 
 -- Create view for pipeline reporting
 CREATE OR REPLACE VIEW public.v_reporte_pipeline AS

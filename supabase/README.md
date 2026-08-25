@@ -11,6 +11,136 @@ esquema real, no migraciones ejecutables en secuencia. Si necesitas reproducir
 el esquema en otro proyecto, copia el contenido del script al SQL editor y
 ejecútalo de arriba a abajo revisando que no falle por objetos previos.
 
+### El riesgo de este modelo, y cómo se revisa
+
+El SQL editor manda el archivo completo en **una sola transacción**. Si algo
+revienta en la línea 400, no queda ni la línea 1: es todo o nada. Y como no hay
+tabla de migraciones, un script que no se corrió —o que se corrió y se
+revirtió— **no deja rastro**: el repo lo tiene, la app se compila igual, y el
+hueco sale semanas después como `column ... does not exist` en una pantalla
+cualquiera. Ya pasó dos veces (ver «Qué se perdió y por qué» más abajo).
+
+Por eso, antes de dar por buena una base:
+
+```
+supabase/diagnostico_esquema.sql
+```
+
+Se pega completo en el SQL editor, es de **sólo lectura**, y por cada script
+dice `APLICADO`, `PARCIAL` o `FALTA` buscando los objetos que ese script
+debería haber dejado. Es la única forma que hay hoy de saber qué corrió de
+verdad. Córrelo después de aplicar cualquier script y cuando una pantalla
+empiece a comportarse como si le faltaran datos.
+
+En la app, los errores `42703 / 42P01 / 42883` ya no se muestran crudos:
+`explicarError()` (en `src/lib/dazon.ts`) los traduce a «falta correr
+supabase/migrations/<archivo> en el SQL editor», que es la acción real.
+
+### Qué se perdió y por qué
+
+1. **KIT-4c (`20260823000003_color_efectivo_capacidad.sql`) nunca se aplicó.**
+   El script se mergeó al repo en `44814ce`, pero no llegó a correrse en
+   producción. Como `inventario_chasis.color_original` es lo primero que crea,
+   no quedó nada del módulo: ni la columna, ni `bitacora_color`, ni
+   `cambiar_color_chasis`, ni el 4º parámetro `_color` de `configurar_unidad`.
+   Se notó en Producción → **Configurar unidad**: el modal pide
+   `color_original` en la consulta de chasis y todo el `load()` va en un solo
+   `try/catch`, así que un 42703 dejaba la pantalla sin chasis, **sin motores**
+   y sin catálogo — parecía pérdida de datos y era una columna que faltaba.
+   Los datos nunca se tocaron.
+
+2. **`20260717000004_crm_fixes.sql` no podía aplicarse.** Traía tres
+   `ALTER TYPE crm_actividad_tipo ADD VALUE ...` sobre un enum que en esta base
+   no existe (`crm_actividades.tipo` es `text` con CHECK). En una transacción
+   eso revierte el archivo entero, así que las columnas `limitante_*` y la
+   vista `v_reporte_pipeline` tampoco existían. Se sustituyó por la ampliación
+   del CHECK, que es lo que de verdad hacía falta.
+
+Para que no se repita, los scripts de la era KIT ahora se pueden volver a pegar
+completos sin miedo, y **KIT-4c se revisa a sí mismo**: abre con un preflight
+que nombra el archivo que falta si no están los cimientos (y no toca nada), y
+cierra con un postflight que tumba la transacción si el módulo quedó a medias.
+Un `COMMIT` limpio ahora sí es prueba de que quedó.
+
+Se corrigieron además tres scripts que no se podían volver a correr y que, al
+abortar, se llevaban todo su archivo por delante:
+
+- `20260714000001_fix_asignar_chasis_modelo.sql` — `GRANT` sin firma explícita
+  («function name is not unique» cuando conviven dos versiones de la función).
+- `20260821000001_unidad_chasis_motor.sql` — `ALTER COLUMN ... TYPE uuid` con
+  un `~*` que truena en la segunda corrida, cuando la columna ya es `uuid`.
+- `20260717000003_clientes_expediente_digital.sql` — faltaban los
+  `DROP POLICY IF EXISTS` de dos políticas que el propio archivo vuelve a crear.
+
+### Qué salió del diagnóstico del 2026-08-25
+
+Con KIT-4c ya aplicado, el diagnóstico destapó **seis scripts que nunca
+llegaron a producción**. Tres estaban rompiendo cosas en vivo:
+
+| Script | Qué rompía |
+|---|---|
+| `20260819000010_bitacora_eliminaciones` | Borrar una remisión fallaba y **ni siquiera borraba**: el código inserta en esa tabla y salía «Error al registrar la eliminación». KIT-4d construyó encima un trigger de borrado que apunta a la misma tabla. |
+| `20260823000002_capturar_seriales_unidad` | KIT-4b. Producción → Editar llama a esa RPC. Además es la que liga la pieza a la unidad: sin ella un chasis con serial capturado se queda `disponible` y fábrica lo puede volver a configurar en otra unidad — **inventario contado doble**. |
+| `20260824000003_usuario_activo_se_aplica` | Sin `usuario_activo()`, dar de baja a alguien no significaba nada en la base: la app lo cortaba del lado del cliente, el RLS lo seguía dejando leer. |
+| `20260824000002_comercial_lee_toda_la_bandeja` | Faltaba `comercial lee motocarros`: el equipo veía la remisión pero no sus unidades. |
+| `20260717000003_clientes_expediente_digital` | Columnas del expediente (`rfc`, `codigo_postal`, `razon_social`, `email_cobranza`) que la pantalla de Clientes ya captura. |
+| `20260819000001_parts_inventory` | `contenedor_partes`. El frontend no la usa; `importar_partes_excel` sí. |
+
+Los seis van juntos en **`supabase/reparar_pendientes.sql`**: se pega completo
+en el SQL editor y aplica los seis en el orden correcto, en una sola
+transacción. Es idempotente — correrlo de más no hace daño — y cierra
+comprobando los seis objetos. Verificado sobre una base que reproduce el estado
+exacto de producción, corriéndolo tres veces seguidas.
+
+De paso se volvieron re-ejecutables `20260819000001` y `20260819000010`
+(`CREATE TABLE`/`CREATE INDEX` sin `IF NOT EXISTS`, `CREATE POLICY` y
+`CREATE TRIGGER` sin `DROP` previo): al abortar por «already exists» se
+llevaban su archivo completo por delante.
+
+**Un modelo que no se podía vender:** el diagnóstico de colores sacó a
+`DZ-K1 / NARANJA`, un código de fábrica crudo sin fila en `modelos_producto`.
+Remisiones tenía la lista de modelos escrita a mano (`["200cc 2026",
+"300cc 2026"]`), así que esa unidad existía en inventario y era invisible para
+ventas. Ahora el selector lee `modelos_producto` como el resto del sistema, y
+un modelo sin nombre comercial entra con su código de fábrica en vez de
+perderse. Si la consulta falla, se cae a la lista vieja para no dejar el
+selector vacío.
+
+### La escalera de Comercial estaba invertida
+
+Al revisar las políticas de `remisiones` después de la reparación salió que
+**mientras más alto el nivel en Comercial, menos se podía hacer.** Medido con
+RLS real sobre producción reproducida:
+
+| operación | com/operador | com/supervisor | com/admin | dirección |
+|---|---|---|---|---|
+| crear remisión | SÍ | **no** | **no** | SÍ |
+| agregar renglón a la remisión | SÍ | **no** | **no** | SÍ |
+| crear oportunidad / actividad / ruta | SÍ | SÍ | **no** | SÍ |
+| comentar una unidad | SÍ | **no** | **no** | SÍ |
+
+La causa: cuando se migró a ÁREA × NIVEL (`20260823000005`) el rol legado pasó a
+**derivarse** — un supervisor de Comercial es `coordinador_ventas` y un
+administrador `director_ventas` — pero estas políticas de **escritura** se
+quedaron escritas contra los roles viejos (`ventas`, `coordinador`, `admin`),
+que ya no incluyen a esos dos. La lectura sí se migró (`20260824000001/2`), y el
+UPDATE de remisiones también (`comercial supervisa remisiones`); el INSERT
+nunca.
+
+`20260825000001_comercial_escalera_de_permisos.sql` lo endereza con la regla del
+modelo: **cada nivel puede al menos lo que puede el de abajo.** Operador, lo
+suyo; supervisor y administrador, todo lo de su área; Dirección, todo. No se
+ensancha nada más — se comprobó que fábrica y almacén siguen sin poder crear
+remisiones ni registros de CRM, y quien está dado de baja sigue fuera porque
+`usuario_activo` vive dentro de `es_area` y `supervisa_area`.
+
+**Pendiente conocido:** los scripts legados de finanzas y CRM
+(`20260713000001`, `20260714000002`) agregan un valor a `app_role` y lo usan en
+el mismo archivo. Postgres no permite usar un valor de enum recién agregado
+dentro de la misma transacción, así que si algún día se reconstruye la base
+desde cero hay que correr esos `ALTER TYPE` aparte, en una primera pasada. En
+producción ya están aplicados y no estorban.
+
 ## Proyecto correcto
 
 Producción: `dmhzhyeivvuliumcgsmm`.
@@ -103,6 +233,12 @@ El archivo `.env` ya no se versiona. Para trabajar localmente:
     chasis que juegos.
   · `v_stock_modelo_color` agrega `capacidad_color`, `juegos_usados`,
     `capacidad_libre` y `piezas_recoloreadas`.
+  · **BLOQUE 0 (preflight)** revisa los cimientos (KIT-3, KIT-4,
+    `remision_items.tipo_servicio`, el UNIQUE de `inventario_colores`) y, si
+    falta alguno, aborta diciendo qué archivo correr antes — sin tocar nada.
+    **BLOQUE 11 (postflight)** verifica los 13 objetos del módulo y revierte si
+    quedó incompleto. Correrlo de nuevo es inocuo: es idempotente y respeta los
+    colores ya cambiados y las piezas extra registradas.
 - `supabase/migrations/20260823000004_finanzas_ingresos_egresos.sql` — KIT-4d:
   Control Financiero deja de ser una lista de gastos y pasa a ser un libro
   mayor de caja. `pagos` queda **obsoleta** (se conserva de respaldo, con

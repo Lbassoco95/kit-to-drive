@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { fmtDate, effEstatusArmado, COLORES } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, StockColor } from "@/lib/dazon";
+import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +23,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileOrCamera } from "@/components/FileOrCamera";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
-const MODELOS = ["200cc 2026", "300cc 2026"];
+// Los modelos se leen del catálogo (ver cargarModelosMotocarro); esta lista
+// sólo se usa como valor inicial mientras carga.
+
+// Radix reserva la cadena vacía para «sin selección», y un <SelectItem value="">
+// truena al abrir el desplegable: la excepción ocurre al DIBUJAR, así que se
+// llevaba la app entera en blanco al dar clic en «Nueva remisión». La opción de
+// «a mí mismo» viaja con un valor propio y se traduce a vacío al guardar.
+const ASIGNAR_A_MI = "__yo__";
 const colorLabel = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 
 const tipoBadgeClass: Record<string, string> = {
@@ -50,9 +58,9 @@ interface MotoItem {
   con_activacion: boolean;
 }
 
-const defaultMoto = (): MotoItem => ({
+const defaultMoto = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
   _key: crypto.randomUUID(),
-  modelo: "200cc 2026",
+  modelo,
   color: "BLANCO",
   cantidad: 1,
   con_caja: false,
@@ -95,13 +103,15 @@ export default function Remisiones() {
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp:"", nombre_comercial:"", telefono:"" });
-  const [colorInventory, setColorInventory] = useState<Map<string, any>>(new Map()); // key: "modelo_color" -> inventory data
+  // Disponibilidad por (modelo comercial, color). Llave: claveStock().
+  const [colorInventory, setColorInventory] = useState<Map<string, StockColor>>(new Map());
 
   const [form, setForm] = useState<any>({
     folio_remision:"", cliente_id:"", vendedor_asignado_id:"", nombre_vendedor:"",
     fecha_remision: new Date().toISOString().slice(0,10),
     notas:"", tipo_pago:"anticipado", pagado:true,
   });
+  const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
   const [motos, setMotos]     = useState<MotoItem[]>([defaultMoto()]);
   const [conFlete, setConFlete] = useState(false);
   const [formFile, setFormFile] = useState<File|null>(null);
@@ -133,32 +143,69 @@ export default function Remisiones() {
     const { data } = await supabase.from("profiles").select("id,nombre_completo,codigo_vendedor,activo").in("id", roles.map(r=>r.user_id)).eq("activo",true).order("nombre_completo");
     setVendedores(data ?? []);
   };
-  const loadColorInventory = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("inventario_colores")
-        .select("*");
-      
-      if (error) {
-        console.error("Error loading color inventory:", error);
-        return;
-      }
-      
-      const inventoryMap = new Map<string, any>();
-      (data || []).forEach((item: any) => {
-        const key = `${item.modelo}_${item.color}`;
-        inventoryMap.set(key, item);
+  /**
+   * Disponibilidad por color, para poder prometerla al cliente.
+   *
+   * Se lee de `v_stock_modelo_color`, que agrega por **nombre comercial**
+   * ("200cc 2026") — que es lo que la remisión captura. La versión anterior
+   * cruzaba contra `inventario_colores.modelo`, que guarda el **código de
+   * fábrica** (DZ200Q1): la llave nunca casaba y el aviso de existencias no
+   * salía casi nunca.
+   *
+   * Si la vista no está (falta correr KIT-4 en el SQL editor), se cae a
+   * `inventario_colores` cruzando por nombre comercial. Ahí no hay demanda
+   * comprometida, así que el número sale optimista — pero es mejor que nada,
+   * y nunca bloquea la captura.
+   */
+  const loadStockColor = async () => {
+    const mapa = new Map<string, StockColor>();
+
+    const { data: vista, error } = await supabase
+      .from("v_stock_modelo_color")
+      .select("modelo_comercial, color, unidades_libres, piezas_disponibles, demanda_pendiente");
+
+    if (!error && vista) {
+      vista.forEach((r: any) => {
+        const libres = Number(r.unidades_libres ?? 0);
+        const piezas = Number(r.piezas_disponibles ?? 0);
+        const demanda = Number(r.demanda_pendiente ?? 0);
+        mapa.set(claveStock(r.modelo_comercial, r.color), {
+          disponibles: libres + piezas - demanda,
+          unidadesLibres: libres,
+          piezasDisponibles: piezas,
+          demandaPendiente: demanda,
+        });
       });
-      
-      setColorInventory(inventoryMap);
-    } catch (error) {
-      console.error("Error loading color inventory:", error);
+      setColorInventory(mapa);
+      return;
     }
+
+    console.warn("v_stock_modelo_color no disponible:", error?.message);
+    // `select("*")` a propósito: pedir `nombre_comercial` por nombre falla si
+    // KIT-4 tampoco se aplicó, que es justo cuando hace falta el respaldo.
+    const { data: colores } = await supabase
+      .from("inventario_colores")
+      .select("*");
+    (colores ?? []).forEach((r: any) => {
+      const disp = Number(r.cantidad_disponible ?? 0);
+      // Un mismo color puede venir en varios códigos de fábrica bajo el mismo
+      // nombre comercial: se suman, no se pisan.
+      const k = claveStock(r.nombre_comercial ?? r.modelo, r.color);
+      const previo = mapa.get(k);
+      mapa.set(k, {
+        disponibles: (previo?.disponibles ?? 0) + disp,
+        unidadesLibres: 0,
+        piezasDisponibles: (previo?.piezasDisponibles ?? 0) + disp,
+        demandaPendiente: 0,
+      });
+    });
+    setColorInventory(mapa);
   };
 
   const load = async () => {
-    // Load color inventory for alerts
-    loadColorInventory();
+    // Disponibilidad por color, para el selector de la remisión
+    loadStockColor();
+    cargarModelosMotocarro().then(setModelos);
 
     // ── 1. Query mínimo garantizado (solo tablas/columnas originales) ──────────
     const { data: base } = await supabase
@@ -253,7 +300,7 @@ export default function Remisiones() {
     });
 
   // ── Moto helpers ────────────────────────────────────────────────────────────
-  const addMoto   = () => setMotos(m => [...m, defaultMoto()]);
+  const addMoto   = () => setMotos(m => [...m, defaultMoto(modelos[0])]);
   const removeMoto = (idx:number) => setMotos(m => m.filter((_,i)=>i!==idx));
   const updateMoto = (idx:number, field:keyof MotoItem, val:any) =>
     setMotos(m => m.map((item,i) => {
@@ -267,15 +314,37 @@ export default function Remisiones() {
       return next;
     }));
 
+  // ── Disponibilidad por color dentro de la orden ─────────────────────────────
+  /**
+   * Cuántas unidades de (modelo, color) quedan para la línea `idx`.
+   *
+   * Al inventario disponible se le resta lo que YA se apartó en las otras
+   * líneas de esta misma remisión: si el motocarro 1 pide 3 blancos, el
+   * selector del motocarro 2 tiene que mostrar 3 menos. La propia línea no se
+   * descuenta a sí misma — si no, el color que acaba de elegir aparecería
+   * agotado por su propia reserva.
+   *
+   * Devuelve `null` cuando no hay dato de ese color: sin información no se
+   * inventa un número ni se estorba la captura.
+   */
+  const disponiblesPara = (idx: number, modelo: string, color: string): number | null =>
+    disponiblesEnOrden(
+      colorInventory.get(claveStock(modelo, color)),
+      // El color a consultar no es siempre el que la línea trae puesto: al
+      // desplegar la lista se pregunta por cada color del catálogo.
+      motos.map((m, i) => (i === idx ? { ...m, modelo, color } : m)),
+      idx,
+    );
+
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
     setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(recentFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
-    setMotos([defaultMoto()]); setConFlete(false); setFormFile(null); setOpen(true);
+    setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null); setOpen(true);
   };
   const resetForm = () => {
     setForm({ folio_remision:"",cliente_id:"",vendedor_asignado_id:"",nombre_vendedor:"",
       fecha_remision:new Date().toISOString().slice(0,10),notas:"",tipo_pago:"anticipado",pagado:true });
-    setMotos([defaultMoto()]); setConFlete(false); setFormFile(null);
+    setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null);
   };
 
   // ── Nuevo cliente ───────────────────────────────────────────────────────────
@@ -580,13 +649,14 @@ export default function Remisiones() {
                 {canAssignVendedor&&(
                   <div>
                     <Label className="text-base">Asignar a vendedor</Label>
-                    <Select value={form.vendedor_asignado_id} onValueChange={v=>{
-                      const vend=vendedores.find(x=>x.id===v);
-                      setForm({...form,vendedor_asignado_id:v,nombre_vendedor:vend?.nombre_completo||form.nombre_vendedor});
+                    <Select value={form.vendedor_asignado_id || ASIGNAR_A_MI} onValueChange={v=>{
+                      const id = v===ASIGNAR_A_MI ? "" : v;
+                      const vend=vendedores.find(x=>x.id===id);
+                      setForm({...form,vendedor_asignado_id:id,nombre_vendedor:vend?.nombre_completo||form.nombre_vendedor});
                     }}>
                       <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Vendedor (opcional)"/></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">— Asignar a mí mismo —</SelectItem>
+                        <SelectItem value={ASIGNAR_A_MI}>— Asignar a mí mismo —</SelectItem>
                         {vendedores.map(v=><SelectItem key={v.id} value={v.id}>{v.nombre_completo}{v.codigo_vendedor?` (${v.codigo_vendedor})`:""}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -623,7 +693,7 @@ export default function Remisiones() {
                             <Label className="text-xs text-muted-foreground">Modelo</Label>
                             <Select value={moto.modelo} onValueChange={v=>updateMoto(idx,"modelo",v)}>
                               <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
-                              <SelectContent>{MODELOS.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                              <SelectContent>{modelos.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
                           <div>
@@ -632,26 +702,16 @@ export default function Remisiones() {
                               <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
                               <SelectContent>
                                 {COLORES.map(c=>{
-                                  const key = `${moto.modelo}_${c}`;
-                                  const inventory = colorInventory.get(key);
-                                  const isLowStock = inventory && inventory.cantidad_disponible <= inventory.umbral_alerta;
-                                  const isOutOfStock = inventory && inventory.cantidad_disponible === 0;
-                                  
+                                  const quedan = disponiblesPara(idx, moto.modelo, c);
                                   return (
-                                    <SelectItem 
-                                      key={c} 
-                                      value={c}
-                                      disabled={isOutOfStock}
-                                      className={isOutOfStock ? "opacity-50" : ""}
-                                    >
-                                      <div className="flex items-center justify-between w-full">
+                                    <SelectItem key={c} value={c}>
+                                      <div className="flex items-center justify-between w-full gap-3">
                                         <span>{colorLabel(c)}</span>
-                                        {isOutOfStock && (
-                                          <span className="text-red-600 text-xs ml-2">Sin stock</span>
-                                        )}
-                                        {isLowStock && !isOutOfStock && (
-                                          <span className="text-amber-600 text-xs ml-2">
-                                            ¡Solo {inventory.cantidad_disponible} unidades!
+                                        {quedan === null ? null : quedan <= 0 ? (
+                                          <span className="text-red-600 text-xs whitespace-nowrap">Sin existencia</span>
+                                        ) : (
+                                          <span className={`text-xs whitespace-nowrap ${quedan <= 3 ? "text-amber-600" : "text-muted-foreground"}`}>
+                                            {quedan} disponible{quedan === 1 ? "" : "s"}
                                           </span>
                                         )}
                                       </div>
@@ -660,27 +720,42 @@ export default function Remisiones() {
                                 })}
                               </SelectContent>
                             </Select>
-                            {/* Color alert badge */}
+                            {/* Qué tan cubierta queda esta línea con el color elegido.
+                                No se bloquea la captura: la remisión es una promesa
+                                al cliente y el sistema ya trabaja con demanda por
+                                encima del inventario (de ahí «déficit» en
+                                Producción). Lo que sí hace falta es que quien
+                                captura vea contra qué se está comprometiendo. */}
                             {(() => {
-                              const key = `${moto.modelo}_${moto.color}`;
-                              const inventory = colorInventory.get(key);
-                              if (!inventory) return null;
-                              
-                              if (inventory.cantidad_disponible === 0) {
+                              const quedan = disponiblesPara(idx, moto.modelo, moto.color);
+                              if (quedan === null) return null;
+                              const piden = Number(moto.cantidad || 0);
+                              const faltan = piden - quedan;
+
+                              if (faltan > 0) {
                                 return (
-                                  <div className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1">
-                                    <XCircle size={12} /> Sin stock de este color
+                                  <div className="mt-1 text-xs text-red-600 font-medium flex items-start gap-1">
+                                    <XCircle size={12} className="mt-0.5 shrink-0" />
+                                    <span>
+                                      {quedan <= 0
+                                        ? `Sin existencia de ${colorLabel(moto.color)}: se piden ${piden} por armar.`
+                                        : `Sólo quedan ${quedan} de ${colorLabel(moto.color)}: faltarían ${faltan} por armar.`}
+                                    </span>
                                   </div>
                                 );
                               }
-                              if (inventory.cantidad_disponible <= inventory.umbral_alerta) {
+                              if (quedan - piden <= 3) {
                                 return (
                                   <div className="mt-1 text-xs text-amber-600 font-medium flex items-center gap-1">
-                                    <AlertTriangle size={12} /> ¡Solo quedan {inventory.cantidad_disponible} unidades de este color!
+                                    <AlertTriangle size={12} /> Quedan {quedan} de {colorLabel(moto.color)}; con esta orden se van {piden}.
                                   </div>
                                 );
                               }
-                              return null;
+                              return (
+                                <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                                  <CheckCircle2 size={12} className="text-emerald-600" /> {quedan} disponibles de {colorLabel(moto.color)}
+                                </div>
+                              );
                             })()}
                           </div>
                         </div>

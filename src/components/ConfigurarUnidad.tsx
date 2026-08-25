@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Wrench, AlertTriangle, CheckCircle2, Search, TriangleAlert, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
-import { CatalogoModelos, displayFabrica, lineaDe, COLORES, normColor, CapacidadColor, claveCapacidad } from "@/lib/dazon";
+import { CatalogoModelos, displayFabrica, lineaDe, COLORES, normColor, CapacidadColor, claveCapacidad, explicarError } from "@/lib/dazon";
 import { ReportarIncidencia } from "@/components/ReportarIncidencia";
 import { cargarCapacidadColor } from "@/components/ColorChasis";
 
@@ -101,7 +101,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
       setMotores((motorData ?? []).map((m: any) => ({ id: m.id, numero_motor: m.numero_motor, modelo: m.modelo })));
       setOrden((ultimoOrden?.[0]?.orden_armado ?? 0) + 1);
     } catch (e: any) {
-      toast.error(e?.message ?? "Error al cargar piezas disponibles");
+      toast.error(explicarError(e, "Error al cargar piezas disponibles"));
     } finally {
       setLoading(false);
     }

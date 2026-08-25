@@ -291,7 +291,7 @@ export default function Clientes() {
     const { error } = await supabase
       .from("clientes_comentarios")
       .insert({
-        cliente_id,
+        cliente_id: clienteId,
         usuario_id: user?.id,
         comentario: newComment.trim(),
       });
@@ -305,7 +305,7 @@ export default function Clientes() {
     await supabase
       .from("clientes_bitacora")
       .insert({
-        cliente_id,
+        cliente_id: clienteId,
         usuario_id: user?.id,
         tipo_cambio: "comentario",
         motivo: "Comentario agregado",
