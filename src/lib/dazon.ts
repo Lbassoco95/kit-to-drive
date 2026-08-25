@@ -258,3 +258,54 @@ export function explicarError(e: unknown, fallback: string): string {
   }
   return crudo || fallback;
 }
+
+// ── Disponibilidad por color ────────────────────────────────────────────────
+// El color es un factor propio, independiente del orden de armado: lo que
+// limita cuántos motocarros de un color se pueden prometer no es qué chasis se
+// armó primero, sino cuántas unidades y cuántas piezas de ESE color hay, menos
+// lo que ya está comprometido en otras remisiones abiertas.
+export type StockColor = {
+  /** Lo que todavía se puede prometer: unidades libres + piezas − demanda ya comprometida. */
+  disponibles: number;
+  /** Ya armadas, con los dos seriales y sin incidencia. */
+  unidadesLibres: number;
+  /** Chasis de ese color todavía sin configurar. */
+  piezasDisponibles: number;
+  /** Pedido en otras remisiones NUEVA/PARCIAL que aún no tiene unidad asignada. */
+  demandaPendiente: number;
+};
+
+/**
+ * Llave por **modelo comercial** + color. La vista `v_stock_modelo_color`
+ * agrega por nombre comercial ("200cc 2026"), no por código de fábrica
+ * (DZ200Q1), que es lo que la remisión captura.
+ */
+export const claveStock = (modelo: string, color: string) =>
+  `${(modelo ?? "").trim().toUpperCase()}__${normColor(color)}`;
+
+/**
+ * Cuántas unidades de (modelo, color) le quedan a la línea `idx` de una orden.
+ *
+ * Al inventario disponible se le resta lo que YA se apartó en las otras líneas
+ * de la misma remisión: si el motocarro 1 pide 3 blancos, el selector del
+ * motocarro 2 debe mostrar 3 menos. La propia línea no se descuenta a sí misma
+ * — si no, el color que acaba de elegir aparecería agotado por su propia
+ * reserva.
+ *
+ * `null` cuando no hay dato de ese color: sin información no se inventa un
+ * número ni se estorba la captura.
+ */
+export function disponiblesEnOrden(
+  stock: StockColor | undefined,
+  lineas: readonly { modelo: string; color: string; cantidad: number }[],
+  idx: number,
+): number | null {
+  if (!stock) return null;
+  const linea = lineas[idx];
+  if (!linea) return null;
+  const apartadas = lineas.reduce((suma, l, i) =>
+    i !== idx && l.modelo === linea.modelo && normColor(l.color) === normColor(linea.color)
+      ? suma + Number(l.cantidad || 0)
+      : suma, 0);
+  return stock.disponibles - apartadas;
+}
