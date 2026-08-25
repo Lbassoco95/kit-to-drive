@@ -79,7 +79,10 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260824000001_remisiones_visibles_equipo_comercial','politica|remisiones.leer remisiones por rol'),
   ('20260824000002_comercial_lee_toda_la_bandeja','politica|remisiones.comercial lee remisiones'),
   ('20260824000002_comercial_lee_toda_la_bandeja','politica|motocarros.comercial lee motocarros'),
-  ('20260824000003_usuario_activo_se_aplica',     'funcion|usuario_activo(uuid)')
+  ('20260824000003_usuario_activo_se_aplica',     'funcion|usuario_activo(uuid)'),
+  ('20260825000001_comercial_escalera_de_permisos','politica|crm_oportunidades.crm_oportunidades_insert_area'),
+  ('20260825000001_comercial_escalera_de_permisos','politica|crm_actividades.crm_actividades_insert_area'),
+  ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area')
 ), revisado AS (
   SELECT e.script, e.objeto,
          split_part(e.objeto, '|', 1) AS tipo,

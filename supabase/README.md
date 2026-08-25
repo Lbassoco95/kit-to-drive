@@ -106,6 +106,34 @@ un modelo sin nombre comercial entra con su código de fábrica en vez de
 perderse. Si la consulta falla, se cae a la lista vieja para no dejar el
 selector vacío.
 
+### La escalera de Comercial estaba invertida
+
+Al revisar las políticas de `remisiones` después de la reparación salió que
+**mientras más alto el nivel en Comercial, menos se podía hacer.** Medido con
+RLS real sobre producción reproducida:
+
+| operación | com/operador | com/supervisor | com/admin | dirección |
+|---|---|---|---|---|
+| crear remisión | SÍ | **no** | **no** | SÍ |
+| agregar renglón a la remisión | SÍ | **no** | **no** | SÍ |
+| crear oportunidad / actividad / ruta | SÍ | SÍ | **no** | SÍ |
+| comentar una unidad | SÍ | **no** | **no** | SÍ |
+
+La causa: cuando se migró a ÁREA × NIVEL (`20260823000005`) el rol legado pasó a
+**derivarse** — un supervisor de Comercial es `coordinador_ventas` y un
+administrador `director_ventas` — pero estas políticas de **escritura** se
+quedaron escritas contra los roles viejos (`ventas`, `coordinador`, `admin`),
+que ya no incluyen a esos dos. La lectura sí se migró (`20260824000001/2`), y el
+UPDATE de remisiones también (`comercial supervisa remisiones`); el INSERT
+nunca.
+
+`20260825000001_comercial_escalera_de_permisos.sql` lo endereza con la regla del
+modelo: **cada nivel puede al menos lo que puede el de abajo.** Operador, lo
+suyo; supervisor y administrador, todo lo de su área; Dirección, todo. No se
+ensancha nada más — se comprobó que fábrica y almacén siguen sin poder crear
+remisiones ni registros de CRM, y quien está dado de baja sigue fuera porque
+`usuario_activo` vive dentro de `es_area` y `supervisa_area`.
+
 **Pendiente conocido:** los scripts legados de finanzas y CRM
 (`20260713000001`, `20260714000002`) agregan un valor a `app_role` y lo usan en
 el mismo archivo. Postgres no permite usar un valor de enum recién agregado
