@@ -181,9 +181,11 @@ export default function Remisiones() {
     }
 
     console.warn("v_stock_modelo_color no disponible:", error?.message);
+    // `select("*")` a propósito: pedir `nombre_comercial` por nombre falla si
+    // KIT-4 tampoco se aplicó, que es justo cuando hace falta el respaldo.
     const { data: colores } = await supabase
       .from("inventario_colores")
-      .select("modelo, nombre_comercial, color, cantidad_disponible");
+      .select("*");
     (colores ?? []).forEach((r: any) => {
       const disp = Number(r.cantidad_disponible ?? 0);
       // Un mismo color puede venir en varios códigos de fábrica bajo el mismo

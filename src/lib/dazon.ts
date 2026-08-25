@@ -223,6 +223,10 @@ export const serialesCompletos = (m: any) =>
 // (modelo de fábrica, color) — una cabina de 200cc no va en un 300cc.
 export type CapacidadColor = { juegos: number; usados: number; libres: number };
 
+// Ojo: `claveCapacidad` va por CÓDIGO DE FÁBRICA (DZ200Q1) porque los juegos
+// de piezas son por modelo de fábrica. `claveStock`, más abajo, va por NOMBRE
+// COMERCIAL ("200cc 2026") porque es lo que captura la remisión. No son
+// intercambiables.
 export const claveCapacidad = (modelo: string, color: string) =>
   `${modelo}__${normColor(color)}`;
 
@@ -233,13 +237,22 @@ export const claveCapacidad = (modelo: string, color: string) =>
 // Postgres contesta 42703: «column inventario_chasis.color_original does not
 // exist». Ese texto no le dice a nadie qué hacer, y el hueco se ve como si se
 // hubiera perdido la información. Esto lo traduce al archivo que falta correr.
+// Se recorre en orden: la primera que casa gana, así que lo específico va
+// arriba. Ojo con `nombre_comercial`: existe en `modelos_producto` (KIT-3) y
+// también en `inventario_colores` (KIT-4), y son scripts distintos.
 const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
   [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color/,
     "20260823000003_color_efectivo_capacidad.sql"],
-  [/incidencias_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at/,
+  [/capturar_seriales_unidad/,
+    "20260823000002_capturar_seriales_unidad.sql"],
+  [/inventario_colores\.nombre_comercial|incidencias_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at/,
     "20260823000001_incidencias_chasis_colores_cierre.sql"],
-  [/nombre_comercial|modelos_producto|bitacora_orden_armado/,
+  [/modelos_producto|bitacora_orden_armado|nombre_comercial|configurar_unidad|desconfigurar_unidad/,
     "20260822000001_configuracion_manual_unidades.sql"],
+  [/bitacora_eliminaciones/,
+    "20260819000010_bitacora_eliminaciones.sql"],
+  [/usuario_activo/,
+    "20260824000003_usuario_activo_se_aplica.sql"],
 ];
 
 /**
@@ -280,8 +293,10 @@ export type StockColor = {
  * agrega por nombre comercial ("200cc 2026"), no por código de fábrica
  * (DZ200Q1), que es lo que la remisión captura.
  */
+export const normModelo = (modelo?: string | null) => (modelo ?? "").trim().toUpperCase();
+
 export const claveStock = (modelo: string, color: string) =>
-  `${(modelo ?? "").trim().toUpperCase()}__${normColor(color)}`;
+  `${normModelo(modelo)}__${normColor(color)}`;
 
 /**
  * Cuántas unidades de (modelo, color) le quedan a la línea `idx` de una orden.
@@ -304,7 +319,8 @@ export function disponiblesEnOrden(
   const linea = lineas[idx];
   if (!linea) return null;
   const apartadas = lineas.reduce((suma, l, i) =>
-    i !== idx && l.modelo === linea.modelo && normColor(l.color) === normColor(linea.color)
+    i !== idx && normModelo(l.modelo) === normModelo(linea.modelo)
+      && normColor(l.color) === normColor(linea.color)
       ? suma + Number(l.cantidad || 0)
       : suma, 0);
   return stock.disponibles - apartadas;
