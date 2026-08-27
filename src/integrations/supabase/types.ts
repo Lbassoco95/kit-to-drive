@@ -1718,7 +1718,6 @@ export type Database = {
         Args: { _chasis_id: string; _color_nuevo: string; _motivo: string }
         Returns: Json
       }
-      }
       cambiar_orden_armado: {
         Args: { _motivo?: string; _motocarro_id: string; _orden_nuevo: number }
         Returns: Json
