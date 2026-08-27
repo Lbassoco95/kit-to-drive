@@ -11,6 +11,7 @@ import { fmtDate, COLORES, claveStock } from "@/lib/dazon";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 import { SerialAutocomplete } from "@/components/SerialAutocomplete";
 
 
@@ -104,6 +105,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [detalleDialog, setDetalleDialog] = useState<RemisionCard | null>(null);
   const [detalleUnidades, setDetalleUnidades] = useState<MotocarroDisponible[]>([]);
   const [detalleLoading, setDetalleLoading] = useState(false);
+  const [previewPath, setPreviewPath] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -233,11 +235,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     await load(); onChange?.();
   };
 
-  const verDoc = async (path: string) => {
-    const { data, error } = await supabase.storage.from("remisiones-docs").createSignedUrl(path, 60);
-    if (error || !data?.signedUrl) { toast.error("No se pudo abrir el documento"); return; }
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-  };
+  const verDoc = (path: string) => setPreviewPath(path);
 
   const descargarDoc = async (path: string) => {
     const nombre = path.split("/").pop() || "remision.pdf";
@@ -1061,6 +1059,12 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DocumentViewerDialog
+        path={previewPath}
+        open={!!previewPath}
+        onOpenChange={o => { if (!o) setPreviewPath(null); }}
+      />
     </>
   );
 }

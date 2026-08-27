@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { FileOrCamera } from "@/components/FileOrCamera";
+import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
 // Los modelos se leen del catálogo (ver cargarModelosMotocarro); esta lista
@@ -135,6 +136,7 @@ export default function Remisiones() {
   const [activeTab, setActiveTab]             = useState<'activas'|'canceladas'>('activas');
   const [notifOpen, setNotifOpen]             = useState(false);
   const [detalleRemision, setDetalleRemision] = useState<any|null>(null);
+  const [previewPath, setPreviewPath] = useState<string|null>(null);
   // Alcance de la bandeja: todo el equipo comercial comparte la misma información,
   // pero cada quien puede acotar la vista a lo suyo sin perder el panorama.
   const [scope, setScope]                     = useState<'todas'|'mias'>('todas');
@@ -489,11 +491,7 @@ export default function Remisiones() {
     await supabase.from("remisiones").update({documento_url:path}).eq("id",r.id);
     toast.success("✓ PDF subido"); load();
   };
-  const verPdf = async (path:string) => {
-    const { data,error } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60);
-    if (error||!data?.signedUrl) { toast.error("No se pudo abrir el PDF"); return; }
-    window.open(data.signedUrl,"_blank","noopener,noreferrer");
-  };
+  const verPdf = (path:string) => setPreviewPath(path);
   const descargarPdf = async (path:string) => {
     const nombre=path.split("/").pop()||"remision.pdf";
     const { data,error } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60,{download:nombre});
@@ -513,10 +511,7 @@ export default function Remisiones() {
     setSubiendoPago(false); if (error) return toast.error(error.message);
     toast.success(t.pago.confirmadoOk); setPagoDialog(null); setComprobanteFile(null); load();
   };
-  const verComprobante = async (path:string) => {
-    const { data } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60);
-    if (data?.signedUrl) window.open(data.signedUrl,"_blank");
-  };
+  const verComprobante = (path:string) => setPreviewPath(path);
 
   const cerrarRemision = async (id: string) => {
     // Get the remision to know which model/color to decrement
@@ -1403,6 +1398,12 @@ export default function Remisiones() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DocumentViewerDialog
+        path={previewPath}
+        open={!!previewPath}
+        onOpenChange={o => { if (!o) setPreviewPath(null); }}
+      />
     </div>
   );
 }
