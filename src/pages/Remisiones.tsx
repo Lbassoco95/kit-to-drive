@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { fmtDate, effEstatusArmado, COLORES } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, StockColor } from "@/lib/dazon";
+import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,7 +23,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileOrCamera } from "@/components/FileOrCamera";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
-const MODELOS = ["200cc 2026", "300cc 2026"];
+// Los modelos se leen del catálogo (ver cargarModelosMotocarro); esta lista
+// sólo se usa como valor inicial mientras carga.
+
+// Radix reserva la cadena vacía para «sin selección», y un <SelectItem value="">
+// truena al abrir el desplegable: la excepción ocurre al DIBUJAR, así que se
+// llevaba la app entera en blanco al dar clic en «Nueva remisión». La opción de
+// «a mí mismo» viaja con un valor propio y se traduce a vacío al guardar.
+const ASIGNAR_A_MI = "__yo__";
 const colorLabel = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 
 const tipoBadgeClass: Record<string, string> = {
@@ -50,9 +58,9 @@ interface MotoItem {
   con_activacion: boolean;
 }
 
-const defaultMoto = (): MotoItem => ({
+const defaultMoto = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
   _key: crypto.randomUUID(),
-  modelo: "200cc 2026",
+  modelo,
   color: "BLANCO",
   cantidad: 1,
   con_caja: false,
@@ -79,7 +87,17 @@ function suggestNextFolio(folios: string[]): string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
 export default function Remisiones() {
-  const { role, user } = useAuth();
+  const { perms, area, user } = useAuth();
+  // Operador de Comercial: captura a su nombre y sólo edita lo suyo.
+  const esVendedor = area === "comercial" && perms.soloPropios("remisiones");
+  // Ojo con la distinción: LEER la bandeja completa no depende del nivel — eso
+  // lo resuelve el RLS, y toda el área comercial ve todas las remisiones para
+  // trabajar con la misma información. `editaTodas` es sólo permiso de
+  // ESCRITURA sobre remisiones ajenas (supervisor y administrador).
+  const editaTodas = perms.puedeEditar("remisiones");
+  // La confirmación de fechas la hace cada área operativa.
+  const confirmaFabrica   = perms.esAdminGlobal || (area === "fabrica" && perms.puedeCrear("produccion"));
+  const confirmaLogistica = perms.esAdminGlobal || (area === "almacen_logistica" && perms.puedeCrear("produccion"));
   const { t } = useLang();
   const [rows, setRows]             = useState<any[]>([]);
   const [clientes, setClientes]     = useState<any[]>([]);
@@ -91,13 +109,15 @@ export default function Remisiones() {
   const [activeFolios, setActiveFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp:"", nombre_comercial:"", telefono:"" });
-  const [colorInventory, setColorInventory] = useState<Map<string, any>>(new Map()); // key: "modelo_color" -> inventory data
+  // Disponibilidad por (modelo comercial, color). Llave: claveStock().
+  const [colorInventory, setColorInventory] = useState<Map<string, StockColor>>(new Map());
 
   const [form, setForm] = useState<any>({
     folio_remision:"", cliente_id:"", vendedor_asignado_id:"", nombre_vendedor:"",
     fecha_remision: new Date().toISOString().slice(0,10),
     notas:"", tipo_pago:"anticipado", pagado:true,
   });
+  const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
   const [motos, setMotos]     = useState<MotoItem[]>([defaultMoto()]);
   const [conFlete, setConFlete] = useState(false);
   const [formFile, setFormFile] = useState<File|null>(null);
@@ -111,8 +131,11 @@ export default function Remisiones() {
   const [deleteMotivo, setDeleteMotivo]       = useState("");
   const [activeTab, setActiveTab]             = useState<'activas'|'canceladas'>('activas');
   const [notifOpen, setNotifOpen]             = useState(false);
+  // Alcance de la bandeja: todo el equipo comercial comparte la misma información,
+  // pero cada quien puede acotar la vista a lo suyo sin perder el panorama.
+  const [scope, setScope]                     = useState<'todas'|'mias'>('todas');
 
-  const canAssignVendedor = role === "admin" || role === "coordinador";
+  const canAssignVendedor = editaTodas;
   const totalUnidades = motos.reduce((s,m) => s + Number(m.cantidad||0), 0);
 
   // ── Loaders ────────────────────────────────────────────────────────────────
@@ -121,37 +144,74 @@ export default function Remisiones() {
     setClientes(data ?? []);
   };
   const loadVendedores = async () => {
-    const { data: roles } = await supabase.from("user_roles").select("user_id,role").in("role",["ventas","coordinador"]);
+    const { data: roles } = await supabase.from("user_roles").select("user_id,area").eq("area","comercial");
     if (!roles?.length) return;
     const { data } = await supabase.from("profiles").select("id,nombre_completo,codigo_vendedor,activo").in("id", roles.map(r=>r.user_id)).eq("activo",true).order("nombre_completo");
     setVendedores(data ?? []);
   };
-  const loadColorInventory = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("inventario_colores")
-        .select("*");
-      
-      if (error) {
-        console.error("Error loading color inventory:", error);
-        return;
-      }
-      
-      const inventoryMap = new Map<string, any>();
-      (data || []).forEach((item: any) => {
-        const key = `${item.modelo}_${item.color}`;
-        inventoryMap.set(key, item);
+  /**
+   * Disponibilidad por color, para poder prometerla al cliente.
+   *
+   * Se lee de `v_stock_modelo_color`, que agrega por **nombre comercial**
+   * ("200cc 2026") — que es lo que la remisión captura. La versión anterior
+   * cruzaba contra `inventario_colores.modelo`, que guarda el **código de
+   * fábrica** (DZ200Q1): la llave nunca casaba y el aviso de existencias no
+   * salía casi nunca.
+   *
+   * Si la vista no está (falta correr KIT-4 en el SQL editor), se cae a
+   * `inventario_colores` cruzando por nombre comercial. Ahí no hay demanda
+   * comprometida, así que el número sale optimista — pero es mejor que nada,
+   * y nunca bloquea la captura.
+   */
+  const loadStockColor = async () => {
+    const mapa = new Map<string, StockColor>();
+
+    const { data: vista, error } = await supabase
+      .from("v_stock_modelo_color")
+      .select("modelo_comercial, color, unidades_libres, piezas_disponibles, demanda_pendiente");
+
+    if (!error && vista) {
+      vista.forEach((r: any) => {
+        const libres = Number(r.unidades_libres ?? 0);
+        const piezas = Number(r.piezas_disponibles ?? 0);
+        const demanda = Number(r.demanda_pendiente ?? 0);
+        mapa.set(claveStock(r.modelo_comercial, r.color), {
+          disponibles: libres + piezas - demanda,
+          unidadesLibres: libres,
+          piezasDisponibles: piezas,
+          demandaPendiente: demanda,
+        });
       });
-      
-      setColorInventory(inventoryMap);
-    } catch (error) {
-      console.error("Error loading color inventory:", error);
+      setColorInventory(mapa);
+      return;
     }
+
+    console.warn("v_stock_modelo_color no disponible:", error?.message);
+    // `select("*")` a propósito: pedir `nombre_comercial` por nombre falla si
+    // KIT-4 tampoco se aplicó, que es justo cuando hace falta el respaldo.
+    const { data: colores } = await supabase
+      .from("inventario_colores")
+      .select("*");
+    (colores ?? []).forEach((r: any) => {
+      const disp = Number(r.cantidad_disponible ?? 0);
+      // Un mismo color puede venir en varios códigos de fábrica bajo el mismo
+      // nombre comercial: se suman, no se pisan.
+      const k = claveStock(r.nombre_comercial ?? r.modelo, r.color);
+      const previo = mapa.get(k);
+      mapa.set(k, {
+        disponibles: (previo?.disponibles ?? 0) + disp,
+        unidadesLibres: 0,
+        piezasDisponibles: (previo?.piezasDisponibles ?? 0) + disp,
+        demandaPendiente: 0,
+      });
+    });
+    setColorInventory(mapa);
   };
 
   const load = async () => {
-    // Load color inventory for alerts
-    loadColorInventory();
+    // Disponibilidad por color, para el selector de la remisión
+    loadStockColor();
+    cargarModelosMotocarro().then(setModelos);
 
     // ── 1. Query mínimo garantizado (solo tablas/columnas originales) ──────────
     const { data: base } = await supabase
@@ -166,10 +226,13 @@ export default function Remisiones() {
       color_solicitado:null, total_unidades_solicitadas:null,
     }));
     setRows(baseRows);
+    // Folios activos (no cancelados) para validar duplicados y sugerir reutilización
     const activos = baseRows.filter((r:any) => r.estatus !== 'CANCELADA');
     setActiveFolios(activos.map((r:any) => r.folio_remision));
-    const propios = activos.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
-    setRecentFolios(propios.slice(0,5).map((r:any)=>r.folio_remision));
+    // Folios sugeridos: primero los propios; si el usuario aún no tiene, los del equipo activo
+    const propios = activos.filter((r:any) => r.vendedor_id===user?.id);
+    const fuenteFolios = propios.length ? propios : activos;
+    setRecentFolios(fuenteFolios.slice(0,5).map((r:any)=>r.folio_remision));
 
     if (!base?.length) return;
     const ids = base.map((r:any) => r.id);
@@ -219,22 +282,24 @@ export default function Remisiones() {
     } catch (_) { /* cache stale — ignorar */ }
   };
 
-  useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, role]);
+  useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, perms.nivel, perms.area]);
   useEffect(() => {
     if (user?.id) supabase.from("profiles").select("nombre_completo").eq("id",user.id).single().then(({data})=>{ if(data) setMyProfile(data); });
   }, [user?.id]);
 
-  const canCreate = role==="admin"||role==="ventas"||role==="coordinador";
+  const canCreate = perms.puedeCrear("remisiones");
 
   // ── Computed rows ────────────────────────────────────────────────────────────
   const today = new Date().toISOString().slice(0, 10);
-  const activeRows   = rows.filter(r => r.estatus !== 'CANCELADA');
-  const canceledRows = rows.filter(r => r.estatus === 'CANCELADA' && (role==='admin' || r.vendedor_id===user?.id));
-  const displayRows  = activeTab === 'activas' ? activeRows : canceledRows;
+  // Qué remisiones llegan lo decide el RLS, no la UI: toda el área comercial lee
+  // la bandeja completa sin importar su nivel. `scope` sólo acota la vista aquí.
+  const inScope      = (r: { vendedor_id?: string | null }) => scope === 'todas' || r.vendedor_id === user?.id;
+  const misRemisiones = rows.filter(r => r.vendedor_id === user?.id).length;
+  const activeRows   = rows.filter(r => r.estatus !== 'CANCELADA' && inScope(r));
+  const canceledRows = rows.filter(r => r.estatus === 'CANCELADA' && inScope(r));
 
-  // Motocarros atrasados — solo para remisiones activas del usuario actual
+  // Motocarros atrasados — de las remisiones activas visibles en el alcance actual
   const motocarrosAtrasados = activeRows
-    .filter(r => role==='admin'||role==='coordinador'||r.vendedor_id===user?.id)
     .filter(r => r.estatus!=='COMPLETA')
     .flatMap(r => (r.motocarros??[]).map((m:any)=>({...m, folio:r.folio_remision})))
     .filter((m:any) => {
@@ -244,7 +309,7 @@ export default function Remisiones() {
     });
 
   // ── Moto helpers ────────────────────────────────────────────────────────────
-  const addMoto   = () => setMotos(m => [...m, defaultMoto()]);
+  const addMoto   = () => setMotos(m => [...m, defaultMoto(modelos[0])]);
   const removeMoto = (idx:number) => setMotos(m => m.filter((_,i)=>i!==idx));
   const updateMoto = (idx:number, field:keyof MotoItem, val:any) =>
     setMotos(m => m.map((item,i) => {
@@ -258,15 +323,37 @@ export default function Remisiones() {
       return next;
     }));
 
+  // ── Disponibilidad por color dentro de la orden ─────────────────────────────
+  /**
+   * Cuántas unidades de (modelo, color) quedan para la línea `idx`.
+   *
+   * Al inventario disponible se le resta lo que YA se apartó en las otras
+   * líneas de esta misma remisión: si el motocarro 1 pide 3 blancos, el
+   * selector del motocarro 2 tiene que mostrar 3 menos. La propia línea no se
+   * descuenta a sí misma — si no, el color que acaba de elegir aparecería
+   * agotado por su propia reserva.
+   *
+   * Devuelve `null` cuando no hay dato de ese color: sin información no se
+   * inventa un número ni se estorba la captura.
+   */
+  const disponiblesPara = (idx: number, modelo: string, color: string): number | null =>
+    disponiblesEnOrden(
+      colorInventory.get(claveStock(modelo, color)),
+      // El color a consultar no es siempre el que la línea trae puesto: al
+      // desplegar la lista se pregunta por cada color del catálogo.
+      motos.map((m, i) => (i === idx ? { ...m, modelo, color } : m)),
+      idx,
+    );
+
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
-    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(activeFolios), nombre_vendedor: role==="ventas"?(myProfile?.nombre_completo||""):"" }));
-    setMotos([defaultMoto()]); setConFlete(false); setFormFile(null); setOpen(true);
+    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(activeFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
+    setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null); setOpen(true);
   };
   const resetForm = () => {
     setForm({ folio_remision:"",cliente_id:"",vendedor_asignado_id:"",nombre_vendedor:"",
       fecha_remision:new Date().toISOString().slice(0,10),notas:"",tipo_pago:"anticipado",pagado:true });
-    setMotos([defaultMoto()]); setConFlete(false); setFormFile(null);
+    setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null);
   };
 
   // ── Nuevo cliente ───────────────────────────────────────────────────────────
@@ -342,26 +429,30 @@ export default function Remisiones() {
 
   // ── Assign chasis ──────────────────────────────────────────────────────────
   const asignarChasis = async (r:any) => {
-    const items:any[] = (r.remision_items??[]).filter((i:any)=>i.tipo_servicio==="motocarro");
-    const motos_:any[] = r.motocarros??[];
-    if (!items.length) {
-      const cant = (r.total_unidades_solicitadas||1) - motos_.length;
-      if (cant<=0) { toast.info("Ya están todos asignados"); return; }
-      const { data, error } = await supabase.rpc("asignar_chasis_remision",{_remision_id:r.id,_cantidad:cant,_color:r.color_solicitado||null});
-      if (error) return toast.error(error.message);
-      toast.success(`✓ ${data} chasis asignados`);
-    } else {
-      let total=0;
-      for (const item of items) {
-        const ya = motos_.filter((m:any)=>(m.color||"").toUpperCase()===item.color?.toUpperCase()).length;
-        const rest = item.cantidad-ya; if (rest<=0) continue;
-        const { data, error } = await supabase.rpc("asignar_chasis_remision",{_remision_id:r.id,_cantidad:rest,_color:item.color});
-        if (error) { console.error(error.message); continue; }
-        total += (data||0);
-      }
-      if (total>0) toast.success(`✓ ${total} chasis asignados`);
-      else toast.info("No hay inventario con esos colores");
-    }
+    // Una sola RPC resuelve todo el pedido: cruza cada línea de
+    // remision_items por modelo comercial + color, exige NS chasis y NS motor,
+    // y salta unidades cuyo chasis está detenido por una incidencia.
+    const { data, error } = await supabase.rpc("asignar_remision_items",{_remision_id:r.id});
+    if (error) return toast.error(error.message);
+
+    const res = data as { asignadas?:number; detalle?:any[] } | null;
+    const asignadas = res?.asignadas ?? 0;
+    if (asignadas>0) toast.success(`✓ ${asignadas} chasis asignados`);
+
+    const faltantes = (res?.detalle ?? []).filter((d:any)=>(d?.faltan??0)>0);
+    faltantes.forEach((d:any)=>{
+      const que = [d.modelo,d.color].filter(Boolean).join(" ") || "sin modelo/color";
+      const porque = d.piezas_por_configurar>0
+        ? `hay ${d.piezas_por_configurar} chasis por configurar`
+        : d.unidades_sin_serial>0
+        ? `hay ${d.unidades_sin_serial} unidad(es) sin NS chasis/NS motor`
+        : d.unidades_detenidas>0
+        ? `hay ${d.unidades_detenidas} unidad(es) detenidas por incidencia de chasis`
+        : "no hay inventario de ese color";
+      toast.warning(`Faltan ${d.faltan} de ${que}: ${porque}`);
+    });
+    if (!asignadas && !faltantes.length) toast.info("Ya están todos asignados");
+
     load();
   };
 
@@ -512,7 +603,10 @@ export default function Remisiones() {
         <div>
           <h1>{t.remisiones.title}</h1>
           <p className="text-muted-foreground text-base mt-1">
-            {t.remisiones.subtitle(rows.length)} {role==="ventas"?"(solo las tuyas)":""}
+            {t.remisiones.subtitle(activeRows.length + canceledRows.length)}
+            {scope === 'todas'
+              ? <> — todo el equipo{misRemisiones>0 ? <> · {misRemisiones} {misRemisiones===1?"tuya":"tuyas"}</> : null}</>
+              : <> — solo las tuyas</>}
           </p>
         </div>
 
@@ -569,13 +663,14 @@ export default function Remisiones() {
                 {canAssignVendedor&&(
                   <div>
                     <Label className="text-base">Asignar a vendedor</Label>
-                    <Select value={form.vendedor_asignado_id} onValueChange={v=>{
-                      const vend=vendedores.find(x=>x.id===v);
-                      setForm({...form,vendedor_asignado_id:v,nombre_vendedor:vend?.nombre_completo||form.nombre_vendedor});
+                    <Select value={form.vendedor_asignado_id || ASIGNAR_A_MI} onValueChange={v=>{
+                      const id = v===ASIGNAR_A_MI ? "" : v;
+                      const vend=vendedores.find(x=>x.id===id);
+                      setForm({...form,vendedor_asignado_id:id,nombre_vendedor:vend?.nombre_completo||form.nombre_vendedor});
                     }}>
                       <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Vendedor (opcional)"/></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">— Asignar a mí mismo —</SelectItem>
+                        <SelectItem value={ASIGNAR_A_MI}>— Asignar a mí mismo —</SelectItem>
                         {vendedores.map(v=><SelectItem key={v.id} value={v.id}>{v.nombre_completo}{v.codigo_vendedor?` (${v.codigo_vendedor})`:""}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -584,7 +679,7 @@ export default function Remisiones() {
 
                 {/* Nombre vendedor — todos */}
                 <div>
-                  <Label className="text-base">Nombre del vendedor{role==="ventas"&&<span className="ml-1 text-xs text-muted-foreground font-normal">(tu nombre)</span>}</Label>
+                  <Label className="text-base">Nombre del vendedor{esVendedor&&<span className="ml-1 text-xs text-muted-foreground font-normal">(tu nombre)</span>}</Label>
                   <Input value={form.nombre_vendedor} onChange={e=>setForm({...form,nombre_vendedor:e.target.value})} placeholder="Nombre completo del vendedor" className="h-12 text-base"/>
                 </div>
 
@@ -612,7 +707,7 @@ export default function Remisiones() {
                             <Label className="text-xs text-muted-foreground">Modelo</Label>
                             <Select value={moto.modelo} onValueChange={v=>updateMoto(idx,"modelo",v)}>
                               <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
-                              <SelectContent>{MODELOS.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                              <SelectContent>{modelos.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                             </Select>
                           </div>
                           <div>
@@ -621,26 +716,16 @@ export default function Remisiones() {
                               <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
                               <SelectContent>
                                 {COLORES.map(c=>{
-                                  const key = `${moto.modelo}_${c}`;
-                                  const inventory = colorInventory.get(key);
-                                  const isLowStock = inventory && inventory.cantidad_disponible <= inventory.umbral_alerta;
-                                  const isOutOfStock = inventory && inventory.cantidad_disponible === 0;
-                                  
+                                  const quedan = disponiblesPara(idx, moto.modelo, c);
                                   return (
-                                    <SelectItem 
-                                      key={c} 
-                                      value={c}
-                                      disabled={isOutOfStock}
-                                      className={isOutOfStock ? "opacity-50" : ""}
-                                    >
-                                      <div className="flex items-center justify-between w-full">
+                                    <SelectItem key={c} value={c}>
+                                      <div className="flex items-center justify-between w-full gap-3">
                                         <span>{colorLabel(c)}</span>
-                                        {isOutOfStock && (
-                                          <span className="text-red-600 text-xs ml-2">Sin stock</span>
-                                        )}
-                                        {isLowStock && !isOutOfStock && (
-                                          <span className="text-amber-600 text-xs ml-2">
-                                            ¡Solo {inventory.cantidad_disponible} unidades!
+                                        {quedan === null ? null : quedan <= 0 ? (
+                                          <span className="text-red-600 text-xs whitespace-nowrap">Sin existencia</span>
+                                        ) : (
+                                          <span className={`text-xs whitespace-nowrap ${quedan <= 3 ? "text-amber-600" : "text-muted-foreground"}`}>
+                                            {quedan} disponible{quedan === 1 ? "" : "s"}
                                           </span>
                                         )}
                                       </div>
@@ -649,27 +734,42 @@ export default function Remisiones() {
                                 })}
                               </SelectContent>
                             </Select>
-                            {/* Color alert badge */}
+                            {/* Qué tan cubierta queda esta línea con el color elegido.
+                                No se bloquea la captura: la remisión es una promesa
+                                al cliente y el sistema ya trabaja con demanda por
+                                encima del inventario (de ahí «déficit» en
+                                Producción). Lo que sí hace falta es que quien
+                                captura vea contra qué se está comprometiendo. */}
                             {(() => {
-                              const key = `${moto.modelo}_${moto.color}`;
-                              const inventory = colorInventory.get(key);
-                              if (!inventory) return null;
-                              
-                              if (inventory.cantidad_disponible === 0) {
+                              const quedan = disponiblesPara(idx, moto.modelo, moto.color);
+                              if (quedan === null) return null;
+                              const piden = Number(moto.cantidad || 0);
+                              const faltan = piden - quedan;
+
+                              if (faltan > 0) {
                                 return (
-                                  <div className="mt-1 text-xs text-red-600 font-medium flex items-center gap-1">
-                                    <XCircle size={12} /> Sin stock de este color
+                                  <div className="mt-1 text-xs text-red-600 font-medium flex items-start gap-1">
+                                    <XCircle size={12} className="mt-0.5 shrink-0" />
+                                    <span>
+                                      {quedan <= 0
+                                        ? `Sin existencia de ${colorLabel(moto.color)}: se piden ${piden} por armar.`
+                                        : `Sólo quedan ${quedan} de ${colorLabel(moto.color)}: faltarían ${faltan} por armar.`}
+                                    </span>
                                   </div>
                                 );
                               }
-                              if (inventory.cantidad_disponible <= inventory.umbral_alerta) {
+                              if (quedan - piden <= 3) {
                                 return (
                                   <div className="mt-1 text-xs text-amber-600 font-medium flex items-center gap-1">
-                                    <AlertTriangle size={12} /> ¡Solo quedan {inventory.cantidad_disponible} unidades de este color!
+                                    <AlertTriangle size={12} /> Quedan {quedan} de {colorLabel(moto.color)}; con esta orden se van {piden}.
                                   </div>
                                 );
                               }
-                              return null;
+                              return (
+                                <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                                  <CheckCircle2 size={12} className="text-emerald-600" /> {quedan} disponibles de {colorLabel(moto.color)}
+                                </div>
+                              );
                             })()}
                           </div>
                         </div>
@@ -797,6 +897,28 @@ export default function Remisiones() {
         </div>
       )}
 
+      {/* ── Alcance: todo el equipo comercial / solo las mías ─────────────── */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Ver</span>
+        <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+          {([
+            { key: 'todas', label: 'Todo el equipo' },
+            { key: 'mias',  label: 'Solo las mías' },
+          ] as const).map(opt => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => setScope(opt.key)}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
+                scope===opt.key ? 'bg-white text-[#1F3864] shadow-sm' : 'text-muted-foreground hover:text-[#1F3864]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Tabs Activas / Canceladas ─────────────────────────────────────── */}
       <div className="flex gap-0 border-b border-slate-200">
         <button
@@ -805,14 +927,14 @@ export default function Remisiones() {
         >
           Activas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{activeRows.length}</span>
         </button>
-        {(role==='admin'||role==='ventas'||role==='coordinador') && (
-          <button
-            onClick={() => setActiveTab('canceladas')}
-            className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='canceladas' ? 'border-red-500 text-red-600' : 'border-transparent text-muted-foreground hover:text-red-500'}`}
-          >
-            Canceladas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{canceledRows.length}</span>
-          </button>
-        )}
+        {/* Quien puede abrir esta página ya lee la bandeja completa (RLS), así que
+            la pestaña de canceladas no necesita su propia lista de permisos. */}
+        <button
+          onClick={() => setActiveTab('canceladas')}
+          className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='canceladas' ? 'border-red-500 text-red-600' : 'border-transparent text-muted-foreground hover:text-red-500'}`}
+        >
+          Canceladas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{canceledRows.length}</span>
+        </button>
       </div>
 
       {/* ── Cards ─────────────────────────────────────────────────────────── */}
@@ -832,10 +954,10 @@ export default function Remisiones() {
               </div>
               <div className="text-sm text-muted-foreground">
                 <div>👤 {r.clientes?.codigo_erp || "—"}{r.clientes?.nombre_comercial ? ` — ${r.clientes.nombre_comercial}` : ""}</div>
-                <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}</div>
+                <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}{r.vendedor_id===user?.id ? " (tuya)" : ""}</div>
                 <div>Fecha: {fmtDate(r.fecha_remision)}</div>
               </div>
-              {role === 'admin' && (
+              {perms.puedeEliminar('remisiones') && (
                 <Button
                   variant="outline"
                   onClick={() => restaurarRemision(r.id)}
@@ -846,8 +968,7 @@ export default function Remisiones() {
               )}
             </Card>
           ))
-        ) : rows.map(r => {
-          if (r.estatus === 'CANCELADA') return null;
+        ) : activeRows.map(r => {
           const motos_   = r.motocarros??[];
           const items:any[] = r.remision_items??[];
           const motoItems  = items.filter((i:any)=>i.tipo_servicio==="motocarro");
@@ -857,9 +978,10 @@ export default function Remisiones() {
           const pct        = Math.round((listas/total)*100);
           const pctColor   = pct===100?"#065F46":pct>=50?"#92400E":"#991B1B";
           const isOwner    = r.vendedor_id===user?.id;
-          const canAssign  = role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner);
-          const canUpload  = role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner);
-          const canPropose = role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner);
+          const puedeGestionar = editaTodas||(canCreate&&isOwner);
+          const canAssign  = puedeGestionar;
+          const canUpload  = puedeGestionar;
+          const canPropose = puedeGestionar;
           const vendedorNombre = r.nombre_vendedor||r.profiles?.nombre_completo||"—";
           const initials = vendedorNombre.split(" ").map((s:string)=>s[0]).slice(0,2).join("").toUpperCase();
 
@@ -880,6 +1002,9 @@ export default function Remisiones() {
                   <span className="w-5 h-5 rounded-full bg-[#2E75B6] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{initials||"?"}</span>
                   {vendedorNombre.split(" ")[0]}
                 </span>
+                {isOwner && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#1F3864] text-white text-[10px] font-bold uppercase tracking-wide">Tuya</span>
+                )}
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
                   👤 {r.clientes?.codigo_erp||"—"}
                 </span>
@@ -941,7 +1066,7 @@ export default function Remisiones() {
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id]?"rotate-180":""}`}/>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-2">
-                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} canPropose={canPropose} role={role} onChange={load}/>)}
+                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} canPropose={canPropose} canConfirmFab={confirmaFabrica} canConfirmLog={confirmaLogistica} onChange={load}/>)}
                   </CollapsibleContent>
                 </Collapsible>
               )}
@@ -969,7 +1094,7 @@ export default function Remisiones() {
                     <FileText className="h-5 w-5 mr-2 opacity-40"/> Sin PDF
                   </div>
                 )}
-                {r.tipo_pago==="contra_entrega"&&!r.pagado&&(role==="admin"||role==="coordinador"||(role==="ventas"&&isOwner))&&(
+                {r.tipo_pago==="contra_entrega"&&!r.pagado&&puedeGestionar&&(
                   <Button onClick={()=>{setPagoDialog(r);setComprobanteFile(null);}} className="flex-1 h-12 text-base bg-emerald-600 hover:bg-emerald-700 min-w-[100px]">
                     <DollarSign className="h-5 w-5 mr-2"/> {t.pago.confirmar}
                   </Button>
@@ -979,8 +1104,8 @@ export default function Remisiones() {
                     <FileDown className="h-5 w-5 mr-2"/> {t.pago.verComprobante}
                   </Button>
                 )}
-                {/* Marcar entregada — admin/coordinador, solo si está activa */}
-                {(role==="admin"||role==="coordinador")&&(r.estatus==="NUEVA"||r.estatus==="PARCIAL")&&(
+                {/* Marcar entregada — supervisor/admin del área, solo si está activa */}
+                {editaTodas&&(r.estatus==="NUEVA"||r.estatus==="PARCIAL")&&(
                   <Button
                     onClick={()=>setCierreConfirm(r)}
                     className="flex-1 h-12 text-base bg-emerald-700 hover:bg-emerald-800 min-w-[120px]"
@@ -988,8 +1113,8 @@ export default function Remisiones() {
                     <CheckCheck className="h-5 w-5 mr-2"/> Entregar
                   </Button>
                 )}
-                {/* Eliminar — admin o ventas (solo sus propias) */}
-                {(role==="admin"||(role==="ventas"&&isOwner))&&(
+                {/* Cancelar — supervisor/admin del área, u operador en las propias */}
+                {(editaTodas||(canCreate&&isOwner))&&(
                   <Button
                     variant="outline"
                     onClick={()=>setDeleteConfirm(r)}
@@ -999,8 +1124,8 @@ export default function Remisiones() {
                     <Trash2 className="h-5 w-5"/>
                   </Button>
                 )}
-                {/* Eliminar definitivamente — solo admin */}
-                {role==="admin"&&(
+                {/* Eliminar definitivamente — solo admin del área */}
+                {perms.puedeEliminar("remisiones")&&(
                   <Button
                     variant="outline"
                     onClick={()=>setHardDeleteConfirm(r)}
@@ -1124,7 +1249,7 @@ export default function Remisiones() {
 }
 
 // ─── MotoRow ──────────────────────────────────────────────────────────────────
-function MotoRow({ m, canPropose, role, onChange }:{m:any;canPropose:boolean;role:string|null;onChange:()=>void}) {
+function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:any;canPropose:boolean;canConfirmFab:boolean;canConfirmLog:boolean;onChange:()=>void}) {
   const [editing, setEditing] = useState(false);
   const [fecha, setFecha]     = useState<string>(m.fecha_propuesta_entrega||"");
   const [notas, setNotas]     = useState<string>(m.propuesta_entrega_notas||"");
@@ -1141,8 +1266,6 @@ function MotoRow({ m, canPropose, role, onChange }:{m:any;canPropose:boolean;rol
     toast.success(`✓ Confirmado por ${area}`); onChange();
   };
 
-  const canConfirmFab = role==="admin"||role==="fabrica";
-  const canConfirmLog = role==="admin"||role==="logistica";
   const tieneFab = !!m.confirmada_fabrica_at;
   const tieneLog = !!m.confirmada_logistica_at;
 

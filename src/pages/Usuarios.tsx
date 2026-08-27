@@ -6,12 +6,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useLang } from "@/contexts/LangContext";
-import { Plus, Pencil, Search, UserCheck, UserX, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  Area, Nivel, AREAS, NIVELES, AREA_COLORS, NIVEL_COLORS,
+  rolLegacy, desdeRolLegacy,
+} from "@/lib/permissions";
+import { Plus, Pencil, Search, UserCheck, UserX, ShieldCheck, Info } from "lucide-react";
 
-type AppRole = "admin" | "fabrica" | "logistica" | "ventas" | "coordinador" | "director_ventas" | "coordinador_ventas" | "auxiliar_ventas";
+interface FormUsuario {
+  nombre_completo: string;
+  email: string;
+  codigo_vendedor: string;
+  activo: boolean;
+  area: Area;
+  nivel: Nivel;
+}
 
 interface Usuario {
   id: string;
@@ -19,56 +30,75 @@ interface Usuario {
   email: string | null;
   codigo_vendedor: string | null;
   activo: boolean;
-  role: AppRole | null;
+  nivel: Nivel | null;
+  area: Area | null;
 }
 
-const ROLE_COLORS: Record<AppRole, string> = {
-  admin:             "bg-red-100 text-red-700 border-red-200",
-  fabrica:           "bg-amber-100 text-amber-700 border-amber-200",
-  logistica:         "bg-indigo-100 text-indigo-700 border-indigo-200",
-  ventas:            "bg-emerald-100 text-emerald-700 border-emerald-200",
-  coordinador:       "bg-purple-100 text-purple-700 border-purple-200",
-  director_ventas:   "bg-rose-100 text-rose-700 border-rose-200",
-  coordinador_ventas: "bg-orange-100 text-orange-700 border-orange-200",
-  auxiliar_ventas:    "bg-yellow-100 text-yellow-700 border-yellow-200",
+const EMPTY_NEW = {
+  email: "", password: "", nombre_completo: "",
+  area: "comercial" as Area, nivel: "operador" as Nivel, codigo_vendedor: "",
 };
-
-const EMPTY_NEW = { email: "", password: "", nombre_completo: "", role: "ventas" as AppRole, codigo_vendedor: "" };
 
 export default function Usuarios() {
   const { t } = useLang();
+  const { perms, area: miArea } = useAuth();
   const [rows, setRows] = useState<Usuario[]>([]);
   const [q, setQ] = useState("");
+  const [fArea, setFArea] = useState<Area | "todas">("todas");
+  const [fNivel, setFNivel] = useState<Nivel | "todos">("todos");
   const [editTarget, setEditTarget] = useState<Usuario | null>(null);
-  const [editForm, setEditForm] = useState<any>({});
+  const [editForm, setEditForm] = useState<FormUsuario>({
+    nombre_completo: "", email: "", codigo_vendedor: "", activo: true,
+    area: "comercial", nivel: "operador",
+  });
   const [newOpen, setNewOpen] = useState(false);
   const [newForm, setNewForm] = useState({ ...EMPTY_NEW });
   const [saving, setSaving] = useState(false);
+
+  // Un admin de área solo administra su propia área; el admin global, todas.
+  const areasDisponibles: Area[] = perms.esAdminGlobal ? AREAS : (miArea ? [miArea] : []);
 
   const load = async () => {
     const [{ data: profiles }, { data: roles }] = await Promise.all([
       supabase.from("profiles").select("*").order("nombre_completo"),
       supabase.from("user_roles").select("*"),
     ]);
-    const merged: Usuario[] = (profiles ?? []).map(p => ({
-      ...p,
-      role: (roles ?? []).find(r => r.user_id === p.id)?.role ?? null,
-    }));
+    const merged: Usuario[] = (profiles ?? []).map(p => {
+      const r = (roles ?? []).find(x => x.user_id === p.id);
+      const fallback = r?.role ? desdeRolLegacy(r.role) : null;
+      return {
+        ...p,
+        nivel: (r?.nivel as Nivel) ?? fallback?.nivel ?? null,
+        area: (r?.area as Area) ?? fallback?.area ?? null,
+      };
+    });
     setRows(merged);
   };
 
   useEffect(() => { load(); }, []);
 
   const filtered = rows.filter(u => {
+    if (fArea !== "todas" && u.area !== fArea) return false;
+    if (fNivel !== "todos" && u.nivel !== fNivel) return false;
     if (!q) return true;
-    const blob = [u.nombre_completo, u.email, u.codigo_vendedor, u.role].filter(Boolean).join(" ").toLowerCase();
+    const blob = [
+      u.nombre_completo, u.email, u.codigo_vendedor,
+      u.area ? t.areas[u.area] : "", u.nivel ? t.niveles[u.nivel] : "",
+    ].filter(Boolean).join(" ").toLowerCase();
     return blob.includes(q.toLowerCase());
   });
 
-  // ── Edit existing user ──────────────────────────────────────────────
+  // ── Editar usuario existente ────────────────────────────────────────
   const openEdit = (u: Usuario) => {
     setEditTarget(u);
-    setEditForm({ nombre_completo: u.nombre_completo ?? "", email: u.email ?? "", codigo_vendedor: u.codigo_vendedor ?? "", activo: u.activo, role: u.role ?? "ventas" });
+    setEditForm({
+      nombre_completo: u.nombre_completo ?? "",
+      email: u.email ?? "",
+      codigo_vendedor: u.codigo_vendedor ?? "",
+      activo: u.activo,
+      area: u.area ?? areasDisponibles[0] ?? "comercial",
+      nivel: u.nivel ?? "operador",
+    });
   };
 
   const saveEdit = async () => {
@@ -83,9 +113,15 @@ export default function Usuarios() {
 
     if (profErr) { toast.error(profErr.message); setSaving(false); return; }
 
-    // Update role: delete + insert (avoid unique constraint issues)
+    // Un usuario = un tipo de usuario en un área: se reemplaza la fila.
     await supabase.from("user_roles").delete().eq("user_id", editTarget.id);
-    await supabase.from("user_roles").insert({ user_id: editTarget.id, role: editForm.role });
+    const { error: rolErr } = await supabase.from("user_roles").insert({
+      user_id: editTarget.id,
+      area: editForm.area,
+      nivel: editForm.nivel,
+      role: rolLegacy(editForm.area, editForm.nivel),
+    });
+    if (rolErr) { toast.error(rolErr.message); setSaving(false); return; }
 
     toast.success("✓ Usuario actualizado");
     setSaving(false);
@@ -99,7 +135,7 @@ export default function Usuarios() {
     else { toast.success(u.activo ? "Usuario desactivado" : "Usuario activado"); load(); }
   };
 
-  // ── Create new user (via Edge Function) ────────────────────────────
+  // ── Crear usuario (Edge Function) ──────────────────────────────────
   const createUser = async () => {
     if (!newForm.email || !newForm.password || !newForm.nombre_completo) {
       toast.error("Email, contraseña y nombre son obligatorios"); return;
@@ -113,7 +149,8 @@ export default function Usuarios() {
         email: newForm.email.trim().toLowerCase(),
         password: newForm.password,
         nombre_completo: newForm.nombre_completo.trim(),
-        role: newForm.role,
+        area: newForm.area,
+        nivel: newForm.nivel,
         codigo_vendedor: newForm.codigo_vendedor.trim() || null,
       },
     });
@@ -124,9 +161,11 @@ export default function Usuarios() {
     }
     toast.success(`✓ Usuario ${newForm.email} creado`);
     setNewOpen(false);
-    setNewForm({ ...EMPTY_NEW });
+    setNewForm({ ...EMPTY_NEW, area: areasDisponibles[0] ?? "comercial" });
     load();
   };
+
+  const esComercial = (a: Area) => a === "comercial";
 
   return (
     <div className="space-y-5">
@@ -139,57 +178,112 @@ export default function Usuarios() {
           </h1>
           <p className="text-base text-muted-foreground mt-1">{filtered.length} de {rows.length} usuarios</p>
         </div>
-        <Button onClick={() => setNewOpen(true)} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-          <Plus className="h-5 w-5 mr-2" /> Nuevo usuario
-        </Button>
+        {perms.gestionaUsuarios && (
+          <Button
+            onClick={() => { setNewForm({ ...EMPTY_NEW, area: areasDisponibles[0] ?? "comercial" }); setNewOpen(true); }}
+            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
+          >
+            <Plus className="h-5 w-5 mr-2" /> Nuevo usuario
+          </Button>
+        )}
       </div>
 
-      {/* Search */}
-      <Card className="p-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input className="pl-10 h-12 text-base" placeholder="Buscar por nombre, email, rol…" value={q} onChange={e => setQ(e.target.value)} />
+      {/* Los tres tipos de usuario */}
+      <Card className="p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-[#1F3864] mb-3">
+          <Info size={16} /> Tipos de usuario
         </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {NIVELES.map(n => (
+            <div key={n} className="rounded-lg border p-3">
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${NIVEL_COLORS[n]}`}>
+                {t.niveles[n]}
+              </span>
+              <p className="text-xs text-muted-foreground mt-2 leading-snug">{t.nivelDesc[n]}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-3">
+          El <strong>área</strong> define qué módulos ve el usuario ({AREAS.map(a => t.areas[a]).join(" · ")}).
+          El <strong>tipo de usuario</strong> define qué puede hacer dentro de ellos.
+        </p>
       </Card>
 
-      {/* Users grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map(u => (
-          <Card key={u.id} className={`p-5 flex flex-col gap-3 transition-shadow hover:shadow-md ${!u.activo ? "opacity-60" : ""}`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="font-bold text-[#1F3864] text-lg truncate">{u.nombre_completo || "—"}</div>
-                <div className="text-sm text-muted-foreground truncate">{u.email || <em className="text-xs">Sin email registrado</em>}</div>
-              </div>
-              <div className="flex gap-1 shrink-0">
-                <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openEdit(u)} title="Editar">
-                  <Pencil size={15} />
-                </Button>
-                <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar" : "Activar"}>
-                  {u.activo ? <UserX size={15} className="text-red-400" /> : <UserCheck size={15} className="text-emerald-500" />}
-                </Button>
-              </div>
-            </div>
+      {/* Búsqueda y filtros */}
+      <Card className="p-3 flex flex-col md:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
+          <Input className="pl-10 h-12 text-base" placeholder="Buscar por nombre, email, área…" value={q} onChange={e => setQ(e.target.value)} />
+        </div>
+        <Select value={fArea} onValueChange={v => setFArea(v as Area | "todas")}>
+          <SelectTrigger className="h-12 md:w-56"><SelectValue placeholder="Área" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas las áreas</SelectItem>
+            {AREAS.map(a => <SelectItem key={a} value={a}>{t.areas[a]}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={fNivel} onValueChange={v => setFNivel(v as Nivel | "todos")}>
+          <SelectTrigger className="h-12 md:w-52"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los tipos</SelectItem>
+            {NIVELES.map(n => <SelectItem key={n} value={n}>{t.niveles[n]}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </Card>
 
-            <div className="flex flex-wrap gap-2 items-center">
-              {u.role && (
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${ROLE_COLORS[u.role]}`}>
-                  {t.roles[u.role as keyof typeof t.roles]}
-                </span>
-              )}
-              {u.codigo_vendedor && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border text-xs font-mono">
-                  {u.codigo_vendedor}
-                </span>
-              )}
-              {!u.activo && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border text-xs">
-                  Inactivo
-                </span>
-              )}
-            </div>
-          </Card>
-        ))}
+      {/* Usuarios */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {filtered.map(u => {
+          const editable = perms.gestionaUsuarios && (perms.esAdminGlobal || (!!u.area && u.area === miArea));
+          return (
+            <Card key={u.id} className={`p-5 flex flex-col gap-3 transition-shadow hover:shadow-md ${!u.activo ? "opacity-60" : ""}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-[#1F3864] text-lg truncate">{u.nombre_completo || "—"}</div>
+                  <div className="text-sm text-muted-foreground truncate">{u.email || <em className="text-xs">Sin email registrado</em>}</div>
+                </div>
+                {editable && (
+                  <div className="flex gap-1 shrink-0">
+                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openEdit(u)} title="Editar">
+                      <Pencil size={15} />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar" : "Activar"}>
+                      {u.activo ? <UserX size={15} className="text-red-400" /> : <UserCheck size={15} className="text-emerald-500" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-2 items-center">
+                {u.area && (
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${AREA_COLORS[u.area]}`}>
+                    {t.areas[u.area]}
+                  </span>
+                )}
+                {u.nivel && (
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${NIVEL_COLORS[u.nivel]}`}>
+                    {t.niveles[u.nivel]}
+                  </span>
+                )}
+                {!u.area && !u.nivel && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border text-xs">
+                    Sin asignar
+                  </span>
+                )}
+                {u.codigo_vendedor && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border text-xs font-mono">
+                    {u.codigo_vendedor}
+                  </span>
+                )}
+                {!u.activo && (
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border text-xs">
+                    Inactivo
+                  </span>
+                )}
+              </div>
+            </Card>
+          );
+        })}
         {!filtered.length && (
           <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">
             No se encontraron usuarios
@@ -197,34 +291,44 @@ export default function Usuarios() {
         )}
       </div>
 
-      {/* ── Edit dialog ── */}
+      {/* ── Editar ── */}
       <Dialog open={!!editTarget} onOpenChange={o => { if (!o) setEditTarget(null); }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Editar usuario</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
               <Label>Nombre completo</Label>
-              <Input value={editForm.nombre_completo ?? ""} onChange={e => setEditForm({ ...editForm, nombre_completo: e.target.value })} className="h-11" />
+              <Input value={editForm.nombre_completo} onChange={e => setEditForm({ ...editForm, nombre_completo: e.target.value })} className="h-11" />
             </div>
             <div>
               <Label>Email</Label>
-              <Input type="email" value={editForm.email ?? ""} onChange={e => setEditForm({ ...editForm, email: e.target.value })} className="h-11" placeholder="correo@ejemplo.com" />
+              <Input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} className="h-11" placeholder="correo@ejemplo.com" />
             </div>
             <div>
-              <Label>{t.usuarios.rol}</Label>
-              <Select value={editForm.role} onValueChange={v => setEditForm({ ...editForm, role: v })}>
+              <Label>Área *</Label>
+              <Select value={editForm.area} onValueChange={v => setEditForm({ ...editForm, area: v as Area })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(["admin","fabrica","logistica","ventas","coordinador","director_ventas","coordinador_ventas","auxiliar_ventas"] as AppRole[]).map(r => (
-                    <SelectItem key={r} value={r}>{t.roles[r as keyof typeof t.roles]}</SelectItem>
-                  ))}
+                  {areasDisponibles.map(a => <SelectItem key={a} value={a}>{t.areas[a]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>{t.usuarios.codigoVendedor} <span className="text-muted-foreground text-xs">(solo ventas)</span></Label>
-              <Input value={editForm.codigo_vendedor ?? ""} onChange={e => setEditForm({ ...editForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder="ej. VEN001" />
+              <Label>Tipo de usuario *</Label>
+              <Select value={editForm.nivel} onValueChange={v => setEditForm({ ...editForm, nivel: v as Nivel })}>
+                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {NIVELES.map(n => <SelectItem key={n} value={n}>{t.niveles[n]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">{t.nivelDesc[editForm.nivel]}</p>
             </div>
+            {esComercial(editForm.area) && (
+              <div>
+                <Label>{t.usuarios.codigoVendedor}</Label>
+                <Input value={editForm.codigo_vendedor} onChange={e => setEditForm({ ...editForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder="ej. VEN001" />
+              </div>
+            )}
             <div className="flex items-center gap-3 pt-1">
               <button
                 type="button"
@@ -245,7 +349,7 @@ export default function Usuarios() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Create new user dialog ── */}
+      {/* ── Nuevo usuario ── */}
       <Dialog open={newOpen} onOpenChange={o => { if (!o) setNewOpen(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle className="flex items-center gap-2"><Plus size={18}/> Nuevo usuario</DialogTitle></DialogHeader>
@@ -263,17 +367,25 @@ export default function Usuarios() {
               <Input value={newForm.nombre_completo} onChange={e => setNewForm({ ...newForm, nombre_completo: e.target.value })} className="h-11" placeholder="Nombre Apellido" />
             </div>
             <div>
-              <Label>Rol *</Label>
-              <Select value={newForm.role} onValueChange={v => setNewForm({ ...newForm, role: v as AppRole })}>
+              <Label>Área *</Label>
+              <Select value={newForm.area} onValueChange={v => setNewForm({ ...newForm, area: v as Area })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(["admin","fabrica","logistica","ventas","coordinador","director_ventas","coordinador_ventas","auxiliar_ventas"] as AppRole[]).map(r => (
-                    <SelectItem key={r} value={r}>{t.roles[r as keyof typeof t.roles]}</SelectItem>
-                  ))}
+                  {areasDisponibles.map(a => <SelectItem key={a} value={a}>{t.areas[a]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            {(newForm.role === "ventas" || newForm.role === "coordinador") && (
+            <div>
+              <Label>Tipo de usuario *</Label>
+              <Select value={newForm.nivel} onValueChange={v => setNewForm({ ...newForm, nivel: v as Nivel })}>
+                <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {NIVELES.map(n => <SelectItem key={n} value={n}>{t.niveles[n]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">{t.nivelDesc[newForm.nivel]}</p>
+            </div>
+            {esComercial(newForm.area) && (
               <div>
                 <Label>{t.usuarios.codigoVendedor}</Label>
                 <Input value={newForm.codigo_vendedor} onChange={e => setNewForm({ ...newForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder="ej. VEN001" />

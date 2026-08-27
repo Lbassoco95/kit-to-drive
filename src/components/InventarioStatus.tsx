@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, PackageSearch, TrendingDown, Wrench } from "lucide-react";
-import { lineaDe, CatalogoModelos } from "@/lib/dazon";
+import { lineaDe, CatalogoModelos, chasisDetenido } from "@/lib/dazon";
 
 type Stats = {
   disponibles: number;        // motocarros sin remisión asignada (con NS o no)
@@ -12,8 +12,9 @@ type Stats = {
   sinSerial: number;          // disponibles sin NS (no se pueden asignar a clientes)
   demandaPendiente: number;   // unidades aún por asignar en remisiones NUEVA/PARCIAL
   remisionesPendientes: number;
-  chasisPorConfigurar: number; // línea motocarro, motocarro_id IS NULL
+  chasisPorConfigurar: number; // línea motocarro, sin unidad y sin incidencia que lo detenga
   motoresPorConfigurar: number;
+  chasisDetenidos: number;     // retenidos, en garantía o no útiles — siguen en inventario
 };
 
 export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
@@ -28,7 +29,7 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
         supabase.from("remisiones").select("id, total_unidades_solicitadas, estatus").in("estatus", ["NUEVA", "PARCIAL"]),
         supabase.from("motocarros").select("remision_id").not("remision_id", "is", null),
         supabase.from("modelos_producto").select("modelo, linea"),
-        supabase.from("inventario_chasis").select("modelo, motocarro_id"),
+        supabase.from("inventario_chasis").select("modelo, motocarro_id, estatus"),
         supabase.from("inventario_motor").select("modelo, motocarro_id"),
       ]);
 
@@ -48,10 +49,14 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
         demandaPendiente += Math.max(0, r.total_unidades_solicitadas - ya);
       });
 
-      const chasisPorConfigurar = (chasisData ?? []).filter((c: any) => !c.motocarro_id && lineaDe(c.modelo, catalogo) === "motocarro").length;
+      // Un chasis detenido por incidencia sigue en inventario pero no se puede
+      // configurar: contarlo como "por configurar" prometía algo que no existe.
+      const chasisMotocarro = (chasisData ?? []).filter((c: any) => lineaDe(c.modelo, catalogo) === "motocarro");
+      const chasisPorConfigurar = chasisMotocarro.filter((c: any) => !c.motocarro_id && !chasisDetenido(c.estatus)).length;
+      const chasisDetenidos = chasisMotocarro.filter((c: any) => chasisDetenido(c.estatus)).length;
       const motoresPorConfigurar = (motorData ?? []).filter((m: any) => !m.motocarro_id && lineaDe(m.modelo, catalogo) === "motocarro").length;
 
-      setS({ disponibles, conSerial, sinSerial, demandaPendiente, remisionesPendientes: rems?.length ?? 0, chasisPorConfigurar, motoresPorConfigurar });
+      setS({ disponibles, conSerial, sinSerial, demandaPendiente, remisionesPendientes: rems?.length ?? 0, chasisPorConfigurar, motoresPorConfigurar, chasisDetenidos });
     })();
   }, [refreshKey]);
 
@@ -100,6 +105,13 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
               ? `Tienes ${s.conSerial} disponibles con serial vs ${s.demandaPendiente} unidades pendientes (${s.remisionesPendientes} remisiones).`
               : `Tienes ${s.conSerial} motocarros con serial listos para asignar.`}
           </div>
+          {s.chasisDetenidos > 0 && (
+            <div className={`text-sm mt-1.5 font-medium ${tone.text}`}>
+              ⚠ {s.chasisDetenidos} chasis detenidos por incidencia (retenidos, en garantía o no útiles):
+              siguen en inventario pero no entran al armado.{" "}
+              <button className="underline" onClick={() => nav("/incidencias")}>Ver incidencias</button>
+            </div>
+          )}
           {porConfigurar && !enProduccion && (
             <Button size="sm" className="mt-2 h-9 bg-[#92400E] hover:bg-[#78350F]" onClick={() => nav("/produccion")}>
               <Wrench className="h-4 w-4 mr-1.5" /> Ir a Producción → Configurar unidad
