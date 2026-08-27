@@ -216,7 +216,7 @@ export default function Remisiones() {
     // ── 1. Query mínimo garantizado (solo tablas/columnas originales) ──────────
     const { data: base } = await supabase
       .from("remisiones")
-      .select("id,folio_remision,cliente_id,vendedor_id,fecha_remision,notas,estatus,created_at, clientes(codigo_erp,folio_interno,nombre_comercial), profiles:vendedor_id(nombre_completo)")
+      .select("id,folio_remision,cliente_id,vendedor_id,fecha_remision,notas,estatus,created_at, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo)")
       .order("created_at", { ascending:false });
 
     // Arrancar con lo que tenemos — siempre muestra algo

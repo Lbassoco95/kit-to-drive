@@ -117,7 +117,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     // ── Query mínimo garantizado ──────────────────────────────────────────────
     const { data: base } = await supabase
       .from("remisiones")
-      .select("id,folio_remision,fecha_remision,estatus,notas, profiles:vendedor_id(nombre_completo), clientes(codigo_erp,folio_interno,nombre_comercial), motocarros(id)")
+      .select("id,folio_remision,fecha_remision,estatus,notas, profiles:vendedor_id(nombre_completo), clientes(codigo_erp,nombre_comercial), motocarros(id)")
       .in("estatus", ["NUEVA", "PARCIAL"])
       .order("created_at", { ascending: false });
 

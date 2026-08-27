@@ -189,7 +189,7 @@ export default function Produccion() {
     // ── 1. Query base garantizado (sin columnas nuevas en joins) ──────────────
     const { data: base } = await supabase
       .from("motocarros")
-      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp,folio_interno))")
+      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
       .order("orden_armado", { ascending: true });
 
     // Producción sólo lista línea "motocarro" — mototaxis y otras líneas

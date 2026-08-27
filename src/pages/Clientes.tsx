@@ -98,7 +98,7 @@ export default function Clientes() {
     
     if (!q) return base;
     const qLower = q.toLowerCase();
-    return base.filter(c => [c.codigo_erp, c.folio_interno, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(qLower));
+    return base.filter(c => c && [c.codigo_erp, c.folio_interno, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(qLower));
   }, [rows, q, listTab]);
 
   const canEdit = perms.puedeEditar("clientes");
@@ -122,8 +122,8 @@ export default function Clientes() {
     return `CLI-${year}-${seq}`;
   };
 
-  const clienteCodigoDisplay = (c: any) => c.folio_interno || c.codigo_erp || "—";
-  const clienteEsMigrado = (c: any) => !!c.codigo_erp;
+  const clienteCodigoDisplay = (c: any) => c?.folio_interno || c?.codigo_erp || "—";
+  const clienteEsMigrado = (c: any) => !!c?.codigo_erp;
 
   const save = async () => {
     // Show motive dialog instead of direct save
