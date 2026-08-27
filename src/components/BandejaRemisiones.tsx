@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Inbox, RefreshCw, FileDown, Package, Settings2, TriangleAlert, Wrench } from "lucide-react";
+import { Inbox, RefreshCw, FileDown, Package, Settings2, TriangleAlert, Wrench, UserPlus, X } from "lucide-react";
 import { fmtDate, COLORES, claveStock } from "@/lib/dazon";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 
 
@@ -62,7 +63,20 @@ const defaultConfigForm = () => ({
   con_flete: false,
 });
 
+type MotocarroDisponible = {
+  id: string;
+  orden_armado: number | null;
+  modelo: string | null;
+  color: string | null;
+  ns_chasis: string | null;
+  ns_motor: string | null;
+  estatus_armado: string | null;
+};
+
 export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
+  const { area, perms } = useAuth();
+  const puedeAsignarManual = area === "fabrica" || area === "direccion" || area === "administracion" || perms.esAdminGlobal;
+
   const [items, setItems] = useState<RemisionCard[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -71,6 +85,14 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [savingConfig, setSavingConfig] = useState(false);
   const [stock, setStock] = useState<Map<string, StockColor>>(new Map());
   const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
+
+  // Asignación manual
+  const [manualDialog, setManualDialog] = useState<RemisionCard | null>(null);
+  const [disponibles, setDisponibles] = useState<MotocarroDisponible[]>([]);
+  const [asignadosManual, setAsignadosManual] = useState<MotocarroDisponible[]>([]);
+  const [manualLoading, setManualLoading] = useState(false);
+  const [manualBusy, setManualBusy] = useState<string | null>(null);
+  const [manualQ, setManualQ] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -266,6 +288,71 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     await load(); onChange?.();
   };
 
+  // ── Asignación manual ─────────────────────────────────────────────────────
+  const abrirManual = async (rem: RemisionCard) => {
+    setManualDialog(rem);
+    setManualLoading(true);
+    setManualQ("");
+
+    // Motocarros ya asignados a esta remisión
+    const { data: asig } = await supabase
+      .from("motocarros")
+      .select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado")
+      .eq("remision_id", rem.id)
+      .order("orden_armado");
+    setAsignadosManual((asig ?? []) as MotocarroDisponible[]);
+
+    // Motocarros disponibles (sin remisión, con serial)
+    const { data: disp } = await supabase
+      .from("motocarros")
+      .select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado")
+      .is("remision_id", null)
+      .not("ns_chasis", "is", null)
+      .not("ns_motor", "is", null)
+      .in("estatus_armado", ["PENDIENTE", "EN_PROCESO", "ARMADO", "LISTO"])
+      .order("orden_armado");
+    setDisponibles((disp ?? []) as MotocarroDisponible[]);
+    setManualLoading(false);
+  };
+
+  const asignarManual = async (motocarroId: string) => {
+    if (!manualDialog) return;
+    setManualBusy(motocarroId);
+    const { error } = await supabase.rpc("asignar_motocarro_a_remision", {
+      _motocarro_id: motocarroId,
+      _remision_id: manualDialog.id,
+    });
+    setManualBusy(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("✓ Unidad asignada");
+    await abrirManual(manualDialog);
+    await load(); onChange?.();
+  };
+
+  const desasignarManual = async (motocarroId: string) => {
+    setManualBusy(motocarroId);
+    const { error } = await supabase.rpc("desasignar_motocarro_de_remision", {
+      _motocarro_id: motocarroId,
+    });
+    setManualBusy(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("✓ Unidad liberada de la remisión");
+    if (manualDialog) await abrirManual(manualDialog);
+    await load(); onChange?.();
+  };
+
+  const disponiblesFiltrados = disponibles.filter(m => {
+    if (!manualQ) return true;
+    const q = manualQ.toLowerCase();
+    return (
+      (m.ns_chasis?.toLowerCase().includes(q)) ||
+      (m.ns_motor?.toLowerCase().includes(q)) ||
+      (m.color?.toLowerCase().includes(q)) ||
+      (m.modelo?.toLowerCase().includes(q)) ||
+      String(m.orden_armado).includes(q)
+    );
+  });
+
   if (!items.length && !loading) return null;
 
   return (
@@ -434,6 +521,16 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                       ? `Asignar ${asignables} de ${faltan}`
                       : `Asignar ${faltan} disponibles`}
                   </Button>
+                  {puedeAsignarManual && (
+                    <Button
+                      variant="outline"
+                      onClick={() => abrirManual(rem)}
+                      className="h-11 px-3 shrink-0 border-[#1F3864]/30 text-[#1F3864] hover:bg-[#1F3864]/5"
+                      title="Asignar manualmente eligiendo chasis y motor"
+                    >
+                      <UserPlus className="h-4 w-4 mr-1.5" /> Manual
+                    </Button>
+                  )}
                   {rem.documento_url && (
                     <Button
                       variant="outline"
@@ -537,6 +634,116 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             >
               {savingConfig ? "Guardando…" : "Guardar configuración"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de asignación manual */}
+      <Dialog open={!!manualDialog} onOpenChange={o => { if (!o) setManualDialog(null); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-[#1F3864]" />
+              Asignación manual — {manualDialog?.folio_remision}
+            </DialogTitle>
+          </DialogHeader>
+
+          {manualLoading ? (
+            <div className="py-8 text-center text-muted-foreground">Cargando unidades…</div>
+          ) : (
+            <div className="flex-1 overflow-y-auto space-y-4">
+              {/* Unidades ya asignadas */}
+              {asignadosManual.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-[#065F46] mb-2">
+                    Asignadas a esta remisión ({asignadosManual.length})
+                  </h4>
+                  <div className="space-y-1.5">
+                    {asignadosManual.map(m => (
+                      <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                        <div className="text-sm">
+                          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+                          {" · "}
+                          <span className="font-medium">{m.color}</span>
+                          {" · "}
+                          <span className="text-xs text-muted-foreground">Chasis: {m.ns_chasis ?? "—"}</span>
+                          {" · "}
+                          <span className="text-xs text-muted-foreground">Motor: {m.ns_motor ?? "—"}</span>
+                          {m.estatus_armado && (
+                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                              {m.estatus_armado}
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => desasignarManual(m.id)}
+                          disabled={manualBusy === m.id}
+                          className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Quitar de esta remisión"
+                        >
+                          <X size={14} className="mr-1" />
+                          {manualBusy === m.id ? "…" : "Quitar"}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Buscador */}
+              <div>
+                <h4 className="text-sm font-semibold text-[#1F3864] mb-2">
+                  Unidades disponibles ({disponiblesFiltrados.length})
+                </h4>
+                <Input
+                  placeholder="Buscar por chasis, motor, color, orden…"
+                  value={manualQ}
+                  onChange={e => setManualQ(e.target.value)}
+                  className="mb-2"
+                />
+              </div>
+
+              {/* Lista de disponibles */}
+              <div className="space-y-1.5 max-h-[40vh] overflow-y-auto">
+                {disponiblesFiltrados.length === 0 && (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    No hay unidades disponibles{manualQ ? " con ese filtro" : ""}
+                  </p>
+                )}
+                {disponiblesFiltrados.map(m => (
+                  <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white border hover:bg-slate-50">
+                    <div className="text-sm">
+                      <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+                      {" · "}
+                      <span className="font-medium">{m.color}</span>
+                      {" · "}
+                      <span className="text-xs text-muted-foreground">Chasis: {m.ns_chasis}</span>
+                      {" · "}
+                      <span className="text-xs text-muted-foreground">Motor: {m.ns_motor}</span>
+                      {m.estatus_armado && (
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                          {m.estatus_armado}
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => asignarManual(m.id)}
+                      disabled={manualBusy === m.id}
+                      className="h-8 px-3 bg-[#1F3864] hover:bg-[#2E75B6] text-white text-xs"
+                    >
+                      {manualBusy === m.id ? "…" : "Asignar"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManualDialog(null)}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
