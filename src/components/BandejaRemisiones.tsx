@@ -329,7 +329,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   // ── Asignación manual ─────────────────────────────────────────────────────
   const [manualNuevoChasis, setManualNuevoChasis] = useState("");
   const [manualNuevoMotor, setManualNuevoMotor] = useState("");
-  const [manualCapturando, setManualCapturando] = useState(false);
+  const [manualCapturando, setManualCapturando] = useState<string | null>(null);
 
   const abrirManual = async (rem: RemisionCard) => {
     setManualDialog(rem);
@@ -402,7 +402,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     toast.success("✓ Seriales capturados y unidad asignada");
     setManualNuevoChasis("");
     setManualNuevoMotor("");
-    setManualCapturando(false);
+    setManualCapturando(null);
     await abrirManual(manualDialog);
     await load(); onChange?.();
   };
@@ -857,7 +857,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       </Dialog>
 
       {/* Dialog de asignación manual */}
-      <Dialog open={!!manualDialog} onOpenChange={o => { if (!o) { setManualDialog(null); setManualCapturando(false); } }}>
+      <Dialog open={!!manualDialog} onOpenChange={o => { if (!o) { setManualDialog(null); setManualCapturando(null); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -957,8 +957,8 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => { setManualCapturando(true); setManualBusy(m.id); setManualNuevoChasis(""); setManualNuevoMotor(""); }}
-                            disabled={manualCapturando && manualBusy !== m.id}
+                            onClick={() => { setManualCapturando(m.id); setManualNuevoChasis(m.ns_chasis || ""); setManualNuevoMotor(m.ns_motor || ""); }}
+                            disabled={!!manualCapturando && manualCapturando !== m.id}
                             className="h-8 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
                             title="Capturar seriales y asignar"
                           >
@@ -968,10 +968,10 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                         <Button
                           size="sm"
                           onClick={() => asignarManual(m.id)}
-                          disabled={manualBusy === m.id && !manualCapturando}
+                          disabled={manualBusy === m.id}
                           className="h-8 px-3 bg-[#1F3864] hover:bg-[#2E75B6] text-white text-xs"
                         >
-                          {manualBusy === m.id && !manualCapturando ? "…" : "Asignar"}
+                          {manualBusy === m.id ? "…" : "Asignar"}
                         </Button>
                       </div>
                     </div>
@@ -980,10 +980,10 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
               </div>
 
               {/* Formulario de captura de seriales */}
-              {manualCapturando && manualBusy && (
+              {manualCapturando && (
                 <div className="border-2 border-amber-300 rounded-lg p-3 bg-amber-50/50 space-y-2">
                   <h4 className="text-sm font-semibold text-amber-800">
-                    Capturar seriales para unidad #{disponibles.find(m => m.id === manualBusy)?.orden_armado}
+                    Capturar seriales para unidad #{disponibles.find(m => m.id === manualCapturando)?.orden_armado}
                   </h4>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
@@ -1002,7 +1002,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => capturarYAsignar(manualBusy, manualNuevoChasis, manualNuevoMotor)}
+                      onClick={() => capturarYAsignar(manualCapturando, manualNuevoChasis, manualNuevoMotor)}
                       disabled={!manualNuevoChasis && !manualNuevoMotor}
                       className="h-9 bg-amber-600 hover:bg-amber-700 text-white"
                     >
@@ -1011,7 +1011,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => { setManualCapturando(false); setManualBusy(null); }}
+                      onClick={() => { setManualCapturando(null); setManualNuevoChasis(""); setManualNuevoMotor(""); }}
                     >
                       Cancelar
                     </Button>
@@ -1022,7 +1022,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setManualDialog(null); setManualCapturando(false); }}>Cerrar</Button>
+            <Button variant="outline" onClick={() => { setManualDialog(null); setManualCapturando(null); }}>Cerrar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
