@@ -337,6 +337,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     setManualQ("");
     setManualNuevoChasis("");
     setManualNuevoMotor("");
+    setManualCapturando(null);
 
     const { data: asig } = await supabase
       .from("motocarros")
@@ -345,7 +346,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       .order("orden_armado");
     setAsignadosManual((asig ?? []) as MotocarroDisponible[]);
 
-    // Mostrar TODOS los motocarros sin remisión (con o sin serial)
+    // Mostrar TODOS los motocarros sin remisión
     const { data: disp } = await supabase
       .from("motocarros")
       .select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado")
@@ -359,13 +360,6 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const asignarManual = async (motocarroId: string) => {
     if (!manualDialog) return;
     setManualBusy(motocarroId);
-
-    // Si el motocarro no tiene seriales, primero intentamos capturarlos si el usuario los escribió
-    const moto = disponibles.find(m => m.id === motocarroId);
-    if (moto && (!moto.ns_chasis || !moto.ns_motor)) {
-      // La RPC permite asignar sin serial, el check está en estatus_armado
-    }
-
     const { error } = await supabase.rpc("asignar_motocarro_a_remision", {
       _motocarro_id: motocarroId,
       _remision_id: manualDialog.id,
@@ -377,12 +371,11 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     await load(); onChange?.();
   };
 
-  // Capturar seriales y asignar en un solo paso
+  // Capturar seriales en una unidad y asignarla
   const capturarYAsignar = async (motocarroId: string, nsChasis: string, nsMotor: string) => {
     if (!manualDialog) return;
     setManualBusy(motocarroId);
 
-    // 1. Capturar seriales
     if (nsChasis || nsMotor) {
       const { error: capErr } = await supabase.rpc("capturar_seriales_unidad", {
         _motocarro_id: motocarroId,
@@ -392,7 +385,6 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       if (capErr) { setManualBusy(null); toast.error(capErr.message); return; }
     }
 
-    // 2. Asignar a remisión
     const { error } = await supabase.rpc("asignar_motocarro_a_remision", {
       _motocarro_id: motocarroId,
       _remision_id: manualDialog.id,
@@ -403,6 +395,87 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     setManualNuevoChasis("");
     setManualNuevoMotor("");
     setManualCapturando(null);
+    await abrirManual(manualDialog);
+    await load(); onChange?.();
+  };
+
+  // Buscar unidad por serial (chasis o motor) para asignarla
+  const buscarYAsignarPorSerial = async () => {
+    if (!manualDialog) return;
+    const chasis = manualNuevoChasis.trim().toUpperCase().replace(/\s/g, "");
+    const motor = manualNuevoMotor.trim().toUpperCase().replace(/\s/g, "");
+    if (!chasis && !motor) { toast.error("Escribe al menos un número de serie"); return; }
+
+    setManualBusy("buscando");
+
+    // Buscar si ya existe un motocarro con ese chasis o motor
+    let motoId: string | null = null;
+
+    if (chasis) {
+      const { data } = await supabase
+        .from("motocarros")
+        .select("id, remision_id")
+        .eq("ns_chasis", chasis)
+        .maybeSingle();
+      if (data) {
+        if (data.remision_id) {
+          setManualBusy(null);
+          toast.error("Ese chasis ya está asignado a otra remisión");
+          return;
+        }
+        motoId = data.id;
+      }
+    }
+
+    if (!motoId && motor) {
+      const { data } = await supabase
+        .from("motocarros")
+        .select("id, remision_id")
+        .eq("ns_motor", motor)
+        .maybeSingle();
+      if (data) {
+        if (data.remision_id) {
+          setManualBusy(null);
+          toast.error("Ese motor ya está asignado a otra remisión");
+          return;
+        }
+        motoId = data.id;
+      }
+    }
+
+    // Si no existe pero hay unidades sin serial, capturar en la primera disponible
+    if (!motoId) {
+      const sinSerial = disponibles.filter(m => !m.ns_chasis && !m.ns_motor);
+      if (sinSerial.length > 0) {
+        await capturarYAsignar(sinSerial[0].id, chasis, motor);
+        return;
+      }
+      // No hay unidades disponibles para vincular
+      setManualBusy(null);
+      toast.error("No se encontró una unidad con ese serial y no hay unidades vacías para asignar. Primero crea la unidad en Producción.");
+      return;
+    }
+
+    // Asignar la unidad encontrada (y actualizar seriales si falta alguno)
+    if (chasis || motor) {
+      const moto = disponibles.find(m => m.id === motoId);
+      const necesitaCaptura = (chasis && moto?.ns_chasis !== chasis) || (motor && moto?.ns_motor !== motor);
+      if (necesitaCaptura) {
+        await capturarYAsignar(motoId, chasis, motor);
+        return;
+      }
+    }
+
+    // Asignar directamente
+    const { error } = await supabase.rpc("asignar_motocarro_a_remision", {
+      _motocarro_id: motoId,
+      _remision_id: manualDialog.id,
+    });
+    setManualBusy(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("✓ Unidad asignada por serial");
+    setManualNuevoChasis("");
+    setManualNuevoMotor("");
     await abrirManual(manualDialog);
     await load(); onChange?.();
   };
@@ -870,6 +943,37 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             <div className="py-8 text-center text-muted-foreground">Cargando unidades…</div>
           ) : (
             <div className="flex-1 overflow-y-auto space-y-4">
+              {/* FORMULARIO PRINCIPAL: asignar por serial */}
+              <div className="border-2 border-[#1F3864]/30 rounded-lg p-4 bg-[#F8FAFC] space-y-3">
+                <h4 className="text-sm font-bold text-[#1F3864]">
+                  Asignar por número de serie
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Escribe el chasis y/o motor. Si ya existe en el sistema se asignará directamente; si no, se vinculará a la primera unidad disponible.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <Input
+                    placeholder="NS Chasis (ej. LDZ4B2P1XRA000123)"
+                    value={manualNuevoChasis}
+                    onChange={e => setManualNuevoChasis(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                    className="h-11 text-sm font-mono"
+                  />
+                  <Input
+                    placeholder="NS Motor (ej. DZ164FMLT2M00654)"
+                    value={manualNuevoMotor}
+                    onChange={e => setManualNuevoMotor(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                    className="h-11 text-sm font-mono"
+                  />
+                </div>
+                <Button
+                  onClick={buscarYAsignarPorSerial}
+                  disabled={(!manualNuevoChasis && !manualNuevoMotor) || manualBusy === "buscando"}
+                  className="w-full h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold"
+                >
+                  {manualBusy === "buscando" ? "Buscando…" : "Buscar y asignar"}
+                </Button>
+              </div>
+
               {/* Unidades ya asignadas */}
               {asignadosManual.length > 0 && (
                 <div>
@@ -887,11 +991,6 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                           <span className="text-xs text-muted-foreground">Chasis: {m.ns_chasis ?? "sin serial"}</span>
                           {" · "}
                           <span className="text-xs text-muted-foreground">Motor: {m.ns_motor ?? "sin serial"}</span>
-                          {m.estatus_armado && (
-                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                              {m.estatus_armado}
-                            </span>
-                          )}
                         </div>
                         <Button
                           variant="ghost"
@@ -910,111 +1009,44 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 </div>
               )}
 
-              {/* Buscador + lista de disponibles */}
-              <div>
-                <h4 className="text-sm font-semibold text-[#1F3864] mb-2">
-                  Unidades disponibles ({disponiblesFiltrados.length})
-                </h4>
-                <Input
-                  placeholder="Buscar por chasis, motor, color, orden…"
-                  value={manualQ}
-                  onChange={e => setManualQ(e.target.value)}
-                  className="mb-2"
-                />
-              </div>
-
-              {/* Lista de disponibles */}
-              <div className="space-y-1.5 max-h-[35vh] overflow-y-auto">
-                {disponiblesFiltrados.length === 0 && (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    No hay unidades disponibles{manualQ ? " con ese filtro" : ""}
-                  </p>
-                )}
-                {disponiblesFiltrados.map(m => {
-                  const tieneSerial = !!m.ns_chasis && !!m.ns_motor;
-                  return (
-                    <div key={m.id} className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border hover:bg-slate-50 ${tieneSerial ? "bg-white" : "bg-amber-50/50 border-amber-200"}`}>
-                      <div className="text-sm min-w-0 flex-1">
-                        <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
-                        {" · "}
-                        <span className="font-medium">{m.color}</span>
-                        {" · "}
-                        <span className={`text-xs ${m.ns_chasis ? "text-muted-foreground" : "text-amber-600 font-medium"}`}>
-                          Chasis: {m.ns_chasis || "pendiente"}
-                        </span>
-                        {" · "}
-                        <span className={`text-xs ${m.ns_motor ? "text-muted-foreground" : "text-amber-600 font-medium"}`}>
-                          Motor: {m.ns_motor || "pendiente"}
-                        </span>
-                        {m.estatus_armado && (
-                          <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                            {m.estatus_armado}
+              {/* Lista de unidades disponibles (selección directa) */}
+              {disponiblesFiltrados.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-semibold text-[#1F3864] mb-2">
+                    O selecciona de la lista ({disponiblesFiltrados.length} disponibles)
+                  </h4>
+                  <Input
+                    placeholder="Filtrar por chasis, motor, color, orden…"
+                    value={manualQ}
+                    onChange={e => setManualQ(e.target.value)}
+                    className="mb-2"
+                  />
+                  <div className="space-y-1.5 max-h-[25vh] overflow-y-auto">
+                    {disponiblesFiltrados.map(m => (
+                      <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white border hover:bg-slate-50">
+                        <div className="text-sm min-w-0 flex-1">
+                          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+                          {" · "}
+                          <span className="font-medium">{m.color}</span>
+                          {" · "}
+                          <span className={`text-xs ${m.ns_chasis ? "text-muted-foreground" : "text-amber-600"}`}>
+                            {m.ns_chasis || "sin chasis"}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex gap-1 shrink-0">
-                        {!tieneSerial && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => { setManualCapturando(m.id); setManualNuevoChasis(m.ns_chasis || ""); setManualNuevoMotor(m.ns_motor || ""); }}
-                            disabled={!!manualCapturando && manualCapturando !== m.id}
-                            className="h-8 px-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
-                            title="Capturar seriales y asignar"
-                          >
-                            Capturar
-                          </Button>
-                        )}
+                          {" · "}
+                          <span className={`text-xs ${m.ns_motor ? "text-muted-foreground" : "text-amber-600"}`}>
+                            {m.ns_motor || "sin motor"}
+                          </span>
+                        </div>
                         <Button
                           size="sm"
                           onClick={() => asignarManual(m.id)}
                           disabled={manualBusy === m.id}
-                          className="h-8 px-3 bg-[#1F3864] hover:bg-[#2E75B6] text-white text-xs"
+                          className="h-8 px-3 bg-[#1F3864] hover:bg-[#2E75B6] text-white text-xs shrink-0"
                         >
                           {manualBusy === m.id ? "…" : "Asignar"}
                         </Button>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Formulario de captura de seriales */}
-              {manualCapturando && (
-                <div className="border-2 border-amber-300 rounded-lg p-3 bg-amber-50/50 space-y-2">
-                  <h4 className="text-sm font-semibold text-amber-800">
-                    Capturar seriales para unidad #{disponibles.find(m => m.id === manualCapturando)?.orden_armado}
-                  </h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="NS Chasis (ej. LDZ4B2P1XRA000123)"
-                      value={manualNuevoChasis}
-                      onChange={e => setManualNuevoChasis(e.target.value.toUpperCase().replace(/\s/g, ""))}
-                      className="h-10 text-sm font-mono"
-                    />
-                    <Input
-                      placeholder="NS Motor (ej. DZ164FMLT2M00654)"
-                      value={manualNuevoMotor}
-                      onChange={e => setManualNuevoMotor(e.target.value.toUpperCase().replace(/\s/g, ""))}
-                      className="h-10 text-sm font-mono"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => capturarYAsignar(manualCapturando, manualNuevoChasis, manualNuevoMotor)}
-                      disabled={!manualNuevoChasis && !manualNuevoMotor}
-                      className="h-9 bg-amber-600 hover:bg-amber-700 text-white"
-                    >
-                      Guardar seriales y asignar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => { setManualCapturando(null); setManualNuevoChasis(""); setManualNuevoMotor(""); }}
-                    >
-                      Cancelar
-                    </Button>
+                    ))}
                   </div>
                 </div>
               )}
