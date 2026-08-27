@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BandejaRemisiones } from "@/components/BandejaRemisiones";
+import { SerialAutocomplete } from "@/components/SerialAutocomplete";
 import { RecibirContenedor } from "@/components/RecibirContenedor";
 import { ConfigurarUnidad } from "@/components/ConfigurarUnidad";
 import { InventarioStatus } from "@/components/InventarioStatus";
@@ -533,11 +534,23 @@ export default function Produccion() {
           <div className="space-y-3">
             <div>
               <Label>{t.produccion.nsChasis}</Label>
-              <Input value={editForm.ns_chasis} onChange={e => setEditForm({ ...editForm, ns_chasis: normSerial(e.target.value) })} placeholder="Sin espacios — ej. LDZ4B2P1XRA000123" />
+              <SerialAutocomplete
+                tipo="chasis"
+                value={editForm.ns_chasis}
+                onChange={v => setEditForm({ ...editForm, ns_chasis: v })}
+                placeholder="Escribe para buscar o registrar nuevo…"
+                className="h-11 font-mono"
+              />
             </div>
             <div>
               <Label>{t.produccion.nsMot}</Label>
-              <Input value={editForm.ns_motor} onChange={e => setEditForm({ ...editForm, ns_motor: normSerial(e.target.value) })} placeholder="Sin espacios — ej. DZ164FMLT2M00654" />
+              <SerialAutocomplete
+                tipo="motor"
+                value={editForm.ns_motor}
+                onChange={v => setEditForm({ ...editForm, ns_motor: v })}
+                placeholder="Escribe para buscar o registrar nuevo…"
+                className="h-11 font-mono"
+              />
             </div>
             {(!editForm.ns_chasis || !editForm.ns_motor) && (
               <div className="rounded-md p-2.5 text-sm bg-[#FEF3C7] text-[#92400E] flex items-start gap-2">

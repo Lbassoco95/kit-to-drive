@@ -11,6 +11,7 @@ import { fmtDate, COLORES, claveStock } from "@/lib/dazon";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { SerialAutocomplete } from "@/components/SerialAutocomplete";
 
 
 
@@ -952,16 +953,18 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   Escribe el chasis y/o motor. Si ya existe en el sistema se asignará directamente; si no, se vinculará a la primera unidad disponible.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <Input
-                    placeholder="NS Chasis (ej. LDZ4B2P1XRA000123)"
+                  <SerialAutocomplete
+                    tipo="chasis"
                     value={manualNuevoChasis}
-                    onChange={e => setManualNuevoChasis(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                    onChange={setManualNuevoChasis}
+                    placeholder="Escribe para buscar o nuevo…"
                     className="h-11 text-sm font-mono"
                   />
-                  <Input
-                    placeholder="NS Motor (ej. DZ164FMLT2M00654)"
+                  <SerialAutocomplete
+                    tipo="motor"
                     value={manualNuevoMotor}
-                    onChange={e => setManualNuevoMotor(e.target.value.toUpperCase().replace(/\s/g, ""))}
+                    onChange={setManualNuevoMotor}
+                    placeholder="Escribe para buscar o nuevo…"
                     className="h-11 text-sm font-mono"
                   />
                 </div>
