@@ -44,6 +44,12 @@ DROP POLICY IF EXISTS "leer clientes" ON public.clientes;
 DROP POLICY IF EXISTS "escribir clientes admin/fabrica/ventas" ON public.clientes;
 DROP POLICY IF EXISTS "actualizar clientes admin/fabrica" ON public.clientes;
 DROP POLICY IF EXISTS "borrar clientes admin" ON public.clientes;
+-- Faltaban las dos que este mismo archivo vuelve a crear más abajo: sin estos
+-- DROP, la corrida fallaba con «policy "actualizar clientes" already exists» y
+-- el SQL editor —que manda todo en una transacción— revertía también las
+-- columnas del expediente que están arriba.
+DROP POLICY IF EXISTS "crear clientes" ON public.clientes;
+DROP POLICY IF EXISTS "actualizar clientes" ON public.clientes;
 
 CREATE POLICY "leer clientes" ON public.clientes FOR SELECT TO authenticated USING (true);
 

@@ -1,11 +1,62 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate, useLocation } from "react-router-dom";
+import { Modulo } from "@/lib/permissions";
+import { Button } from "@/components/ui/button";
+import { LogOut, ShieldOff, UserCog } from "lucide-react";
 
-export default function ProtectedRoute({ children, roles }: { children: JSX.Element; roles?: string[] }) {
-  const { user, role, loading } = useAuth();
+/**
+ * Pantalla de corte. Se muestra en vez de mandar a la persona a un tablero
+ * vacío sin explicación: si no puede pasar, que sepa por qué y a quién pedirle.
+ */
+function SinAcceso({ icono, titulo, detalle }: { icono: JSX.Element; titulo: string; detalle: string }) {
+  const { signOut, profileName } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
+      <div className="max-w-md w-full bg-card border rounded-lg p-8 text-center space-y-4">
+        <div className="flex justify-center text-[#1F3864]">{icono}</div>
+        <h1 className="text-xl font-bold text-[#1F3864]">{titulo}</h1>
+        {profileName && <p className="text-sm font-medium text-slate-600">{profileName}</p>}
+        <p className="text-muted-foreground text-sm leading-relaxed">{detalle}</p>
+        <Button onClick={signOut} variant="outline" className="w-full h-11">
+          <LogOut className="h-4 w-4 mr-2" /> Salir
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function ProtectedRoute({ children, modulo }: { children: JSX.Element; modulo?: Modulo }) {
+  const { user, area, nivel, perms, activo, loading } = useAuth();
   const loc = useLocation();
+
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando…</div>;
   if (!user) return <Navigate to="/auth" state={{ from: loc }} replace />;
-  if (roles && role && !roles.includes(role)) return <Navigate to="/" replace />;
+
+  // Dado de baja: no entra a ningún lado. El RLS ya lo corta del lado de la
+  // base (`usuario_activo`); esto es para que vea el motivo en vez de una app
+  // vacía que parece descompuesta.
+  if (!activo) {
+    return (
+      <SinAcceso
+        icono={<ShieldOff className="h-10 w-10" />}
+        titulo="Tu cuenta está desactivada"
+        detalle="Un administrador dio de baja este usuario. Si crees que es un error, pídele que te reactive desde Sistema → Usuarios."
+      />
+    );
+  }
+
+  // Sin área ni tipo de usuario asignados todavía: tampoco tiene sentido
+  // dejarlo navegar, porque no hay un solo módulo que le corresponda.
+  if (!area || !nivel) {
+    return (
+      <SinAcceso
+        icono={<UserCog className="h-10 w-10" />}
+        titulo="Tu usuario aún no tiene permisos"
+        detalle="Falta asignarte un área y un tipo de usuario. Pídele a un administrador que lo haga desde Sistema → Usuarios."
+      />
+    );
+  }
+
+  if (modulo && !perms.puedeVer(modulo)) return <Navigate to="/" replace />;
   return children;
 }

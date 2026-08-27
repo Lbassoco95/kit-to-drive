@@ -15,7 +15,7 @@ import { Plus, Pencil, Search, BookOpen, Calendar, User, Building2, CheckCircle,
 import { FileOrCamera } from "@/components/FileOrCamera";
 
 export default function CrmActividades() {
-  const { role, user } = useAuth();
+  const { perms, user } = useAuth();
   const { t } = useLang();
   const [actividades, setActividades] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
@@ -139,9 +139,9 @@ export default function CrmActividades() {
     });
   }, [actividades, clientes, vendedores, oportunidades, q]);
 
-  const canEdit = role === "admin" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
-  const canCreate = role === "admin" || role === "ventas" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
-  const canDelete = role === "admin" || role === "coordinador_ventas";
+  const canEdit = perms.puedeEditar("crm");
+  const canCreate = perms.puedeCrear("crm");
+  const canDelete = perms.puedeEliminar("crm");
 
   const saveProgramar = async () => {
     const payload = {
@@ -213,6 +213,42 @@ export default function CrmActividades() {
       otro: false
     });
     setOtraMarca("");
+    load();
+  };
+
+  /**
+   * `<input type="datetime-local">` sólo entiende «YYYY-MM-DDTHH:mm». La fila
+   * viene de Postgres como ISO con zona, así que sin convertirla el campo se
+   * dibuja vacío y no se puede ver ni corregir la fecha.
+   */
+  const paraInputFecha = (iso?: string | null) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+
+  /**
+   * Guardar el diálogo «Editar actividad». Sólo manda los campos que ese
+   * diálogo deja tocar: `form` trae la fila completa (viene de `setForm(a)`),
+   * y devolverla entera reenviaría id, created_at y todo el reporte de la
+   * visita, que aquí no se edita.
+   */
+  const guardarEdicion = async () => {
+    if (!editing) return;
+    const payload = {
+      cliente_id:      form.cliente_id || null,
+      vendedor_id:     form.vendedor_id || null,
+      tipo:            form.tipo,
+      fecha_actividad: form.fecha_actividad || editing.fecha_actividad,
+      resultado:       form.resultado || null,
+      descripcion:     form.descripcion || null,
+    };
+    const { error } = await supabase.from("crm_actividades").update(payload).eq("id", editing.id);
+    if (error) return toast.error(error.message);
+    toast.success("Actividad actualizada");
+    setEditing(null);
     load();
   };
 
@@ -386,7 +422,7 @@ export default function CrmActividades() {
                     </Button>
                   )}
                   {canEdit && (
-                    <Button size="icon" variant="ghost" onClick={() => { setForm(a); setEditing(a); setStep(a.tipo === 'visita' ? 1 : 1); }} className="h-8 w-8">
+                    <Button size="icon" variant="ghost" onClick={() => { setForm({ ...a, fecha_actividad: paraInputFecha(a.fecha_actividad) }); setEditing(a); setStep(1); }} className="h-8 w-8">
                       <Pencil className="h-4 w-4" />
                     </Button>
                   )}
@@ -816,7 +852,7 @@ export default function CrmActividades() {
               <Textarea value={form.descripcion || ""} onChange={e => setForm({ ...form, descripcion: e.target.value })} rows={2} />
             </div>
           </div>
-          <DialogFooter><Button onClick={save} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Guardar</Button></DialogFooter>
+          <DialogFooter><Button onClick={guardarEdicion} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">Guardar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
