@@ -62,14 +62,19 @@ const defaultMoto = (): MotoItem => ({
 });
 
 // ─── Folio suggester ────────────────────────────────────────────────────────────
+// Reusa el número más bajo disponible, incluyendo folios liberados por remisiones canceladas.
 function suggestNextFolio(folios: string[]): string {
   if (!folios.length) return "REM-001";
   const parsed = folios
     .map(f => { const m = (f||"").match(/^(.*?)(\d+)\s*$/); return m ? { prefix: m[1], num: parseInt(m[2],10), pad: m[2].length } : null; })
     .filter(Boolean) as { prefix: string; num: number; pad: number }[];
-  if (!parsed.length) return folios[0] + "-1";
-  const last = parsed.sort((a,b) => b.num - a.num)[0];
-  return `${last.prefix}${String(last.num+1).padStart(last.pad,"0")}`;
+  if (!parsed.length) return "REM-001";
+  const prefix = parsed[0].prefix;
+  const pad = parsed[0].pad;
+  const nums = new Set(parsed.map(p => p.num));
+  let n = 1;
+  while (nums.has(n)) n++;
+  return `${prefix}${String(n).padStart(pad,"0")}`;
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
@@ -83,6 +88,7 @@ export default function Remisiones() {
   const [open, setOpen]             = useState(false);
   const [expanded, setExpanded]     = useState<Record<string,boolean>>({});
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
+  const [activeFolios, setActiveFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
   const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp:"", nombre_comercial:"", telefono:"" });
   const [colorInventory, setColorInventory] = useState<Map<string, any>>(new Map()); // key: "modelo_color" -> inventory data
@@ -160,7 +166,9 @@ export default function Remisiones() {
       color_solicitado:null, total_unidades_solicitadas:null,
     }));
     setRows(baseRows);
-    const propios = baseRows.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
+    const activos = baseRows.filter((r:any) => r.estatus !== 'CANCELADA');
+    setActiveFolios(activos.map((r:any) => r.folio_remision));
+    const propios = activos.filter((r:any) => role==="admin"||role==="coordinador"||r.vendedor_id===user?.id);
     setRecentFolios(propios.slice(0,5).map((r:any)=>r.folio_remision));
 
     if (!base?.length) return;
@@ -252,7 +260,7 @@ export default function Remisiones() {
 
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
-    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(recentFolios), nombre_vendedor: role==="ventas"?(myProfile?.nombre_completo||""):"" }));
+    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(activeFolios), nombre_vendedor: role==="ventas"?(myProfile?.nombre_completo||""):"" }));
     setMotos([defaultMoto()]); setConFlete(false); setFormFile(null); setOpen(true);
   };
   const resetForm = () => {
@@ -274,7 +282,7 @@ export default function Remisiones() {
   // ── Create remisión ─────────────────────────────────────────────────────────
   const crearRemision = async () => {
     if (!form.folio_remision||!form.cliente_id) { toast.error("Folio y cliente son obligatorios"); return; }
-    if (recentFolios.includes(form.folio_remision.trim())) { toast.error("Ese folio ya existe"); return; }
+    if (activeFolios.includes(form.folio_remision.trim())) { toast.error("Ese folio ya está en uso por una remisión activa"); return; }
     if (totalUnidades===0) { toast.error("Agrega al menos un motocarro"); return; }
 
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
@@ -487,6 +495,11 @@ export default function Remisiones() {
   };
 
   const restaurarRemision = async (id: string) => {
+    const r = rows.find((row) => row.id === id);
+    if (r?.folio_remision && activeFolios.includes(r.folio_remision)) {
+      toast.error(`No se puede restaurar: el folio ${r.folio_remision} ya está en uso por una remisión activa`);
+      return;
+    }
     const { error } = await supabase.from("remisiones").update({ estatus: "NUEVA" }).eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("✓ Remisión restaurada a activa"); load();
@@ -522,7 +535,7 @@ export default function Remisiones() {
                   {recentFolios.length>0&&(
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {recentFolios.map(f=>(
-                        <button key={f} type="button" onClick={()=>setForm((s:any)=>({...s,folio_remision:suggestNextFolio([f])}))}
+                        <button key={f} type="button" onClick={()=>setForm((s:any)=>({...s,folio_remision:suggestNextFolio(activeFolios)}))}
                           className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-[#1F3864] border">{f}</button>
                       ))}
                     </div>

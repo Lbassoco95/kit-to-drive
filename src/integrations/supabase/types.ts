@@ -1428,6 +1428,13 @@ export type Database = {
         }
         Returns: number
       }
+      asignar_motocarro_a_remision: {
+        Args: {
+          _motocarro_id: string
+          _remision_id: string
+        }
+        Returns: undefined
+      }
       cambiar_orden_armado: {
         Args: { _motivo?: string; _motocarro_id: string; _orden_nuevo: number }
         Returns: Json
@@ -1442,6 +1449,10 @@ export type Database = {
       }
       decrementar_inventario_color: {
         Args: { _cantidad?: number; _color: string; _modelo: string }
+        Returns: undefined
+      }
+      desasignar_motocarro_de_remision: {
+        Args: { _motocarro_id: string }
         Returns: undefined
       }
       desconfigurar_unidad: {
