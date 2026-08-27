@@ -355,8 +355,8 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
 
   return (
     <>
-      <Card className="p-5 border-2 border-[#E8A30D]/40 bg-gradient-to-br from-[#FFF8E7] to-white">
-        <div className="flex items-center gap-3 mb-4">
+      <Card className="p-3 sm:p-5 border-2 border-[#E8A30D]/40 bg-gradient-to-br from-[#FFF8E7] to-white min-w-0">
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="w-11 h-11 rounded-xl bg-[#E8A30D]/15 flex items-center justify-center shrink-0">
             <Inbox className="h-6 w-6 text-[#A36B00]" />
           </div>
@@ -369,7 +369,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="responsive-card-grid gap-3">
           {items.map(rem => {
             const faltan = rem.total_unidades - rem.asignados;
             const sinAsignar = rem.asignados === 0;
@@ -397,7 +397,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             const asignables = cobertura.length ? Math.min(faltan, libresTotales) : faltan;
 
             return (
-              <div key={rem.id} className="bg-white rounded-xl border border-[#E8A30D]/25 flex flex-col overflow-hidden shadow-sm">
+              <div key={rem.id} className="bg-white rounded-xl border border-[#E8A30D]/25 flex flex-col min-w-0 overflow-hidden shadow-sm">
                 {/* Header */}
                 <div className="flex items-start justify-between px-4 pt-3 pb-2 border-b bg-[#FFFBF0]">
                   <div>
@@ -413,7 +413,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 <div className="px-4 py-3 space-y-1.5 text-sm">
                   <div className="text-muted-foreground">Vendedor: <strong className="text-foreground">{vendedorDisplay}</strong></div>
                   <div className="text-muted-foreground">Cliente: <strong className="text-foreground">{rem.cliente}</strong></div>
-                  <div className="flex gap-3 pt-0.5">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
                     <span className="text-muted-foreground">Solicita: <strong className="text-foreground">{rem.total_unidades}</strong></span>
                     <span className="text-muted-foreground">Asignados: <strong className="text-foreground">{rem.asignados}</strong></span>
                     <span className="text-red-600 font-bold">Faltan: {faltan}</span>
@@ -466,9 +466,9 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     {cobertura.map(c => {
                       const alcanza = c.libres >= c.pedidas;
                       return (
-                        <div key={c.id} className="flex items-center justify-between gap-2 text-[11px]">
-                          <span className="font-medium text-slate-700">{c.etiqueta}</span>
-                          <span className="flex items-center gap-2">
+                        <div key={c.id} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px]">
+                          <span className="font-medium text-slate-700 break-words">{c.etiqueta}</span>
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             <span className={alcanza ? "text-[#065F46] font-semibold" : "text-[#991B1B] font-semibold"}>
                               {c.libres} con serial
                             </span>
@@ -502,11 +502,11 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 )}
 
                 {/* Acciones */}
-                <div className="px-4 py-3 mt-auto border-t flex gap-2">
+                <div className="px-4 py-3 mt-auto border-t grid grid-cols-2 gap-2">
                   <Button
                     onClick={() => asignar(rem.id, faltan)}
                     disabled={busy === rem.id || faltan <= 0 || (cobertura.length > 0 && asignables <= 0)}
-                    className="flex-1 h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold text-sm"
+                    className="col-span-2 h-auto min-h-11 whitespace-normal bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold text-sm"
                     title={cobertura.length > 0 && asignables <= 0
                       ? "No hay unidades con serial de ese modelo y color — configura chasis + motor en Producción"
                       : undefined}
@@ -523,7 +523,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     <Button
                       variant="outline"
                       onClick={() => abrirManual(rem)}
-                      className="h-11 px-3 shrink-0 border-[#1F3864]/30 text-[#1F3864] hover:bg-[#1F3864]/5"
+                      className="h-11 px-3 border-[#1F3864]/30 text-[#1F3864] hover:bg-[#1F3864]/5"
                       title="Asignar manualmente eligiendo chasis y motor"
                     >
                       <UserPlus className="h-4 w-4 mr-1.5" /> Manual
@@ -533,7 +533,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     <Button
                       variant="outline"
                       onClick={() => verDoc(rem.documento_url!)}
-                      className="h-11 w-11 p-0 shrink-0"
+                      className="h-11 w-full p-0"
                       title="Ver documento"
                     >
                       <FileDown className="h-5 w-5" />

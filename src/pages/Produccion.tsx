@@ -478,7 +478,7 @@ export default function Produccion() {
       </Card>
 
       {view === "cards" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="responsive-card-grid gap-4">
           {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
             catalogo={catalogo}
             incidencias={incidencias.get(r.id) ?? []}

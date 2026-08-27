@@ -416,7 +416,7 @@ export default function Clientes() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="responsive-card-grid gap-4">
         {filtered.map(c => {
           const s = stats[c.id] || { total: 0, entregados: 0 };
           const activos = s.total - s.entregados;

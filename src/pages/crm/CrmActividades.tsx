@@ -366,7 +366,7 @@ export default function CrmActividades() {
         </div>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="responsive-card-grid gap-4">
         {filtered.map((a: any) => {
           const cliente = clientes.find((c: any) => c.id === a.cliente_id);
           const vendedor = vendedores.find((v: any) => v.id === a.vendedor_id);

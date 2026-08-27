@@ -97,4 +97,8 @@
   }
   .data-table tbody tr:hover { @apply bg-[hsl(var(--surface))]; }
   .data-table td { @apply px-3 py-2 border-b border-border align-middle; }
+  .responsive-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  }
 }
