@@ -78,7 +78,7 @@ export default function MisMotocarros() {
                   </div>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
-                  <div className="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <div className="px-4 pb-4 responsive-card-grid gap-3">
                     {items.map(r => (
                       <div key={r.id} className="rounded-lg border p-3 bg-white flex flex-col gap-2">
                         <div className="flex items-center gap-2">

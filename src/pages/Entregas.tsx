@@ -71,7 +71,7 @@ export default function Entregas() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="responsive-card-grid gap-4">
         {filtered.map(r => {
           const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
           const colorBg = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";

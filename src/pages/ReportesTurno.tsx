@@ -165,7 +165,7 @@ export default function ReportesTurno() {
               <h2 className="text-sm font-semibold uppercase text-muted-foreground tracking-wider mb-3 px-1 capitalize">
                 {formatDate(fecha)}
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="responsive-card-grid gap-4">
                 {reportes.map(r => {
                   const TurnoIcon = TURNO_ICONS[r.turno];
                   const colorClass = TURNO_COLORS[r.turno];

@@ -232,7 +232,7 @@ export default function Usuarios() {
       </Card>
 
       {/* Usuarios */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="responsive-card-grid gap-4">
         {filtered.map(u => {
           const editable = perms.gestionaUsuarios && (perms.esAdminGlobal || (!!u.area && u.area === miArea));
           return (

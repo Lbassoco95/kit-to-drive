@@ -185,7 +185,7 @@ export default function CrmOportunidades() {
         })}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="responsive-card-grid gap-4">
         {filtered.map((o: any) => {
           const cliente = clientes.find((c: any) => c.id === o.cliente_id);
           const vendedor = vendedores.find((v: any) => v.id === o.vendedor_id);

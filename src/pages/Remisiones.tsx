@@ -962,7 +962,7 @@ export default function Remisiones() {
       </div>
 
       {/* ── Cards ─────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="responsive-card-grid gap-4">
         {activeTab === 'canceladas' ? (
           canceledRows.length === 0 ? (
             <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones canceladas</div>

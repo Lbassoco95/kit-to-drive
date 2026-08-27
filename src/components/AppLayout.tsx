@@ -21,7 +21,7 @@ export default function AppLayout() {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 bg-card border-b border-border flex items-center px-3 gap-3 shrink-0">
+          <header className="min-h-14 bg-card border-b border-border flex items-center px-2 sm:px-3 gap-2 sm:gap-3 shrink-0">
             <SidebarTrigger />
             <form
               onSubmit={(e) => { e.preventDefault(); if (q.trim()) nav(`/buscar?q=${encodeURIComponent(q)}`); }}
@@ -39,11 +39,11 @@ export default function AppLayout() {
               <div className="font-semibold text-foreground">{profileName || user?.email}</div>
               <div className="text-muted-foreground">{area && nivel ? `${t.areas[area]} · ${t.niveles[nivel]}` : ""}</div>
             </div>
-            <Button variant="outline" size="sm" onClick={async () => { await signOut(); nav("/auth"); }}>
-              <LogOut className="h-4 w-4 mr-1" /> {t.layout.signOut}
+            <Button variant="outline" size="sm" onClick={async () => { await signOut(); nav("/auth"); }} title={t.layout.signOut}>
+              <LogOut className="h-4 w-4 sm:mr-1" /> <span className="hidden sm:inline">{t.layout.signOut}</span>
             </Button>
           </header>
-          <main className="flex-1 overflow-auto p-4 md:p-6 bg-surface">
+          <main className="flex-1 min-w-0 overflow-auto p-3 sm:p-4 md:p-6 bg-surface">
             {/* El boundary encierra el error en el área de contenido: si una
                 pantalla truena, el menú y la sesión siguen ahí en vez de
                 dejar la app en blanco. La `key` lo reinicia al navegar, para
