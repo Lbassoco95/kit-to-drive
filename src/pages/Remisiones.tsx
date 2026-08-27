@@ -224,6 +224,7 @@ export default function Remisiones() {
       ...r, remision_items:[], motocarros:[],
       tipo_pago:null, pagado:null, nombre_vendedor:null,
       color_solicitado:null, total_unidades_solicitadas:null,
+      documento_url:null, comprobante_pago_url:null,
     }));
     setRows(baseRows);
     // Folios activos (no cancelados) para validar duplicados y sugerir reutilización
@@ -241,7 +242,7 @@ export default function Remisiones() {
     try {
       const { data: ext } = await supabase
         .from("remisiones")
-        .select("id,tipo_pago,pagado,nombre_vendedor,color_solicitado,total_unidades_solicitadas")
+        .select("id,tipo_pago,pagado,nombre_vendedor,color_solicitado,total_unidades_solicitadas,documento_url,comprobante_pago_url")
         .in("id", ids);
       if (ext?.length) {
         const extMap = Object.fromEntries(ext.map((r:any) => [r.id, r]));
