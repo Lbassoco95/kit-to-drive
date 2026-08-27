@@ -60,8 +60,4 @@ BEGIN
 END;
 $$;
 
--- La firma va explícita: si en la base conviven dos versiones de
--- asignar_chasis_remision, el GRANT sin argumentos falla con «function name
--- is not unique» y tumba el archivo completo (el SQL editor va en una sola
--- transacción).
-GRANT EXECUTE ON FUNCTION public.asignar_chasis_remision(uuid, integer, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.asignar_chasis_remision TO authenticated;

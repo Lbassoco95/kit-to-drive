@@ -49,7 +49,6 @@ export function FileOrCamera({ value, onChange, imageOnly = false, label, classN
         <button
           type="button"
           onClick={() => {
-            if (typeof URL === "undefined" || !URL.createObjectURL) return;
             const url = URL.createObjectURL(value);
             window.open(url, "_blank", "noopener,noreferrer");
           }}

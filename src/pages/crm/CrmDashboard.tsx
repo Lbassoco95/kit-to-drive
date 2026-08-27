@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { BarChart2, TrendingUp, DollarSign, Calendar, Users, MapPin, BookOpen, CheckCircle } from "lucide-react";
 
 export default function CrmDashboard() {
+  const { role } = useAuth();
   const { t } = useLang();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({

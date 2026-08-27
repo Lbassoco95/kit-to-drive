@@ -40,7 +40,7 @@ const TURNO_COLORS: Record<Turno, string> = {
 const EMPTY_FORM = { fecha: new Date().toISOString().split("T")[0], turno: "manana" as Turno, unidades_armadas: 0, paros: "", observaciones: "" };
 
 export default function ReportesTurno() {
-  const { perms, user } = useAuth();
+  const { role, user } = useAuth();
   const { t, lang } = useLang();
   const tr = t.reportesTurno;
 
@@ -52,7 +52,7 @@ export default function ReportesTurno() {
   const [saving, setSaving] = useState(false);
   const [autoArmados, setAutoArmados] = useState<{ orden: number; modelo: string; color: string }[]>([]);
 
-  const canCreate = perms.puedeCrear("reportesTurno");
+  const canCreate = role === "admin" || role === "fabrica";
 
   const load = async () => {
     setLoading(true);
@@ -171,7 +171,7 @@ export default function ReportesTurno() {
                   const colorClass = TURNO_COLORS[r.turno];
                   const isOwn = user?.id === r.usuario_id;
                   const isToday = r.fecha === new Date().toISOString().split("T")[0];
-                  const canEdit = perms.puedeEditar("reportesTurno") || (isOwn && isToday);
+                  const canEdit = role === "admin" || (isOwn && isToday);
                   return (
                     <Card key={r.id} className="p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
                       {/* Turno badge + edit */}

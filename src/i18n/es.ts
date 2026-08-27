@@ -8,7 +8,6 @@ export const es = {
     dashboard: "Dashboard",
     produccion: "Producción",
     inventario: "Inventario",
-    incidencias: "Incidencias de chasis",
     reportesTurno: "Reportes de turno",
     remisiones: "Remisiones",
     entregas: "Entregas",
@@ -25,7 +24,6 @@ export const es = {
     crmDashboard: "Monitor equipo",
     crmTracker: "Tracker Vendedores",
     finanzas: "Control Financiero",
-    proveedores: "Proveedores",
   },
   groups: {
     Inicio: "Inicio",
@@ -52,25 +50,6 @@ export const es = {
   },
 
   // Roles
-  // Tipos de usuario (nivel) y áreas
-  niveles: {
-    operador: "Operador",
-    supervisor: "Supervisor",
-    admin: "Administrador",
-  },
-  nivelDesc: {
-    operador: "Captura y da seguimiento a su propio trabajo dentro de su área.",
-    supervisor: "Ve y corrige todo lo de su área, aprueba y consulta indicadores del equipo.",
-    admin: "Control total de su área, incluida la gestión de usuarios de su área.",
-  },
-  areas: {
-    comercial: "Comercial",
-    fabrica: "Fábrica",
-    almacen_logistica: "Almacén y Logística",
-    administracion: "Administración",
-    direccion: "Dirección",
-  },
-
   roles: {
     direccion: "Dirección",
     admin: "Administrador",

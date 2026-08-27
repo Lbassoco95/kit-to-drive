@@ -1,4 +1,4 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,11 +7,9 @@ import { LogOut, Bell, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useLang } from "@/contexts/LangContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function AppLayout() {
-  const { profileName, area, nivel, signOut, user } = useAuth();
-  const loc = useLocation();
+  const { profileName, role, signOut, user } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
   const [q, setQ] = useState("");
@@ -37,21 +35,14 @@ export default function AppLayout() {
             <Button variant="ghost" size="icon"><Bell className="h-4 w-4" /></Button>
             <div className="text-right text-xs leading-tight hidden sm:block">
               <div className="font-semibold text-foreground">{profileName || user?.email}</div>
-              <div className="text-muted-foreground">{area && nivel ? `${t.areas[area]} · ${t.niveles[nivel]}` : ""}</div>
+              <div className="text-muted-foreground">{role ? t.roles[role] : ""}</div>
             </div>
             <Button variant="outline" size="sm" onClick={async () => { await signOut(); nav("/auth"); }}>
               <LogOut className="h-4 w-4 mr-1" /> {t.layout.signOut}
             </Button>
           </header>
           <main className="flex-1 overflow-auto p-4 md:p-6 bg-surface">
-            {/* El boundary encierra el error en el área de contenido: si una
-                pantalla truena, el menú y la sesión siguen ahí en vez de
-                dejar la app en blanco. La `key` lo reinicia al navegar, para
-                que el error de una pantalla no se quede pegado en la
-                siguiente. */}
-            <ErrorBoundary key={loc.pathname} area={loc.pathname}>
-              <Outlet />
-            </ErrorBoundary>
+            <Outlet />
           </main>
           <footer className="text-xs text-muted-foreground text-center py-2 border-t border-border bg-card">
             {t.footer}

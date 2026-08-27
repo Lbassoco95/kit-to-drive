@@ -1,39 +1,36 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar";
-import { useAuth } from "@/contexts/AuthContext";
-import { Modulo } from "@/lib/permissions";
+import { useAuth, AppRole } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 
 type Group = "Inicio" | "Operación" | "Catálogos" | "CRM" | "Finanzas" | "Sistema";
 
-type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; icon: any; modulo: Modulo; group: Group };
+type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; icon: any; roles: AppRole[]; group: Group };
 
-// La visibilidad la resuelven los permisos del módulo (área × tipo de usuario).
 const ITEMS: Item[] = [
-  { key: "dashboard",       url: "/",                 icon: LayoutDashboard, modulo: "dashboard",     group: "Inicio"    },
-  { key: "produccion",      url: "/produccion",       icon: Factory,         modulo: "produccion",    group: "Operación" },
-  { key: "inventario",      url: "/inventario",       icon: Package,         modulo: "inventario",    group: "Operación" },
-  { key: "incidencias",     url: "/incidencias",      icon: TriangleAlert,   modulo: "inventario",    group: "Operación" },
-  { key: "reportesTurno",   url: "/reportes-turno",   icon: ClipboardList,   modulo: "reportesTurno", group: "Operación" },
-  { key: "remisiones",      url: "/remisiones",       icon: FileText,        modulo: "remisiones",    group: "Operación" },
-  { key: "entregas",        url: "/entregas",         icon: Truck,           modulo: "entregas",      group: "Operación" },
-  { key: "misMotocarros",   url: "/mis-motocarros",   icon: Bike,            modulo: "misMotocarros", group: "Catálogos" },
-  { key: "clientes",        url: "/clientes",         icon: Users,           modulo: "clientes",      group: "Catálogos" },
-  { key: "crmOportunidades",url: "/crm/oportunidades",icon: TrendingUp,      modulo: "crm",           group: "CRM"       },
-  { key: "crmEquipo",       url: "/crm/equipo",       icon: Users,           modulo: "crmEquipo",     group: "CRM"       },
-  { key: "crmActividades",  url: "/crm/actividades",  icon: BookOpen,        modulo: "crm",           group: "CRM"       },
-  { key: "crmRutas",        url: "/crm/rutas",        icon: MapPin,          modulo: "crm",           group: "CRM"       },
-  { key: "crmTracker",      url: "/crm/tracker",      icon: BarChart2,       modulo: "crmEquipo",     group: "CRM"       },
-  { key: "finanzas",        url: "/finanzas",         icon: Wallet,          modulo: "finanzas",      group: "Finanzas"  },
-  { key: "proveedores",     url: "/proveedores",      icon: Building2,       modulo: "finanzas",      group: "Finanzas"  },
-  { key: "importar",        url: "/importar",         icon: Upload,          modulo: "importar",      group: "Sistema"   },
-  { key: "usuarios",        url: "/usuarios",         icon: Database,        modulo: "usuarios",      group: "Sistema"   },
-  { key: "bitacora",        url: "/bitacora",         icon: ScrollText,      modulo: "bitacora",      group: "Sistema"   },
-  { key: "configuracion",   url: "/configuracion",    icon: Settings,        modulo: "configuracion", group: "Sistema"   },
+  { key: "dashboard",      url: "/",              icon: LayoutDashboard, roles: ["admin","fabrica","logistica","ventas","coordinador","director_ventas","coordinador_ventas","auxiliar_ventas"], group: "Inicio" },
+  { key: "produccion",     url: "/produccion",    icon: Factory,         roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
+  { key: "inventario",     url: "/inventario",    icon: Package,         roles: ["admin","fabrica","coordinador"],                      group: "Operación" },
+  { key: "reportesTurno",  url: "/reportes-turno",icon: ClipboardList,   roles: ["admin","fabrica","logistica","coordinador"],          group: "Operación" },
+  { key: "remisiones",     url: "/remisiones",    icon: FileText,        roles: ["admin","fabrica","logistica","ventas","coordinador"], group: "Operación" },
+  { key: "entregas",       url: "/entregas",      icon: Truck,           roles: ["admin","logistica","coordinador"],                    group: "Operación" },
+  { key: "misMotocarros",  url: "/mis-motocarros",icon: Bike,            roles: ["ventas","admin","coordinador"],                       group: "Catálogos" },
+  { key: "clientes",       url: "/clientes",      icon: Users,           roles: ["admin","fabrica","coordinador"],                      group: "Catálogos" },
+  { key: "crmDashboard",    url: "/crm/dashboard",    icon: BarChart2,      roles: ["admin","director_ventas","coordinador_ventas","auxiliar_ventas"], group: "CRM" },
+  { key: "crmOportunidades",url: "/crm/oportunidades",icon: TrendingUp,     roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
+  { key: "crmEquipo",       url: "/crm/equipo",       icon: Users,           roles: ["admin","director_ventas","coordinador_ventas"], group: "CRM" },
+  { key: "crmActividades",  url: "/crm/actividades",  icon: BookOpen,       roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
+  { key: "crmRutas",        url: "/crm/rutas",        icon: MapPin,         roles: ["admin","ventas","auxiliar_ventas","coordinador_ventas","director_ventas"], group: "CRM" },
+  { key: "crmTracker",      url: "/crm/tracker",      icon: BarChart2,      roles: ["admin","director_ventas","coordinador_ventas"], group: "CRM" },
+  { key: "finanzas",       url: "/finanzas",      icon: Wallet,          roles: ["admin","finanzas","admin_financiero"],              group: "Finanzas" },
+  { key: "importar",       url: "/importar",      icon: Upload,          roles: ["admin"],                                              group: "Sistema" },
+  { key: "usuarios",       url: "/usuarios",      icon: Database,        roles: ["admin"],                                              group: "Sistema" },
+  { key: "bitacora",       url: "/bitacora",      icon: ScrollText,      roles: ["admin"],                                              group: "Sistema" },
+  { key: "configuracion",  url: "/configuracion", icon: Settings,        roles: ["admin"],                                              group: "Sistema" },
 ];
 
 const GROUPS: Group[] = ["Inicio", "Operación", "Catálogos", "CRM", "Finanzas", "Sistema"];
@@ -42,9 +39,9 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
-  const { perms, area, nivel } = useAuth();
+  const { role } = useAuth();
   const { t, toggleLang } = useLang();
-  const items = area && nivel ? ITEMS.filter(i => perms.puedeVer(i.modulo)) : [];
+  const items = ITEMS.filter(i => role && i.roles.includes(role));
 
   return (
     <Sidebar collapsible="icon">
@@ -68,9 +65,7 @@ export function AppSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {list.map(item => {
-                    const active = item.url === "/"
-                      ? pathname === "/"
-                      : pathname === item.url || pathname.startsWith(item.url + "/");
+                    const active = pathname === item.url;
                     return (
                       <SidebarMenuItem key={item.url}>
                         <SidebarMenuButton asChild isActive={active} className="h-12 my-0.5">

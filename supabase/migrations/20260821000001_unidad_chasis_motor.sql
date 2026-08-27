@@ -17,23 +17,15 @@
 -- 2.1 · contenedor_id pasa de TEXT a uuid con FK real.
 -- Las tablas están vacías; el CASE es defensivo por si alguien importa algo
 -- entre que lees esto y lo corres (un folio no casteable queda en NULL, no truena).
--- El cast va condicionado a que la columna siga siendo texto: si ya se corrió
--- este script, contenedor_id es uuid y el `~*` truena con «operator does not
--- exist: uuid ~* unknown», que en el SQL editor revierte todo el archivo.
-DO $conv$
-DECLARE _t text;
-BEGIN
-  FOREACH _t IN ARRAY ARRAY['inventario_chasis','inventario_motor'] LOOP
-    IF EXISTS (SELECT 1 FROM information_schema.columns
-                WHERE table_schema='public' AND table_name = _t
-                  AND column_name='contenedor_id' AND data_type <> 'uuid') THEN
-      EXECUTE format(
-        'ALTER TABLE public.%I ALTER COLUMN contenedor_id TYPE uuid USING '
-        '(CASE WHEN contenedor_id ~* ''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'' '
-        'THEN contenedor_id::uuid END)', _t);
-    END IF;
-  END LOOP;
-END $conv$;
+ALTER TABLE public.inventario_chasis
+  ALTER COLUMN contenedor_id TYPE uuid
+  USING (CASE WHEN contenedor_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              THEN contenedor_id::uuid END);
+
+ALTER TABLE public.inventario_motor
+  ALTER COLUMN contenedor_id TYPE uuid
+  USING (CASE WHEN contenedor_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              THEN contenedor_id::uuid END);
 
 DO $$
 BEGIN

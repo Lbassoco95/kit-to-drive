@@ -35,7 +35,7 @@ type OpportunityData = {
 };
 
 export default function CrmTracker() {
-  const { perms } = useAuth();
+  const { role } = useAuth();
   const { t } = useLang();
   const [sellers, setSellers] = useState<SellerData[]>([]);
   const [oportunidades, setOportunidades] = useState<OpportunityData[]>([]);
@@ -81,7 +81,7 @@ export default function CrmTracker() {
     return sellerOps.length > 0;
   }).map(s => s.vendedor);
 
-  if (!perms.puedeVer("crmEquipo")) {
+  if (role !== "admin" && role !== "director_ventas" && role !== "coordinador_ventas") {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">No tienes permiso para ver esta página</p>

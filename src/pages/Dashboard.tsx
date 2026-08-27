@@ -66,7 +66,7 @@ function SeccionDashboard({
 }
 
 export default function Dashboard() {
-  const { perms, area, nivel, user, profileName } = useAuth();
+  const { role, user, profileName } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
   const [data, setData] = useState<{ motos: any[]; rems: any[]; catalogo: CatalogoModelos; chasisPorConfigurar: number } | null>(null);
@@ -118,13 +118,14 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, [user, retry]);
 
-  // El tablero general es de Dirección; las demás áreas entran a su módulo.
+  // Redirect based on role
   useEffect(() => {
-    if (!area || !nivel) return;
-    if (perms.inicio !== "/") nav(perms.inicio);
-  }, [area, nivel, perms.inicio, nav]);
+    if (role === "finanzas" || role === "admin_financiero") { nav("/finanzas"); return; }
+    if (role === "ventas" || role === "auxiliar_ventas") { nav("/crm/oportunidades"); return; }
+    if (role === "director_ventas" || role === "coordinador_ventas") { nav("/crm/oportunidades"); return; }
+  }, [role, nav]);
 
-  const greeting = t.dashboard.greeting(profileName || "usuario", area && nivel ? `${t.areas[area]} · ${t.niveles[nivel]}` : "");
+  const greeting = t.dashboard.greeting(profileName || "usuario", role ? t.roles[role] : "");
 
   if (loading) {
     return (
@@ -227,7 +228,7 @@ export default function Dashboard() {
       return acc;
     }, []);
 
-  const isVendedor = area === "comercial";
+  const isVendedor = role === "ventas";
 
   return (
     <div className="space-y-6">
@@ -236,7 +237,7 @@ export default function Dashboard() {
         <p className="text-muted-foreground text-base mt-1">{greeting}</p>
       </div>
 
-      {area === "direccion" && (
+      {role === "admin" && (
         <div className="space-y-8">
           <SeccionDashboard titulo="Operación" subtitulo="Producción y entregas de las unidades del embarque">
             <InventarioStatus />
@@ -353,7 +354,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {area === "fabrica" && (
+      {role === "fabrica" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" />
@@ -368,7 +369,7 @@ export default function Dashboard() {
         </>
       )}
 
-      {area === "almacen_logistica" && (
+      {role === "logistica" && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard label={t.dashboard.kpi.listosEntrega} value={listosEntrega} icon={Truck} color="#1F3864" onClick={() => nav("/entregas")} />
           <KpiCard label={t.dashboard.kpi.enRuta} value={motos.filter(m => m.estatus_entrega === "EN_RUTA").length} icon={Truck} color="#92400E" />

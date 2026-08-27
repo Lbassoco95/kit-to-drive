@@ -7,13 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { Nivel, NIVELES, NIVEL_LABELS } from "@/lib/permissions";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Plus, User as UserIcon, Mail, Key, Shield, Trash2 } from "lucide-react";
 
 export default function CrmEquipo() {
-  const { perms } = useAuth();
+  const { role } = useAuth();
   const { t } = useLang();
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [creating, setCreating] = useState(false);
@@ -21,20 +20,20 @@ export default function CrmEquipo() {
     nombre_completo: "",
     email: "",
     password: "",
-    nivel: "operador" as Nivel,
+    role: "ventas"
   });
 
   const load = async () => {
     const { data } = await supabase
       .from("profiles")
-      .select("*, user_roles!inner(nivel, area)")
-      .eq("user_roles.area", "comercial");
+      .select("*, user_roles!inner(role)")
+      .in("user_roles.role", ["ventas", "auxiliar_ventas", "coordinador_ventas"]);
     setUsuarios(data ?? []);
   };
   useEffect(() => { load(); }, []);
 
   const save = async () => {
-    if (!form.nombre_completo || !form.email || !form.password || !form.nivel) {
+    if (!form.nombre_completo || !form.email || !form.password || !form.role) {
       return toast.error("Todos los campos son obligatorios");
     }
 
@@ -51,8 +50,7 @@ export default function CrmEquipo() {
           email: form.email,
           password: form.password,
           nombre_completo: form.nombre_completo,
-          area: "comercial",
-          nivel: form.nivel,
+          role: form.role,
         }),
       });
 
@@ -64,7 +62,7 @@ export default function CrmEquipo() {
 
       toast.success("Usuario creado exitosamente");
       setCreating(false);
-      setForm({ nombre_completo: "", email: "", password: "", nivel: "operador" });
+      setForm({ nombre_completo: "", email: "", password: "", role: "ventas" });
       load();
     } catch (error: any) {
       toast.error(error.message || "Error al crear usuario");
@@ -88,6 +86,12 @@ export default function CrmEquipo() {
     }
   };
 
+  const roleLabels: Record<string, string> = {
+    ventas: "Vendedor",
+    auxiliar_ventas: "Auxiliar de Ventas",
+    coordinador_ventas: "Coordinador de Ventas",
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-end flex-wrap gap-3">
@@ -95,12 +99,10 @@ export default function CrmEquipo() {
           <h1>Equipo de Ventas</h1>
           <p className="text-base text-muted-foreground mt-1">{usuarios.length} miembros en el equipo</p>
         </div>
-        {perms.gestionaUsuarios && (
-          <Button onClick={() => setCreating(true)}
-            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-            <Plus className="h-5 w-5 mr-2"/> Agregar vendedor
-          </Button>
-        )}
+        <Button onClick={() => setCreating(true)}
+          className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+          <Plus className="h-5 w-5 mr-2"/> Agregar vendedor
+        </Button>
       </div>
 
       <Card className="p-5">
@@ -110,7 +112,7 @@ export default function CrmEquipo() {
               <tr className="border-b">
                 <th className="text-left py-3 px-4 font-semibold">Nombre</th>
                 <th className="text-left py-3 px-4 font-semibold">Email</th>
-                <th className="text-left py-3 px-4 font-semibold">Tipo de usuario</th>
+                <th className="text-left py-3 px-4 font-semibold">Rol</th>
                 <th className="text-left py-3 px-4 font-semibold">Acciones</th>
               </tr>
             </thead>
@@ -129,15 +131,13 @@ export default function CrmEquipo() {
                   <td className="py-3 px-4">
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                       <Shield size={12} />
-                      {u.user_roles?.nivel ? NIVEL_LABELS[u.user_roles.nivel as Nivel] : "—"}
+                      {roleLabels[u.user_roles?.role] || u.user_roles?.role}
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    {perms.gestionaUsuarios && (
-                      <Button size="icon" variant="ghost" onClick={() => deleteUser(u.id)} className="h-8 w-8 text-red-600 hover:text-red-700">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+                    <Button size="icon" variant="ghost" onClick={() => deleteUser(u.id)} className="h-8 w-8 text-red-600 hover:text-red-700">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -191,16 +191,15 @@ export default function CrmEquipo() {
             </div>
             <div>
               <Label className="flex items-center gap-2">
-                <Shield size={16} /> Tipo de usuario
+                <Shield size={16} /> Rol
               </Label>
-              <Select value={form.nivel} onValueChange={(v) => setForm({ ...form, nivel: v as Nivel })}>
+              <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {NIVELES.map(n => (
-                    <SelectItem key={n} value={n}>{NIVEL_LABELS[n]}</SelectItem>
-                  ))}
+                  <SelectItem value="ventas">Vendedor</SelectItem>
+                  <SelectItem value="auxiliar_ventas">Auxiliar de Ventas</SelectItem>
                 </SelectContent>
               </Select>
             </div>

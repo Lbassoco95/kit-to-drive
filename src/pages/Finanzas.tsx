@@ -1,472 +1,458 @@
-// Control Financiero — libro mayor de caja: ingresos y egresos en una sola
-// línea de tiempo, con saldos por caja/banco y pendientes de comprobar.
-import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import {
-  Plus, Search, Wallet, ArrowDownCircle, ArrowUpCircle, FileText,
-  AlertTriangle, Banknote, Landmark, Building2, ChevronRight, Filter, X,
-} from "lucide-react";
-import MovimientoForm from "@/components/finanzas/MovimientoForm";
-import { fdb } from "@/lib/finanzasDb";
-import {
-  fmtMoneda, fmtFecha, formVacio, validarMovimiento, coincideBusqueda,
-  totalesMXN, ESTATUS_MOV, METODOS_PAGO,
-  type Cuenta, type SaldoCuenta, type Movimiento, type MovEstatus,
-  type MovTipo, type MovimientoForm as FormState,
-} from "@/lib/finanzas";
+import { Plus, Pencil, Trash2, Search, Wallet, FileText, ExternalLink, Upload, X } from "lucide-react";
 
-type FiltroTipo = "TODOS" | MovTipo;
+interface Pago {
+  id: string;
+  nombre_pago: string;
+  beneficiario: string;
+  monto: number;
+  moneda: string;
+  tiene_factura: boolean;
+  factura_url: string | null;
+  aprobado_por: string | null;
+  descripcion: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+const MONEDAS = ["MXN", "USD", "EUR", "CNY"];
+
+const EMPTY_FORM = {
+  nombre_pago: "",
+  beneficiario: "",
+  monto: "",
+  moneda: "MXN",
+  tiene_factura: false,
+  aprobado_por: "",
+  descripcion: "",
+};
+
+const fmt = (n: number, moneda: string) =>
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: moneda, minimumFractionDigits: 2 }).format(n);
 
 export default function Finanzas() {
-  const { user, perms } = useAuth();
-  const navigate = useNavigate();
-
-  const [movs, setMovs] = useState<Movimiento[]>([]);
-  const [saldos, setSaldos] = useState<SaldoCuenta[]>([]);
-  const [cuentas, setCuentas] = useState<Cuenta[]>([]);
-  const [cargando, setCargando] = useState(true);
-  const [guardando, setGuardando] = useState(false);
-
-  // Filtros
+  const { user, role } = useAuth();
+  const [rows, setRows] = useState<Pago[]>([]);
   const [q, setQ] = useState("");
-  const [tipo, setTipo] = useState<FiltroTipo>("TODOS");
-  const [estatus, setEstatus] = useState<MovEstatus | "TODOS">("TODOS");
-  const [cuentaId, setCuentaId] = useState("TODAS");
-  const [metodo, setMetodo] = useState("TODOS");
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
-  const [soloPorComprobar, setSoloPorComprobar] = useState(false);
-  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Alta
-  const [altaAbierta, setAltaAbierta] = useState(false);
-  const [form, setForm] = useState<FormState>(formVacio("INGRESO"));
+  // dialogs
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Pago | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Pago | null>(null);
 
-  const puedeCapturar = perms.puedeCrear("finanzas");
+  // forms
+  const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [facturaFile, setFacturaFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // ── Carga ─────────────────────────────────────────────────
-  const cargar = async () => {
-    setCargando(true);
-    const [mv, sd, ct] = await Promise.all([
-      fdb.from("v_movimientos_financieros").select("*")
-         .order("fecha_movimiento", { ascending: false })
-         .order("created_at", { ascending: false })
-         .limit(500),
-      fdb.from("v_saldos_cuentas").select("*").order("orden"),
-      fdb.from("cuentas_financieras").select("*").order("orden"),
-    ]);
-    if (mv.error) toast.error(mv.error.message); else setMovs(mv.data ?? []);
-    if (!sd.error) setSaldos(sd.data ?? []);
-    if (!ct.error) setCuentas(ct.data ?? []);
-    setCargando(false);
+  const canDelete = role === "admin" || role === "admin_financiero";
+  const canEdit = role === "admin" || role === "admin_financiero" || role === "finanzas";
+
+  // ── Load ──────────────────────────────────────────────────────────────
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("pagos")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) toast.error(error.message);
+    else setRows(data ?? []);
+    setLoading(false);
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { load(); }, []);
 
-  // ── Filtrado ──────────────────────────────────────────────
-  const filtrados = useMemo(() => movs.filter(m => {
-    if (tipo !== "TODOS" && m.tipo !== tipo) return false;
-    if (estatus !== "TODOS" && m.estatus !== estatus) return false;
-    if (cuentaId !== "TODAS" && m.cuenta_id !== cuentaId) return false;
-    if (metodo !== "TODOS" && m.metodo_pago !== metodo) return false;
-    if (desde && m.fecha_movimiento < desde) return false;
-    if (hasta && m.fecha_movimiento > hasta) return false;
-    if (soloPorComprobar && !(m.requiere_comprobacion && !m.comprobado)) return false;
-    return coincideBusqueda(m, q);
-  }), [movs, tipo, estatus, cuentaId, metodo, desde, hasta, soloPorComprobar, q]);
+  const filtered = rows.filter(p => {
+    if (!q) return true;
+    const blob = [p.nombre_pago, p.beneficiario, p.aprobado_por, p.descripcion, p.moneda]
+      .filter(Boolean).join(" ").toLowerCase();
+    return blob.includes(q.toLowerCase());
+  });
 
-  const totales = useMemo(() => totalesMXN(filtrados), [filtrados]);
-
-  const porComprobar = useMemo(
-    () => movs.filter(m => m.requiere_comprobacion && !m.comprobado && m.estatus !== "CANCELADO"),
-    [movs]);
-
-  const filtrosActivos =
-    tipo !== "TODOS" || estatus !== "TODOS" || cuentaId !== "TODAS" ||
-    metodo !== "TODOS" || !!desde || !!hasta || soloPorComprobar;
-
-  const limpiarFiltros = () => {
-    setTipo("TODOS"); setEstatus("TODOS"); setCuentaId("TODAS");
-    setMetodo("TODOS"); setDesde(""); setHasta(""); setSoloPorComprobar(false);
+  // ── File upload ───────────────────────────────────────────────────────
+  const uploadFactura = async (file: File): Promise<string | null> => {
+    setUploading(true);
+    const ext = file.name.split(".").pop();
+    const path = `${user?.id}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from("facturas").upload(path, file, { upsert: false });
+    setUploading(false);
+    if (error) { toast.error("Error al subir factura: " + error.message); return null; }
+    const { data: signedData } = await supabase.storage.from("facturas").createSignedUrl(path, 60 * 60 * 24 * 365);
+    return path; // store path, generate signed URL on demand
   };
 
-  // ── Alta ──────────────────────────────────────────────────
-  const abrirAlta = (t: MovTipo) => {
-    setForm(formVacio(t));
-    setAltaAbierta(true);
+  const verFactura = async (facturaUrl: string) => {
+    // facturaUrl is a storage path
+    const { data, error } = await supabase.storage.from("facturas").createSignedUrl(facturaUrl, 3600);
+    if (error || !data?.signedUrl) { toast.error("No se pudo abrir la factura"); return; }
+    window.open(data.signedUrl, "_blank");
   };
 
-  const guardar = async () => {
-    const errores = validarMovimiento(form, cuentas);
-    if (errores.length) { toast.error(errores[0]); return; }
+  // ── Create ────────────────────────────────────────────────────────────
+  const openCreate = () => {
+    setForm({ ...EMPTY_FORM });
+    setFacturaFile(null);
+    setCreateOpen(true);
+  };
 
-    setGuardando(true);
-    const { data, error } = await fdb.from("movimientos_financieros").insert({
-      tipo: form.tipo,
-      estatus: "PENDIENTE",
-      concepto: form.concepto.trim(),
-      categoria: form.categoria || null,
-      descripcion: form.descripcion.trim() || null,
-      monto: parseFloat(form.monto),
+  const submitCreate = async () => {
+    if (!form.nombre_pago.trim() || !form.beneficiario.trim() || !form.monto) {
+      toast.error("Nombre del pago, beneficiario y monto son obligatorios"); return;
+    }
+    const montoNum = parseFloat(form.monto);
+    if (isNaN(montoNum) || montoNum < 0) { toast.error("Monto inválido"); return; }
+
+    setSaving(true);
+    let facturaPath: string | null = null;
+    if (form.tiene_factura && facturaFile) {
+      facturaPath = await uploadFactura(facturaFile);
+      if (!facturaPath) { setSaving(false); return; }
+    }
+
+    const { error } = await supabase.from("pagos").insert({
+      nombre_pago: form.nombre_pago.trim(),
+      beneficiario: form.beneficiario.trim(),
+      monto: montoNum,
       moneda: form.moneda,
-      tipo_cambio: form.moneda === "MXN" ? null : parseFloat(form.tipo_cambio),
-      fecha_movimiento: form.fecha_movimiento,
-      metodo_pago: form.metodo_pago,
-      cuenta_id: form.cuenta_id || null,
-      referencia: form.referencia.trim() || null,
-      contraparte_tipo: form.contraparte_tipo,
-      cliente_id: form.cliente_id,
-      proveedor_id: form.proveedor_id,
-      empleado_id: form.empleado_id,
-      contraparte_nombre: form.contraparte_nombre.trim(),
-      via: form.via,
-      intermediario_id: form.intermediario_id,
-      intermediario_nombre: form.intermediario_nombre.trim() || null,
-      recibido_por: form.recibido_por,
-      factura_folio: form.factura_folio.trim() || null,
-      factura_uuid: form.factura_uuid.trim() || null,
-      factura_rfc: form.factura_rfc.trim() || null,
-      remision_id: form.remision_id,
+      tiene_factura: form.tiene_factura,
+      factura_url: facturaPath,
+      aprobado_por: form.aprobado_por.trim() || null,
+      descripcion: form.descripcion.trim() || null,
       created_by: user?.id,
-    }).select("id, folio").single();
+    });
 
-    setGuardando(false);
+    setSaving(false);
     if (error) { toast.error(error.message); return; }
-
-    toast.success(`✓ ${data.folio} registrado — agrega su expediente`);
-    setAltaAbierta(false);
-    await cargar();
-    navigate(`/finanzas/${data.id}`);
+    toast.success("✓ Pago registrado");
+    setCreateOpen(false);
+    load();
   };
 
-  // ── Render ────────────────────────────────────────────────
-  const iconoCuenta = (t: string) => (t === "EFECTIVO" ? Banknote : Landmark);
+  // ── Edit ──────────────────────────────────────────────────────────────
+  const openEdit = (p: Pago) => {
+    setEditTarget(p);
+    setForm({
+      nombre_pago: p.nombre_pago,
+      beneficiario: p.beneficiario,
+      monto: String(p.monto),
+      moneda: p.moneda,
+      tiene_factura: p.tiene_factura,
+      aprobado_por: p.aprobado_por ?? "",
+      descripcion: p.descripcion ?? "",
+    });
+    setFacturaFile(null);
+  };
+
+  const submitEdit = async () => {
+    if (!editTarget) return;
+    if (!form.nombre_pago.trim() || !form.beneficiario.trim() || !form.monto) {
+      toast.error("Nombre del pago, beneficiario y monto son obligatorios"); return;
+    }
+    const montoNum = parseFloat(form.monto);
+    if (isNaN(montoNum) || montoNum < 0) { toast.error("Monto inválido"); return; }
+
+    setSaving(true);
+    let facturaPath = editTarget.factura_url;
+    if (form.tiene_factura && facturaFile) {
+      const newPath = await uploadFactura(facturaFile);
+      if (!newPath) { setSaving(false); return; }
+      facturaPath = newPath;
+    }
+    if (!form.tiene_factura) facturaPath = null;
+
+    const { error } = await supabase.from("pagos").update({
+      nombre_pago: form.nombre_pago.trim(),
+      beneficiario: form.beneficiario.trim(),
+      monto: montoNum,
+      moneda: form.moneda,
+      tiene_factura: form.tiene_factura,
+      factura_url: facturaPath,
+      aprobado_por: form.aprobado_por.trim() || null,
+      descripcion: form.descripcion.trim() || null,
+    }).eq("id", editTarget.id);
+
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("✓ Pago actualizado");
+    setEditTarget(null);
+    load();
+  };
+
+  // ── Delete ────────────────────────────────────────────────────────────
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { error } = await supabase.from("pagos").delete().eq("id", deleteTarget.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Pago eliminado");
+    setDeleteTarget(null);
+    load();
+  };
+
+  // ── Summary ───────────────────────────────────────────────────────────
+  const totalMXN = rows.filter(p => p.moneda === "MXN").reduce((s, p) => s + p.monto, 0);
+  const totalUSD = rows.filter(p => p.moneda === "USD").reduce((s, p) => s + p.monto, 0);
+
+  // ── Form shared component ─────────────────────────────────────────────
+  const FormFields = () => (
+    <div className="space-y-3">
+      <div>
+        <Label>Nombre del pago *</Label>
+        <Input value={form.nombre_pago} onChange={e => setForm({ ...form, nombre_pago: e.target.value })} className="h-11" placeholder="ej. Pago proveedor acero" />
+      </div>
+      <div>
+        <Label>Beneficiario *</Label>
+        <Input value={form.beneficiario} onChange={e => setForm({ ...form, beneficiario: e.target.value })} className="h-11" placeholder="A quién se realiza el pago" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Monto *</Label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.monto}
+            onChange={e => setForm({ ...form, monto: e.target.value })}
+            className="h-11"
+            placeholder="0.00"
+          />
+        </div>
+        <div>
+          <Label>Moneda</Label>
+          <Select value={form.moneda} onValueChange={v => setForm({ ...form, moneda: v })}>
+            <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MONEDAS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label>Aprobado por</Label>
+        <Input value={form.aprobado_por} onChange={e => setForm({ ...form, aprobado_por: e.target.value })} className="h-11" placeholder="Nombre de quien autorizó" />
+      </div>
+      <div>
+        <Label>Descripción / notas</Label>
+        <Textarea value={form.descripcion} onChange={e => setForm({ ...form, descripcion: e.target.value })} rows={2} placeholder="Detalles adicionales (opcional)" />
+      </div>
+
+      {/* Factura toggle */}
+      <div className="flex items-center gap-3 pt-1">
+        <button
+          type="button"
+          onClick={() => setForm({ ...form, tiene_factura: !form.tiene_factura })}
+          className={`relative w-11 h-6 rounded-full transition-colors ${form.tiene_factura ? "bg-emerald-500" : "bg-slate-300"}`}
+        >
+          <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${form.tiene_factura ? "left-5" : "left-0.5"}`} />
+        </button>
+        <span className="text-sm font-medium">Tiene factura / invoice</span>
+      </div>
+
+      {/* File upload */}
+      {form.tiene_factura && (
+        <div>
+          <Label>Archivo de factura (PDF o imagen)</Label>
+          <div
+            className="mt-1 border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-[#1F3864] transition-colors"
+            onClick={() => fileRef.current?.click()}
+          >
+            {facturaFile ? (
+              <div className="flex items-center justify-center gap-2 text-emerald-600">
+                <FileText size={20} />
+                <span className="text-sm font-medium truncate max-w-[200px]">{facturaFile.name}</span>
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); setFacturaFile(null); }}
+                  className="ml-1 text-red-400 hover:text-red-600"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="text-muted-foreground">
+                <Upload size={24} className="mx-auto mb-1 opacity-50" />
+                <p className="text-sm">Toca para seleccionar PDF o imagen</p>
+                <p className="text-xs mt-0.5 opacity-60">PDF, JPG, PNG, WEBP — máx. 10 MB</p>
+              </div>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+            className="hidden"
+            onChange={e => setFacturaFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-5">
-      {/* Encabezado */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      {/* Header */}
+      <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
           <h1 className="flex items-center gap-2">
             <Wallet size={28} className="text-[#1F3864]" />
             Control Financiero
           </h1>
-          <p className="mt-1 text-base text-muted-foreground">
-            Ingresos de caja y egresos · {filtrados.length} de {movs.length} movimientos
+          <p className="text-base text-muted-foreground mt-1">
+            {rows.length} registros
+            {totalMXN > 0 && <span className="ml-3 font-semibold text-[#1F3864]">{fmt(totalMXN, "MXN")}</span>}
+            {totalUSD > 0 && <span className="ml-2 font-semibold text-emerald-700">{fmt(totalUSD, "USD")}</span>}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="h-12 px-4 text-base" onClick={() => navigate("/proveedores")}>
-            <Building2 className="mr-2 h-5 w-5" /> Proveedores
+        {canEdit && (
+          <Button onClick={openCreate} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+            <Plus className="h-5 w-5 mr-2" /> Nuevo registro
           </Button>
-          {puedeCapturar && (
-            <>
-              <Button
-                onClick={() => abrirAlta("INGRESO")}
-                className="h-12 bg-emerald-600 px-5 text-base hover:bg-emerald-700"
-              >
-                <ArrowDownCircle className="mr-2 h-5 w-5" /> Registrar ingreso
-              </Button>
-              <Button
-                onClick={() => abrirAlta("EGRESO")}
-                className="h-12 bg-[#1F3864] px-5 text-base hover:bg-[#162a4d]"
-              >
-                <ArrowUpCircle className="mr-2 h-5 w-5" /> Registrar egreso
-              </Button>
-            </>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Saldos por caja / banco */}
-      {saldos.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {saldos.filter(s => s.activo).map(s => {
-            const Icono = iconoCuenta(s.tipo);
-            const negativo = Number(s.saldo_actual) < 0;
-            return (
-              <Card key={s.id} className="p-4">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Icono size={15} className="text-[#2E75B6]" />
-                  <span className="truncate font-medium">{s.nombre}</span>
-                  <Badge variant="outline" className="ml-auto text-[10px]">{s.moneda}</Badge>
-                </div>
-                <div className={`mt-1.5 text-2xl font-extrabold ${negativo ? "text-red-600" : "text-[#1F3864]"}`}>
-                  {fmtMoneda(Number(s.saldo_actual), s.moneda)}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  <span className="text-emerald-600">+{fmtMoneda(Number(s.total_ingresos), s.moneda)}</span>
-                  {" · "}
-                  <span className="text-red-500">−{fmtMoneda(Number(s.total_egresos), s.moneda)}</span>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Alerta de efectivo sin comprobar */}
-      {porComprobar.length > 0 && (
-        <Card
-          className="cursor-pointer border-amber-200 bg-amber-50 p-4 transition-shadow hover:shadow-md"
-          onClick={() => { setSoloPorComprobar(true); setFiltrosAbiertos(true); }}
-        >
-          <div className="flex items-center gap-3">
-            <AlertTriangle size={22} className="shrink-0 text-amber-600" />
-            <div className="flex-1">
-              <p className="font-bold text-amber-900">
-                {porComprobar.length} entrega{porComprobar.length === 1 ? "" : "s"} de efectivo sin comprobar
-              </p>
-              <p className="text-sm text-amber-800">
-                {fmtMoneda(porComprobar.reduce((s, m) => s + Number(m.monto_mxn ?? 0), 0))} entregados que
-                todavía no tienen comprobante ni cambio de vuelta.
-              </p>
-            </div>
-            <ChevronRight size={18} className="text-amber-600" />
-          </div>
-        </Card>
-      )}
-
-      {/* Totales del filtro */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Ingresos confirmados</p>
-          <p className="text-2xl font-extrabold text-emerald-600">{fmtMoneda(totales.ingresos)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Egresos confirmados</p>
-          <p className="text-2xl font-extrabold text-red-600">{fmtMoneda(totales.egresos)}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Neto (MXN)</p>
-          <p className={`text-2xl font-extrabold ${totales.neto < 0 ? "text-red-600" : "text-[#1F3864]"}`}>
-            {fmtMoneda(totales.neto)}
-          </p>
-        </Card>
-      </div>
-
-      {/* Búsqueda + pestañas */}
-      <Card className="space-y-3 p-3">
-        <div className="flex flex-wrap gap-2">
-          {([
-            { v: "TODOS" as FiltroTipo, label: "Todos" },
-            { v: "INGRESO" as FiltroTipo, label: "Ingresos" },
-            { v: "EGRESO" as FiltroTipo, label: "Egresos" },
-          ]).map(t => (
-            <button
-              key={t.v}
-              onClick={() => setTipo(t.v)}
-              className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
-                tipo === t.v ? "bg-[#1F3864] text-white" : "bg-[#2E75B6]/10 text-[#1F3864] hover:bg-[#2E75B6]/20"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-          <Button
-            variant="outline"
-            className="ml-auto h-10"
-            onClick={() => setFiltrosAbiertos(v => !v)}
-          >
-            <Filter size={15} className="mr-1.5" />
-            Filtros{filtrosActivos ? " ·" : ""}
-          </Button>
-          {filtrosActivos && (
-            <Button variant="ghost" className="h-10" onClick={limpiarFiltros}>
-              <X size={15} className="mr-1" /> Limpiar
-            </Button>
-          )}
-        </div>
-
+      {/* Search */}
+      <Card className="p-3">
         <div className="relative">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input
-            className="h-12 pl-10 text-base"
-            placeholder="Buscar por folio, concepto, cliente, proveedor, referencia…"
-            value={q}
-            onChange={e => setQ(e.target.value)}
-          />
+          <Input className="pl-10 h-12 text-base" placeholder="Buscar por pago, beneficiario, descripción…" value={q} onChange={e => setQ(e.target.value)} />
         </div>
-
-        {filtrosAbiertos && (
-          <div className="grid gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div>
-              <Label className="text-xs">Estatus</Label>
-              <Select value={estatus} onValueChange={v => setEstatus(v as MovEstatus | "TODOS")}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODOS">Todos</SelectItem>
-                  {(Object.keys(ESTATUS_MOV) as MovEstatus[]).map(e => (
-                    <SelectItem key={e} value={e}>{ESTATUS_MOV[e].label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Caja / banco</Label>
-              <Select value={cuentaId} onValueChange={setCuentaId}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODAS">Todas</SelectItem>
-                  {cuentas.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.nombre} · {c.moneda}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Forma de pago</Label>
-              <Select value={metodo} onValueChange={setMetodo}>
-                <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TODOS">Todas</SelectItem>
-                  {METODOS_PAGO.map(m => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs">Desde</Label>
-              <Input type="date" className="h-10" value={desde} onChange={e => setDesde(e.target.value)} />
-            </div>
-            <div>
-              <Label className="text-xs">Hasta</Label>
-              <Input type="date" className="h-10" value={hasta} onChange={e => setHasta(e.target.value)} />
-            </div>
-            <div className="flex items-end">
-              <button
-                type="button"
-                onClick={() => setSoloPorComprobar(v => !v)}
-                className={`h-10 w-full rounded-md border px-3 text-sm font-medium transition-colors ${
-                  soloPorComprobar
-                    ? "border-amber-400 bg-amber-50 text-amber-800"
-                    : "border-slate-200 text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                Solo pendientes de comprobar
-              </button>
-            </div>
-          </div>
-        )}
       </Card>
 
-      {/* Lista */}
-      {cargando ? (
-        <div className="py-16 text-center text-muted-foreground">Cargando…</div>
-      ) : filtrados.length === 0 ? (
-        <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
-          {movs.length === 0
-            ? "Aún no hay movimientos. Registra el primer ingreso o egreso."
-            : "Ningún movimiento coincide con la búsqueda."}
+      {/* Table */}
+      {loading ? (
+        <div className="text-center py-16 text-muted-foreground">Cargando…</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground bg-card rounded-lg border">
+          {q ? "Sin resultados para esa búsqueda" : "Aún no hay registros. Crea el primero."}
         </div>
       ) : (
-        <div className="space-y-2.5">
-          {filtrados.map(m => {
-            const esIngreso = m.tipo === "INGRESO";
-            const est = ESTATUS_MOV[m.estatus];
-            const pendienteComprobar = m.requiere_comprobacion && !m.comprobado;
-            return (
-              <Card
-                key={m.id}
-                className="cursor-pointer p-4 transition-shadow hover:shadow-md"
-                onClick={() => navigate(`/finanzas/${m.id}`)}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={`mt-0.5 shrink-0 rounded-full p-2 ${
-                      esIngreso ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"
-                    }`}
-                  >
-                    {esIngreso ? <ArrowDownCircle size={20} /> : <ArrowUpCircle size={20} />}
-                  </div>
-
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-muted-foreground">{m.folio}</span>
-                      <span className="truncate text-base font-bold text-[#1F3864]">{m.concepto}</span>
-                      <Badge variant="outline" className={est.clase}>{est.label}</Badge>
-                      {m.tiene_factura && (
-                        <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-xs text-emerald-700">
-                          <FileText size={11} className="mr-1" /> Con factura
-                        </Badge>
-                      )}
-                      {pendienteComprobar && (
-                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-xs text-amber-800">
-                          <AlertTriangle size={11} className="mr-1" /> Por comprobar
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {esIngreso ? "Pagó:" : "Pagamos a:"}
-                      </span>{" "}
-                      {m.contraparte_nombre}
-                      {m.via === "INTERMEDIARIO" && m.intermediario_display && (
-                        <span className="text-amber-700">
-                          {" "}· {esIngreso ? "lo trajo" : "vía"} {m.intermediario_display}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                      <span>{fmtFecha(m.fecha_movimiento)}</span>
-                      {m.cuenta_nombre && <span>· {m.cuenta_nombre}</span>}
-                      <span>· {METODOS_PAGO.find(x => x.value === m.metodo_pago)?.label ?? m.metodo_pago}</span>
-                      {m.categoria && <span>· {m.categoria}</span>}
-                      {m.folio_remision && <span>· Remisión {m.folio_remision}</span>}
-                      {!!m.adjuntos_count && <span>· {m.adjuntos_count} doc.</span>}
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 text-right">
-                    <div className={`text-lg font-extrabold ${esIngreso ? "text-emerald-600" : "text-red-600"}`}>
-                      {esIngreso ? "+" : "−"}{fmtMoneda(Number(m.monto), m.moneda)}
-                    </div>
-                    {m.moneda !== "MXN" && (
-                      <div className="text-xs text-muted-foreground">
-                        {fmtMoneda(Number(m.monto_mxn), "MXN")}
-                      </div>
-                    )}
-                  </div>
+        <div className="space-y-3">
+          {filtered.map(p => (
+            <Card key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-start gap-3 hover:shadow-md transition-shadow">
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-bold text-[#1F3864] text-base truncate">{p.nombre_pago}</span>
+                  <Badge variant="outline" className={
+                    p.moneda === "MXN" ? "border-blue-200 bg-blue-50 text-blue-700" :
+                    p.moneda === "USD" ? "border-green-200 bg-green-50 text-green-700" :
+                    "border-slate-200 bg-slate-50 text-slate-700"
+                  }>
+                    {fmt(p.monto, p.moneda)}
+                  </Badge>
+                  {p.tiene_factura && (
+                    <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700 text-xs">
+                      <FileText size={11} className="mr-1" /> Con factura
+                    </Badge>
+                  )}
                 </div>
-              </Card>
-            );
-          })}
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Beneficiario:</span> {p.beneficiario}
+                </div>
+                {p.aprobado_por && (
+                  <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">Aprobado por:</span> {p.aprobado_por}
+                  </div>
+                )}
+                {p.descripcion && (
+                  <div className="text-sm text-muted-foreground">{p.descripcion}</div>
+                )}
+                <div className="text-xs text-muted-foreground/70">
+                  {new Date(p.created_at).toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </div>
+              </div>
+
+              <div className="flex gap-1 shrink-0 self-start">
+                {p.tiene_factura && p.factura_url && (
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => verFactura(p.factura_url!)} title="Ver factura">
+                    <ExternalLink size={15} className="text-blue-600" />
+                  </Button>
+                )}
+                {canEdit && (
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openEdit(p)} title="Editar">
+                    <Pencil size={15} />
+                  </Button>
+                )}
+                {canDelete && (
+                  <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setDeleteTarget(p)} title="Eliminar">
+                    <Trash2 size={15} className="text-red-400" />
+                  </Button>
+                )}
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 
-      {/* Alta de movimiento */}
-      <Dialog open={altaAbierta} onOpenChange={o => { if (!o) setAltaAbierta(false); }}>
-        <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus size={18} />
-              {form.tipo === "INGRESO" ? "Registrar ingreso a caja" : "Registrar egreso / pago"}
-            </DialogTitle>
-          </DialogHeader>
-          <MovimientoForm form={form} setForm={setForm} cuentas={cuentas} />
+      {/* ── Create dialog ── */}
+      <Dialog open={createOpen} onOpenChange={o => { if (!o) setCreateOpen(false); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Plus size={18} /> Nuevo registro</DialogTitle></DialogHeader>
+          <FormFields />
           <DialogFooter>
-            <Button variant="outline" className="h-11" onClick={() => setAltaAbierta(false)}>
-              Cancelar
+            <Button variant="outline" onClick={() => setCreateOpen(false)} className="h-11">Cancelar</Button>
+            <Button onClick={submitCreate} disabled={saving || uploading} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
+              {saving || uploading ? "Guardando…" : "Guardar"}
             </Button>
-            <Button
-              onClick={guardar}
-              disabled={guardando}
-              className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
-            >
-              {guardando ? "Guardando…" : "Guardar y abrir expediente"}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit dialog ── */}
+      <Dialog open={!!editTarget} onOpenChange={o => { if (!o) setEditTarget(null); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Editar registro</DialogTitle></DialogHeader>
+          {editTarget && (
+            <>
+              <FormFields />
+              {editTarget.tiene_factura && editTarget.factura_url && !facturaFile && (
+                <div className="text-sm text-muted-foreground flex items-center gap-2 -mt-1">
+                  <FileText size={14} className="text-emerald-600" />
+                  <span>Hay una factura guardada.</span>
+                  <button
+                    type="button"
+                    className="text-blue-600 underline text-xs"
+                    onClick={() => verFactura(editTarget.factura_url!)}
+                  >
+                    Ver actual
+                  </button>
+                  <span className="text-xs opacity-60">(selecciona un archivo nuevo para reemplazarla)</span>
+                </div>
+              )}
+            </>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)} className="h-11">Cancelar</Button>
+            <Button onClick={submitEdit} disabled={saving || uploading} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
+              {saving || uploading ? "Guardando…" : "Guardar"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete confirm ── */}
+      <Dialog open={!!deleteTarget} onOpenChange={o => { if (!o) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>¿Eliminar registro?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Se eliminará permanentemente <strong>{deleteTarget?.nombre_pago}</strong> — {deleteTarget ? fmt(deleteTarget.monto, deleteTarget.moneda) : ""}.
+            Esta acción no se puede deshacer.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="h-11">Cancelar</Button>
+            <Button variant="destructive" onClick={confirmDelete} className="h-11 px-6">Eliminar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

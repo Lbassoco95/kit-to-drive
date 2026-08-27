@@ -20,7 +20,7 @@ interface Parada {
 }
 
 export default function CrmRutas() {
-  const { perms, user } = useAuth();
+  const { role, user } = useAuth();
   const { t } = useLang();
   const [rutas, setRutas] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
@@ -75,9 +75,9 @@ export default function CrmRutas() {
     return paradas.filter((p: any) => p.ruta_id === rutaId).sort((a: any, b: any) => a.orden - b.orden);
   };
 
-  const canEdit = perms.puedeEditar("crm");
-  const canCreate = perms.puedeCrear("crm");
-  const canDelete = perms.puedeEliminar("crm");
+  const canEdit = role === "admin" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
+  const canCreate = role === "admin" || role === "ventas" || role === "coordinador_ventas" || role === "director_ventas" || role === "auxiliar_ventas";
+  const canDelete = role === "admin" || role === "coordinador_ventas";
 
   const save = async () => {
     const payload = {

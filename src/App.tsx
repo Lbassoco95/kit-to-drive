@@ -20,8 +20,6 @@ import Bitacora from "./pages/Bitacora";
 import Configuracion from "./pages/Configuracion";
 import ReportesTurno from "./pages/ReportesTurno";
 import Finanzas from "./pages/Finanzas";
-import FinanzasMovimiento from "./pages/FinanzasMovimiento";
-import Proveedores from "./pages/Proveedores";
 import CrmOportunidades from "./pages/crm/CrmOportunidades";
 import CrmOportunidadDetail from "./pages/crm/CrmOportunidadDetail";
 import CrmActividades from "./pages/crm/CrmActividades";
@@ -29,7 +27,6 @@ import CrmRutas from "./pages/crm/CrmRutas";
 import CrmEquipo from "./pages/crm/CrmEquipo";
 import CrmTracker from "./pages/crm/CrmTracker";
 import Inventario from "./pages/Inventario";
-import Incidencias from "./pages/Incidencias";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,27 +43,24 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/produccion" element={<ProtectedRoute modulo="produccion"><Produccion /></ProtectedRoute>} />
-              <Route path="/inventario" element={<ProtectedRoute modulo="inventario"><Inventario /></ProtectedRoute>} />
-              <Route path="/incidencias" element={<ProtectedRoute modulo="inventario"><Incidencias /></ProtectedRoute>} />
-              <Route path="/reportes-turno" element={<ProtectedRoute modulo="reportesTurno"><ReportesTurno /></ProtectedRoute>} />
-              <Route path="/remisiones" element={<ProtectedRoute modulo="remisiones"><Remisiones /></ProtectedRoute>} />
-              <Route path="/entregas" element={<ProtectedRoute modulo="entregas"><Entregas /></ProtectedRoute>} />
-              <Route path="/mis-motocarros" element={<ProtectedRoute modulo="misMotocarros"><MisMotocarros /></ProtectedRoute>} />
-              <Route path="/clientes" element={<ProtectedRoute modulo="clientes"><Clientes /></ProtectedRoute>} />
-              <Route path="/importar" element={<ProtectedRoute modulo="importar"><Importar /></ProtectedRoute>} />
-              <Route path="/usuarios" element={<ProtectedRoute modulo="usuarios"><Usuarios /></ProtectedRoute>} />
-              <Route path="/bitacora" element={<ProtectedRoute modulo="bitacora"><Bitacora /></ProtectedRoute>} />
-              <Route path="/configuracion" element={<ProtectedRoute modulo="configuracion"><Configuracion /></ProtectedRoute>} />
-              <Route path="/finanzas" element={<ProtectedRoute modulo="finanzas"><Finanzas /></ProtectedRoute>} />
-              <Route path="/finanzas/:id" element={<ProtectedRoute modulo="finanzas"><FinanzasMovimiento /></ProtectedRoute>} />
-              <Route path="/proveedores" element={<ProtectedRoute modulo="finanzas"><Proveedores /></ProtectedRoute>} />
-              <Route path="/crm/oportunidades" element={<ProtectedRoute modulo="crm"><CrmOportunidades /></ProtectedRoute>} />
-              <Route path="/crm/oportunidades/:id" element={<ProtectedRoute modulo="crm"><CrmOportunidadDetail /></ProtectedRoute>} />
-              <Route path="/crm/actividades" element={<ProtectedRoute modulo="crm"><CrmActividades /></ProtectedRoute>} />
-              <Route path="/crm/rutas" element={<ProtectedRoute modulo="crm"><CrmRutas /></ProtectedRoute>} />
-              <Route path="/crm/equipo" element={<ProtectedRoute modulo="crmEquipo"><CrmEquipo /></ProtectedRoute>} />
-              <Route path="/crm/tracker" element={<ProtectedRoute modulo="crmEquipo"><CrmTracker /></ProtectedRoute>} />
+              <Route path="/produccion" element={<ProtectedRoute roles={["admin","fabrica","logistica","coordinador"]}><Produccion /></ProtectedRoute>} />
+              <Route path="/inventario" element={<ProtectedRoute roles={["admin","fabrica","coordinador"]}><Inventario /></ProtectedRoute>} />
+              <Route path="/reportes-turno" element={<ProtectedRoute roles={["admin","fabrica","logistica","coordinador"]}><ReportesTurno /></ProtectedRoute>} />
+              <Route path="/remisiones" element={<Remisiones />} />
+              <Route path="/entregas" element={<ProtectedRoute roles={["admin","logistica","coordinador"]}><Entregas /></ProtectedRoute>} />
+              <Route path="/mis-motocarros" element={<ProtectedRoute roles={["admin","ventas","coordinador"]}><MisMotocarros /></ProtectedRoute>} />
+              <Route path="/clientes" element={<ProtectedRoute roles={["admin","fabrica","coordinador"]}><Clientes /></ProtectedRoute>} />
+              <Route path="/importar" element={<ProtectedRoute roles={["admin"]}><Importar /></ProtectedRoute>} />
+              <Route path="/usuarios" element={<ProtectedRoute roles={["admin"]}><Usuarios /></ProtectedRoute>} />
+              <Route path="/bitacora" element={<ProtectedRoute roles={["admin"]}><Bitacora /></ProtectedRoute>} />
+              <Route path="/configuracion" element={<ProtectedRoute roles={["admin"]}><Configuracion /></ProtectedRoute>} />
+              <Route path="/finanzas" element={<ProtectedRoute roles={["admin","finanzas","admin_financiero"]}><Finanzas /></ProtectedRoute>} />
+              <Route path="/crm/oportunidades" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmOportunidades /></ProtectedRoute>} />
+              <Route path="/crm/oportunidades/:id" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmOportunidadDetail /></ProtectedRoute>} />
+              <Route path="/crm/actividades" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmActividades /></ProtectedRoute>} />
+              <Route path="/crm/rutas" element={<ProtectedRoute roles={["admin","ventas","director_ventas","coordinador_ventas","auxiliar_ventas"]}><CrmRutas /></ProtectedRoute>} />
+              <Route path="/crm/equipo" element={<ProtectedRoute roles={["admin","director_ventas","coordinador_ventas"]}><CrmEquipo /></ProtectedRoute>} />
+              <Route path="/crm/tracker" element={<ProtectedRoute roles={["admin","director_ventas","coordinador_ventas"]}><CrmTracker /></ProtectedRoute>} />
               <Route path="/buscar" element={<Navigate to="/produccion" replace />} />
             </Route>
             <Route path="*" element={<NotFound />} />
