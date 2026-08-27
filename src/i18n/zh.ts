@@ -1,6 +1,7 @@
 import type { Translations } from "./es";
 
-export const zh: Translations = {
+// TODO: completar traducciones al chino; se usa aserción mientras se llena.
+export const zh = {
   lang: "zh",
   langLabel: "中文",
   otherLang: "ES",
@@ -308,6 +309,10 @@ export const zh: Translations = {
     nuevo: "新建客户",
     buscar: "按编号、名称或电话搜索…",
     codigoErp: "ERP编码",
+    codigoErpMigrado: "仅用于从ERP迁移的客户",
+    folioInterno: "内部编号",
+    folioInternoAuto: "自动生成",
+    opcional: "可选",
     nombreComercial: "商业名称",
     telefono: "电话",
     direccion: "地址",
@@ -464,4 +469,4 @@ export const zh: Translations = {
     ns_motor: "发动机序列号",
     remision: "提货单",
   },
-};
+} as Translations;

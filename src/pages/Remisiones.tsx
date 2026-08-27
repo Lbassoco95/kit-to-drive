@@ -15,7 +15,7 @@ import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
-  Plus, Upload, Wand2, FileDown, FileText, ChevronDown,
+  Plus, Upload, Wand2, Eye, Download, FileDown, FileText, ChevronDown,
   UserPlus, CalendarClock, CheckCircle2, Factory, Truck,
   DollarSign, Trash2, Package, CheckCheck, XCircle, AlertTriangle
 } from "lucide-react";
@@ -44,6 +44,9 @@ const tipoBadgeClass: Record<string, string> = {
 const tipoIcon: Record<string, string> = {
   motocarro: "🏍️", cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",
 };
+const tipoLabel: Record<string, string> = {
+  motocarro: "Motocarro", cabina: "Cabina", instalacion_cabina: "Instalación de cabina", activacion: "Activación", flete: "Flete",
+};
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface MotoItem {
@@ -70,7 +73,9 @@ const defaultMoto = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
 });
 
 // ─── Folio suggester ────────────────────────────────────────────────────────────
-// Reusa el número más bajo disponible, incluyendo folios liberados por remisiones canceladas.
+// Siempre sugiere el siguiente número consecutivo (max + 1), sin regresar a folios
+// cancelados que tengan números menores. El folio cancelado sigue siendo técnicamente
+// reutilizable (índice parcial lo permite), pero la sugerencia avanza hacia adelante.
 function suggestNextFolio(folios: string[]): string {
   if (!folios.length) return "REM-001";
   const parsed = folios
@@ -79,10 +84,8 @@ function suggestNextFolio(folios: string[]): string {
   if (!parsed.length) return "REM-001";
   const prefix = parsed[0].prefix;
   const pad = parsed[0].pad;
-  const nums = new Set(parsed.map(p => p.num));
-  let n = 1;
-  while (nums.has(n)) n++;
-  return `${prefix}${String(n).padStart(pad,"0")}`;
+  const max = Math.max(...parsed.map(p => p.num));
+  return `${prefix}${String(max + 1).padStart(pad,"0")}`;
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
@@ -131,6 +134,7 @@ export default function Remisiones() {
   const [deleteMotivo, setDeleteMotivo]       = useState("");
   const [activeTab, setActiveTab]             = useState<'activas'|'canceladas'>('activas');
   const [notifOpen, setNotifOpen]             = useState(false);
+  const [detalleRemision, setDetalleRemision] = useState<any|null>(null);
   // Alcance de la bandeja: todo el equipo comercial comparte la misma información,
   // pero cada quien puede acotar la vista a lo suyo sin perder el panorama.
   const [scope, setScope]                     = useState<'todas'|'mias'>('todas');
@@ -270,7 +274,7 @@ export default function Remisiones() {
     try {
       const { data: motos } = await supabase
         .from("motocarros")
-        .select("id,remision_id,orden_armado,modelo,color,ns_chasis,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega")
+        .select("id,remision_id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,fecha_real_entrega")
         .in("remision_id", ids);
       if (motos?.length) {
         const motosMap: Record<string,any[]> = {};
@@ -348,7 +352,8 @@ export default function Remisiones() {
 
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
-    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(activeFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
+    const allFolios = rows.map((r:any) => r.folio_remision);
+    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(allFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
     setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null); setOpen(true);
   };
   const resetForm = () => {
@@ -485,8 +490,18 @@ export default function Remisiones() {
     toast.success("✓ PDF subido"); load();
   };
   const verPdf = async (path:string) => {
-    const { data } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60);
-    if (data?.signedUrl) window.open(data.signedUrl,"_blank");
+    const { data,error } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60);
+    if (error||!data?.signedUrl) { toast.error("No se pudo abrir el PDF"); return; }
+    window.open(data.signedUrl,"_blank","noopener,noreferrer");
+  };
+  const descargarPdf = async (path:string) => {
+    const nombre=path.split("/").pop()||"remision.pdf";
+    const { data,error } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60,{download:nombre});
+    if (error||!data?.signedUrl) { toast.error("No se pudo descargar el PDF"); return; }
+    const link=document.createElement("a");
+    link.href=data.signedUrl;
+    link.download=nombre;
+    link.click();
   };
   const confirmarPago = async () => {
     if (!pagoDialog||!comprobanteFile) { toast.error(t.pago.sinComprobante); return; }
@@ -650,7 +665,7 @@ export default function Remisiones() {
                   {recentFolios.length>0&&(
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {recentFolios.map(f=>(
-                        <button key={f} type="button" onClick={()=>setForm((s:any)=>({...s,folio_remision:suggestNextFolio(activeFolios)}))}
+                        <button key={f} type="button" onClick={()=>setForm((s:any)=>({...s,folio_remision:suggestNextFolio(rows.map((r:any)=>r.folio_remision))}))}
                           className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-[#1F3864] border">{f}</button>
                       ))}
                     </div>
@@ -981,6 +996,9 @@ export default function Remisiones() {
                 <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}{r.vendedor_id===user?.id ? " (tuya)" : ""}</div>
                 <div>Fecha: {fmtDate(r.fecha_remision)}</div>
               </div>
+              <Button variant="outline" onClick={()=>setDetalleRemision(r)} className="w-full h-10 text-sm">
+                <FileText className="h-4 w-4 mr-2"/> Ver remisión completa
+              </Button>
               {perms.puedeEliminar('remisiones') && (
                 <Button
                   variant="outline"
@@ -1097,15 +1115,23 @@ export default function Remisiones() {
 
               {/* Actions */}
               <div className="flex gap-2 mt-auto pt-2 border-t flex-wrap">
+                <Button variant="outline" onClick={()=>setDetalleRemision(r)} className="basis-full h-12 text-base">
+                  <FileText className="h-5 w-5 mr-2"/> Ver remisión completa
+                </Button>
                 {canAssign&&asignadas<total&&r.estatus!=="COMPLETA"&&r.estatus!=="CANCELADA"&&(
                   <Button onClick={()=>asignarChasis(r)} className="flex-1 h-12 bg-[#2E75B6] hover:bg-[#246094] text-base min-w-[100px]">
                     <Wand2 className="h-5 w-5 mr-2"/> Asignar
                   </Button>
                 )}
                 {r.documento_url?(
-                  <Button variant="outline" onClick={()=>verPdf(r.documento_url)} className="flex-1 h-12 text-base min-w-[100px]">
-                    <FileDown className="h-5 w-5 mr-2"/> Ver PDF
-                  </Button>
+                  <>
+                    <Button variant="outline" onClick={()=>verPdf(r.documento_url)} className="flex-1 h-12 text-base min-w-[100px]">
+                      <Eye className="h-5 w-5 mr-2"/> Ver PDF
+                    </Button>
+                    <Button variant="outline" onClick={()=>descargarPdf(r.documento_url)} className="flex-1 h-12 text-base min-w-[100px]">
+                      <Download className="h-5 w-5 mr-2"/> Descargar
+                    </Button>
+                  </>
                 ):canUpload?(
                   <label className="flex-1 min-w-[100px]">
                     <input type="file" accept="application/pdf,image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f)subirPdf(r,f);}}/>
@@ -1165,6 +1191,115 @@ export default function Remisiones() {
         })}
         {activeTab==='activas'&&!activeRows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones activas</div>}
       </div>
+
+      <Dialog open={!!detalleRemision} onOpenChange={o=>{if(!o)setDetalleRemision(null);}}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex flex-wrap items-center gap-2 text-[#1F3864]">
+              Remisión {detalleRemision?.folio_remision}
+              {detalleRemision&&<EstatusBadge estatus={detalleRemision.estatus} size="md"/>}
+            </DialogTitle>
+            <DialogDescription>Información completa, configuración solicitada y unidades asignadas.</DialogDescription>
+          </DialogHeader>
+          {detalleRemision&&(
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <div className="text-xs text-muted-foreground">Fecha</div>
+                  <div className="font-semibold">{fmtDate(detalleRemision.fecha_remision)}</div>
+                </div>
+                <div className="rounded-lg border bg-slate-50 p-3 sm:col-span-2">
+                  <div className="text-xs text-muted-foreground">Cliente</div>
+                  <div className="font-semibold break-words">
+                    {detalleRemision.clientes?.codigo_erp||detalleRemision.clientes?.folio_interno||"—"}
+                    {detalleRemision.clientes?.nombre_comercial?` · ${detalleRemision.clientes.nombre_comercial}`:""}
+                  </div>
+                </div>
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <div className="text-xs text-muted-foreground">Vendedor</div>
+                  <div className="font-semibold break-words">{detalleRemision.nombre_vendedor||detalleRemision.profiles?.nombre_completo||"—"}</div>
+                </div>
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <div className="text-xs text-muted-foreground">Tipo de pago</div>
+                  <div className="font-semibold">{detalleRemision.tipo_pago==="contra_entrega"?"Contra entrega":"Anticipado"}</div>
+                </div>
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <div className="text-xs text-muted-foreground">Estado del pago</div>
+                  <div className="font-semibold">{detalleRemision.pagado===false?"Pendiente":"Pagado"}</div>
+                </div>
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <div className="text-xs text-muted-foreground">Unidades solicitadas</div>
+                  <div className="font-semibold">{detalleRemision.total_unidades_solicitadas||detalleRemision.motocarros?.length||1}</div>
+                </div>
+                <div className="rounded-lg border bg-slate-50 p-3">
+                  <div className="text-xs text-muted-foreground">Unidades asignadas</div>
+                  <div className="font-semibold">{detalleRemision.motocarros?.length||0}</div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-base mb-2">Configuración del pedido</h3>
+                {detalleRemision.remision_items?.length?(
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {detalleRemision.remision_items.map((item:any)=>(
+                      <div key={item.id} className="rounded-lg border p-3 flex items-start gap-2">
+                        <span>{tipoIcon[item.tipo_servicio]||"•"}</span>
+                        <div className="min-w-0">
+                          <div className="font-semibold">{tipoLabel[item.tipo_servicio]||item.tipo_servicio}</div>
+                          <div className="text-sm text-muted-foreground break-words">
+                            {[item.modelo,item.color,item.cantidad?`Cantidad: ${item.cantidad}`:null,item.con_caja?"Con caja":null].filter(Boolean).join(" · ")}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Sin configuración capturada.</div>}
+              </div>
+
+              <div>
+                <h3 className="text-base mb-2">Unidades asignadas</h3>
+                {detalleRemision.motocarros?.length?(
+                  <div className="space-y-2">
+                    {detalleRemision.motocarros.map((m:any)=>(
+                      <div key={m.id} className="rounded-lg border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
+                        <div><span className="text-muted-foreground">Orden:</span> <strong>#{m.orden_armado}</strong></div>
+                        <div><span className="text-muted-foreground">Modelo/color:</span> <strong>{m.modelo||"—"} {m.color||""}</strong></div>
+                        <div className="break-all"><span className="text-muted-foreground">NS chasis:</span> <strong>{m.ns_chasis||m.chasis_asignado||"—"}</strong></div>
+                        <div className="break-all"><span className="text-muted-foreground">NS motor:</span> <strong>{m.ns_motor||"—"}</strong></div>
+                        <div><span className="text-muted-foreground">Estado:</span> <strong>{m.estatus_entrega==="ENTREGADA"?"ENTREGADA":effEstatusArmado(m)}</strong></div>
+                        <div><span className="text-muted-foreground">Armado estimado:</span> <strong>{fmtDate(m.fecha_estimada_armado)}</strong></div>
+                        <div><span className="text-muted-foreground">Armado real:</span> <strong>{fmtDate(m.fecha_real_armado)}</strong></div>
+                        <div><span className="text-muted-foreground">Entrega:</span> <strong>{fmtDate(m.fecha_real_entrega||m.fecha_estimada_entrega)}</strong></div>
+                      </div>
+                    ))}
+                  </div>
+                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Todavía no hay unidades asignadas.</div>}
+              </div>
+
+              {detalleRemision.notas&&(
+                <div>
+                  <h3 className="text-base mb-2">Notas</h3>
+                  <div className="rounded-lg border bg-blue-50/50 p-3 text-sm whitespace-pre-wrap break-words">{detalleRemision.notas}</div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap gap-2 border-t pt-4">
+                {detalleRemision.documento_url?(
+                  <>
+                    <Button onClick={()=>verPdf(detalleRemision.documento_url)} className="flex-1 min-w-40 bg-[#1F3864] hover:bg-[#162a4d]">
+                      <Eye className="h-4 w-4 mr-2"/> Visualizar PDF
+                    </Button>
+                    <Button variant="outline" onClick={()=>descargarPdf(detalleRemision.documento_url)} className="flex-1 min-w-40">
+                      <Download className="h-4 w-4 mr-2"/> Descargar PDF
+                    </Button>
+                  </>
+                ):<div className="flex-1 rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">Esta remisión no tiene PDF adjunto.</div>}
+                <Button variant="outline" onClick={()=>setDetalleRemision(null)}>Cerrar</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Cierre / entregar remisión */}
       <AlertDialog open={!!cierreConfirm} onOpenChange={o=>{ if(!o) setCierreConfirm(null); }}>
