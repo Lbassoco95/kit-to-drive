@@ -23,7 +23,7 @@ export default function Entregas() {
   const load = async () => {
     const { data } = await supabase
       .from("motocarros")
-      .select("*, remisiones(folio_remision, tipo_pago, pagado, clientes(codigo_erp), profiles:vendedor_id(nombre_completo))")
+      .select("*, remisiones(folio_remision, tipo_pago, pagado, clientes(codigo_erp,folio_interno), profiles:vendedor_id(nombre_completo))")
       .in("estatus_armado", ["ARMADO", "LISTO"])
       .not("chasis_asignado", "is", null)
       .order("orden_armado");
@@ -97,7 +97,7 @@ export default function Entregas() {
                   <div className="font-mono text-sm">{r.ns_motor || "—"}</div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">👤 {r.remisiones?.clientes?.codigo_erp || "—"}</span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">👤 {r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "—"}</span>
                   <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">📄 {r.remisiones?.folio_remision || "—"}</span>
                   {pagoPendiente && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">

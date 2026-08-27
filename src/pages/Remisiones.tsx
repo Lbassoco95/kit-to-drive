@@ -108,7 +108,7 @@ export default function Remisiones() {
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
   const [activeFolios, setActiveFolios] = useState<string[]>([]);
   const [creandoCliente, setCreandoCliente] = useState(false);
-  const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp:"", nombre_comercial:"", telefono:"" });
+  const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp:"", folio_interno:"", nombre_comercial:"", telefono:"" });
   // Disponibilidad por (modelo comercial, color). Llave: claveStock().
   const [colorInventory, setColorInventory] = useState<Map<string, StockColor>>(new Map());
 
@@ -140,7 +140,7 @@ export default function Remisiones() {
 
   // ── Loaders ────────────────────────────────────────────────────────────────
   const loadClientes = async () => {
-    const { data } = await supabase.from("clientes").select("id,codigo_erp,nombre_comercial").order("codigo_erp");
+    const { data } = await supabase.from("clientes").select("id,codigo_erp,folio_interno,nombre_comercial").order("folio_interno, codigo_erp");
     setClientes(data ?? []);
   };
   const loadVendedores = async () => {
@@ -216,7 +216,7 @@ export default function Remisiones() {
     // ── 1. Query mínimo garantizado (solo tablas/columnas originales) ──────────
     const { data: base } = await supabase
       .from("remisiones")
-      .select("id,folio_remision,cliente_id,vendedor_id,fecha_remision,notas,estatus,created_at, clientes(codigo_erp,nombre_comercial), profiles:vendedor_id(nombre_completo)")
+      .select("id,folio_remision,cliente_id,vendedor_id,fecha_remision,notas,estatus,created_at, clientes(codigo_erp,folio_interno,nombre_comercial), profiles:vendedor_id(nombre_completo)")
       .order("created_at", { ascending:false });
 
     // Arrancar con lo que tenemos — siempre muestra algo
@@ -358,12 +358,32 @@ export default function Remisiones() {
 
   // ── Nuevo cliente ───────────────────────────────────────────────────────────
   const guardarNuevoCliente = async () => {
-    if (!nuevoCliente.codigo_erp.trim()) return toast.error("El código ERP es obligatorio");
-    const { data, error } = await supabase.from("clientes").insert(nuevoCliente).select("id,codigo_erp,nombre_comercial").single();
+    if (!nuevoCliente.nombre_comercial.trim() && !nuevoCliente.codigo_erp.trim()) return toast.error("El nombre comercial o el código ERP es obligatorio");
+    if (nuevoCliente.codigo_erp.trim()) {
+      const { count } = await supabase.from("clientes").select("*", { count: "exact", head: true }).eq("codigo_erp", nuevoCliente.codigo_erp.trim());
+      if (count && count > 0) return toast.error(`El código ERP ${nuevoCliente.codigo_erp.trim()} ya existe`);
+    }
+
+    const payload: any = {
+      nombre_comercial: nuevoCliente.nombre_comercial.trim() || null,
+      telefono: nuevoCliente.telefono.trim() || null,
+      codigo_erp: nuevoCliente.codigo_erp.trim() || null,
+    };
+
+    const { data, error } = await supabase.from("clientes").insert(payload).select("id,codigo_erp,folio_interno,nombre_comercial").single();
     if (error) return toast.error(error.message);
+
+    await supabase.from("clientes_bitacora").insert({
+      cliente_id: data.id,
+      usuario_id: user?.id,
+      tipo_cambio: "alta",
+      motivo: "Alta de cliente desde remisión",
+      datos_nuevos: data,
+    });
+
     toast.success("✓ Cliente creado"); await loadClientes();
     setForm((f:any)=>({...f, cliente_id: data.id}));
-    setNuevoCliente({codigo_erp:"",nombre_comercial:"",telefono:""}); setCreandoCliente(false);
+    setNuevoCliente({codigo_erp:"",folio_interno:"",nombre_comercial:"",telefono:""}); setCreandoCliente(false);
   };
 
   // ── Create remisión ─────────────────────────────────────────────────────────
@@ -647,12 +667,15 @@ export default function Remisiones() {
                   {!creandoCliente ? (
                     <Select value={form.cliente_id} onValueChange={v=>setForm({...form,cliente_id:v})}>
                       <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente"/></SelectTrigger>
-                      <SelectContent>{clientes.map(c=><SelectItem key={c.id} value={c.id}>{c.codigo_erp}{c.nombre_comercial?` — ${c.nombre_comercial}`:""}</SelectItem>)}</SelectContent>
+                      <SelectContent>{clientes.map(c=>{
+                        const label = c.codigo_erp || c.folio_interno || "—";
+                        return <SelectItem key={c.id} value={c.id}>{label}{c.nombre_comercial?` — ${c.nombre_comercial}`:""}</SelectItem>;
+                      })}</SelectContent>
                     </Select>
                   ):(
                     <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
-                      <Input placeholder="Código ERP *" value={nuevoCliente.codigo_erp} onChange={e=>setNuevoCliente({...nuevoCliente,codigo_erp:e.target.value})} className="h-11"/>
-                      <Input placeholder="Nombre comercial" value={nuevoCliente.nombre_comercial} onChange={e=>setNuevoCliente({...nuevoCliente,nombre_comercial:e.target.value})} className="h-11"/>
+                      <Input placeholder="Nombre comercial *" value={nuevoCliente.nombre_comercial} onChange={e=>setNuevoCliente({...nuevoCliente,nombre_comercial:e.target.value})} className="h-11"/>
+                      <Input placeholder="Código ERP (solo si es cliente migrado)" value={nuevoCliente.codigo_erp} onChange={e=>setNuevoCliente({...nuevoCliente,codigo_erp:e.target.value})} className="h-11"/>
                       <Input placeholder="Teléfono" value={nuevoCliente.telefono} onChange={e=>setNuevoCliente({...nuevoCliente,telefono:e.target.value})} className="h-11"/>
                       <Button type="button" onClick={guardarNuevoCliente} className="w-full h-11 bg-[#2E75B6] hover:bg-[#246094]">Guardar cliente</Button>
                     </div>
@@ -953,7 +976,7 @@ export default function Remisiones() {
                 <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">CANCELADA</span>
               </div>
               <div className="text-sm text-muted-foreground">
-                <div>👤 {r.clientes?.codigo_erp || "—"}{r.clientes?.nombre_comercial ? ` — ${r.clientes.nombre_comercial}` : ""}</div>
+                <div>👤 {r.clientes?.codigo_erp || r.clientes?.folio_interno || "—"}{r.clientes?.nombre_comercial ? ` — ${r.clientes.nombre_comercial}` : ""}</div>
                 <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}{r.vendedor_id===user?.id ? " (tuya)" : ""}</div>
                 <div>Fecha: {fmtDate(r.fecha_remision)}</div>
               </div>
@@ -1006,7 +1029,7 @@ export default function Remisiones() {
                   <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#1F3864] text-white text-[10px] font-bold uppercase tracking-wide">Tuya</span>
                 )}
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
-                  👤 {r.clientes?.codigo_erp||"—"}
+                  👤 {r.clientes?.codigo_erp || r.clientes?.folio_interno || "—"}
                 </span>
                 {r.tipo_pago==="contra_entrega"&&!r.pagado ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">{t.pago.pendiente}</span>

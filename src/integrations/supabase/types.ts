@@ -146,9 +146,10 @@ export type Database = {
       clientes: {
         Row: {
           activo: boolean
-          codigo_erp: string
+          codigo_erp: string | null
           created_at: string
           direccion: string | null
+          folio_interno: string | null
           id: string
           nombre_comercial: string | null
           telefono: string | null
@@ -156,9 +157,10 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
-          codigo_erp: string
+          codigo_erp?: string | null
           created_at?: string
           direccion?: string | null
+          folio_interno?: string | null
           id?: string
           nombre_comercial?: string | null
           telefono?: string | null
@@ -166,9 +168,10 @@ export type Database = {
         }
         Update: {
           activo?: boolean
-          codigo_erp?: string
+          codigo_erp?: string | null
           created_at?: string
           direccion?: string | null
+          folio_interno?: string | null
           id?: string
           nombre_comercial?: string | null
           telefono?: string | null

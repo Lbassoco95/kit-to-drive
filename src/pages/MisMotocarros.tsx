@@ -20,7 +20,7 @@ export default function MisMotocarros() {
     (async () => {
       const { data } = await supabase
         .from("motocarros")
-        .select("*, remisiones!inner(folio_remision, tipo_pago, pagado, clientes(id, codigo_erp, nombre_comercial))")
+        .select("*, remisiones!inner(folio_remision, tipo_pago, pagado, clientes(id, codigo_erp, folio_interno, nombre_comercial))")
         .order("orden_armado");
       setRows((data ?? []).map((r: any) => ({ ...r, color: normColor(r.color) })));
     })();
@@ -31,7 +31,7 @@ export default function MisMotocarros() {
     rows.forEach(r => {
       const c = r.remisiones?.clientes;
       const key = c?.id || "sin";
-      if (!map.has(key)) map.set(key, { cliente: c || { codigo_erp: t.misMotocarros.sinCliente }, items: [] });
+      if (!map.has(key)) map.set(key, { cliente: c || { folio_interno: t.misMotocarros.sinCliente }, items: [] });
       map.get(key)!.items.push(r);
     });
     return Array.from(map.values());
@@ -53,8 +53,9 @@ export default function MisMotocarros() {
           const entregados = items.filter(i => i.estatus_entrega === "ENTREGADA").length;
           const armados = items.filter(i => ["ARMADO","LISTO"].includes(i.estatus_armado)).length;
           const pct = total ? Math.round((armados / total) * 100) : 0;
-          const open = !!openClient[cliente.id || cliente.codigo_erp];
-          const key = cliente.id || cliente.codigo_erp;
+          const displayCliente = cliente.codigo_erp || cliente.folio_interno || t.misMotocarros.sinCliente;
+          const open = !!openClient[cliente.id || displayCliente];
+          const key = cliente.id || displayCliente;
 
           return (
             <Card key={key} className="overflow-hidden">
@@ -63,7 +64,7 @@ export default function MisMotocarros() {
                   <div className="p-5 flex items-center gap-4 hover:bg-slate-50">
                     <div className="p-3 rounded-lg bg-[#DBEAFE]"><Users size={32} color="#1F3864"/></div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-2xl font-bold text-[#1F3864]">{cliente.codigo_erp}</div>
+                      <div className="text-2xl font-bold text-[#1F3864]">{displayCliente}</div>
                       {cliente.nombre_comercial && <div className="text-sm text-muted-foreground truncate">{cliente.nombre_comercial}</div>}
                     </div>
                     <div className="hidden md:flex flex-col items-end gap-1">

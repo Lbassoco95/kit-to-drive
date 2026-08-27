@@ -189,7 +189,7 @@ export default function Produccion() {
     // ── 1. Query base garantizado (sin columnas nuevas en joins) ──────────────
     const { data: base } = await supabase
       .from("motocarros")
-      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
+      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp,folio_interno))")
       .order("orden_armado", { ascending: true });
 
     // Producción sólo lista línea "motocarro" — mototaxis y otras líneas
@@ -307,7 +307,7 @@ export default function Produccion() {
     if (q) {
       const qLower = q.toLowerCase();
       const blob = [r.orden_armado, r.chasis_asignado, r.ns_chasis, r.ns_motor,
-        r.remisiones?.folio_remision, r.remisiones?.clientes?.codigo_erp,
+        r.remisiones?.folio_remision, r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno,
         r.remisiones?.profiles?.nombre_completo].filter(Boolean).join(" ").toLowerCase();
       if (!blob.includes(qLower)) return false;
     }
@@ -316,7 +316,7 @@ export default function Produccion() {
 
   const exportCsv = () => {
     const header = ["Orden","Modelo","Color","Fecha estimada de armado","Estatus","Fecha real de armado","Número de serie del chasis","Número de serie del motor","Chasis","Vendedor","Cliente","Remisión","Fecha estimada de entrega","Estatus entrega"];
-    const rows2 = filtered.map(r => [r.orden_armado, r.modelo, r.color, r.fecha_estimada_armado, r._eff, r.fecha_real_armado || "", r.ns_chasis||"", r.ns_motor||"", r.chasis_asignado||"", r.remisiones?.profiles?.nombre_completo||"", r.remisiones?.clientes?.codigo_erp||"", r.remisiones?.folio_remision||"", r.fecha_estimada_entrega||"", r.estatus_entrega]);
+    const rows2 = filtered.map(r => [r.orden_armado, r.modelo, r.color, r.fecha_estimada_armado, r._eff, r.fecha_real_armado || "", r.ns_chasis||"", r.ns_motor||"", r.chasis_asignado||"", r.remisiones?.profiles?.nombre_completo||"", r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "", r.remisiones?.folio_remision||"", r.fecha_estimada_entrega||"", r.estatus_entrega]);
     const csv = [header, ...rows2].map(r => r.map(c => `"${String(c ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     if (typeof URL === "undefined" || !URL.createObjectURL) return;
@@ -342,7 +342,7 @@ export default function Produccion() {
       toast.error(`Falta capturar ${faltan} de la unidad #${moto.orden_armado} antes de cerrar el proceso`);
       setConfirm(null);
       setEditing(moto);
-      setEditForm({ ns_chasis: moto.ns_chasis || "", ns_motor: moto.ns_motor || "", chasis_asignado: moto.chasis_asignado || "", observaciones_paro: moto.observaciones_paro || "", fecha_estimada_armado: moto.fecha_estimada_armado || "", orden_armado: moto.orden_armado });
+      setEditForm({ ns_chasis: moto.ns_chasis || "", ns_motor: moto.ns_motor || "", observaciones_paro: moto.observaciones_paro || "", fecha_estimada_armado: moto.fecha_estimada_armado || "", orden_armado: moto.orden_armado });
       return;
     }
 
@@ -483,7 +483,7 @@ export default function Produccion() {
             catalogo={catalogo}
             incidencias={incidencias.get(r.id) ?? []}
             historialCount={historial.get(r.id) ?? 0}
-            onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", chasis_asignado: r.chasis_asignado || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "", orden_armado: r.orden_armado }); }}
+            onEdit={() => { setEditing(r); setEditForm({ ns_chasis: r.ns_chasis || "", ns_motor: r.ns_motor || "", observaciones_paro: r.observaciones_paro || "", fecha_estimada_armado: r.fecha_estimada_armado || "", orden_armado: r.orden_armado }); }}
             onAction={(action) => setConfirm({ moto: r, action })}
             onComentarios={() => setComentariosMoto({ id: r.id, orden: r.orden_armado })}
             onLiberar={() => setLiberar({ id: r.id, orden: r.orden_armado })}
@@ -513,7 +513,7 @@ export default function Produccion() {
                     <td className="font-mono text-[11px]">{r.ns_motor || "—"}</td>
                     <td>{r.chasis_asignado || "—"}</td>
                     <td>{r.remisiones?.profiles?.nombre_completo || "—"}</td>
-                    <td>{r.remisiones?.clientes?.codigo_erp || "—"}</td>
+                    <td>{r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "—"}</td>
                     <td>{r.remisiones?.folio_remision || "—"}</td>
                     <td>{fmtDate(r.fecha_estimada_entrega)}</td>
                     <td><span className={`px-2 py-0.5 rounded text-xs ${ESTATUS_ENTREGA_COLOR[r.estatus_entrega]}`}>{r.estatus_entrega}</span></td>
@@ -545,7 +545,6 @@ export default function Produccion() {
                 Sin los dos seriales la unidad no puede marcarse armada, entregarse ni asignarse a una remisión.
               </div>
             )}
-            <div><Label>{t.produccion.chasisAsignado}</Label><Input value={editForm.chasis_asignado} onChange={e => setEditForm({ ...editForm, chasis_asignado: e.target.value })} /></div>
             <div><Label>{t.produccion.fechaEstimadaArmado}</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
             <div><Label>{t.produccion.observaciones}</Label><Textarea value={editForm.observaciones_paro} onChange={e => setEditForm({ ...editForm, observaciones_paro: e.target.value })} /></div>
             {(editing?._eff === "PENDIENTE" || editing?._eff === "EN_PROCESO") && (
@@ -737,9 +736,9 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         </div>
 
         <div className="flex flex-wrap gap-1.5 text-xs">
-          {r.remisiones?.clientes?.codigo_erp && (
+          {(r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno) && (
             <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
-              👤 {r.remisiones.clientes.codigo_erp}
+              👤 {r.remisiones.clientes.codigo_erp || r.remisiones.clientes.folio_interno}
             </span>
           )}
           {r.remisiones?.profiles?.nombre_completo && (

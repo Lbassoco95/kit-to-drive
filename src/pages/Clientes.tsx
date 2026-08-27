@@ -25,8 +25,8 @@ export default function Clientes() {
   const [selectedCliente, setSelectedCliente] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState("datos");
   const [q, setQ] = useState("");
-  const [form, setForm] = useState<any>({ 
-    codigo_erp: "", nombre_comercial: "", telefono: "", direccion: "", activo: true,
+  const [form, setForm] = useState<any>({
+    codigo_erp: "", folio_interno: "", nombre_comercial: "", telefono: "", direccion: "", activo: true,
     razon_social: "", rfc: "", email: "", email_cobranza: "",
     nombre_contacto: "", cargo_contacto: "", telefono_contacto: "",
     calle: "", num_exterior: "", num_interior: "", colonia: "",
@@ -51,7 +51,7 @@ export default function Clientes() {
 
   const load = async () => {
     const [{ data: cs }, { data: ms }] = await Promise.all([
-      supabase.from("clientes").select("*").order("codigo_erp"),
+      supabase.from("clientes").select("*").order("folio_interno, codigo_erp"),
       supabase.from("motocarros").select("id, estatus_entrega, remisiones!inner(cliente_id)"),
     ]);
     setRows(cs ?? []); setMotos(ms ?? []);
@@ -98,7 +98,7 @@ export default function Clientes() {
     
     if (!q) return base;
     const qLower = q.toLowerCase();
-    return base.filter(c => [c.codigo_erp, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(qLower));
+    return base.filter(c => [c.codigo_erp, c.folio_interno, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(qLower));
   }, [rows, q, listTab]);
 
   const canEdit = perms.puedeEditar("clientes");
@@ -122,14 +122,17 @@ export default function Clientes() {
     return `CLI-${year}-${seq}`;
   };
 
+  const clienteCodigoDisplay = (c: any) => c.folio_interno || c.codigo_erp || "—";
+  const clienteEsMigrado = (c: any) => !!c.codigo_erp;
+
   const save = async () => {
     // Show motive dialog instead of direct save
     setSaveMotivoDialog(true);
   };
 
   const resetForm = () => {
-    setForm({ 
-      codigo_erp: "", nombre_comercial: "", telefono: "", direccion: "", activo: true,
+    setForm({
+      codigo_erp: "", folio_interno: "", nombre_comercial: "", telefono: "", direccion: "", activo: true,
       razon_social: "", rfc: "", email: "", email_cobranza: "",
       nombre_contacto: "", cargo_contacto: "", telefono_contacto: "",
       calle: "", num_exterior: "", num_interior: "", colonia: "",
@@ -335,7 +338,9 @@ export default function Clientes() {
     const payload = { ...form };
     if (payload.limite_credito) payload.limite_credito = parseFloat(payload.limite_credito);
     else delete payload.limite_credito;
-    
+    if (!payload.codigo_erp?.trim()) payload.codigo_erp = null;
+    if (!payload.folio_interno?.trim()) payload.folio_interno = null;
+
     if (editing) {
       // Get current data for audit
       const { data: currentData } = await supabase
@@ -362,8 +367,17 @@ export default function Clientes() {
       toast.success(t.clientes.actualizado);
       setEditing(null);
     } else {
-      const { error } = await supabase.from("clientes").insert(payload);
+      const { data: created, error } = await supabase.from("clientes").insert(payload).select("*").single();
       if (error) return toast.error(error.message);
+
+      await supabase.from("clientes_bitacora").insert({
+        cliente_id: created.id,
+        usuario_id: user?.id,
+        tipo_cambio: "alta",
+        motivo: motivoFinal,
+        datos_nuevos: created,
+      });
+
       toast.success(t.clientes.creado);
       setCreating(false);
     }
@@ -380,7 +394,7 @@ export default function Clientes() {
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div><h1>{t.clientes.title}</h1><p className="text-base text-muted-foreground mt-1">{t.clientes.subtitle(filtered.length, rows.length)}</p></div>
         {canCreate && (
-          <Button onClick={() => { resetForm(); setForm(prev => ({ ...prev, codigo_erp: generateFolioSugerido() })); setCreating(true); }}
+          <Button onClick={() => { resetForm(); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> {t.clientes.nuevo}
           </Button>
@@ -412,7 +426,8 @@ export default function Clientes() {
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <Badge className={`bg-[#1F3864] ${isArchived ? "bg-slate-500" : ""}`}>{c.codigo_erp}</Badge>
+                    <Badge className={`bg-[#1F3864] ${isArchived ? "bg-slate-500" : ""}`}>{clienteCodigoDisplay(c)}</Badge>
+                    {clienteEsMigrado(c) && <Badge variant="outline" className="text-xs">ERP</Badge>}
                     {isArchived && <Badge variant="outline" className="text-xs">Archivado</Badge>}
                   </div>
                   <div className="text-lg font-bold text-[#1F3864] truncate">{c.nombre_comercial || <em>{t.clientes.sinNombre}</em>}</div>
@@ -481,8 +496,14 @@ export default function Clientes() {
             </TabsList>
             <TabsContent value="datos" className="space-y-3 mt-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>{t.clientes.codigoErp}</Label><Input value={form.codigo_erp} onChange={e => setForm({ ...form, codigo_erp: e.target.value })} placeholder={t.clientes.folioSugerido} /></div>
-                <div><Label>{t.clientes.rfc}</Label><Input value={form.rfc || ""} onChange={e => setForm({ ...form, rfc: e.target.value.toUpperCase() })} maxLength={13} /></div>
+                <div>
+                  <Label>{t.clientes.codigoErp} <span className="text-muted-foreground font-normal">({t.clientes.opcional})</span></Label>
+                  <Input value={form.codigo_erp} onChange={e => setForm({ ...form, codigo_erp: e.target.value })} placeholder={t.clientes.codigoErpMigrado} />
+                </div>
+                <div>
+                  <Label>{t.clientes.folioInterno}</Label>
+                  <Input value={form.folio_interno || ""} disabled placeholder={editing ? "" : t.clientes.folioInternoAuto} />
+                </div>
               </div>
               <div><Label>{t.clientes.nombreComercial}</Label><Input value={form.nombre_comercial || ""} onChange={e => setForm({ ...form, nombre_comercial: e.target.value })} /></div>
               <div><Label>{t.clientes.razonSocial}</Label><Input value={form.razon_social || ""} onChange={e => setForm({ ...form, razon_social: e.target.value })} /></div>
@@ -596,7 +617,7 @@ export default function Clientes() {
       <Dialog open={expedienteOpen} onOpenChange={(o) => { if (!o) { setExpedienteOpen(false); setSelectedCliente(null); } }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t.clientes.expediente} — {selectedCliente?.codigo_erp}</DialogTitle>
+            <DialogTitle>{t.clientes.expediente} — {clienteCodigoDisplay(selectedCliente)}</DialogTitle>
           </DialogHeader>
           {selectedCliente && (
             <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === "comentarios") loadComments(selectedCliente.id); if (v === "bitacora") loadBitacora(selectedCliente.id); }} className="w-full">
@@ -610,9 +631,10 @@ export default function Clientes() {
               </TabsList>
               <TabsContent value="datos" className="space-y-3 mt-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>{t.clientes.codigoErp}</Label><Input value={selectedCliente.codigo_erp} disabled /></div>
-                  <div><Label>{t.clientes.rfc}</Label><Input value={selectedCliente.rfc || ""} disabled /></div>
+                  <div><Label>{t.clientes.folioInterno}</Label><Input value={selectedCliente.folio_interno || "—"} disabled /></div>
+                  <div><Label>{t.clientes.codigoErp}</Label><Input value={selectedCliente.codigo_erp || "—"} disabled /></div>
                 </div>
+                <div><Label>{t.clientes.rfc}</Label><Input value={selectedCliente.rfc || ""} disabled /></div>
                 <div><Label>{t.clientes.nombreComercial}</Label><Input value={selectedCliente.nombre_comercial || ""} disabled /></div>
                 <div><Label>{t.clientes.razonSocial}</Label><Input value={selectedCliente.razon_social || ""} disabled /></div>
                 <div className="grid grid-cols-2 gap-3">
