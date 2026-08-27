@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Inbox, RefreshCw, FileDown, Package, Settings2 } from "lucide-react";
-import { fmtDate, COLORES } from "@/lib/dazon";
+import { Inbox, RefreshCw, FileDown, Package, Settings2, Search } from "lucide-react";
+import { fmtDate, COLORES, ESTATUS_ARMADO_COLOR, displayFabrica } from "@/lib/dazon";
+import { CatalogoModelos } from "@/lib/dazon";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const MODELOS = ["200cc 2026", "300cc 2026"];
 
@@ -53,13 +55,62 @@ const defaultConfigForm = () => ({
   con_flete: false,
 });
 
+function MotoRow({
+  m,
+  catalogo,
+  onAction,
+  busy,
+  action,
+}: {
+  m: any;
+  catalogo: CatalogoModelos;
+  onAction: () => void;
+  busy: boolean;
+  action: "asignar" | "desasignar";
+}) {
+  return (
+    <div className="border rounded-lg p-3 bg-white text-sm">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ESTATUS_ARMADO_COLOR[m.estatus_armado] ?? "bg-slate-100 text-slate-600"}`}>
+          {m.estatus_armado || "PENDIENTE"}
+        </span>
+      </div>
+      <div className="text-muted-foreground space-y-0.5 text-xs">
+        <div>Modelo: <strong className="text-foreground text-sm">{displayFabrica(m.modelo, catalogo)}</strong></div>
+        <div>Color: <strong className="text-foreground text-sm">{m.color || "—"}</strong></div>
+        <div className="font-mono">Chasis: {m.ns_chasis || m.chasis_asignado || "—"}</div>
+        <div className="font-mono">Motor: {m.ns_motor || "—"}</div>
+      </div>
+      <Button
+        size="sm"
+        variant={action === "asignar" ? "default" : "outline"}
+        onClick={onAction}
+        disabled={busy}
+        className={`w-full mt-2 h-9 text-xs ${action === "asignar" ? "bg-[#1F3864] hover:bg-[#162a4d]" : ""}`}
+      >
+        {busy ? "Procesando…" : action === "asignar" ? "Asignar a remisión" : "Desasignar"}
+      </Button>
+    </div>
+  );
+}
+
 export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
+  const { role } = useAuth();
+  const canAssign = role === "admin" || role === "fabrica";
+
   const [items, setItems] = useState<RemisionCard[]>([]);
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
   const [configDialog, setConfigDialog] = useState<RemisionCard | null>(null);
   const [configForm, setConfigForm] = useState(defaultConfigForm());
   const [savingConfig, setSavingConfig] = useState(false);
+  const [assignDialog, setAssignDialog] = useState<RemisionCard | null>(null);
+  const [availableMotos, setAvailableMotos] = useState<any[]>([]);
+  const [assignedMotos, setAssignedMotos] = useState<any[]>([]);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignBusy, setAssignBusy] = useState<string | null>(null);
+  const [assignQ, setAssignQ] = useState("");
+  const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
 
   const load = async () => {
     setLoading(true);
@@ -132,14 +183,64 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
 
   useEffect(() => { load(); }, []);
 
-  const asignar = async (id: string, faltan: number) => {
-    setBusy(id);
-    const { data, error } = await supabase.rpc("reintentar_asignar_remision", { _remision_id: id });
-    setBusy(null);
+  const abrirAsignacion = async (rem: RemisionCard) => {
+    setAssignDialog(rem);
+    setAssignLoading(true);
+    setAssignBusy(null);
+    setAssignQ("");
+
+    try {
+      const { data: catData } = await supabase.from("modelos_producto").select("modelo, linea, nombre_comercial");
+      setCatalogo(new Map((catData || []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }])));
+    } catch (_) {}
+
+    const [assignedRes, availableRes] = await Promise.all([
+      supabase
+        .from("motocarros")
+        .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,estatus_entrega,fecha_real_armado,remision_id")
+        .eq("remision_id", rem.id)
+        .order("orden_armado", { ascending: true }),
+      supabase
+        .from("motocarros")
+        .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,estatus_entrega,fecha_real_armado,remision_id")
+        .is("remision_id", null)
+        .in("estatus_armado", ["PENDIENTE", "EN_PROCESO", "ARMADO", "LISTO"])
+        .order("orden_armado", { ascending: true }),
+    ]);
+
+    if (assignedRes.error) toast.error(assignedRes.error.message);
+    if (availableRes.error) toast.error(availableRes.error.message);
+
+    setAssignedMotos(assignedRes.data || []);
+    setAvailableMotos(availableRes.data || []);
+    setAssignLoading(false);
+  };
+
+  const asignarMoto = async (motoId: string) => {
+    if (!assignDialog) return;
+    setAssignBusy(motoId);
+    const { error } = await supabase.rpc("asignar_motocarro_a_remision", {
+      _motocarro_id: motoId,
+      _remision_id: assignDialog.id,
+    });
+    setAssignBusy(null);
     if (error) { toast.error(error.message); return; }
-    if ((data ?? 0) > 0) toast.success(`✓ ${data} motocarro(s) asignado(s)`);
-    else toast.info("No hay motocarros disponibles con esas características");
-    await load(); onChange?.();
+    toast.success("✓ Motocarro asignado");
+    await abrirAsignacion(assignDialog);
+    await load();
+    onChange?.();
+  };
+
+  const desasignarMoto = async (motoId: string) => {
+    if (!assignDialog) return;
+    setAssignBusy(motoId);
+    const { error } = await supabase.rpc("desasignar_motocarro_de_remision", { _motocarro_id: motoId });
+    setAssignBusy(null);
+    if (error) { toast.error(error.message); return; }
+    toast.success("✓ Motocarro liberado de la remisión");
+    await abrirAsignacion(assignDialog);
+    await load();
+    onChange?.();
   };
 
   const verDoc = async (path: string) => {
@@ -310,13 +411,22 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
 
                 {/* Acciones */}
                 <div className="px-4 py-3 mt-auto border-t flex gap-2">
-                  <Button
-                    onClick={() => asignar(rem.id, faltan)}
-                    disabled={busy === rem.id || faltan <= 0}
-                    className="flex-1 h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold text-sm"
-                  >
-                    {busy === rem.id ? "Asignando…" : `Asignar ${faltan} disponibles`}
-                  </Button>
+                  {canAssign ? (
+                    <Button
+                      onClick={() => abrirAsignacion(rem)}
+                      className="flex-1 h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold text-sm"
+                    >
+                      Asignar unidades
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled
+                      variant="outline"
+                      className="flex-1 h-11 text-sm"
+                    >
+                      {faltan > 0 ? `${faltan} por asignar (fábrica)` : "Completa"}
+                    </Button>
+                  )}
                   {rem.documento_url && (
                     <Button
                       variant="outline"
@@ -421,6 +531,70 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
               {savingConfig ? "Guardando…" : "Guardar configuración"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de asignación manual de unidades */}
+      <Dialog open={!!assignDialog} onOpenChange={o => { if (!o) setAssignDialog(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-[#1F3864]" />
+              Asignar unidades — {assignDialog?.folio_remision}
+            </DialogTitle>
+          </DialogHeader>
+
+          {assignLoading ? (
+            <div className="py-8 text-center text-muted-foreground">Cargando unidades…</div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-slate-50 rounded-lg p-3 text-sm flex flex-wrap gap-4">
+                <div>Solicita: <strong className="text-[#1F3864]">{assignDialog?.total_unidades}</strong></div>
+                <div>Asignados: <strong className="text-[#1F3864]">{assignedMotos.length}</strong></div>
+                <div>Faltan: <strong className="text-[#1F3864]">{Math.max(0, (assignDialog?.total_unidades || 0) - assignedMotos.length)}</strong></div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-[#1F3864]">Asignados a esta remisión</h3>
+                  <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                    {assignedMotos.length === 0 && (
+                      <div className="text-sm text-muted-foreground border border-dashed rounded-lg p-3">Sin unidades asignadas</div>
+                    )}
+                    {assignedMotos.map(m => (
+                      <MotoRow key={m.id} m={m} catalogo={catalogo} onAction={() => desasignarMoto(m.id)} busy={assignBusy === m.id} action="desasignar" />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-[#1F3864]">Unidades disponibles</h3>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={assignQ}
+                      onChange={e => setAssignQ(e.target.value)}
+                      placeholder="Buscar por orden, chasis o motor…"
+                      className="pl-9 h-10"
+                    />
+                  </div>
+                  <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                    {availableMotos.length === 0 && (
+                      <div className="text-sm text-muted-foreground border border-dashed rounded-lg p-3">No hay unidades disponibles</div>
+                    )}
+                    {availableMotos.filter(m => {
+                      if (!assignQ.trim()) return true;
+                      const q = assignQ.toLowerCase();
+                      const blob = [m.orden_armado, m.ns_chasis, m.ns_motor, m.chasis_asignado, m.modelo, m.color].filter(Boolean).join(" ").toLowerCase();
+                      return blob.includes(q);
+                    }).map(m => (
+                      <MotoRow key={m.id} m={m} catalogo={catalogo} onAction={() => asignarMoto(m.id)} busy={assignBusy === m.id} action="asignar" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

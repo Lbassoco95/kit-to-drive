@@ -4,7 +4,7 @@
  * En desktop el botón de cámara también funciona si hay webcam.
  */
 import { useRef } from "react";
-import { Camera, FolderOpen, X } from "lucide-react";
+import { Camera, FolderOpen, X, Eye } from "lucide-react";
 
 interface FileOrCameraProps {
   value: File | null;
@@ -46,6 +46,17 @@ export function FileOrCamera({ value, onChange, imageOnly = false, label, classN
           <p className="text-xs font-medium text-emerald-700 truncate">✓ {value.name}</p>
           <p className="text-[10px] text-emerald-600">{(value.size / 1024).toFixed(0)} KB</p>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            const url = URL.createObjectURL(value);
+            window.open(url, "_blank", "noopener,noreferrer");
+          }}
+          className="shrink-0 p-1 rounded-full hover:bg-emerald-200 text-emerald-600"
+          title="Ver documento"
+        >
+          <Eye size={16} />
+        </button>
         <button
           type="button"
           onClick={() => onChange(null)}
