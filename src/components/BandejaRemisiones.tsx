@@ -85,7 +85,7 @@ type MotocarroDisponible = {
 
 export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const { area, perms } = useAuth();
-  const puedeAsignarManual = area === "fabrica" || area === "direccion" || area === "administracion" || perms.esAdminGlobal;
+  const puedeAsignarManual = area === "fabrica" || perms.esAdminGlobal;
 
   const [items, setItems] = useState<RemisionCard[]>([]);
   const [loading, setLoading] = useState(false);

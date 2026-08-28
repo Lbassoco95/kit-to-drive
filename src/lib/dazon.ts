@@ -243,6 +243,8 @@ export const claveCapacidad = (modelo: string, color: string) =>
 const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
   [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color/,
     "20260823000003_color_efectivo_capacidad.sql"],
+  [/crear_motocarro_ya_armado/,
+    "20260828000001_motocarro_ya_armado.sql"],
   [/capturar_seriales_unidad/,
     "20260823000002_capturar_seriales_unidad.sql"],
   [/inventario_colores\.nombre_comercial|incidencias_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at/,
