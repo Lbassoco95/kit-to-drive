@@ -84,12 +84,14 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
         .limit(1);
 
       const chasisMotocarro = (chasisData ?? []).filter((c: any) => modelosMotocarro.has(c.modelo));
-      // Un chasis retenido / en garantía / no útil sigue en inventario pero no
-      // entra al armado: se cuenta aparte para que fábrica sepa por qué falta.
-      setDetenidos(chasisMotocarro.filter((c: any) => c.estatus !== "disponible").length);
+      // Un chasis retenido / en garantía / no útil, o con un reporte abierto,
+      // sigue en inventario pero no entra al armado: se cuenta aparte para que
+      // fábrica sepa por qué falta.
+      const conIncidenciaAbierta = new Set(incMap.keys());
+      setDetenidos(chasisMotocarro.filter((c: any) => c.estatus !== "disponible" || conIncidenciaAbierta.has(c.id)).length);
       setChasis(
         chasisMotocarro
-          .filter((c: any) => c.estatus === "disponible")
+          .filter((c: any) => c.estatus === "disponible" && !conIncidenciaAbierta.has(c.id))
           .map((c: any) => ({
             id: c.id, numero_chasis: c.numero_chasis, modelo: c.modelo, color: c.color,
             color_original: c.color_original ?? null,
@@ -245,10 +247,10 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
             <button
               type="button"
               onClick={() => setReportar(chasisSel)}
-              className="self-start text-sm text-[#C0392B] hover:underline inline-flex items-center gap-1.5"
+              className="self-start text-sm text-slate-600 hover:text-[#C0392B] hover:underline inline-flex items-center gap-1.5"
             >
               <TriangleAlert className="h-4 w-4" />
-              El chasis {chasisSel.numero_chasis} llegó con una falla — levantar reporte
+              ¿Este chasis llegó con una falla? Levantar reporte
             </button>
           )}
 
