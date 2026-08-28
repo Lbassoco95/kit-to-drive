@@ -1735,6 +1735,16 @@ export type Database = {
         }
         Returns: Json
       }
+      crear_motocarro_ya_armado: {
+        Args: {
+          _color: string
+          _modelo: string
+          _ns_chasis: string
+          _ns_motor: string
+          _remision_id: string
+        }
+        Returns: Json
+      }
       confirmar_fecha_entrega: {
         Args: { _area: string; _motocarro_id: string }
         Returns: undefined

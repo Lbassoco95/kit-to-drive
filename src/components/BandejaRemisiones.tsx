@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -329,6 +330,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [manualNuevoChasis, setManualNuevoChasis] = useState("");
   const [manualNuevoMotor, setManualNuevoMotor] = useState("");
   const [manualCapturando, setManualCapturando] = useState<string | null>(null);
+  const [manualYaArmado, setManualYaArmado] = useState(false);
 
   const abrirManual = async (rem: RemisionCard) => {
     setManualDialog(rem);
@@ -337,6 +339,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     setManualNuevoChasis("");
     setManualNuevoMotor("");
     setManualCapturando(null);
+    setManualYaArmado(false);
 
     const { data: asig } = await supabase
       .from("motocarros")
@@ -440,6 +443,38 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         }
         motoId = data.id;
       }
+    }
+
+    // Si no existe y el usuario confirma que es un motocarro ya armado, crearlo
+    if (!motoId && manualYaArmado) {
+      if (!chasis || !motor) {
+        setManualBusy(null);
+        toast.error("Para registrar un motocarro ya armado se necesita NS chasis y NS motor");
+        return;
+      }
+      const motoItem = manualDialog.items.find(it => it.tipo_servicio === "motocarro");
+      if (!motoItem?.modelo || !motoItem?.color) {
+        setManualBusy(null);
+        toast.error("Captura primero la configuración del pedido (modelo y color) para crear la unidad");
+        return;
+      }
+      const { data, error } = await supabase.rpc("crear_motocarro_ya_armado", {
+        _ns_chasis: chasis,
+        _ns_motor: motor,
+        _modelo: motoItem.modelo,
+        _color: motoItem.color,
+        _remision_id: manualDialog.id,
+      });
+      setManualBusy(null);
+      if (error) { toast.error(error.message); return; }
+      const r = data as { ok?: boolean; orden_armado?: number } | null;
+      toast.success(`✓ Unidad ya armada #${r?.orden_armado} creada y asignada`);
+      setManualNuevoChasis("");
+      setManualNuevoMotor("");
+      setManualYaArmado(false);
+      await abrirManual(manualDialog);
+      await load(); onChange?.();
+      return;
     }
 
     // Si no existe pero hay unidades sin serial, capturar en la primera disponible
@@ -929,7 +964,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       </Dialog>
 
       {/* Dialog de asignación manual */}
-      <Dialog open={!!manualDialog} onOpenChange={o => { if (!o) { setManualDialog(null); setManualCapturando(null); } }}>
+      <Dialog open={!!manualDialog} onOpenChange={o => { if (!o) { setManualDialog(null); setManualCapturando(null); setManualYaArmado(false); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -966,12 +1001,31 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     className="h-11 text-sm font-mono"
                   />
                 </div>
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox
+                    id="yaArmado"
+                    checked={manualYaArmado}
+                    onCheckedChange={c => setManualYaArmado(c === true)}
+                  />
+                  <label htmlFor="yaArmado" className="text-xs text-muted-foreground leading-tight cursor-pointer select-none">
+                    <span className="font-medium text-[#1F3864] block mb-0.5">Es un motocarro ya armado</span>
+                    Marca esta opción si la unidad está físicamente ensamblada y no está registrada en el sistema. Se creará la configuración y se marcará como armada.
+                  </label>
+                </div>
                 <Button
                   onClick={buscarYAsignarPorSerial}
-                  disabled={(!manualNuevoChasis && !manualNuevoMotor) || manualBusy === "buscando"}
+                  disabled={
+                    (!manualNuevoChasis && !manualNuevoMotor) ||
+                    (manualYaArmado && (!manualNuevoChasis || !manualNuevoMotor)) ||
+                    manualBusy === "buscando"
+                  }
                   className="w-full h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold"
                 >
-                  {manualBusy === "buscando" ? "Buscando…" : "Buscar y asignar"}
+                  {manualBusy === "buscando"
+                    ? "Buscando…"
+                    : manualYaArmado
+                    ? "Crear y asignar unidad armada"
+                    : "Buscar y asignar"}
                 </Button>
               </div>
 
