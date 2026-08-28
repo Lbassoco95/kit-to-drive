@@ -986,20 +986,26 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   Escribe el chasis y/o motor. Si ya existe en el sistema se asignará directamente; si no, se vinculará a la primera unidad disponible.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <SerialAutocomplete
-                    tipo="chasis"
-                    value={manualNuevoChasis}
-                    onChange={setManualNuevoChasis}
-                    placeholder="Escribe para buscar o nuevo…"
-                    className="h-11 text-sm font-mono"
-                  />
-                  <SerialAutocomplete
-                    tipo="motor"
-                    value={manualNuevoMotor}
-                    onChange={setManualNuevoMotor}
-                    placeholder="Escribe para buscar o nuevo…"
-                    className="h-11 text-sm font-mono"
-                  />
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#1F3864]">NS Chasis</Label>
+                    <SerialAutocomplete
+                      tipo="chasis"
+                      value={manualNuevoChasis}
+                      onChange={setManualNuevoChasis}
+                      placeholder="Buscar o registrar chasis…"
+                      className="h-11 text-sm font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#1F3864]">NS Motor</Label>
+                    <SerialAutocomplete
+                      tipo="motor"
+                      value={manualNuevoMotor}
+                      onChange={setManualNuevoMotor}
+                      placeholder="Buscar o registrar motor…"
+                      className="h-11 text-sm font-mono"
+                    />
+                  </div>
                 </div>
                 <div className="flex items-start gap-2 pt-1">
                   <Checkbox
