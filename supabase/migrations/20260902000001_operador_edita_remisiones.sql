@@ -404,55 +404,54 @@ END $postflight$;
 -- BLOQUE 7 · Qué había en esta base (informativo, no cambia nada)
 -- ============================================================================
 -- La primera versión de este script se negó a correr porque faltaba un helper
--- de ÁREA × NIVEL, y el diagnóstico decía que estaban todos — porque sólo
--- revisaba uno de los ocho. Esto lo deja escrito en el log de la corrida, para
--- no volver a adivinar.
-
-DO $informe$
-DECLARE
-  _hay text := '';
-  _f   text;
-  _pol text;
-BEGIN
-  FOREACH _f IN ARRAY ARRAY[
-    'es_area(uuid,public.user_area)', 'supervisa_area(uuid,public.user_area)',
-    'es_admin_area(uuid,public.user_area)', 'es_admin_global(uuid)',
-    'nivel_al_menos(uuid,public.user_nivel)', 'usuario_activo(uuid)'
-  ] LOOP
-    _hay := _hay || E'\n  · ' || rpad(split_part(_f,'(',1), 16)
-         || CASE WHEN to_regprocedure('public.'||_f) IS NULL THEN 'NO está' ELSE 'está' END;
-  END LOOP;
-  RAISE NOTICE E'Helpers de ÁREA × NIVEL (20260823000005 / 20260824000003):%', _hay;
-
-  _hay := '';
-  FOR _pol IN
-    SELECT tablename||' · '||policyname||' → '
-        || CASE WHEN COALESCE(qual,'')||COALESCE(with_check,'') LIKE '%supervisa_area%'
-                THEN 'versión por área (20260825000001)'
-                ELSE 'versión vieja, por rol legado' END
-      FROM pg_policies
-     WHERE schemaname='public'
-       AND ((tablename='remisiones'     AND policyname='crear remisiones')
-         OR (tablename='remision_items' AND policyname='remision_items_insert'))
-  LOOP
-    _hay := _hay || E'\n  · ' || _pol;
-  END LOOP;
-  IF _hay = '' THEN _hay := E'\n  · (ninguna: el INSERT de renglones lo rige ya la escalera de este script)'; END IF;
-  RAISE NOTICE E'Políticas de captura que había antes de esto:%', _hay;
-END $informe$;
-
--- Verificación a ojo — quién puede corregir qué (cámbiale el folio):
---   SELECT p.nombre_completo, ur.area, ur.nivel, ur.role,
---          public.rol_comercial(ur.user_id)               AS escalon,
---          public.puede_editar_remision(r.id, ur.user_id) AS puede
---     FROM public.user_roles ur
---     JOIN public.profiles p ON p.id = ur.user_id
---     CROSS JOIN LATERAL (SELECT id FROM public.remisiones WHERE folio_remision='REM-012') r
---    ORDER BY ur.area, ur.nivel;
+-- de ÁREA × NIVEL, y el diagnóstico decía que estaban todos — porque revisaba
+-- uno de los ocho. Esto lo deja a la vista.
 --
--- Y el historial de una remisión:
---   SELECT b.created_at, b.nombre_usuario, b.tipo_cambio, b.motivo
---     FROM public.remisiones_bitacora b
---     JOIN public.remisiones r ON r.id = b.remision_id
---    WHERE r.folio_remision = 'REM-012'
---    ORDER BY b.created_at DESC;
+-- Va como SELECT, no como RAISE NOTICE: el editor SQL de Supabase no muestra
+-- los avisos, sólo el resultado de la última consulta. Es la tabla que sale
+-- abajo cuando termina la corrida.
+
+SELECT * FROM (
+  SELECT 1 AS orden,
+         'helper'                                AS que,
+         split_part(f, '(', 1)                   AS nombre,
+         CASE WHEN to_regprocedure('public.' || f) IS NULL
+              THEN '✗ NO está' ELSE '✓ está' END AS estado,
+         '20260823000005 / 20260824000003'       AS lo_deja
+    FROM unnest(ARRAY[
+      'es_area(uuid,public.user_area)',
+      'supervisa_area(uuid,public.user_area)',
+      'es_admin_area(uuid,public.user_area)',
+      'es_admin_global(uuid)',
+      'nivel_al_menos(uuid,public.user_nivel)',
+      'usuario_activo(uuid)'
+    ]) AS f
+
+  UNION ALL
+
+  -- Las políticas de captura viven con el mismo nombre en dos versiones: por
+  -- rol legado (la vieja) o por área (20260825000001). El nombre no lo dice.
+  SELECT 2,
+         'política de captura',
+         tablename || ' · ' || policyname,
+         CASE WHEN COALESCE(qual,'') || COALESCE(with_check,'') LIKE '%supervisa_area%'
+              THEN '✓ versión por área (20260825000001)'
+              ELSE '✗ versión vieja, por rol legado' END,
+         'la rige ahora este script'
+    FROM pg_policies
+   WHERE schemaname = 'public'
+     AND ((tablename = 'remisiones'     AND policyname = 'crear remisiones')
+       OR (tablename = 'remision_items' AND policyname = 'remision_items_insert'))
+
+  UNION ALL
+
+  -- Y lo que acaba de quedar, para no tener que ir a buscarlo.
+  SELECT 3, 'lo que dejó este script', tablename || ' · ' || policyname, '✓ creada', '20260902000001'
+    FROM pg_policies
+   WHERE schemaname = 'public'
+     AND policyname IN ('remision_items_update_area','remision_items_delete_area',
+                        'remision_items_insert_area','comercial edita sus remisiones',
+                        'comercial captura remisiones','leer bitacora de remisiones',
+                        'registrar cambio de remision')
+) t
+ORDER BY orden, nombre;
