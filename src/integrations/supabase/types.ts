@@ -1353,6 +1353,7 @@ export type Database = {
           created_at: string | null
           id: string
           modelo: string | null
+          orden_linea: number | null
           remision_id: string
           tipo_servicio: string
         }
@@ -1363,6 +1364,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           modelo?: string | null
+          orden_linea?: number | null
           remision_id: string
           tipo_servicio?: string
         }
@@ -1373,6 +1375,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           modelo?: string | null
+          orden_linea?: number | null
           remision_id?: string
           tipo_servicio?: string
         }
@@ -1392,6 +1395,160 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      remisiones_bitacora: {
+        Row: {
+          created_at: string
+          datos_antes: Json | null
+          datos_despues: Json | null
+          id: string
+          motivo: string
+          nombre_usuario: string | null
+          remision_id: string
+          tipo_cambio: string
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          id?: string
+          motivo: string
+          nombre_usuario?: string | null
+          remision_id: string
+          tipo_cambio?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          id?: string
+          motivo?: string
+          nombre_usuario?: string | null
+          remision_id?: string
+          tipo_cambio?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remisiones_bitacora_remision_id_fkey"
+            columns: ["remision_id"]
+            isOneToOne: false
+            referencedRelation: "remisiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      avisos: {
+        Row: {
+          accion: Json | null
+          area_destino: Database["public"]["Enums"]["user_area"]
+          created_at: string
+          creado_por: string | null
+          cuerpo: string | null
+          datos: Json | null
+          estado: string
+          folio_remision: string | null
+          id: string
+          nombre_creador: string | null
+          remision_id: string | null
+          requiere_respuesta: boolean
+          respondido_at: string | null
+          respondido_por: string | null
+          respuesta: string | null
+          tipo: string
+          titulo: string
+          usuario_destino: string | null
+          visto_at: string | null
+          visto_por: string | null
+        }
+        Insert: {
+          accion?: Json | null
+          area_destino: Database["public"]["Enums"]["user_area"]
+          created_at?: string
+          creado_por?: string | null
+          cuerpo?: string | null
+          datos?: Json | null
+          estado?: string
+          folio_remision?: string | null
+          id?: string
+          nombre_creador?: string | null
+          remision_id?: string | null
+          requiere_respuesta?: boolean
+          respondido_at?: string | null
+          respondido_por?: string | null
+          respuesta?: string | null
+          tipo?: string
+          titulo: string
+          usuario_destino?: string | null
+          visto_at?: string | null
+          visto_por?: string | null
+        }
+        Update: {
+          accion?: Json | null
+          area_destino?: Database["public"]["Enums"]["user_area"]
+          created_at?: string
+          creado_por?: string | null
+          cuerpo?: string | null
+          datos?: Json | null
+          estado?: string
+          folio_remision?: string | null
+          id?: string
+          nombre_creador?: string | null
+          remision_id?: string | null
+          requiere_respuesta?: boolean
+          respondido_at?: string | null
+          respondido_por?: string | null
+          respuesta?: string | null
+          tipo?: string
+          titulo?: string
+          usuario_destino?: string | null
+          visto_at?: string | null
+          visto_por?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avisos_remision_id_fkey"
+            columns: ["remision_id"]
+            isOneToOne: false
+            referencedRelation: "remisiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bitacora_eliminaciones: {
+        Row: {
+          created_at: string | null
+          datos_eliminados: Json | null
+          eliminado_por: string | null
+          id: string
+          motivo: string
+          nombre_usuario: string | null
+          registro_id: string
+          tabla: string
+        }
+        Insert: {
+          created_at?: string | null
+          datos_eliminados?: Json | null
+          eliminado_por?: string | null
+          id?: string
+          motivo: string
+          nombre_usuario?: string | null
+          registro_id: string
+          tabla: string
+        }
+        Update: {
+          created_at?: string | null
+          datos_eliminados?: Json | null
+          eliminado_por?: string | null
+          id?: string
+          motivo?: string
+          nombre_usuario?: string | null
+          registro_id?: string
+          tabla?: string
+        }
+        Relationships: []
       }
       remisiones: {
         Row: {
@@ -1696,6 +1853,30 @@ export type Database = {
       asignar_remision_items: {
         Args: { _remision_id: string }
         Returns: Json
+      }
+      ajustar_unidades_remision: {
+        Args: { _motivo?: string; _remision_id: string; _total_objetivo: number }
+        Returns: Json
+      }
+      rol_comercial: {
+        Args: { _user_id?: string }
+        Returns: string
+      }
+      puede_editar_remision: {
+        Args: { _remision_id: string; _user_id?: string }
+        Returns: boolean
+      }
+      puede_capturar_remision: {
+        Args: { _user_id?: string; _vendedor_id: string }
+        Returns: boolean
+      }
+      responder_solicitud: {
+        Args: { _aceptar: boolean; _aviso_id: string; _respuesta?: string }
+        Returns: Json
+      }
+      recibe_avisos_de: {
+        Args: { _area: Database["public"]["Enums"]["user_area"]; _user_id?: string }
+        Returns: boolean
       }
       capturar_seriales_unidad: {
         Args: { _motocarro_id: string; _ns_chasis?: string; _ns_motor?: string }

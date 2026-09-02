@@ -169,7 +169,7 @@ export default function Inventario() {
         supabase.from("inventario_motor").select("*").order("fecha_importacion", { ascending: false }),
         supabase.from("motocarros").select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado, estatus_entrega, fecha_real_armado, remision_id, contenedor_id").order("orden_armado"),
         supabase.from("inventario_partes").select("*").order("descripcion"),
-        supabase.from("inventario_colores").select("*").order("modelo, color"),
+        supabase.from("inventario_colores").select("*").order("modelo").order("color"),
         supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
         supabase.from("v_stock_modelo_color").select("*"),
         supabase.from("incidencias_chasis")

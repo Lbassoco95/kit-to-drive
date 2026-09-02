@@ -20,8 +20,6 @@ export interface ClienteCatalogo {
   [extra: string]: unknown;
 }
 
-const ORDEN_CATALOGO = "folio_interno, codigo_erp";
-
 const COLUMNAS_RESPALDO =
   "id, created_at, updated_at, codigo_erp, nombre_comercial, telefono, " +
   "direccion, activo, razon_social, rfc, email, email_cobranza, " +
@@ -35,7 +33,8 @@ export async function cargarClientes(): Promise<{ data: ClienteCatalogo[]; error
   const { data, error } = await supabase
     .from("clientes")
     .select("*")
-    .order(ORDEN_CATALOGO);
+    .order("folio_interno", { nullsFirst: false })
+    .order("codigo_erp", { nullsFirst: false });
 
   if (!error) {
     return { data: ((data as unknown) as ClienteCatalogo[]) ?? [] };
@@ -51,7 +50,7 @@ export async function cargarClientes(): Promise<{ data: ClienteCatalogo[]; error
     const { data: fallback } = await supabase
       .from("clientes")
       .select(COLUMNAS_RESPALDO)
-      .order("codigo_erp");
+      .order("codigo_erp", { nullsFirst: false });
     return { data: ((fallback as unknown) as ClienteCatalogo[]) ?? [], error };
   }
 

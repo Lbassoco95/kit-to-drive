@@ -8,6 +8,7 @@ import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, CatalogoMode
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
+import { ResumenAvisos } from "@/components/BandejaAvisos";
 import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -235,6 +236,9 @@ export default function Dashboard() {
         <h1>{t.dashboard.title}</h1>
         <p className="text-muted-foreground text-base mt-1">{greeting}</p>
       </div>
+
+      {/* Avisos de otra área sin acusar. Sólo se dibuja si hay. */}
+      <ResumenAvisos onClick={() => nav("/produccion")} />
 
       {area === "direccion" && (
         <div className="space-y-8">
