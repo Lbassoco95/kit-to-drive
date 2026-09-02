@@ -15,6 +15,10 @@
 --   · FALTA     → hay que correr ese archivo de supabase/migrations/.
 --   · PARCIAL   → quedó a medias; vuelve a correr el archivo completo
 --                 (todos son idempotentes) y revisa el error que salga.
+--
+-- Para saber qué le falta a UN script antes de correrlo, hay revisiones
+-- puntuales al lado de este archivo, p. ej.
+-- supabase/revisar_antes_de_20260902000001.sql.
 -- ============================================================================
 
 WITH esperado(script, objeto) AS (VALUES

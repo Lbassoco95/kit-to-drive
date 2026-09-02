@@ -75,9 +75,13 @@ BEGIN
     _faltan := _faltan || 'columna user_roles.nivel (corre 20260823000005_usuarios_niveles_areas.sql)'::text;
   END IF;
 
+  -- En UNA línea a propósito: el editor SQL de Supabase corta los mensajes
+  -- largos y con saltos de línea, y entonces no se alcanza a leer QUÉ faltó.
+  -- Si esto truena, corre supabase/revisar_antes_de_20260902000001.sql, que
+  -- devuelve la misma revisión como tabla, objeto por objeto.
   IF array_length(_faltan,1) > 0 THEN
-    RAISE EXCEPTION E'Falta lo mínimo para aplicar esto, no se modificó nada:\n  · %',
-      array_to_string(_faltan, E'\n  · ');
+    RAISE EXCEPTION 'No se modificó nada. Falta: %. (Corre supabase/revisar_antes_de_20260902000001.sql para el detalle.)',
+      array_to_string(_faltan, ' | ');
   END IF;
 END $preflight$;
 
