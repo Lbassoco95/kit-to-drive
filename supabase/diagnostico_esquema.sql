@@ -132,7 +132,15 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260903000001_avisos_entre_areas',           'trigger|avisos.trg_avisos_solo_acuse'),
   ('20260903000001_avisos_entre_areas',           'politica|avisos.leer avisos de mi area'),
   ('20260903000001_avisos_entre_areas',           'politica|avisos.mandar aviso'),
-  ('20260903000001_avisos_entre_areas',           'politica|avisos.dar por visto')
+  ('20260903000001_avisos_entre_areas',           'politica|avisos.dar por visto'),
+
+  -- Solicitudes a Fábrica cuando la unidad ya entró a armado
+  ('20260904000001_solicitudes_a_fabrica',        'columna|avisos.requiere_respuesta'),
+  ('20260904000001_solicitudes_a_fabrica',        'columna|avisos.estado'),
+  ('20260904000001_solicitudes_a_fabrica',        'columna|avisos.accion'),
+  ('20260904000001_solicitudes_a_fabrica',        'columna|avisos.usuario_destino'),
+  ('20260904000001_solicitudes_a_fabrica',        'funcion|responder_solicitud(uuid,boolean,text)'),
+  ('20260904000001_solicitudes_a_fabrica',        'politica|avisos.leer avisos de mi area|usuario_destino')
 ), revisado AS (
   SELECT e.script, e.objeto,
          split_part(e.objeto, '|', 1) AS tipo,

@@ -66,13 +66,20 @@ confundirla:
   caracteres en la propia tabla) *antes* de aplicar el cambio, así que una
   modificación sin justificación no llega a guardarse. El historial se ve en
   «Ver remisión completa» y la tarjeta marca cuántas veces se modificó.
-- **Fábrica no frena a Ventas.** La primera versión impedía bajar el total si ya
-  había chasis asignados. Se quitó: para Fábrica el cambio es indistinto — el
-  chasis vuelve a la fila y se va a otra orden. Ahora las unidades de más se
-  liberan solas (`ajustar_unidades_remision()`, las menos avanzadas primero) y
-  el aviso le llega a Fábrica y a Logística. El único piso que queda es que no
-  se puede bajar por debajo de lo ya **entregado o en ruta**: eso ya salió del
-  almacén.
+- **Fábrica no frena a Ventas, pero el armado empezado no se toca.** Bajar el
+  total reparte las unidades sobrantes en tres:
+  1. Las que siguen en `PENDIENTE` **se liberan solas** y Fábrica y Logística
+     reciben el aviso. Para ellos es indistinto: el chasis vuelve a la fila.
+  2. Las que ya entraron a armado (`EN_PROCESO` en adelante) **no se quitan
+     desde Comercial**: se levanta una **solicitud** a Fábrica, que acepta o
+     rechaza desde su bandeja (`responder_solicitud()`). Aceptar libera la
+     unidad ahí mismo; la respuesta le regresa a quien la pidió.
+  3. Las ya **entregadas o en ruta** no se pueden ni pidiendo: ya salieron del
+     almacén.
+
+  `PENDIENTE` es el corte porque es lo único que la base guarda como «todavía
+  no se toca»: `ATRASADO` nunca se escribe, se calcula en pantalla para lo
+  vencido.
 - **Lo que no hay, no se compromete.** Al capturar y al editar, una línea que
   pida más de lo disponible no deja guardar: «estás pidiendo 3 de Azul y sólo
   hay 1». Cuando no hay dato de inventario de ese color no se bloquea — no
@@ -138,8 +145,13 @@ sólo un filtro de vista del lado del cliente.
   `ajustar_unidades_remision()`, que libera las unidades sobrantes al bajar una
   remisión y deja el aviso. El aviso no se puede editar después: un trigger
   congela todo menos el acuse.
-- `src/components/BandejaAvisos.tsx` — la bandeja arriba de Producción y el
-  contador del tablero.
+- `supabase/migrations/20260904000001_solicitudes_a_fabrica.sql` — el corte en
+  el inicio de armado, y las solicitudes: `avisos` aprende a pedir respuesta
+  (`requiere_respuesta`, `estado`, `accion`) y `responder_solicitud()` la
+  ejecuta. Un aviso se acusa y se contesta, pero nunca se reescribe.
+- `src/components/BandejaAvisos.tsx` — la bandeja (Producción y Remisiones) y
+  el contador del tablero. Un aviso normal se despacha con «Visto»; una
+  solicitud pide «Aceptar y liberar» o «No se puede», con respuesta escrita.
 
 ## Compatibilidad
 

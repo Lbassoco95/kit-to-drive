@@ -1442,47 +1442,68 @@ export type Database = {
       }
       avisos: {
         Row: {
+          accion: Json | null
           area_destino: Database["public"]["Enums"]["user_area"]
           created_at: string
           creado_por: string | null
           cuerpo: string | null
           datos: Json | null
+          estado: string
           folio_remision: string | null
           id: string
           nombre_creador: string | null
           remision_id: string | null
+          requiere_respuesta: boolean
+          respondido_at: string | null
+          respondido_por: string | null
+          respuesta: string | null
           tipo: string
           titulo: string
+          usuario_destino: string | null
           visto_at: string | null
           visto_por: string | null
         }
         Insert: {
+          accion?: Json | null
           area_destino: Database["public"]["Enums"]["user_area"]
           created_at?: string
           creado_por?: string | null
           cuerpo?: string | null
           datos?: Json | null
+          estado?: string
           folio_remision?: string | null
           id?: string
           nombre_creador?: string | null
           remision_id?: string | null
+          requiere_respuesta?: boolean
+          respondido_at?: string | null
+          respondido_por?: string | null
+          respuesta?: string | null
           tipo?: string
           titulo: string
+          usuario_destino?: string | null
           visto_at?: string | null
           visto_por?: string | null
         }
         Update: {
+          accion?: Json | null
           area_destino?: Database["public"]["Enums"]["user_area"]
           created_at?: string
           creado_por?: string | null
           cuerpo?: string | null
           datos?: Json | null
+          estado?: string
           folio_remision?: string | null
           id?: string
           nombre_creador?: string | null
           remision_id?: string | null
+          requiere_respuesta?: boolean
+          respondido_at?: string | null
+          respondido_por?: string | null
+          respuesta?: string | null
           tipo?: string
           titulo?: string
+          usuario_destino?: string | null
           visto_at?: string | null
           visto_por?: string | null
         }
@@ -1848,6 +1869,10 @@ export type Database = {
       puede_capturar_remision: {
         Args: { _user_id?: string; _vendedor_id: string }
         Returns: boolean
+      }
+      responder_solicitud: {
+        Args: { _aceptar: boolean; _aviso_id: string; _respuesta?: string }
+        Returns: Json
       }
       recibe_avisos_de: {
         Args: { _area: Database["public"]["Enums"]["user_area"]; _user_id?: string }

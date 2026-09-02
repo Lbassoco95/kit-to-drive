@@ -303,6 +303,67 @@ export function planEditarRenglones(
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   Bajar el total: qué se suelta, qué se pide y qué no se puede
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Lo mínimo que hace falta saber de una unidad para decidir si se puede soltar. */
+export interface UnidadAsignada {
+  estatus_armado?: string | null;
+  estatus_entrega?: string | null;
+}
+
+export interface RepartoAlBajar {
+  asignadas: number;
+  /** Sobran y todavía no se tocan: se sueltan solas. */
+  liberables: number;
+  /** Sobran pero Fábrica ya empezó: hay que pedírselas. */
+  porPedir: number;
+  /** Sobran y ya salieron del almacén: no hay forma. */
+  imposible: number;
+  /** Del total asignado, cuántas van en armado o ya salieron. Para explicar. */
+  enArmado: number;
+  yaSalieron: number;
+}
+
+/** Una unidad que ya salió del almacén no vuelve desde una pantalla. */
+const salioDelAlmacen = (u: UnidadAsignada) =>
+  ["ENTREGADA", "EN_RUTA"].includes(u?.estatus_entrega ?? "");
+
+/**
+ * `PENDIENTE` es lo único que la base guarda como «todavía no se toca»:
+ * `ATRASADO` nunca se escribe, se calcula en pantalla para lo vencido. Desde
+ * `EN_PROCESO` ya hay trabajo de Fábrica encima.
+ */
+const yaEntroAArmado = (u: UnidadAsignada) =>
+  !salioDelAlmacen(u) && (u?.estatus_armado ?? "PENDIENTE") !== "PENDIENTE";
+
+/**
+ * Qué pasa con las unidades asignadas si el pedido baja a `objetivo`.
+ *
+ * Es el mismo reparto que hace `ajustar_unidades_remision()` en la base: se
+ * calcula también aquí para poder decirlo ANTES de guardar, en vez de que la
+ * persona se entere por el resultado.
+ */
+export function repartoAlBajar(unidades: readonly UnidadAsignada[], objetivo: number): RepartoAlBajar {
+  const asignadas  = unidades.length;
+  const enArmado   = unidades.filter(yaEntroAArmado).length;
+  const yaSalieron = unidades.filter(salioDelAlmacen).length;
+  const base = { asignadas, liberables: 0, porPedir: 0, imposible: 0, enArmado, yaSalieron };
+
+  let sobran = asignadas - Math.max(0, objetivo);
+  if (sobran <= 0) return base;
+
+  const sinEmpezar = asignadas - enArmado - yaSalieron;
+
+  const liberables = Math.min(sobran, sinEmpezar);
+  sobran -= liberables;
+  const porPedir = Math.min(sobran, enArmado);
+  sobran -= porPedir;
+
+  return { ...base, liberables, porPedir, imposible: sobran };
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    Existencia: no comprometer lo que no hay
    ────────────────────────────────────────────────────────────────────────── */
 
