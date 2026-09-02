@@ -15,6 +15,10 @@
 --   · FALTA     → hay que correr ese archivo de supabase/migrations/.
 --   · PARCIAL   → quedó a medias; vuelve a correr el archivo completo
 --                 (todos son idempotentes) y revisa el error que salga.
+--
+-- Para saber qué le falta a UN script antes de correrlo, hay revisiones
+-- puntuales al lado de este archivo, p. ej.
+-- supabase/revisar_antes_de_20260902000001.sql.
 -- ============================================================================
 
 WITH esperado(script, objeto) AS (VALUES
@@ -73,20 +77,61 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260823000004_finanzas_ingresos_egresos',    'vista|v_saldos_cuentas'),
 
   -- Usuarios ÁREA × NIVEL y permisos
+  -- Los OCHO helpers, no sólo es_area: este script dejaba pasar una base a la
+  -- que le faltaba supervisa_area() y la reportaba como APLICADA, con lo que el
+  -- hueco sólo salía cuando otro script se negaba a correr.
   ('20260823000005_usuarios_niveles_areas',       'columna|user_roles.area'),
   ('20260823000005_usuarios_niveles_areas',       'columna|user_roles.nivel'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|nivel_rank(user_nivel)'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|rol_legacy(user_area,user_nivel)'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|mi_area()'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|mi_nivel()'),
   ('20260823000005_usuarios_niveles_areas',       'funcion|es_area(uuid,user_area)'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|nivel_al_menos(uuid,user_nivel)'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|es_admin_area(uuid,user_area)'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|es_admin_global(uuid)'),
+  ('20260823000005_usuarios_niveles_areas',       'funcion|supervisa_area(uuid,user_area)'),
   ('20260824000001_remisiones_visibles_equipo_comercial','politica|remisiones.leer remisiones por rol'),
   ('20260824000002_comercial_lee_toda_la_bandeja','politica|remisiones.comercial lee remisiones'),
   ('20260824000002_comercial_lee_toda_la_bandeja','politica|motocarros.comercial lee motocarros'),
   ('20260824000003_usuario_activo_se_aplica',     'funcion|usuario_activo(uuid)'),
+  -- La escalera de Comercial no es sólo el CRM: lo que más se nota es que el
+  -- supervisor pueda capturar una remisión y sus renglones.
+  ('20260825000001_comercial_escalera_de_permisos','politica|remisiones.crear remisiones|supervisa_area'),
+  -- `remision_items_insert` NO se revisa aquí: 20260902000001 se hace cargo de
+  -- ese permiso con `remision_items_insert_area`, y la política vieja deja de
+  -- existir a propósito. Revisarla marcaría este script como PARCIAL para
+  -- siempre.
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_oportunidades.crm_oportunidades_insert_area'),
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_actividades.crm_actividades_insert_area'),
-  ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area')
+  ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area'),
+
+  -- Folio interno de clientes nuevos
+  ('20260827000001_folio_interno_clientes_nuevos','columna|clientes.folio_interno'),
+  ('20260827000001_folio_interno_clientes_nuevos','funcion|generar_folio_interno_cliente()'),
+
+  -- Motocarro ya armado desde remisiones
+  ('20260828000001_motocarro_ya_armado',          'funcion|crear_motocarro_ya_armado(uuid,text,text,text,text,integer)'),
+
+  -- El operador corrige y complementa sus remisiones, con motivo
+  ('20260902000001_operador_edita_remisiones',    'funcion|rol_comercial(uuid)'),
+  ('20260902000001_operador_edita_remisiones',    'funcion|puede_editar_remision(uuid,uuid)'),
+  ('20260902000001_operador_edita_remisiones',    'funcion|puede_capturar_remision(uuid,uuid)'),
+  ('20260902000001_operador_edita_remisiones',    'columna|remision_items.orden_linea'),
+  ('20260902000001_operador_edita_remisiones',    'tabla|remisiones_bitacora'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_update_area'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_delete_area'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_insert_area'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial edita sus remisiones'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial captura remisiones')
 ), revisado AS (
   SELECT e.script, e.objeto,
          split_part(e.objeto, '|', 1) AS tipo,
-         split_part(e.objeto, '|', 2) AS nombre
+         split_part(e.objeto, '|', 2) AS nombre,
+         -- Tercer campo opcional: texto que la política tiene que contener. Hace
+         -- falta porque varios scripts REDEFINEN una política con el mismo
+         -- nombre; que exista no dice cuál de las dos versiones quedó.
+         NULLIF(split_part(e.objeto, '|', 3), '') AS detalle
     FROM esperado e
 ), resuelto AS (
   SELECT r.script, r.objeto, r.tipo, r.nombre,
@@ -114,7 +159,9 @@ WITH esperado(script, objeto) AS (VALUES
         EXISTS (SELECT 1 FROM pg_policies p
                  WHERE p.schemaname = 'public'
                    AND p.tablename  = split_part(r.nombre, '.', 1)
-                   AND p.policyname = split_part(r.nombre, '.', 2))
+                   AND p.policyname = split_part(r.nombre, '.', 2)
+                   AND (r.detalle IS NULL
+                        OR COALESCE(p.qual,'') || ' ' || COALESCE(p.with_check,'') LIKE '%' || r.detalle || '%'))
     END AS existe
   FROM revisado r
 )

@@ -51,7 +51,12 @@ export default function Clientes() {
 
   const load = async () => {
     const [{ data: cs }, { data: ms }] = await Promise.all([
-      supabase.from("clientes").select("*").order("folio_interno, codigo_erp"),
+      // `order` encadenado: supabase-js manda una sola columna por llamada y
+      // "folio_interno, codigo_erp" se va como un nombre de columna inválido
+      // (PostgREST responde 400 y la lista queda vacía).
+      supabase.from("clientes").select("*")
+        .order("folio_interno", { nullsFirst: false })
+        .order("codigo_erp", { nullsFirst: false }),
       supabase.from("motocarros").select("id, estatus_entrega, remisiones!inner(cliente_id)"),
     ]);
     setRows(cs ?? []); setMotos(ms ?? []);

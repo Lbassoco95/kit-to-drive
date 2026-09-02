@@ -1353,6 +1353,7 @@ export type Database = {
           created_at: string | null
           id: string
           modelo: string | null
+          orden_linea: number | null
           remision_id: string
           tipo_servicio: string
         }
@@ -1363,6 +1364,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           modelo?: string | null
+          orden_linea?: number | null
           remision_id: string
           tipo_servicio?: string
         }
@@ -1373,6 +1375,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           modelo?: string | null
+          orden_linea?: number | null
           remision_id?: string
           tipo_servicio?: string
         }
@@ -1392,6 +1395,83 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      remisiones_bitacora: {
+        Row: {
+          created_at: string
+          datos_antes: Json | null
+          datos_despues: Json | null
+          id: string
+          motivo: string
+          nombre_usuario: string | null
+          remision_id: string
+          tipo_cambio: string
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          id?: string
+          motivo: string
+          nombre_usuario?: string | null
+          remision_id: string
+          tipo_cambio?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          datos_antes?: Json | null
+          datos_despues?: Json | null
+          id?: string
+          motivo?: string
+          nombre_usuario?: string | null
+          remision_id?: string
+          tipo_cambio?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "remisiones_bitacora_remision_id_fkey"
+            columns: ["remision_id"]
+            isOneToOne: false
+            referencedRelation: "remisiones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bitacora_eliminaciones: {
+        Row: {
+          created_at: string | null
+          datos_eliminados: Json | null
+          eliminado_por: string | null
+          id: string
+          motivo: string
+          nombre_usuario: string | null
+          registro_id: string
+          tabla: string
+        }
+        Insert: {
+          created_at?: string | null
+          datos_eliminados?: Json | null
+          eliminado_por?: string | null
+          id?: string
+          motivo: string
+          nombre_usuario?: string | null
+          registro_id: string
+          tabla: string
+        }
+        Update: {
+          created_at?: string | null
+          datos_eliminados?: Json | null
+          eliminado_por?: string | null
+          id?: string
+          motivo?: string
+          nombre_usuario?: string | null
+          registro_id?: string
+          tabla?: string
+        }
+        Relationships: []
       }
       remisiones: {
         Row: {
