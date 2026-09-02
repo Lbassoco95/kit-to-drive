@@ -15,7 +15,7 @@ const DEMO_ROLES = [
   { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", labelKey: "fabrica" as const,   icon: Wrench },
   { email: "logistica@dazon.demo", pwd: "Dazon2026!", labelKey: "logistica" as const, icon: Truck },
   { email: "ventas@dazon.demo",    pwd: "Dazon2026!", labelKey: "ventas" as const,     icon: Briefcase },
-  { email: "finanzas@dazon.demo",  pwd: "Dazon2026!", labelKey: "finanzas" as const,  icon: Wallet },
+  { email: "finanzas@dazon.demo",  pwd: "Dazon123!$", labelKey: "finanzas" as const,  icon: Wallet },
 ];
 
 export default function Auth() {
@@ -89,7 +89,7 @@ export default function Auth() {
               </button>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-4 text-center">{t.auth.demoPassword} <code>Dazon2026!</code></p>
+          <p className="text-[11px] text-muted-foreground mt-4 text-center">{t.auth.demoPassword}</p>
         </div>}
       </Card>
     </div>

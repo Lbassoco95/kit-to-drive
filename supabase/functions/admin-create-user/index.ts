@@ -119,20 +119,43 @@ serve(async (req) => {
     };
     const rolDerivado = rolLegacy(area, nivel);
 
-    // 3. Crear usuario en Supabase Auth
-    const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // confirmar email automáticamente (no requiere verificación)
-    });
-
-    if (createErr) {
-      return new Response(JSON.stringify({ error: createErr.message }), {
-        status: 400, headers: { ...CORS, "Content-Type": "application/json" }
+    // 3. Crear o actualizar usuario en Supabase Auth.
+    // Si ya existe, sólo se renueva la contraseña; esto evita tener que borrar
+    // el usuario y recrear sus perfiles/roles.
+    const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (listErr) {
+      return new Response(JSON.stringify({ error: listErr.message }), {
+        status: 500, headers: { ...CORS, "Content-Type": "application/json" }
       });
     }
 
-    const uid = newUser.user.id;
+    const existente = (list?.users ?? []).find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    let uid: string;
+
+    if (existente) {
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(existente.id, {
+        password,
+        email_confirm: true,
+      });
+      if (updateErr) {
+        return new Response(JSON.stringify({ error: updateErr.message }), {
+          status: 400, headers: { ...CORS, "Content-Type": "application/json" }
+        });
+      }
+      uid = existente.id;
+    } else {
+      const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+      if (createErr) {
+        return new Response(JSON.stringify({ error: createErr.message }), {
+          status: 400, headers: { ...CORS, "Content-Type": "application/json" }
+        });
+      }
+      uid = newUser.user!.id;
+    }
 
     // 4. Crear perfil
     await supabaseAdmin.from("profiles").upsert({
