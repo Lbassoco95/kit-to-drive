@@ -68,13 +68,25 @@ confundirla:
   «Ver remisión completa» y la tarjeta marca cuántas veces se modificó. Lo que
   no cambia: bajar el total de unidades por debajo de los chasis ya asignados
   sigue exigiendo liberarlos primero en Producción.
-- **Capturar.** La misma migración destapa un hueco viejo de la captura: la
-  política `crear remisiones` sólo conoce los roles legados `admin`,
-  `coordinador` y `ventas`, de modo que un supervisor de Comercial
-  (`coordinador_ventas`) o su administrador (`director_ventas`) no podía dar de
-  alta una remisión ni a su nombre. Ya pueden, por área. Y al revés: el INSERT
-  de `remision_items` dejaba que cualquier vendedor metiera renglones en la
-  remisión de otro — eso se cerró.
+- **Capturar.** `crear remisiones` y `remision_items_insert` existen en dos
+  versiones con el mismo nombre: la original, que sólo conoce los roles legados
+  (`admin`, `coordinador`, `ventas`) y por tanto no deja capturar al supervisor
+  de Comercial —`coordinador_ventas`— ni siquiera a su nombre; y la de
+  20260825000001, que ya trae la escalera por área. Como el nombre no dice cuál
+  quedó, 20260902000001 se hace cargo del INSERT de renglones y suma una
+  política de captura por área: si la buena ya estaba, no cambia nada; si no,
+  cierra el hueco.
+
+## Cuidado con revisar políticas por nombre
+
+Varios scripts **redefinen** una política conservando su nombre
+(`crear remisiones`, `remision_items_insert`, `leer remisiones por rol`…). Que
+exista no dice cuál versión quedó, y por eso `diagnostico_esquema.sql` acepta un
+tercer campo con un texto que la política debe contener
+(`politica|tabla.nombre|supervisa_area`). El mismo cuidado aplica a los helpers:
+ese script revisaba **uno** de los ocho que crea 20260823000005 y daba el
+archivo por aplicado, así que un hueco a media migración sólo salía cuando otro
+script se negaba a correr. Ahora los revisa todos.
 
 En la UI eso es `editaTodas = perms.puedeEditar("remisiones")` en
 `src/pages/Remisiones.tsx`, que gobierna **acciones**, nunca visibilidad. Qué
@@ -103,12 +115,12 @@ sólo un filtro de vista del lado del cliente.
   `remision_items`, el UPDATE del encabezado y el INSERT de `remisiones`;
   agrega `remision_items.orden_linea` y crea `remisiones_bitacora` (motivo
   obligatorio, sin políticas de UPDATE ni DELETE: la bitácora no se corrige).
-  **No usa `es_area()` / `supervisa_area()` a propósito**: esos helpers no
-  llegaron a la base de producción (de 20260823000005 sólo quedaron el enum y
-  las columnas), así que `rol_comercial()` lee `user_roles.area/nivel`
-  directamente y, cuando vienen vacíos, deduce el par del rol legado igual que
-  `desdeRolLegacy()`. Corre `supabase/diagnostico_esquema.sql` para ver qué
-  scripts faltan de verdad en una base.
+  **No usa `es_area()` / `supervisa_area()` a propósito**: la primera versión
+  los exigía en su preflight y se negó a correr en producción porque faltaba al
+  menos uno. `rol_comercial()` lee `user_roles.area/nivel` directamente y, si
+  vienen vacíos, deduce el par del rol legado igual que `desdeRolLegacy()`, así
+  que da lo mismo si los helpers están o no. Al correr, el script imprime cuáles
+  encontró.
 - `src/lib/remisionesEdicion.ts` — reconstruye el formulario desde los
   renglones guardados y calcula el alta/cambio/baja de cada renglón al guardar.
 

@@ -41,14 +41,18 @@
 --
 -- Por qué no usa `es_area()` / `supervisa_area()`
 -- ----------------------------------------------
--- Porque en esta base **no existen**: de 20260823000005 quedaron el enum
--- `user_area` y las columnas `user_roles.area/nivel`, pero no los helpers ni
--- sus políticas (corre `supabase/diagnostico_esquema.sql` para verlo). Pedirlos
--- dejaba este arreglo bloqueado detrás de otro script. La función de aquí lee
--- las mismas columnas y, cuando `area`/`nivel` vienen vacíos (usuario sin
+-- La primera versión de este script los exigía en su preflight y se negó a
+-- correr en producción: al menos uno de los dos no estaba. (El enum `user_area`
+-- y las columnas `user_roles.area/nivel` sí; `es_area()` también, según el
+-- diagnóstico — que hasta hoy sólo revisaba ESE helper de los ocho que crea
+-- 20260823000005, y por eso reportaba el script como aplicado.) El bloque 6 de
+-- aquí abajo imprime, al correr, cuáles hay y cuáles no.
+--
+-- Sea cual sea el estado, este arreglo ya no depende de ellos: `rol_comercial()`
+-- lee `user_roles.area/nivel` directamente y, cuando vienen vacíos (usuario sin
 -- migrar), deduce el par del rol legado igual que `desdeRolLegacy()` en la app.
--- Si más adelante se corren 20260823000005 y 20260824000003, esto sigue siendo
--- correcto: se apoya en los mismos datos, no en los helpers.
+-- Si los helpers están, o se agregan después, esto sigue siendo correcto: se
+-- apoya en los mismos datos, no en las funciones.
 --
 -- ADVERTENCIA: idempotente, para el SQL editor de Supabase. NO usar
 -- `supabase db push`.
@@ -262,14 +266,17 @@ CREATE POLICY "remision_items_delete_area" ON public.remision_items
   USING (public.puede_editar_remision(remision_id));
 
 -- Complementar es agregar renglones. Aquí SÍ se reemplaza la política vieja —
--- es la única del archivo que no es aditiva, y va con razón:
---   · `remision_items_insert` pedía los roles legados `admin`, `ventas` o
---     `coordinador`, así que dejaba fuera al supervisor y al administrador de
---     Comercial (`coordinador_ventas` / `director_ventas`): no podían agregar
---     un renglón ni al capturar.
---   · Y al mismo tiempo dejaba de más: cualquier `ventas` podía meter renglones
---     en la remisión de OTRO vendedor. Con la edición abierta, esa puerta ya no
---     puede quedarse abierta.
+-- es la única del archivo que no es aditiva — porque `remision_items_insert`
+-- tiene dos versiones posibles en la base y ninguna sirve tal cual:
+--   · La original (20260629000003) pide los roles legados `admin`, `ventas` o
+--     `coordinador`: deja fuera al supervisor y al administrador de Comercial
+--     (`coordinador_ventas` / `director_ventas`), y al mismo tiempo deja de más
+--     — cualquier `ventas` puede meter renglones en la remisión de OTRO. Con la
+--     edición abierta esa puerta no puede quedarse así.
+--   · La de 20260825000001 ya trae la escalera correcta; si es la que está,
+--     esto la deja igual salvo un detalle: aquella daba INSERT a cualquiera de
+--     Dirección y aquí sólo al administrador de Dirección, que es lo que dice
+--     el modelo (Dirección es de lectura, salvo su administrador).
 -- Nadie pierde nada de lo que hace a diario: se captura sobre la remisión que
 -- uno acaba de crear (uno es el vendedor), y el supervisor captura a nombre de
 -- quien sea de su área.
@@ -293,15 +300,15 @@ CREATE POLICY "comercial edita sus remisiones" ON public.remisiones
   USING (public.puede_editar_remision(id))
   WITH CHECK (public.puede_editar_remision(id));
 
--- Y de paso, el hueco de la captura, que es la misma causa: `crear remisiones`
--- pide los roles legados `admin`, `coordinador` o `ventas`, así que un
--- supervisor de Comercial (`coordinador_ventas`) o su administrador
--- (`director_ventas`) NO puede dar de alta una remisión — ni siquiera a su
--- nombre. Sin esto quedaría el absurdo de que el supervisor puede corregir
--- todas las remisiones de su área pero no capturar una. Es aditiva: la política
--- vieja se queda como está.
--- (Es el mismo arreglo del bloque 1 de 20260825000001, que no se puede correr
--- en esta base porque le faltan los helpers de ÁREA × NIVEL.)
+-- Y por si acaso, la captura. `crear remisiones` tiene, otra vez, dos versiones
+-- posibles con el mismo nombre: la original pide los roles legados `admin`,
+-- `coordinador` o `ventas` — con lo que un supervisor de Comercial
+-- (`coordinador_ventas`) o su administrador (`director_ventas`) no puede dar de
+-- alta una remisión ni a su nombre —, y la de 20260825000001 ya lo arregla.
+-- Esta política es ADITIVA y no toca ninguna de las dos: si la buena ya está,
+-- no cambia nada; si está la vieja, cierra el absurdo de que el supervisor
+-- pueda corregir todas las remisiones de su área pero no capturar una.
+-- El bloque 6 dice cuál de las dos tenías.
 DROP POLICY IF EXISTS "comercial captura remisiones" ON public.remisiones;
 CREATE POLICY "comercial captura remisiones" ON public.remisiones
   FOR INSERT TO authenticated
@@ -391,6 +398,48 @@ BEGIN
   END IF;
   RAISE NOTICE 'Listo: el operador de Comercial corrige y complementa sus remisiones, y cada cambio queda con motivo en remisiones_bitacora.';
 END $postflight$;
+
+
+-- ============================================================================
+-- BLOQUE 7 · Qué había en esta base (informativo, no cambia nada)
+-- ============================================================================
+-- La primera versión de este script se negó a correr porque faltaba un helper
+-- de ÁREA × NIVEL, y el diagnóstico decía que estaban todos — porque sólo
+-- revisaba uno de los ocho. Esto lo deja escrito en el log de la corrida, para
+-- no volver a adivinar.
+
+DO $informe$
+DECLARE
+  _hay text := '';
+  _f   text;
+  _pol text;
+BEGIN
+  FOREACH _f IN ARRAY ARRAY[
+    'es_area(uuid,public.user_area)', 'supervisa_area(uuid,public.user_area)',
+    'es_admin_area(uuid,public.user_area)', 'es_admin_global(uuid)',
+    'nivel_al_menos(uuid,public.user_nivel)', 'usuario_activo(uuid)'
+  ] LOOP
+    _hay := _hay || E'\n  · ' || rpad(split_part(_f,'(',1), 16)
+         || CASE WHEN to_regprocedure('public.'||_f) IS NULL THEN 'NO está' ELSE 'está' END;
+  END LOOP;
+  RAISE NOTICE E'Helpers de ÁREA × NIVEL (20260823000005 / 20260824000003):%', _hay;
+
+  _hay := '';
+  FOR _pol IN
+    SELECT tablename||' · '||policyname||' → '
+        || CASE WHEN COALESCE(qual,'')||COALESCE(with_check,'') LIKE '%supervisa_area%'
+                THEN 'versión por área (20260825000001)'
+                ELSE 'versión vieja, por rol legado' END
+      FROM pg_policies
+     WHERE schemaname='public'
+       AND ((tablename='remisiones'     AND policyname='crear remisiones')
+         OR (tablename='remision_items' AND policyname='remision_items_insert'))
+  LOOP
+    _hay := _hay || E'\n  · ' || _pol;
+  END LOOP;
+  IF _hay = '' THEN _hay := E'\n  · (ninguna: el INSERT de renglones lo rige ya la escalera de este script)'; END IF;
+  RAISE NOTICE E'Políticas de captura que había antes de esto:%', _hay;
+END $informe$;
 
 -- Verificación a ojo — quién puede corregir qué (cámbiale el folio):
 --   SELECT p.nombre_completo, ur.area, ur.nivel, ur.role,
