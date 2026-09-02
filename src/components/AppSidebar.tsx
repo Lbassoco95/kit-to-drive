@@ -50,12 +50,19 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent className="bg-[#1F3864]">
         <div className={`px-4 py-5 border-b border-white/10 ${collapsed ? "text-center px-2" : ""}`}>
-          <img
-            src="/logo-mati-dark.png"
-            alt="Mati"
-            className={collapsed ? "h-8 w-8 object-contain mx-auto" : "h-9 w-auto object-contain"}
-          />
-          {!collapsed && <div className="text-xs text-white/70 mt-0.5">{t.subtitle}</div>}
+          <div className={collapsed ? "" : "flex items-center gap-3"}>
+            <img
+              src="/mati-icon-white.png"
+              alt="Mati"
+              className={collapsed ? "h-8 w-8 object-contain mx-auto" : "h-9 w-9 object-contain"}
+            />
+            {!collapsed && (
+              <div className="flex flex-col leading-tight">
+                <span className="text-white font-extrabold text-xl tracking-tight">mati</span>
+                <span className="text-[10px] text-white/70 -mt-0.5">{t.subtitle}</span>
+              </div>
+            )}
+          </div>
         </div>
         {GROUPS.map(g => {
           const list = items.filter(i => i.group === g);
