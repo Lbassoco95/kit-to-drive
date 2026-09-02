@@ -50,9 +50,11 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent className="bg-[#1F3864]">
         <div className={`px-4 py-5 border-b border-white/10 ${collapsed ? "text-center px-2" : ""}`}>
-          <div className="text-white font-extrabold text-xl leading-tight tracking-wide">
-            {collapsed ? "GD" : "GRUPO DAZON"}
-          </div>
+          <img
+            src="/logo-mati-dark.png"
+            alt="Mati"
+            className={collapsed ? "h-8 w-8 object-contain mx-auto" : "h-9 w-auto object-contain"}
+          />
           {!collapsed && <div className="text-xs text-white/70 mt-0.5">{t.subtitle}</div>}
         </div>
         {GROUPS.map(g => {
