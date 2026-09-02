@@ -75,6 +75,11 @@ y si alguien recarga en esos minutos, ve la pantalla rota. Así que:
 - **Una sola forma de leer cada cosa.** Clientes y Remisiones leían el mismo
   catálogo de dos maneras y sólo una tenía respaldo: la que no lo tenía es la que
   se vació. Si dos pantallas piden lo mismo, que compartan la función.
+- **Las RPC también.** Un `supabase.rpc(...)` contra una función que no está
+  contesta `42883 function ... does not exist`. Pasa el error por
+  `explicarError()`, nunca `error.message` pelón: así fue como el botón de
+  liberar unidad y la importación de packing list se veían como «no funciona» en
+  vez de «falta correr tal script».
 
 ## Registra cada script en el diagnóstico
 
@@ -107,7 +112,7 @@ diagnóstico no cuadran, en las dos direcciones.
 | Prueba | Qué evita |
 |---|---|
 | `inventario-migraciones` | Un script que el diagnóstico no ve. |
-| `consultas-supabase` | `.order("a, b")` en una sola llamada; leer clientes sin el lector compartido. |
+| `consultas-supabase` | `.order("a, b")` en una sola llamada; leer clientes sin el lector compartido; una RPC que ninguna migración crea, o que al fallar no dice qué script correr. |
 | `catalogo-clientes` | Que el catálogo se quede sin respaldo o se trague el error. |
 | `clientes-visibilidad` | Que la pantalla de Clientes vuelva a decir «Sin resultados» cuando en realidad falló. |
 | `esquema-pendiente` | Que un error de esquema no diga qué script correr. |

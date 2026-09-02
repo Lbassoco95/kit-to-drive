@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { explicarError } from "@/lib/dazon";
 
 /**
  * Errores de consulta que ya rompieron pantallas en producción y que no se
@@ -35,6 +36,27 @@ const codigo = fuentes(RAIZ).map(ruta => ({
   ruta: relative(process.cwd(), ruta),
   texto: sinComentarios(readFileSync(ruta, "utf8")),
 }));
+
+/** Las RPC que la app llama de verdad. */
+const rpcs = (): Set<string> => {
+  const nombres = new Set<string>();
+  for (const { texto } of codigo) {
+    for (const m of texto.matchAll(/\brpc\(\s*["'`]([a-z_0-9]+)["'`]/g)) nombres.add(m[1]);
+  }
+  return nombres;
+};
+
+/** El script que crea esa función, si alguno la crea. */
+const MIGRACIONES = join(process.cwd(), "supabase", "migrations");
+const sql = readdirSync(MIGRACIONES)
+  .filter(f => f.endsWith(".sql"))
+  .map(f => ({ archivo: f, texto: readFileSync(join(MIGRACIONES, f), "utf8") }));
+
+const scriptQueLaCrea = (fn: string): string | undefined =>
+  sql.filter(({ texto }) => texto.includes(`FUNCTION public.${fn}(`))
+     .map(({ archivo }) => archivo)
+     .sort()
+     .pop();
 
 describe("consultas a Supabase", () => {
   /**
@@ -86,6 +108,43 @@ describe("consultas a Supabase", () => {
       "Usa cargarCatalogoClientes() de @/lib/catalogoClientes: trae el " +
       "respaldo para una base sin folio_interno y no se traga el error:\n" +
       sueltas.map(l => `  · ${l}`).join("\n"),
+    ).toEqual([]);
+  });
+
+  /**
+   * Cada RPC que la app llama tiene que existir en algún script de
+   * `supabase/migrations/`. Si no, la base nunca va a poder tenerla: el botón
+   * está roto de origen y no hay nada que correr para arreglarlo.
+   */
+  it("toda RPC que llama la app la crea alguna migración", () => {
+    const huerfanas = [...rpcs()].filter(r => !scriptQueLaCrea(r));
+    expect(
+      huerfanas,
+      "Estas RPC no las crea ninguna migración, así que no hay script que " +
+      "correr para que existan:\n" + huerfanas.map(r => `  · ${r}`).join("\n"),
+    ).toEqual([]);
+  });
+
+  /**
+   * Y si falla porque la base va atrás, el mensaje tiene que nombrar el
+   * archivo. `desasignar_motocarro_de_remision` e `importar_packing_list`
+   * faltaban en producción y el usuario sólo veía «function public.… does not
+   * exist»: un botón que no sirve y nadie sabe por qué.
+   */
+  it("un 42883 de cualquier RPC dice qué script correr", () => {
+    const mudas: string[] = [];
+    for (const r of rpcs()) {
+      const msg = explicarError(
+        { code: "42883", message: `function public.${r}(uuid) does not exist` },
+        "x",
+      );
+      if (!/supabase\/migrations\/\S+\.sql/.test(msg)) mudas.push(r);
+    }
+    expect(
+      mudas,
+      "Agrega estas RPC a `SCRIPT_DE_OBJETO` en src/lib/dazon.ts; si no, el " +
+      "usuario recibe el error crudo de Postgres y nadie sabe qué correr:\n" +
+      mudas.map(r => `  · ${r}`).join("\n"),
     ).toEqual([]);
   });
 });

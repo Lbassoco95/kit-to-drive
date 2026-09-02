@@ -247,15 +247,15 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
   // pedía `clientes.folio_interno` en una base donde el script no se corrió.
   [/folio_interno|generar_folio_interno_cliente|clientes_folio_interno_seq/,
     "20260827000001_folio_interno_clientes_nuevos.sql"],
-  [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color/,
+  [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color|cambiar_color_chasis|intercambiar_color_chasis/,
     "20260823000003_color_efectivo_capacidad.sql"],
   [/crear_motocarro_ya_armado/,
     "20260828000001_motocarro_ya_armado.sql"],
   [/capturar_seriales_unidad/,
     "20260823000002_capturar_seriales_unidad.sql"],
-  [/inventario_colores\.nombre_comercial|incidencias_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at/,
+  [/inventario_colores\.nombre_comercial|incidencia_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at|asignar_remision_items|crementar_inventario_color/,
     "20260823000001_incidencias_chasis_colores_cierre.sql"],
-  [/modelos_producto|bitacora_orden_armado|nombre_comercial|configurar_unidad|desconfigurar_unidad/,
+  [/modelos_producto|bitacora_orden_armado|nombre_comercial|configurar_unidad|desconfigurar_unidad|cambiar_orden_armado|importar_vins_inventario|importar_motores_inventario/,
     "20260822000001_configuracion_manual_unidades.sql"],
   [/bitacora_eliminaciones/,
     "20260819000010_bitacora_eliminaciones.sql"],
@@ -267,6 +267,16 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
   // script; sin él la ficha abre pero las pestañas salen vacías.
   [/clientes_comentarios|clientes_bitacora/,
     "20260819000011_clientes_crm.sql"],
+  [/importar_packing_list/,
+    "20260819000009_importar_packing_list.sql"],
+  [/importar_partes_excel/,
+    "20260819000002_importar_partes_excel.sql"],
+  [/importar_contenedores_excel/,
+    "20260819000003_importar_contenedores_excel.sql"],
+  [/proponer_fecha_entrega|confirmar_fecha_entrega/,
+    "20260503192333_cb78101f-581a-4ca7-ba6c-2917c43edb25.sql"],
+  [/recibir_contenedor/,
+    "20260503193601_1f2d647e-2717-44a2-a009-d1616587e0ac.sql"],
 ];
 
 /**

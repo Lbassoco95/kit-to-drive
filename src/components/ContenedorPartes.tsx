@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Upload, FileSpreadsheet, Package, CheckCircle2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { parsePackingListExcel, ParteFromExcel } from "@/lib/excelParser";
+import { explicarError } from "@/lib/dazon";
 
 type Parte = {
   id: string;
@@ -73,7 +74,10 @@ export function ContenedorPartes({
       });
 
       if (error) {
-        toast.error(error.message);
+        // Igual que en la bandeja: un «function ... does not exist» crudo no
+        // dice qué correr. `importar_packing_list` (20260819000009) es de los
+        // scripts que no habían llegado a producción.
+        toast.error(explicarError(error, "No se pudo importar el packing list"));
         setBusy(false);
         return;
       }
