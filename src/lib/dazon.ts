@@ -241,6 +241,12 @@ export const claveCapacidad = (modelo: string, color: string) =>
 // arriba. Ojo con `nombre_comercial`: existe en `modelos_producto` (KIT-3) y
 // también en `inventario_colores` (KIT-4), y son scripts distintos.
 const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
+  [/remisiones_bitacora|puede_editar_remision|puede_capturar_remision|rol_comercial|orden_linea/,
+    "20260902000001_operador_edita_remisiones.sql"],
+  // Los clientes se vieron «sin resultados» en producción por esto: la lista
+  // pedía `clientes.folio_interno` en una base donde el script no se corrió.
+  [/folio_interno|generar_folio_interno_cliente|clientes_folio_interno_seq/,
+    "20260827000001_folio_interno_clientes_nuevos.sql"],
   [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color/,
     "20260823000003_color_efectivo_capacidad.sql"],
   [/crear_motocarro_ya_armado/,
@@ -255,6 +261,12 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260819000010_bitacora_eliminaciones.sql"],
   [/usuario_activo/,
     "20260824000003_usuario_activo_se_aplica.sql"],
+  [/asignar_motocarro_a_remision|desasignar_motocarro_de_remision/,
+    "20260826000003_asignacion_manual_remisiones.sql"],
+  // El expediente del cliente (comentarios y bitácora) vive en su propio
+  // script; sin él la ficha abre pero las pestañas salen vacías.
+  [/clientes_comentarios|clientes_bitacora/,
+    "20260819000011_clientes_crm.sql"],
 ];
 
 /**

@@ -48,6 +48,15 @@ describe("explicarError · a qué script apunta cada objeto", () => {
     ["column modelos_producto.nombre_comercial does not exist", "20260822000001"],
     ['relation "public.bitacora_eliminaciones" does not exist', "20260819000010"],
     ["function public.usuario_activo(uuid) does not exist", "20260824000003"],
+    // El incidente de Clientes: la lista salía vacía porque la base no tenía
+    // esta columna, y el mensaje no decía qué correr.
+    ["column clientes.folio_interno does not exist", "20260827000001"],
+    ["function public.generar_folio_interno_cliente() does not exist", "20260827000001"],
+    ['relation "public.clientes_bitacora" does not exist', "20260819000011"],
+    ['relation "public.remisiones_bitacora" does not exist', "20260902000001"],
+    ["function public.puede_editar_remision(uuid, uuid) does not exist", "20260902000001"],
+    ["column remision_items.orden_linea does not exist", "20260902000001"],
+    ["function public.asignar_motocarro_a_remision(uuid, uuid) does not exist", "20260826000003"],
   ];
 
   for (const [crudo, esperado] of casos) {

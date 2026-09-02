@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, normColor, normModelo, StockColor } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, normColor, normModelo, StockColor, explicarError } from "@/lib/dazon";
+import { cargarCatalogoClientes, SCRIPT_FOLIO_INTERNO } from "@/lib/catalogoClientes";
 import {
   agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, MOTIVOS_EDICION,
   type LineaMoto, type RenglonRemision,
@@ -417,36 +418,37 @@ export default function Remisiones() {
   /**
    * Catálogo de clientes para el selector de la remisión.
    *
-   * OJO con el `order`: `supabase-js` no acepta varias columnas en una sola
-   * llamada. `.order("folio_interno, codigo_erp")` viaja como
-   * `order=folio_interno, codigo_erp.asc`, PostgREST no puede leer el segundo
-   * término (le queda un espacio pegado al nombre) y responde 400. La lista
-   * llegaba vacía y el desplegable «Selecciona cliente» no ofrecía nada: se
-   * veía como que el sistema no permitía elegir cliente. Van encadenados.
+   * La lectura vive en `@/lib/catalogoClientes` porque esta pantalla y la de
+   * Clientes leían el mismo catálogo de dos maneras distintas, y sólo una
+   * tenía respaldo: el selector aguantaba una base sin `folio_interno` y la
+   * lista de Clientes se quedaba vacía. Ahí está contado el incidente.
+   *
+   * Sin clientes no hay remisión, así que aquí nunca se falla en silencio.
    */
   const loadClientes = async () => {
-    const { data, error } = await supabase
-      .from("clientes")
-      .select("id,codigo_erp,folio_interno,nombre_comercial")
-      .order("folio_interno", { nullsFirst: false })
-      .order("codigo_erp", { nullsFirst: false });
+    const carga = await cargarCatalogoClientes((conFolioInterno) => {
+      const columnas = conFolioInterno
+        ? "id,codigo_erp,folio_interno,nombre_comercial"
+        : "id,codigo_erp,nombre_comercial";
+      const q = supabase.from("clientes").select(columnas);
+      // OJO con el `order`: `supabase-js` no acepta varias columnas en una
+      // sola llamada. `.order("folio_interno, codigo_erp")` viaja como
+      // `order=folio_interno, codigo_erp.asc`, PostgREST no puede leer el
+      // segundo término y responde 400. Van encadenados.
+      return conFolioInterno
+        ? q.order("folio_interno", { nullsFirst: false }).order("codigo_erp", { nullsFirst: false })
+        : q.order("codigo_erp", { nullsFirst: false });
+    });
 
-    if (!error) { setClientes(data ?? []); return; }
-
-    // Respaldo: si `folio_interno` todavía no existe en la base (falta correr
-    // 20260827000001), se pide lo de siempre. Sin clientes no hay remisión, así
-    // que aquí nunca se falla en silencio.
-    console.warn("clientes con folio_interno no disponible:", error.message);
-    const { data: previo, error: error2 } = await supabase
-      .from("clientes")
-      .select("id,codigo_erp,nombre_comercial")
-      .order("codigo_erp", { nullsFirst: false });
-    if (error2) {
+    if (carga.error) {
       setClientes([]);
-      toast.error(`No se pudo cargar el catálogo de clientes: ${error2.message}`);
+      toast.error(explicarError(carga.error, "No se pudo cargar el catálogo de clientes"));
       return;
     }
-    setClientes(previo ?? []);
+    if (carga.degradado) {
+      console.warn(`clientes sin folio_interno: falta correr supabase/migrations/${SCRIPT_FOLIO_INTERNO}`);
+    }
+    setClientes(carga.clientes);
   };
   const loadVendedores = async () => {
     const { data: roles } = await supabase.from("user_roles").select("user_id,area").eq("area","comercial");

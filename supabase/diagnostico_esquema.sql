@@ -16,25 +16,93 @@
 --   · PARCIAL   → quedó a medias; vuelve a correr el archivo completo
 --                 (todos son idempotentes) y revisa el error que salga.
 --
+--   · SUPERADO → otro script posterior lo reemplazó por completo; no hay que
+--                 correrlo y no se revisa.
+--
+-- AQUÍ SE REGISTRAN TODOS LOS SCRIPTS. Si `supabase/migrations/` tiene un
+-- archivo que no aparece abajo (ni en `esperado` ni en `superado`), la prueba
+-- `src/test/inventario-migraciones.test.ts` falla: un script sin registrar es
+-- un hueco que este diagnóstico no puede ver, y así fue como
+-- 20260827000001 llevaba días sin correr mientras la pantalla de Clientes
+-- decía «Sin resultados».
+--
+-- Tipos de objeto que se pueden pedir en `esperado`:
+--   tabla|nombre                       · vista|nombre
+--   columna|tabla.columna              · funcion|nombre(tipos)
+--   columna|tabla.columna|texto        · el DEFAULT debe contener ese texto
+--   funcion|nombre(tipos)|texto        · el cuerpo debe contener ese texto
+--   trigger|tabla.trigger              · indice|nombre[|texto del índice]
+--   politica|tabla.politica[|texto]    · tipo|enum.valor
+--   restriccion|tabla.restriccion[|texto]
+--   sin_privilegio|funcion(tipos)|rol  · ese rol NO debe poder ejecutarla
+--
 -- Para saber qué le falta a UN script antes de correrlo, hay revisiones
 -- puntuales al lado de este archivo, p. ej.
 -- supabase/revisar_antes_de_20260902000001.sql.
 -- ============================================================================
 
 WITH esperado(script, objeto) AS (VALUES
+  -- Base del sistema. Si algo de esto falta, la app no arranca; se registra
+  -- para que el inventario esté completo y no por miedo a que se pierda.
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tipo|app_role.admin'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|user_roles'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|profiles'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|clientes'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|contenedores'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|remisiones'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|motocarros'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|bitacora_eventos'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'tabla|config_general'),
+  ('20260503015306_f99960c9-701f-452a-aab9-4d1216cb57ae', 'funcion|has_role(uuid,app_role)'),
+  -- Endurecimiento de permisos: `anon` no debe poder preguntar por roles.
+  -- No deja objetos nuevos, así que se revisa por lo que QUITA.
+  ('20260503015323_a96fe55f-42c2-460e-b39d-70ee25c5777b', 'sin_privilegio|get_my_role()|anon'),
+  ('20260503015323_a96fe55f-42c2-460e-b39d-70ee25c5777b', 'sin_privilegio|handle_new_user()|authenticated'),
+  ('20260503023936_e271aa15-dd34-4c36-970b-6b30a5eaf2a4', 'funcion|log_motocarros_changes()'),
+  ('20260503023936_e271aa15-dd34-4c36-970b-6b30a5eaf2a4', 'funcion|log_remisiones_changes()'),
+  ('20260503190820_5b97bddd-db06-4817-abf2-cc96562f8fa0', 'funcion|auto_asignar_motocarros_remision()'),
+  ('20260503190820_5b97bddd-db06-4817-abf2-cc96562f8fa0', 'funcion|reintentar_asignar_remision(uuid)'),
+  ('20260503192247_c54db563-2e9e-43a1-ad2b-757bd198e7ac', 'tipo|app_role.coordinador'),
+  ('20260503192333_cb78101f-581a-4ca7-ba6c-2917c43edb25', 'columna|motocarros.fecha_propuesta_entrega'),
+  ('20260503192333_cb78101f-581a-4ca7-ba6c-2917c43edb25', 'columna|motocarros.confirmada_logistica_at'),
+  ('20260503192333_cb78101f-581a-4ca7-ba6c-2917c43edb25', 'funcion|proponer_fecha_entrega(uuid,date,text)'),
+  ('20260503192333_cb78101f-581a-4ca7-ba6c-2917c43edb25', 'funcion|confirmar_fecha_entrega(uuid,text)'),
+  ('20260503193601_1f2d647e-2717-44a2-a009-d1616587e0ac', 'funcion|recibir_contenedor(text,date,text,text,jsonb)'),
+  ('20260629000001_reportes_comentarios',         'tabla|reportes_turno'),
+  ('20260629000001_reportes_comentarios',         'tabla|comentarios_motocarros'),
+  ('20260629000002_profiles_email',               'columna|profiles.email'),
+  ('20260629000003_remision_items',               'tabla|remision_items'),
+  ('20260629000003_remision_items',               'columna|remisiones.tipo_remision'),
+  -- Ojo: la restricción `remisiones_tipo_remision_check` NO sirve para
+  -- reconocer este script, porque 20260629000005 la borra a propósito (el
+  -- tipo pasó a vivir en cada renglón). Lo que queda es el default de la
+  -- columna, que este script cambió de 'cabina' a 'motocarro'.
+  ('20260629000004_tipo_remision_v2',             'columna|remisiones.tipo_remision|motocarro'),
   ('20260629000005_remision_items_tipo_servicio', 'columna|remision_items.tipo_servicio'),
   ('20260713000001_finanzas_module',              'tabla|pagos'),
+  -- El bug era asignar un 300cc a una remisión de 200cc: la versión buena
+  -- filtra por modelo y se distingue por el cuarto argumento.
+  ('20260714000001_fix_asignar_chasis_modelo',    'funcion|asignar_chasis_remision(uuid,integer,text,text)'),
   ('20260714000002_crm_ventas',                   'tabla|crm_oportunidades'),
   ('20260714000002_crm_ventas',                   'tabla|crm_rutas'),
   ('20260717000003_clientes_expediente_digital',  'columna|clientes.rfc'),
   ('20260717000003_clientes_expediente_digital',  'columna|clientes.codigo_postal'),
   ('20260717000004_crm_fixes',                    'vista|v_reporte_pipeline'),
   ('20260717000004_crm_fixes',                    'columna|crm_oportunidades.limitante_notas'),
+  ('20260717000007_crm_actividades_estatus',      'columna|crm_actividades.objetivo_visita'),
   ('20260819000001_parts_inventory',              'tabla|contenedor_partes'),
+  ('20260819000002_importar_partes_excel',        'funcion|importar_partes_excel(uuid,jsonb)'),
+  ('20260819000003_importar_contenedores_excel',  'funcion|importar_contenedores_excel(jsonb)'),
   ('20260819000004_inventario_chasis',            'tabla|inventario_chasis'),
   ('20260819000005_inventario_motor',             'tabla|inventario_motor'),
+  ('20260819000006_inventario_partes',            'tabla|inventario_partes'),
   ('20260819000007_inventario_colores',           'tabla|inventario_colores'),
+  ('20260819000009_importar_packing_list',        'funcion|importar_packing_list(uuid,jsonb)'),
   ('20260819000010_bitacora_eliminaciones',       'tabla|bitacora_eliminaciones'),
+  -- El expediente del cliente: sin esto la ficha abre con las pestañas vacías.
+  ('20260819000011_clientes_crm',                 'columna|clientes.activo'),
+  ('20260819000011_clientes_crm',                 'tabla|clientes_comentarios'),
+  ('20260819000011_clientes_crm',                 'tabla|clientes_bitacora'),
 
   -- KIT-1 · unidad = chasis + motor
   ('20260821000001_unidad_chasis_motor',          'columna|contenedores.total_chasis'),
@@ -106,12 +174,20 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_actividades.crm_actividades_insert_area'),
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area'),
 
-  -- Folio interno de clientes nuevos
+  -- Reutilizar el folio de una remisión cancelada: el UNIQUE completo se
+  -- cambió por un índice único parcial que excluye las CANCELADA.
+  ('20260826000002_folio_reutilizable_canceladas','indice|idx_remisiones_folio_activas|CANCELADA'),
+  ('20260826000003_asignacion_manual_remisiones', 'funcion|asignar_motocarro_a_remision(uuid,uuid)'),
+  ('20260826000003_asignacion_manual_remisiones', 'funcion|desasignar_motocarro_de_remision(uuid)'),
+
+  -- Folio interno de clientes nuevos. ESTE es el que dejó a Clientes sin
+  -- lista en producción: la pantalla pedía `clientes.folio_interno` y la base
+  -- no la tenía.
   ('20260827000001_folio_interno_clientes_nuevos','columna|clientes.folio_interno'),
   ('20260827000001_folio_interno_clientes_nuevos','funcion|generar_folio_interno_cliente()'),
 
   -- Motocarro ya armado desde remisiones
-  ('20260828000001_motocarro_ya_armado',          'funcion|crear_motocarro_ya_armado(uuid,text,text,text,text,integer)'),
+  ('20260828000001_motocarro_ya_armado',          'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)'),
 
   -- El operador corrige y complementa sus remisiones, con motivo
   ('20260902000001_operador_edita_remisiones',    'funcion|rol_comercial(uuid)'),
@@ -123,14 +199,27 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_delete_area'),
   ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_insert_area'),
   ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial edita sus remisiones'),
-  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial captura remisiones')
+  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial captura remisiones'),
+
+  -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
+  ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
+  ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
+  ('fix_remisiones_columns',                      'restriccion|remisiones.remisiones_tipo_pago_check|contra_entrega')
+), superado(script, por) AS (VALUES
+  -- Scripts que otro posterior reemplazó por completo (les tiró la función y
+  -- la volvió a crear con otra firma). No hay que correrlos y revisarlos
+  -- daría un falso APLICADO: lo que se busca es lo que dejó el script nuevo.
+  ('20260819000008_importar_vins_inventario',     '20260821000001_unidad_chasis_motor'),
+  ('20260819000012_importar_motores_inventario',  '20260821000001_unidad_chasis_motor')
 ), revisado AS (
   SELECT e.script, e.objeto,
          split_part(e.objeto, '|', 1) AS tipo,
          split_part(e.objeto, '|', 2) AS nombre,
-         -- Tercer campo opcional: texto que la política tiene que contener. Hace
-         -- falta porque varios scripts REDEFINEN una política con el mismo
-         -- nombre; que exista no dice cuál de las dos versiones quedó.
+         -- Tercer campo opcional. Para `politica`, `funcion`, `indice` y
+         -- `restriccion` es el texto que la definición tiene que contener:
+         -- hace falta porque varios scripts REDEFINEN el mismo objeto con el
+         -- mismo nombre, y que exista no dice cuál versión quedó. Para
+         -- `sin_privilegio` es el rol que NO debe poder ejecutar la función.
          NULLIF(split_part(e.objeto, '|', 3), '') AS detalle
     FROM esperado e
 ), resuelto AS (
@@ -144,9 +233,47 @@ WITH esperado(script, objeto) AS (VALUES
         EXISTS (SELECT 1 FROM information_schema.columns c
                  WHERE c.table_schema = 'public'
                    AND c.table_name  = split_part(r.nombre, '.', 1)
-                   AND c.column_name = split_part(r.nombre, '.', 2))
+                   AND c.column_name = split_part(r.nombre, '.', 2)
+                   -- Con `detalle`, el DEFAULT de la columna tiene que
+                   -- contener ese texto: sirve para los scripts que sólo
+                   -- cambian un default y no dejan objeto nuevo.
+                   AND (r.detalle IS NULL
+                        OR COALESCE(c.column_default,'') LIKE '%' || r.detalle || '%'))
       WHEN 'funcion' THEN
         to_regprocedure('public.' || r.nombre) IS NOT NULL
+        -- Con `detalle`, además de existir, el cuerpo tiene que contener ese
+        -- texto: varios scripts REDEFINEN la misma función con la misma firma
+        -- y que exista no dice cuál de las dos versiones quedó.
+        AND (r.detalle IS NULL OR EXISTS (
+              SELECT 1 FROM pg_proc p
+               WHERE p.oid = to_regprocedure('public.' || r.nombre)
+                 AND p.prosrc LIKE '%' || r.detalle || '%'))
+      WHEN 'sin_privilegio' THEN
+        -- Al revés que los demás: el script se reconoce por lo que QUITÓ.
+        to_regprocedure('public.' || r.nombre) IS NOT NULL
+        AND NOT has_function_privilege(
+              r.detalle, to_regprocedure('public.' || r.nombre), 'EXECUTE')
+      WHEN 'tipo' THEN
+        EXISTS (SELECT 1 FROM pg_enum e
+                  JOIN pg_type ty ON ty.oid = e.enumtypid
+                  JOIN pg_namespace n ON n.oid = ty.typnamespace
+                 WHERE n.nspname = 'public'
+                   AND ty.typname  = split_part(r.nombre, '.', 1)
+                   AND e.enumlabel = split_part(r.nombre, '.', 2))
+      WHEN 'indice' THEN
+        EXISTS (SELECT 1 FROM pg_indexes
+                 WHERE schemaname = 'public'
+                   AND indexname  = r.nombre
+                   AND (r.detalle IS NULL OR indexdef LIKE '%' || r.detalle || '%'))
+      WHEN 'restriccion' THEN
+        EXISTS (SELECT 1 FROM pg_constraint co
+                  JOIN pg_class cl ON cl.oid = co.conrelid
+                  JOIN pg_namespace n ON n.oid = cl.relnamespace
+                 WHERE n.nspname = 'public'
+                   AND cl.relname = split_part(r.nombre, '.', 1)
+                   AND co.conname = split_part(r.nombre, '.', 2)
+                   AND (r.detalle IS NULL
+                        OR pg_get_constraintdef(co.oid) LIKE '%' || r.detalle || '%'))
       WHEN 'trigger' THEN
         EXISTS (SELECT 1 FROM pg_trigger t
                   JOIN pg_class c ON c.oid = t.tgrelid
@@ -165,15 +292,22 @@ WITH esperado(script, objeto) AS (VALUES
     END AS existe
   FROM revisado r
 )
-SELECT script,
-       CASE
-         WHEN bool_and(existe)     THEN 'APLICADO'
-         WHEN bool_or(existe)      THEN 'PARCIAL  ←— vuelve a correr el archivo completo'
-         ELSE                           'FALTA    ←— corre supabase/migrations/' || script || '.sql'
-       END AS estado,
-       count(*) FILTER (WHERE existe)     AS objetos_ok,
-       count(*)                           AS objetos_esperados,
-       string_agg(nombre, ', ') FILTER (WHERE NOT existe) AS lo_que_falta
-  FROM resuelto
- GROUP BY script
+SELECT * FROM (
+  SELECT script,
+         CASE
+           WHEN bool_and(existe)     THEN 'APLICADO'
+           WHEN bool_or(existe)      THEN 'PARCIAL  ←— vuelve a correr el archivo completo'
+           ELSE                           'FALTA    ←— corre supabase/migrations/' || script || '.sql'
+         END AS estado,
+         count(*) FILTER (WHERE existe)     AS objetos_ok,
+         count(*)                           AS objetos_esperados,
+         string_agg(nombre, ', ') FILTER (WHERE NOT existe) AS lo_que_falta
+    FROM resuelto
+   GROUP BY script
+  UNION ALL
+  SELECT s.script,
+         'SUPERADO ←— lo reemplazó ' || s.por,
+         0::bigint, 0::bigint, NULL::text
+    FROM superado s
+) todo
  ORDER BY script;
