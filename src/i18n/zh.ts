@@ -320,6 +320,8 @@ export const zh = {
     entregados: "已交付",
     sinNombre: "无商业名称",
     sinResultados: "无结果",
+    cargando: "正在加载客户…",
+    reintentar: "重试",
     editar: "编辑客户",
     creado: "✓ 客户已创建",
     actualizado: "✓ 客户已更新",

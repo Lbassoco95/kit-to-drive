@@ -241,7 +241,13 @@ export const claveCapacidad = (modelo: string, color: string) =>
 // arriba. Ojo con `nombre_comercial`: existe en `modelos_producto` (KIT-3) y
 // también en `inventario_colores` (KIT-4), y son scripts distintos.
 const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
-  [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color/,
+  [/remisiones_bitacora|puede_editar_remision|puede_capturar_remision|rol_comercial|orden_linea/,
+    "20260902000001_operador_edita_remisiones.sql"],
+  // Los clientes se vieron «sin resultados» en producción por esto: la lista
+  // pedía `clientes.folio_interno` en una base donde el script no se corrió.
+  [/folio_interno|generar_folio_interno_cliente|clientes_folio_interno_seq/,
+    "20260827000001_folio_interno_clientes_nuevos.sql"],
+  [/color_original|piezas_recibidas|piezas_extra|juegos_usados|bitacora_color|capacidad_color|cambiar_color_chasis|intercambiar_color_chasis/,
     "20260823000003_color_efectivo_capacidad.sql"],
   [/crear_motocarro_ya_armado/,
     "20260828000001_motocarro_ya_armado.sql"],
@@ -251,14 +257,36 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260827000001_folio_interno_clientes_nuevos.sql"],
   [/capturar_seriales_unidad/,
     "20260823000002_capturar_seriales_unidad.sql"],
-  [/inventario_colores\.nombre_comercial|incidencias_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at/,
+  [/inventario_colores\.nombre_comercial|incidencia_chasis|piezas_total|piezas_en_revision|piezas_garantia|piezas_no_util|recalculado_at|asignar_remision_items|crementar_inventario_color/,
     "20260823000001_incidencias_chasis_colores_cierre.sql"],
-  [/modelos_producto|bitacora_orden_armado|nombre_comercial|configurar_unidad|desconfigurar_unidad/,
+  [/modelos_producto|bitacora_orden_armado|nombre_comercial|configurar_unidad|desconfigurar_unidad|cambiar_orden_armado|importar_vins_inventario|importar_motores_inventario/,
     "20260822000001_configuracion_manual_unidades.sql"],
   [/bitacora_eliminaciones/,
     "20260819000010_bitacora_eliminaciones.sql"],
   [/usuario_activo/,
     "20260824000003_usuario_activo_se_aplica.sql"],
+  [/asignar_motocarro_a_remision|desasignar_motocarro_de_remision/,
+    "20260826000003_asignacion_manual_remisiones.sql"],
+  // El expediente del cliente (comentarios y bitácora) vive en su propio
+  // script; sin él la ficha abre pero las pestañas salen vacías.
+  [/clientes_comentarios|clientes_bitacora/,
+    "20260819000011_clientes_crm.sql"],
+  [/importar_packing_list/,
+    "20260819000009_importar_packing_list.sql"],
+  [/importar_partes_excel/,
+    "20260819000002_importar_partes_excel.sql"],
+  [/importar_contenedores_excel/,
+    "20260819000003_importar_contenedores_excel.sql"],
+  [/proponer_fecha_entrega|confirmar_fecha_entrega/,
+    "20260503192333_cb78101f-581a-4ca7-ba6c-2917c43edb25.sql"],
+  [/recibir_contenedor/,
+    "20260503193601_1f2d647e-2717-44a2-a009-d1616587e0ac.sql"],
+  // Las solicitudes cuelgan de la misma tabla `avisos`, así que lo específico
+  // va primero: sin 20260904000001 la tabla existe pero sin esas columnas.
+  [/responder_solicitud|requiere_respuesta|usuario_destino/,
+    "20260904000001_solicitudes_a_fabrica.sql"],
+  [/ajustar_unidades_remision|recibe_avisos_de|\bavisos\b/,
+    "20260903000001_avisos_entre_areas.sql"],
 ];
 
 /**

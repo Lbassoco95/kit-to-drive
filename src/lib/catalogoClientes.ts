@@ -29,7 +29,19 @@ const COLUMNAS_RESPALDO =
   "fecha_alta, doc_constancia_sf_url, doc_comprobante_domicilio_url, " +
   "doc_ine_representante_url, doc_acta_constitutiva_url, doc_poder_notarial_url";
 
-export async function cargarClientes(): Promise<{ data: ClienteCatalogo[]; error?: { code?: string; message?: string } }> {
+export async function cargarClientes(): Promise<{
+  data: ClienteCatalogo[];
+  error?: { code?: string; message?: string };
+  /**
+   * Se leyó con el respaldo (sin `folio_interno`) porque la base va atrás. La
+   * pantalla funciona: los clientes se ven, sólo sin folio interno. Hace falta
+   * distinguirlo porque `error` viene lleno en ese caso también —para poder
+   * avisar en consola— y sin esta bandera quien llama no puede diferenciar
+   * «funcionó degradado» de «no se pudo leer», que es justo la confusión que
+   * dejó la pantalla de Clientes diciendo «Sin resultados».
+   */
+  degradado?: boolean;
+}> {
   const { data, error } = await supabase
     .from("clientes")
     .select("*")
@@ -47,11 +59,16 @@ export async function cargarClientes(): Promise<{ data: ClienteCatalogo[]; error
 
   if (esFolio) {
     console.warn("clientes.folio_interno no disponible:", msg);
-    const { data: fallback } = await supabase
+    const { data: fallback, error: error2 } = await supabase
       .from("clientes")
       .select(COLUMNAS_RESPALDO)
       .order("codigo_erp", { nullsFirst: false });
-    return { data: ((fallback as unknown) as ClienteCatalogo[]) ?? [], error };
+    if (error2) return { data: [], error: error2 };
+    return {
+      data: ((fallback as unknown) as ClienteCatalogo[]) ?? [],
+      error,
+      degradado: true,
+    };
   }
 
   return { data: [], error };

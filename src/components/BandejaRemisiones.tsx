@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Inbox, RefreshCw, Eye, Download, FileText, Package, Settings2, TriangleAlert, Wrench, UserPlus, X } from "lucide-react";
-import { fmtDate, COLORES, claveStock } from "@/lib/dazon";
+import { fmtDate, COLORES, claveStock, explicarError } from "@/lib/dazon";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -520,7 +520,11 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       _motocarro_id: motocarroId,
     });
     setManualBusy(null);
-    if (error) { toast.error(error.message); return; }
+    // `explicarError` y no `error.message`: si la base va atrás, esta RPC
+    // contesta «function ... does not exist», que no le dice a nadie qué
+    // hacer. Pasó en producción con 20260826000003 a medias — quedó
+    // `asignar_motocarro_a_remision` y no su contraparte.
+    if (error) { toast.error(explicarError(error, "No se pudo liberar la unidad")); return; }
     toast.success("✓ Unidad liberada de la remisión");
     if (manualDialog) await abrirManual(manualDialog);
     await load(); onChange?.();
