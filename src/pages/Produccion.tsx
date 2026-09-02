@@ -18,6 +18,7 @@ import { SerialAutocomplete } from "@/components/SerialAutocomplete";
 import { RecibirContenedor } from "@/components/RecibirContenedor";
 import { ConfigurarUnidad } from "@/components/ConfigurarUnidad";
 import { InventarioStatus } from "@/components/InventarioStatus";
+import { BandejaAvisos } from "@/components/BandejaAvisos";
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { ContenedorPartes } from "@/components/ContenedorPartes";
 
@@ -418,6 +419,11 @@ export default function Produccion() {
           <Button onClick={exportCsv} variant="outline" className="h-12"><Download className="h-5 w-5 mr-2" /> {t.produccion.exportarCsv}</Button>
         </div>
       </div>
+
+      {/* Lo que otra área dejó pendiente aquí — p. ej. unidades que Comercial
+          liberó al bajar una remisión. Va hasta arriba: es lo único de esta
+          pantalla que llegó solo y que nadie pidió ver. */}
+      <BandejaAvisos onChange={load} />
 
       {/* InventarioStatus (alertas de déficit): solo admin/coordinador */}
       {perms.puedeVer("inventario") && <InventarioStatus refreshKey={rows.length} />}

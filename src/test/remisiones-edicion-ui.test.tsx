@@ -6,6 +6,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const filas: Record<string, Record<string, unknown>[]> = {};
+const rpcs: { fn: string; args: Record<string, unknown> }[] = [];
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -21,7 +22,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       q.then = (res: (r: { data: unknown[]; error: null }) => void) => res({ data: filas[tabla] ?? [], error: null });
       return q;
     },
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      rpcs.push({ fn, args });
+      return Promise.resolve({ data: { liberadas: 2 }, error: null });
+    },
     storage: { from: () => ({}) },
   },
 }));
@@ -165,5 +169,75 @@ describe("consultas a Supabase", () => {
       });
     }
     expect(culpables).toEqual([]);
+  });
+});
+
+/**
+ * Fábrica no puede frenar a Ventas: bajar una remisión con chasis asignados se
+ * resuelve liberando las unidades de más y avisando, no impidiendo el cambio.
+ */
+describe("Remisiones · bajar una remisión con chasis asignados", () => {
+  const conAsignados = (estatusEntrega: string[]) => {
+    for (const k of Object.keys(filas)) delete filas[k];
+    rpcs.length = 0;
+    filas.remisiones = [{
+      ...REMISION,
+      total_unidades_solicitadas: estatusEntrega.length,
+      motocarros: estatusEntrega.map((e, i) => ({
+        id: `m${i}`, remision_id: "r1", orden_armado: 100 + i, estatus_entrega: e, estatus_armado: "PENDIENTE",
+      })),
+    }];
+    filas.clientes = [{ id: "c1", codigo_erp: "R195", folio_interno: null, nombre_comercial: "Ferretería del Sur" }];
+    filas.remision_items = [
+      { id: "i1", remision_id: "r1", tipo_servicio: "motocarro", modelo: "200cc 2026", color: "BLANCO", cantidad: 3, con_caja: false, orden_linea: 0 },
+    ];
+  };
+
+  it("avisa cuántas se van a liberar en vez de impedir el cambio", async () => {
+    conAsignados(["PROGRAMADA", "PROGRAMADA", "PROGRAMADA"]);
+    await dibujar();
+    await act(async () => { fireEvent.click(boton(/^\s*Editar\s*$/)!); });
+
+    const cantidad = document.body.querySelector('input[type="number"]') as HTMLInputElement;
+    await act(async () => { fireEvent.change(cantidad, { target: { value: "1" } }); });
+
+    const texto = document.body.textContent || "";
+    expect(texto).toContain("se");
+    expect(texto).toMatch(/liberar[aá]n 2/);
+    expect(texto).toContain("Fábrica queda avisada");
+    // Y sobre todo: no aparece el candado viejo.
+    expect(texto).not.toContain("libéralos en Producción");
+    // El botón sigue vivo en cuanto hay motivo.
+    const motivo = document.body.querySelector("textarea")!;
+    await act(async () => { fireEvent.change(motivo, { target: { value: "El cliente canceló dos unidades" } }); });
+    expect(boton(/Guardar cambios/i)!.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("avisa que no se puede bajar por debajo de lo que ya salió del almacén", async () => {
+    conAsignados(["ENTREGADA", "EN_RUTA", "PROGRAMADA"]);
+    await dibujar();
+    await act(async () => { fireEvent.click(boton(/^\s*Editar\s*$/)!); });
+
+    const cantidad = document.body.querySelector('input[type="number"]') as HTMLInputElement;
+    await act(async () => { fireEvent.change(cantidad, { target: { value: "1" } }); });
+
+    expect(document.body.textContent).toContain("2 ya salieron del almacén");
+  });
+
+  it("al guardar, pide liberar las unidades sobrantes", async () => {
+    conAsignados(["PROGRAMADA", "PROGRAMADA", "PROGRAMADA"]);
+    await dibujar();
+    await act(async () => { fireEvent.click(boton(/^\s*Editar\s*$/)!); });
+
+    const cantidad = document.body.querySelector('input[type="number"]') as HTMLInputElement;
+    await act(async () => { fireEvent.change(cantidad, { target: { value: "1" } }); });
+    const motivo = document.body.querySelector("textarea")!;
+    await act(async () => { fireEvent.change(motivo, { target: { value: "El cliente canceló dos unidades" } }); });
+    await act(async () => { fireEvent.click(boton(/Guardar cambios/i)!); });
+
+    const ajuste = rpcs.find(r => r.fn === "ajustar_unidades_remision");
+    expect(ajuste).toBeTruthy();
+    expect(ajuste!.args).toMatchObject({ _remision_id: "r1", _total_objetivo: 1 });
+    expect(String(ajuste!.args._motivo)).toContain("canceló dos");
   });
 });
