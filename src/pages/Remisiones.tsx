@@ -13,6 +13,7 @@ import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, nor
 import { cargarCatalogoClientes, SCRIPT_FOLIO_INTERNO } from "@/lib/catalogoClientes";
 import {
   agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, MOTIVOS_EDICION,
+  faltantesDeExistencia, mensajeFaltantes, repartoAlBajar,
   type LineaMoto, type RenglonRemision,
 } from "@/lib/remisionesEdicion";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
@@ -28,6 +29,7 @@ import {
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
+import { BandejaAvisos } from "@/components/BandejaAvisos";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
 // Los modelos se leen del catálogo (ver cargarModelosMotocarro); esta lista
@@ -38,6 +40,9 @@ import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 // llevaba la app entera en blanco al dar clic en «Nueva remisión». La opción de
 // «a mí mismo» viaja con un valor propio y se traduce a vacío al guardar.
 const ASIGNAR_A_MI = "__yo__";
+
+/** El reparto de la remisión abierta si su total baja a `objetivo`. */
+const repartoDe = (r: any, objetivo: number) => repartoAlBajar(r?.motocarros ?? [], objetivo);
 
 /** Lo que se va a guardar en una columna JSONB, ya serializable. */
 const comoJson = (v: unknown): Json => JSON.parse(JSON.stringify(v ?? null));
@@ -240,12 +245,11 @@ function LineasMotocarro({
                       })}
                     </SelectContent>
                   </Select>
-                  {/* Qué tan cubierta queda esta línea con el color elegido.
-                      No se bloquea la captura: la remisión es una promesa
-                      al cliente y el sistema ya trabaja con demanda por
-                      encima del inventario (de ahí «déficit» en
-                      Producción). Lo que sí hace falta es que quien
-                      captura vea contra qué se está comprometiendo. */}
+                  {/* Contra qué se está comprometiendo esta línea.
+                      No se puede guardar pidiendo más de lo que hay, así que
+                      el aviso tiene que decir qué hacer, no sólo qué falta.
+                      Cuando no hay dato del color no se dice nada: no saber
+                      no es lo mismo que no haber. */}
                   {(() => {
                     const quedan = disponiblesPara(idx, moto.modelo, moto.color);
                     if (quedan === null) return null;
@@ -258,8 +262,8 @@ function LineasMotocarro({
                           <XCircle size={12} className="mt-0.5 shrink-0" />
                           <span>
                             {quedan <= 0
-                              ? `Sin existencia de ${colorLabel(moto.color)}: se piden ${piden} por armar.`
-                              : `Sólo quedan ${quedan} de ${colorLabel(moto.color)}: faltarían ${faltan} por armar.`}
+                              ? `Ya no hay existencia de ${colorLabel(moto.color)}. Cambia el color o quita la línea.`
+                              : `Sólo hay ${quedan} de ${colorLabel(moto.color)} y pides ${piden}. Baja la cantidad a ${quedan} o cambia el color.`}
                           </span>
                         </div>
                       );
@@ -724,6 +728,11 @@ export default function Remisiones() {
     if (activeFolios.includes(form.folio_remision.trim())) { toast.error("Ese folio ya está en uso por una remisión activa"); return; }
     if (totalUnidades===0) { toast.error("Agrega al menos un motocarro"); return; }
 
+    // No se compromete lo que no hay. Sin dato de inventario no se bloquea:
+    // ver faltantesDeExistencia().
+    const faltan = faltantesDeExistencia(motos, disponiblesPara);
+    if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel)); return; }
+
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
 
     // INSERT mínimo: solo columnas que siempre han existido en la tabla.
@@ -1045,14 +1054,19 @@ export default function Remisiones() {
     if (rows.some((r:any) => r.id !== editar.id && r.estatus !== "CANCELADA" && r.folio_remision === folio))
       return toast.error("Ese folio ya está en uso por otra remisión activa");
 
+    const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
+    if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel));
+
     const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
     if (!plan.totalUnidades) return toast.error("La remisión necesita al menos un motocarro");
 
-    // No se puede pedir menos de lo que ya se armó: esos chasis se liberan
-    // primero desde Producción, si no la remisión queda con unidades huérfanas.
+    // Bajar el total ya no frena a Comercial. Lo que aún no entra a armado se
+    // suelta solo; lo que Fábrica ya empezó se le PIDE; y lo que ya salió del
+    // almacén no se puede deshacer desde ninguna pantalla.
     const asignadas = (editar.motocarros ?? []).length;
-    if (plan.totalUnidades < asignadas)
-      return toast.error(`Esta remisión ya tiene ${asignadas} chasis asignados: libéralos en Producción antes de bajarla a ${plan.totalUnidades} unidades`);
+    const reparto   = repartoDe(editar, plan.totalUnidades);
+    if (reparto.imposible > 0)
+      return toast.error(`No se puede bajar a ${plan.totalUnidades}: ${reparto.yaSalieron} unidad(es) de esta remisión ya se entregaron o van en ruta`);
 
     setGuardandoEdicion(true);
 
@@ -1121,10 +1135,38 @@ export default function Remisiones() {
 
     // 4. Renglones.
     const fallo = await aplicarPlanRenglones(plan);
-    setGuardandoEdicion(false);
-    if (fallo) return toast.error(`La remisión se actualizó, pero un renglón falló: ${fallo}`);
+    if (fallo) {
+      setGuardandoEdicion(false);
+      return toast.error(`La remisión se actualizó, pero un renglón falló: ${fallo}`);
+    }
 
-    toast.success("✓ Remisión actualizada — el motivo quedó en la bitácora");
+    // 5. Si el pedido se achicó, soltar las unidades de más y avisarle a
+    //    Fábrica y a Logística. Va al final: la RPC compara contra el total ya
+    //    guardado.
+    let liberadas = 0, solicitadas = 0;
+    if (plan.totalUnidades < asignadas) {
+      const { data, error } = await supabase.rpc("ajustar_unidades_remision", {
+        _remision_id: editar.id,
+        _total_objetivo: plan.totalUnidades,
+        _motivo: motivo,
+      });
+      if (error) {
+        setGuardandoEdicion(false);
+        return toast.error(`La remisión se actualizó, pero las unidades de más no se movieron: ${error.message}`);
+      }
+      const r = data as { liberadas?: number; solicitadas?: number } | null;
+      liberadas   = Number(r?.liberadas ?? 0);
+      solicitadas = Number(r?.solicitadas ?? 0);
+    }
+
+    setGuardandoEdicion(false);
+    const partes = [
+      liberadas   ? `se liberaron ${liberadas} unidad(es)` : "",
+      solicitadas ? `se le pidió a Fábrica soltar ${solicitadas} que ya está(n) en armado` : "",
+    ].filter(Boolean);
+    toast.success(partes.length
+      ? `✓ Remisión actualizada — ${partes.join(" y ")}`
+      : "✓ Remisión actualizada — el motivo quedó en la bitácora");
     cerrarEdicion();
     load(); loadModificaciones();
   };
@@ -1285,6 +1327,10 @@ export default function Remisiones() {
           </Dialog>
         )}
       </div>
+
+      {/* Respuestas de Fábrica a lo que se le pidió, y lo que otra área deje
+          aquí. Va antes de los atrasos: es lo que espera una reacción. */}
+      <BandejaAvisos onChange={load} />
 
       {/* ── Notificaciones de atrasos ─────────────────────────────────────── */}
       {motocarrosAtrasados.length > 0 && (
@@ -1739,15 +1785,43 @@ export default function Remisiones() {
 
           {editForm&&(
             <div className="space-y-4">
-              {(editar?.motocarros?.length ?? 0) > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5"/>
-                  <span>
-                    Esta remisión ya tiene <strong>{editar.motocarros.length}</strong> chasis asignados.
-                    Puedes agregar unidades, pero para bajar el total hay que liberarlos primero en Producción.
-                  </span>
-                </div>
-              )}
+              {(() => {
+                const asignadas = editar?.motocarros?.length ?? 0;
+                if (!asignadas) return null;
+                const reparto = repartoDe(editar, totalUnidadesEdit);
+                const mueve   = reparto.liberables + reparto.porPedir;
+                return (
+                  <div className={`rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${
+                    mueve ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-muted-foreground"
+                  }`}>
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5"/>
+                    <span>
+                      Esta remisión tiene <strong>{asignadas}</strong> chasis asignados
+                      {reparto.enArmado > 0 && <> — {reparto.enArmado} ya en armado</>}
+                      {reparto.yaSalieron > 0 && <>, {reparto.yaSalieron} entregada{reparto.yaSalieron===1?"":"s"} o en ruta</>}.
+                      {!mueve && <> Puedes ajustarla libremente.</>}
+                      {reparto.liberables > 0 && (
+                        <> Al bajarla a {totalUnidadesEdit} se <strong>
+                          {reparto.liberables === 1 ? "libera 1" : `liberan ${reparto.liberables}`}</strong>
+                          {reparto.liberables === 1 ? " que aún no entra" : " que aún no entran"} a armado,
+                          y Fábrica queda avisada.</>
+                      )}
+                      {reparto.porPedir > 0 && (
+                        <strong className="block mt-1 text-[#1F3864]">
+                          {reparto.porPedir} ya {reparto.porPedir===1?"entró":"entraron"} a armado: no se
+                          {reparto.porPedir===1?" quita":" quitan"} desde aquí. Se le manda la solicitud a Fábrica y
+                          ell{reparto.porPedir===1?"a":"os"} contesta{reparto.porPedir===1?"":"n"} si {reparto.porPedir===1?"se puede":"se pueden"} soltar.
+                        </strong>
+                      )}
+                      {reparto.imposible > 0 && (
+                        <strong className="block mt-1 text-red-700">
+                          {reparto.imposible} de las que quieres quitar ya salieron del almacén: eso no se puede deshacer.
+                        </strong>
+                      )}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Folio */}
               <div>

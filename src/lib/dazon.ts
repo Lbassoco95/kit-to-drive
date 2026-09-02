@@ -277,6 +277,12 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260503192333_cb78101f-581a-4ca7-ba6c-2917c43edb25.sql"],
   [/recibir_contenedor/,
     "20260503193601_1f2d647e-2717-44a2-a009-d1616587e0ac.sql"],
+  // Las solicitudes cuelgan de la misma tabla `avisos`, así que lo específico
+  // va primero: sin 20260904000001 la tabla existe pero sin esas columnas.
+  [/responder_solicitud|requiere_respuesta|usuario_destino/,
+    "20260904000001_solicitudes_a_fabrica.sql"],
+  [/ajustar_unidades_remision|recibe_avisos_de|\bavisos\b/,
+    "20260903000001_avisos_entre_areas.sql"],
 ];
 
 /**

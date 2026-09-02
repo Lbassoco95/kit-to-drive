@@ -65,9 +65,25 @@ confundirla:
   obligatorio**: se guarda en `remisiones_bitacora` (con `CHECK` de 10
   caracteres en la propia tabla) *antes* de aplicar el cambio, así que una
   modificación sin justificación no llega a guardarse. El historial se ve en
-  «Ver remisión completa» y la tarjeta marca cuántas veces se modificó. Lo que
-  no cambia: bajar el total de unidades por debajo de los chasis ya asignados
-  sigue exigiendo liberarlos primero en Producción.
+  «Ver remisión completa» y la tarjeta marca cuántas veces se modificó.
+- **Fábrica no frena a Ventas, pero el armado empezado no se toca.** Bajar el
+  total reparte las unidades sobrantes en tres:
+  1. Las que siguen en `PENDIENTE` **se liberan solas** y Fábrica y Logística
+     reciben el aviso. Para ellos es indistinto: el chasis vuelve a la fila.
+  2. Las que ya entraron a armado (`EN_PROCESO` en adelante) **no se quitan
+     desde Comercial**: se levanta una **solicitud** a Fábrica, que acepta o
+     rechaza desde su bandeja (`responder_solicitud()`). Aceptar libera la
+     unidad ahí mismo; la respuesta le regresa a quien la pidió.
+  3. Las ya **entregadas o en ruta** no se pueden ni pidiendo: ya salieron del
+     almacén.
+
+  `PENDIENTE` es el corte porque es lo único que la base guarda como «todavía
+  no se toca»: `ATRASADO` nunca se escribe, se calcula en pantalla para lo
+  vencido.
+- **Lo que no hay, no se compromete.** Al capturar y al editar, una línea que
+  pida más de lo disponible no deja guardar: «estás pidiendo 3 de Azul y sólo
+  hay 1». Cuando no hay dato de inventario de ese color no se bloquea — no
+  saber no es lo mismo que no haber.
 - **Capturar.** `crear remisiones` y `remision_items_insert` existen en dos
   versiones con el mismo nombre: la original, que sólo conoce los roles legados
   (`admin`, `coordinador`, `ventas`) y por tanto no deja capturar al supervisor
@@ -122,7 +138,20 @@ sólo un filtro de vista del lado del cliente.
   que da lo mismo si los helpers están o no. Al correr, el script imprime cuáles
   encontró.
 - `src/lib/remisionesEdicion.ts` — reconstruye el formulario desde los
-  renglones guardados y calcula el alta/cambio/baja de cada renglón al guardar.
+  renglones guardados, calcula el alta/cambio/baja de cada renglón al guardar, y
+  decide qué líneas no alcanzan con el inventario.
+- `supabase/migrations/20260903000001_avisos_entre_areas.sql` — la tabla
+  `avisos` (el único canal entre áreas que hay) con acuse de «visto», y
+  `ajustar_unidades_remision()`, que libera las unidades sobrantes al bajar una
+  remisión y deja el aviso. El aviso no se puede editar después: un trigger
+  congela todo menos el acuse.
+- `supabase/migrations/20260904000001_solicitudes_a_fabrica.sql` — el corte en
+  el inicio de armado, y las solicitudes: `avisos` aprende a pedir respuesta
+  (`requiere_respuesta`, `estado`, `accion`) y `responder_solicitud()` la
+  ejecuta. Un aviso se acusa y se contesta, pero nunca se reescribe.
+- `src/components/BandejaAvisos.tsx` — la bandeja (Producción y Remisiones) y
+  el contador del tablero. Un aviso normal se despacha con «Visto»; una
+  solicitud pide «Aceptar y liberar» o «No se puede», con respuesta escrita.
 
 ## Compatibilidad
 
