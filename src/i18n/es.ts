@@ -317,6 +317,8 @@ export const es = {
     entregados: "Entregados",
     sinNombre: "Sin nombre comercial",
     sinResultados: "Sin resultados",
+    cargando: "Cargando clientes…",
+    reintentar: "Reintentar",
     editar: "Editar cliente",
     creado: "✓ Cliente creado",
     actualizado: "✓ Cliente actualizado",

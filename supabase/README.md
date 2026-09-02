@@ -27,10 +27,18 @@ supabase/diagnostico_esquema.sql
 ```
 
 Se pega completo en el SQL editor, es de **sólo lectura**, y por cada script
-dice `APLICADO`, `PARCIAL` o `FALTA` buscando los objetos que ese script
-debería haber dejado. Es la única forma que hay hoy de saber qué corrió de
-verdad. Córrelo después de aplicar cualquier script y cuando una pantalla
+dice `APLICADO`, `PARCIAL`, `FALTA` o `SUPERADO` buscando los objetos que ese
+script debería haber dejado. Es la única forma que hay hoy de saber qué corrió
+de verdad. Córrelo después de aplicar cualquier script y cuando una pantalla
 empiece a comportarse como si le faltaran datos.
+
+Ahí están registrados **todos** los archivos de `supabase/migrations/`, no una
+selección: un script sin registrar es un hueco que el diagnóstico no puede ver,
+y así estuvo `20260827000001` mientras Clientes salía vacía. La prueba
+`src/test/inventario-migraciones.test.ts` falla si la carpeta y el diagnóstico
+dejan de cuadrar. El procedimiento completo —qué correr, en qué orden, y qué
+cuidar al escribir código que le pide algo nuevo a la base— está en
+[`docs/no-romper-produccion.md`](../docs/no-romper-produccion.md).
 
 En la app, los errores `42703 / 42P01 / 42883` ya no se muestran crudos:
 `explicarError()` (en `src/lib/dazon.ts`) los traduce a «falta correr
@@ -55,6 +63,18 @@ supabase/migrations/<archivo> en el SQL editor», que es la acción real.
    eso revierte el archivo entero, así que las columnas `limitante_*` y la
    vista `v_reporte_pipeline` tampoco existían. Se sustituyó por la ampliación
    del CHECK, que es lo que de verdad hacía falta.
+
+3. **`20260827000001_folio_interno_clientes_nuevos.sql` tronaba en el renglón
+   5.** Hacía `PERFORM setval('clientes_folio_interno_seq', max_seq)`, y
+   `max_seq` sale `0` mientras ningún cliente traiga folio `CLI-AAAA-NNN` —
+   que es justo el arranque. `setval(seq, 0)` no es válido (la secuencia
+   empieza en 1) y, en una transacción, ese error se llevó el archivo entero:
+   `clientes.folio_interno` nunca se creó y no quedó rastro. Producción se
+   quedó así, y como la pantalla de Clientes pedía esa columna, la lista salía
+   vacía: se leyó como «se perdieron los clientes» cuando en realidad estaban
+   todos ahí. Ya usa el tercer argumento (`is_called`), que resuelve el
+   arranque y la recorrida. Chequeo previo:
+   `supabase/revisar_antes_de_20260827000001.sql`.
 
 Para que no se repita, los scripts de la era KIT ahora se pueden volver a pegar
 completos sin miedo, y **KIT-4c se revisa a sí mismo**: abre con un preflight

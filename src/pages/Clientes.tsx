@@ -14,7 +14,7 @@ import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { cargarClientes, displayCliente } from "@/lib/catalogoClientes";
 import { explicarError } from "@/lib/dazon";
-import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History } from "lucide-react";
+import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History, AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function Clientes() {
   const { perms, area, user } = useAuth();
@@ -50,14 +50,46 @@ export default function Clientes() {
   const [saveMotivoSelect, setSaveMotivoSelect] = useState("");
   const [saveMotivoOther, setSaveMotivoOther] = useState("");
   const [listTab, setListTab] = useState<"activos" | "archivados">("activos");
+  /** Por qué no se pudo leer el catálogo. `null` = se leyó bien. */
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(true);
 
+  /**
+   * Carga la lista de clientes y, aparte, las estadísticas de unidades.
+   *
+   * Las unidades entregadas son un adorno de la tarjeta; los clientes son la
+   * pantalla. Van en consultas separadas y sólo la del catálogo decide si se
+   * avisa: antes las dos iban en un `Promise.all` que descartaba los dos
+   * `error` y se quedaba con `data ?? []`, así que cualquier falla dejaba la
+   * pantalla diciendo «Sin resultados» — lo mismo que se ve cuando de verdad
+   * no hay clientes. Por eso el incidente se leyó como «se perdieron los
+   * clientes».
+   *
+   * `degradado` no es una falla: la base va atrás pero los clientes se ven.
+   * Eso se avisa en consola, no en la cara del usuario.
+   */
   const load = async () => {
-    const [{ data: cs, error: ce }, { data: ms }] = await Promise.all([
+    setCargando(true);
+    const [cat, stats] = await Promise.all([
       cargarClientes(),
       supabase.from("motocarros").select("id, estatus_entrega, remisiones!inner(cliente_id)"),
     ]);
-    setRows(cs ?? []); setMotos(ms ?? []);
-    if (ce) toast.error(explicarError(ce, t.clientes.errorCargar));
+
+    if (cat.error && !cat.degradado) {
+      // La lista anterior no se borra: un error pasajero no debe dejar la
+      // pantalla en blanco cuando ya había datos buenos en la mano.
+      const aviso = explicarError(cat.error, t.clientes.errorCargar);
+      setErrorCarga(aviso);
+      toast.error(aviso);
+    } else {
+      setErrorCarga(null);
+      setRows(cat.data ?? []);
+      if (cat.degradado) console.warn("clientes leídos sin folio_interno:", cat.error?.message);
+    }
+
+    if (stats.error) console.warn("estadísticas de clientes no disponibles:", stats.error.message);
+    setMotos(stats.data ?? []);
+    setCargando(false);
   };
   useEffect(() => { load(); }, []);
 
@@ -419,6 +451,27 @@ export default function Clientes() {
         </div>
       </Card>
 
+      {/*
+        Cuando el catálogo no se pudo leer, la pantalla lo dice. Antes salía
+        «Sin resultados», que es lo mismo que se ve cuando de verdad no hay
+        clientes: por eso el incidente se leyó como «se perdieron los
+        clientes» en lugar de «falta correr un script».
+      */}
+      {errorCarga && (
+        <Card className="p-4 border-red-300 bg-red-50">
+          <div className="flex items-start gap-3 flex-wrap">
+            <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-[16rem]">
+              <div className="font-semibold text-red-800">{t.clientes.errorCargar}</div>
+              <div className="text-sm text-red-700 mt-1 break-words">{errorCarga}</div>
+            </div>
+            <Button variant="outline" size="sm" className="h-10 shrink-0" onClick={load}>
+              <RefreshCw className="h-4 w-4 mr-2" /> {t.clientes.reintentar}
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <div className="responsive-card-grid gap-4">
         {filtered.map(c => {
           const s = stats[c.id] || { total: 0, entregados: 0 };
@@ -483,7 +536,11 @@ export default function Clientes() {
             </Card>
           );
         })}
-        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.clientes.sinResultados}</div>}
+        {!filtered.length && !errorCarga && (
+          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">
+            {cargando ? t.clientes.cargando : t.clientes.sinResultados}
+          </div>
+        )}
       </div>
 
       <Dialog open={creating || !!editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); resetForm(); } }}>
