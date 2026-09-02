@@ -173,66 +173,84 @@ describe("consultas a Supabase", () => {
 });
 
 /**
- * Fábrica no puede frenar a Ventas: bajar una remisión con chasis asignados se
- * resuelve liberando las unidades de más y avisando, no impidiendo el cambio.
+ * Fábrica no frena a Ventas, pero desde que empieza a armar la unidad ya no se
+ * le quita: se le pide. El diálogo tiene que decir ese reparto ANTES de
+ * guardar.
  */
 describe("Remisiones · bajar una remisión con chasis asignados", () => {
-  const conAsignados = (estatusEntrega: string[]) => {
+  const conAsignados = (unidades: { armado: string; entrega?: string }[]) => {
     for (const k of Object.keys(filas)) delete filas[k];
     rpcs.length = 0;
     filas.remisiones = [{
       ...REMISION,
-      total_unidades_solicitadas: estatusEntrega.length,
-      motocarros: estatusEntrega.map((e, i) => ({
-        id: `m${i}`, remision_id: "r1", orden_armado: 100 + i, estatus_entrega: e, estatus_armado: "PENDIENTE",
+      total_unidades_solicitadas: unidades.length,
+      motocarros: unidades.map((u, i) => ({
+        id: `m${i}`, remision_id: "r1", orden_armado: 100 + i,
+        estatus_armado: u.armado, estatus_entrega: u.entrega ?? "PROGRAMADA",
       })),
     }];
     filas.clientes = [{ id: "c1", codigo_erp: "R195", folio_interno: null, nombre_comercial: "Ferretería del Sur" }];
     filas.remision_items = [
-      { id: "i1", remision_id: "r1", tipo_servicio: "motocarro", modelo: "200cc 2026", color: "BLANCO", cantidad: 3, con_caja: false, orden_linea: 0 },
+      { id: "i1", remision_id: "r1", tipo_servicio: "motocarro", modelo: "200cc 2026", color: "BLANCO", cantidad: unidades.length, con_caja: false, orden_linea: 0 },
     ];
   };
 
-  it("avisa cuántas se van a liberar en vez de impedir el cambio", async () => {
-    conAsignados(["PROGRAMADA", "PROGRAMADA", "PROGRAMADA"]);
+  const abrirYBajarA = async (n: string) => {
     await dibujar();
     await act(async () => { fireEvent.click(boton(/^\s*Editar\s*$/)!); });
-
     const cantidad = document.body.querySelector('input[type="number"]') as HTMLInputElement;
-    await act(async () => { fireEvent.change(cantidad, { target: { value: "1" } }); });
+    await act(async () => { fireEvent.change(cantidad, { target: { value: n } }); });
+    return document.body.textContent || "";
+  };
 
-    const texto = document.body.textContent || "";
-    expect(texto).toContain("se");
-    expect(texto).toMatch(/liberar[aá]n 2/);
-    expect(texto).toContain("Fábrica queda avisada");
-    // Y sobre todo: no aparece el candado viejo.
-    expect(texto).not.toContain("libéralos en Producción");
-    // El botón sigue vivo en cuanto hay motivo.
+  const conMotivo = async () => {
     const motivo = document.body.querySelector("textarea")!;
     await act(async () => { fireEvent.change(motivo, { target: { value: "El cliente canceló dos unidades" } }); });
+  };
+
+  it("lo que no ha empezado se libera, sin candados", async () => {
+    conAsignados([{ armado: "PENDIENTE" }, { armado: "PENDIENTE" }, { armado: "PENDIENTE" }]);
+    const texto = await abrirYBajarA("1");
+
+    expect(texto).toMatch(/se liberan 2/);
+    expect(texto).toContain("Fábrica queda avisada");
+    // Y ni rastro del candado que había antes.
+    expect(texto).not.toContain("libéralos en Producción");
+
+    await conMotivo();
     expect(boton(/Guardar cambios/i)!.hasAttribute("disabled")).toBe(false);
   });
 
-  it("avisa que no se puede bajar por debajo de lo que ya salió del almacén", async () => {
-    conAsignados(["ENTREGADA", "EN_RUTA", "PROGRAMADA"]);
-    await dibujar();
-    await act(async () => { fireEvent.click(boton(/^\s*Editar\s*$/)!); });
+  it("lo que ya entró a armado se pide, y lo dice antes de guardar", async () => {
+    // A 1, porque una remisión no puede quedarse sin motocarros: sobran 2, de
+    // las cuales sólo una no ha empezado.
+    conAsignados([{ armado: "PENDIENTE" }, { armado: "EN_PROCESO" }, { armado: "ARMADO" }]);
+    const texto = await abrirYBajarA("1");
 
-    const cantidad = document.body.querySelector('input[type="number"]') as HTMLInputElement;
-    await act(async () => { fireEvent.change(cantidad, { target: { value: "1" } }); });
+    expect(texto).toContain("2 ya en armado");
+    expect(texto).toMatch(/se libera 1 que aún no entra a armado/);
+    expect(texto).toContain("1 ya entró a armado: no se quita desde aquí");
+    expect(texto).toContain("solicitud a Fábrica");
 
-    expect(document.body.textContent).toContain("2 ya salieron del almacén");
+    // Sigue siendo guardable: pedir no es lo mismo que estar bloqueado.
+    await conMotivo();
+    expect(boton(/Guardar cambios/i)!.hasAttribute("disabled")).toBe(false);
   });
 
-  it("al guardar, pide liberar las unidades sobrantes", async () => {
-    conAsignados(["PROGRAMADA", "PROGRAMADA", "PROGRAMADA"]);
-    await dibujar();
-    await act(async () => { fireEvent.click(boton(/^\s*Editar\s*$/)!); });
+  it("lo que ya salió del almacén no se puede ni pidiendo", async () => {
+    conAsignados([
+      { armado: "LISTO", entrega: "ENTREGADA" },
+      { armado: "LISTO", entrega: "EN_RUTA" },
+      { armado: "PENDIENTE" },
+    ]);
+    const texto = await abrirYBajarA("0");
+    expect(texto).toContain("ya salieron del almacén");
+  });
 
-    const cantidad = document.body.querySelector('input[type="number"]') as HTMLInputElement;
-    await act(async () => { fireEvent.change(cantidad, { target: { value: "1" } }); });
-    const motivo = document.body.querySelector("textarea")!;
-    await act(async () => { fireEvent.change(motivo, { target: { value: "El cliente canceló dos unidades" } }); });
+  it("al guardar, pide mover las unidades sobrantes", async () => {
+    conAsignados([{ armado: "PENDIENTE" }, { armado: "PENDIENTE" }, { armado: "PENDIENTE" }]);
+    await abrirYBajarA("1");
+    await conMotivo();
     await act(async () => { fireEvent.click(boton(/Guardar cambios/i)!); });
 
     const ajuste = rpcs.find(r => r.fn === "ajustar_unidades_remision");

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   agruparRenglones, planEditarRenglones, motivoValido, MOTIVO_MIN, ORDEN_FLETE,
-  faltantesDeExistencia, mensajeFaltantes,
+  faltantesDeExistencia, mensajeFaltantes, repartoAlBajar,
   type LineaMoto, type RenglonRemision,
 } from "@/lib/remisionesEdicion";
 
@@ -242,5 +242,48 @@ describe("existencia · no comprometer lo que no hay", () => {
 
   it("no dice nada cuando no falta nada", () => {
     expect(mensajeFaltantes([])).toBe("");
+  });
+});
+
+/**
+ * Desde que Fábrica empieza a armar, la unidad no se le quita: se le pide. El
+ * reparto tiene que decirlo ANTES de guardar, no después.
+ */
+describe("repartoAlBajar", () => {
+  const u = (armado: string, entrega = "PROGRAMADA") => ({ estatus_armado: armado, estatus_entrega: entrega });
+
+  it("no mueve nada si el total no baja", () => {
+    const r = repartoAlBajar([u("PENDIENTE"), u("EN_PROCESO")], 2);
+    expect(r).toMatchObject({ liberables: 0, porPedir: 0, imposible: 0 });
+  });
+
+  it("suelta primero lo que aún no se toca", () => {
+    const r = repartoAlBajar([u("PENDIENTE"), u("PENDIENTE"), u("EN_PROCESO")], 1);
+    expect(r).toMatchObject({ liberables: 2, porPedir: 0, imposible: 0 });
+  });
+
+  it("lo que ya entró a armado se pide, no se suelta", () => {
+    const r = repartoAlBajar([u("PENDIENTE"), u("EN_PROCESO"), u("ARMADO")], 1);
+    expect(r).toMatchObject({ liberables: 1, porPedir: 1, imposible: 0 });
+  });
+
+  it("una unidad ARMADA o LISTA también se pide: el trabajo ya está hecho", () => {
+    expect(repartoAlBajar([u("ARMADO")], 0)).toMatchObject({ liberables: 0, porPedir: 1 });
+    expect(repartoAlBajar([u("LISTO")], 0)).toMatchObject({ liberables: 0, porPedir: 1 });
+  });
+
+  it("lo entregado o en ruta no se puede ni pidiendo", () => {
+    const r = repartoAlBajar([u("LISTO", "ENTREGADA"), u("LISTO", "EN_RUTA"), u("PENDIENTE")], 0);
+    expect(r).toMatchObject({ liberables: 1, porPedir: 0, imposible: 2, yaSalieron: 2 });
+  });
+
+  it("cuenta cuántas van en armado para poder explicarlo", () => {
+    const r = repartoAlBajar([u("PENDIENTE"), u("EN_PROCESO"), u("ARMADO"), u("LISTO", "ENTREGADA")], 4);
+    expect(r).toMatchObject({ asignadas: 4, enArmado: 2, yaSalieron: 1 });
+  });
+
+  it("sin estatus se trata como no empezada, igual que el DEFAULT de la base", () => {
+    const r = repartoAlBajar([{}], 0);
+    expect(r).toMatchObject({ liberables: 1, porPedir: 0, imposible: 0 });
   });
 });

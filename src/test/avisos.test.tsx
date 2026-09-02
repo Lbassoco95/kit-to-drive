@@ -9,6 +9,7 @@ import React from "react";
  */
 const filas: Record<string, Record<string, unknown>[]> = {};
 const updates: Record<string, unknown>[] = [];
+const rpcs: { fn: string; args: Record<string, unknown> }[] = [];
 let errorDeTabla: { message: string } | null = null;
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -25,7 +26,10 @@ vi.mock("@/integrations/supabase/client", () => ({
         res(errorDeTabla ? { data: null, error: errorDeTabla } : { data: filas[tabla] ?? [], error: null });
       return q;
     },
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      rpcs.push({ fn, args });
+      return Promise.resolve({ data: { aceptada: args._aceptar, liberadas: 1 }, error: null });
+    },
     storage: { from: () => ({}) },
   },
 }));
@@ -36,8 +40,17 @@ vi.mock("@/contexts/AuthContext", () => ({
 
 import { BandejaAvisos, ResumenAvisos } from "@/components/BandejaAvisos";
 
+const SOLICITUD = {
+  id: "sol1", tipo: "solicitud_liberar",
+  titulo: "REM-012 pide soltar 1 unidad(es) en armado",
+  cuerpo: "REM-012 pide soltar 1 unidad(es) que ya están en armado: DZ...103 (EN_PROCESO).",
+  folio_remision: "REM-012", nombre_creador: "Ana Karen",
+  created_at: "2026-09-04T09:00:00Z", visto_at: null,
+  requiere_respuesta: true, estado: "pendiente",
+};
+
 const AVISO = {
-  id: "av1", tipo: "unidades_liberadas",
+  id: "av1", tipo: "unidades_liberadas", requiere_respuesta: false, estado: "pendiente",
   titulo: "REM-012 liberó 2 unidad(es)",
   cuerpo: "REM-012 bajó de 5 a 3 unidades. Se liberaron 2: DZ...104, DZ...105.",
   folio_remision: "REM-012", nombre_creador: "Ana Karen",
@@ -104,5 +117,46 @@ describe("ResumenAvisos", () => {
   it("no se dibuja si no hay pendientes", async () => {
     const cuerpo = await dibujar(<ResumenAvisos />);
     expect(cuerpo.querySelector("button")).toBeNull();
+  });
+});
+
+describe("BandejaAvisos · solicitudes que esperan respuesta", () => {
+  beforeEach(() => {
+    for (const k of Object.keys(filas)) delete filas[k];
+    updates.length = 0; rpcs.length = 0; errorDeTabla = null;
+  });
+
+  it("una solicitud se distingue de un aviso y no se despacha con «Visto»", async () => {
+    filas.avisos = [SOLICITUD];
+    const cuerpo = await dibujar(<BandejaAvisos />);
+    expect(cuerpo.textContent).toContain("Necesita tu respuesta");
+    expect(cuerpo.textContent).toContain("espera tu respuesta");
+    const botones = Array.from(cuerpo.querySelectorAll("button")).map(b => b.textContent || "");
+    expect(botones.some(t => /Aceptar y liberar/.test(t))).toBe(true);
+    expect(botones.some(t => /No se puede/.test(t))).toBe(true);
+    expect(botones.some(t => /Visto/.test(t))).toBe(false);
+  });
+
+  it("aceptar manda la respuesta escrita junto con el sí", async () => {
+    filas.avisos = [SOLICITUD];
+    const cuerpo = await dibujar(<BandejaAvisos />);
+    const texto = cuerpo.querySelector("textarea")!;
+    await act(async () => { fireEvent.change(texto, { target: { value: "Va, la paso a otra orden" } }); });
+    const aceptar = Array.from(cuerpo.querySelectorAll("button")).find(b => /Aceptar y liberar/.test(b.textContent || ""))!;
+    await act(async () => { fireEvent.click(aceptar); });
+
+    expect(rpcs).toHaveLength(1);
+    expect(rpcs[0].fn).toBe("responder_solicitud");
+    expect(rpcs[0].args).toMatchObject({ _aviso_id: "sol1", _aceptar: true, _respuesta: "Va, la paso a otra orden" });
+  });
+
+  it("rechazar también pasa por la función, nunca por un UPDATE suelto", async () => {
+    filas.avisos = [SOLICITUD];
+    const cuerpo = await dibujar(<BandejaAvisos />);
+    const rechazar = Array.from(cuerpo.querySelectorAll("button")).find(b => /No se puede/.test(b.textContent || ""))!;
+    await act(async () => { fireEvent.click(rechazar); });
+
+    expect(rpcs[0].args).toMatchObject({ _aviso_id: "sol1", _aceptar: false });
+    expect(updates).toHaveLength(0);
   });
 });
