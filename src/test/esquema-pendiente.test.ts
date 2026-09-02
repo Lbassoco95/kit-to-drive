@@ -48,6 +48,10 @@ describe("explicarError · a qué script apunta cada objeto", () => {
     ["column modelos_producto.nombre_comercial does not exist", "20260822000001"],
     ['relation "public.bitacora_eliminaciones" does not exist', "20260819000010"],
     ["function public.usuario_activo(uuid) does not exist", "20260824000003"],
+    ["column clientes.folio_interno does not exist", "20260827000001"],
+    ["function public.generar_folio_interno_cliente() does not exist", "20260827000001"],
+    ["function public.asignar_motocarro_a_remision(uuid, uuid) does not exist", "20260826000003"],
+    ["function public.desasignar_motocarro_de_remision(uuid) does not exist", "20260826000003"],
   ];
 
   for (const [crudo, esperado] of casos) {

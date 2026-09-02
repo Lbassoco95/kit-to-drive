@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
+import { cargarClientes, displayCliente } from "@/lib/catalogoClientes";
+import { explicarError } from "@/lib/dazon";
 import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History } from "lucide-react";
 
 export default function Clientes() {
@@ -50,11 +52,12 @@ export default function Clientes() {
   const [listTab, setListTab] = useState<"activos" | "archivados">("activos");
 
   const load = async () => {
-    const [{ data: cs }, { data: ms }] = await Promise.all([
-      supabase.from("clientes").select("*").order("folio_interno, codigo_erp"),
+    const [{ data: cs, error: ce }, { data: ms }] = await Promise.all([
+      cargarClientes(),
       supabase.from("motocarros").select("id, estatus_entrega, remisiones!inner(cliente_id)"),
     ]);
     setRows(cs ?? []); setMotos(ms ?? []);
+    if (ce) toast.error(explicarError(ce, t.clientes.errorCargar));
   };
   useEffect(() => { load(); }, []);
 
@@ -122,7 +125,7 @@ export default function Clientes() {
     return `CLI-${year}-${seq}`;
   };
 
-  const clienteCodigoDisplay = (c: any) => c?.folio_interno || c?.codigo_erp || "—";
+  const clienteCodigoDisplay = (c: any) => displayCliente(c);
   const clienteEsMigrado = (c: any) => !!c?.codigo_erp;
 
   const save = async () => {

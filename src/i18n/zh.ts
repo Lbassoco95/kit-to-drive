@@ -323,6 +323,7 @@ export const zh = {
     editar: "编辑客户",
     creado: "✓ 客户已创建",
     actualizado: "✓ 客户已更新",
+    errorCargar: "加载客户时出错",
   },
 
   // Remisiones

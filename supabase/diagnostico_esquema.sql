@@ -82,7 +82,24 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260824000003_usuario_activo_se_aplica',     'funcion|usuario_activo(uuid)'),
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_oportunidades.crm_oportunidades_insert_area'),
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_actividades.crm_actividades_insert_area'),
-  ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area')
+  ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area'),
+
+  -- Folios reutilizables en remisiones canceladas
+  ('20260826000002_folio_reutilizable_canceladas','indice|idx_remisiones_folio_activas'),
+
+  -- Asignación manual de motocarros a remisiones
+  ('20260826000003_asignacion_manual_remisiones','funcion|asignar_motocarro_a_remision(uuid,uuid)'),
+  ('20260826000003_asignacion_manual_remisiones','funcion|desasignar_motocarro_de_remision(uuid)'),
+
+  -- Folio interno para clientes nuevos
+  ('20260827000001_folio_interno_clientes_nuevos','columna|clientes.folio_interno'),
+  ('20260827000001_folio_interno_clientes_nuevos','indice|idx_clientes_folio_interno_unico'),
+  ('20260827000001_folio_interno_clientes_nuevos','secuencia|clientes_folio_interno_seq'),
+  ('20260827000001_folio_interno_clientes_nuevos','funcion|generar_folio_interno_cliente()'),
+  ('20260827000001_folio_interno_clientes_nuevos','trigger|clientes.trg_clientes_folio_interno'),
+
+  -- Carga de motocarro ya armado desde asignación manual
+  ('20260828000001_motocarro_ya_armado','funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)')
 ), revisado AS (
   SELECT e.script, e.objeto,
          split_part(e.objeto, '|', 1) AS tipo,
@@ -115,6 +132,10 @@ WITH esperado(script, objeto) AS (VALUES
                  WHERE p.schemaname = 'public'
                    AND p.tablename  = split_part(r.nombre, '.', 1)
                    AND p.policyname = split_part(r.nombre, '.', 2))
+      WHEN 'indice' THEN
+        to_regclass('public.' || quote_ident(r.nombre)) IS NOT NULL
+      WHEN 'secuencia' THEN
+        to_regclass('public.' || quote_ident(r.nombre)) IS NOT NULL
     END AS existe
   FROM revisado r
 )

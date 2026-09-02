@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, StockColor } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, StockColor, explicarError } from "@/lib/dazon";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
+import { cargarClientes, displayCliente } from "@/lib/catalogoClientes";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -146,7 +147,8 @@ export default function Remisiones() {
 
   // ── Loaders ────────────────────────────────────────────────────────────────
   const loadClientes = async () => {
-    const { data } = await supabase.from("clientes").select("id,codigo_erp,folio_interno,nombre_comercial").order("folio_interno, codigo_erp");
+    const { data, error } = await cargarClientes();
+    if (error) toast.error(explicarError(error, t.clientes.errorCargar));
     setClientes(data ?? []);
   };
   const loadVendedores = async () => {
@@ -679,7 +681,7 @@ export default function Remisiones() {
                     <Select value={form.cliente_id} onValueChange={v=>setForm({...form,cliente_id:v})}>
                       <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente"/></SelectTrigger>
                       <SelectContent>{clientes.map(c=>{
-                        const label = c.codigo_erp || c.folio_interno || "—";
+                        const label = displayCliente(c);
                         return <SelectItem key={c.id} value={c.id}>{label}{c.nombre_comercial?` — ${c.nombre_comercial}`:""}</SelectItem>;
                       })}</SelectContent>
                     </Select>

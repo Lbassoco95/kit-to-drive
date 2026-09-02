@@ -54,7 +54,10 @@ BEGIN
   FROM public.clientes
   WHERE folio_interno ~ '^CLI-[0-9]{4}-[0-9]{3}$';
 
-  PERFORM setval('public.clientes_folio_interno_seq', max_seq);
+  -- El sequence tiene MINVALUE 1; setval(0) falla y revierte toda la
+  -- transacción en el SQL editor. Arrancamos en max_seq + 1 con is_called=false
+  -- para que el primer nextval devuelva el siguiente número libre.
+  PERFORM setval('public.clientes_folio_interno_seq', GREATEST(max_seq, 0) + 1, false);
 END $$;
 
 -- 6. Funcion para generar el siguiente folio interno.

@@ -358,6 +358,7 @@ export const es = {
     subiendo: "Subiendo…",
     documentoSubido: "✓ Documento subido",
     errorSubir: "Error al subir documento",
+    errorCargar: "Error al cargar clientes",
     rfcInvalido: "RFC inválido (12 o 13 caracteres)",
     folioSugerido: "Folio sugerido",
     guardar: "Guardar cliente",
