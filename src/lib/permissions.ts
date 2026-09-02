@@ -172,7 +172,7 @@ const INICIO: Record<Area, string> = {
   comercial: "/crm/oportunidades",
   fabrica: "/",
   almacen_logistica: "/",
-  administracion: "/finanzas",
+  administracion: "/",
   direccion: "/",
 };
 

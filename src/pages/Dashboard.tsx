@@ -5,11 +5,12 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, CatalogoModelos, nombreComercial, displayFabrica } from "@/lib/dazon";
+import { fmtMoneda } from "@/lib/finanzas";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
 import { ResumenAvisos } from "@/components/BandejaAvisos";
-import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, type LucideIcon } from "lucide-react";
+import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, TrendingUp, DollarSign, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const CAPACIDAD = 4;
@@ -357,6 +358,10 @@ export default function Dashboard() {
         </div>
       )}
 
+      {area === "administracion" && (
+        <ResumenEjecutivo />
+      )}
+
       {area === "fabrica" && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -445,5 +450,184 @@ function ProximasOrdenes({ motos, catalogo, t }: { motos: any[]; catalogo: Catal
         ))}
       </tbody>
     </table>
+  );
+}
+
+// Resumen ejecutivo para Administración / Finanzas: une dinero, motocarros
+// y actividad del equipo comercial en una vista estratégica.
+function ResumenEjecutivo() {
+  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState({
+    motosTotal: 0,
+    motosEntregados: 0,
+    motosPorEntregar: 0,
+    remisionesTotal: 0,
+    remisionesCompletas: 0,
+    remisionesParciales: 0,
+    oportunidadesTotal: 0,
+    oportunidadesGanadas: 0,
+    oportunidadesMonto: 0,
+    actividadesMes: 0,
+    topVendedores: [] as { nombre: string; monto: number }[],
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    const cargar = async () => {
+      const ahora = new Date();
+      const hace30 = new Date(ahora.setDate(ahora.getDate() - 30)).toISOString();
+      const [
+        { data: motos },
+        { data: rems },
+        { count: opsTotal },
+        { count: opsGanadas },
+        { data: opsGanadasData },
+        { count: actividades },
+      ] = await Promise.all([
+        supabase.from("motocarros").select("estatus_entrega"),
+        supabase.from("remisiones").select("estatus"),
+        supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }),
+        supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }).eq("etapa", "ganado"),
+        supabase.from("crm_oportunidades").select("vendedor_id, monto_estimado").eq("etapa", "ganado"),
+        supabase.from("crm_actividades").select("*", { count: "exact", head: true }).gte("fecha", hace30),
+      ]);
+
+      const motosTotal = (motos ?? []).length;
+      const motosEntregados = (motos ?? []).filter((m: any) => m.estatus_entrega === "ENTREGADA").length;
+      const motosPorEntregar = motosTotal - motosEntregados;
+
+      const remisionesTotal = (rems ?? []).length;
+      const remisionesCompletas = (rems ?? []).filter((r: any) => r.estatus === "COMPLETA").length;
+      const remisionesParciales = (rems ?? []).filter((r: any) => r.estatus === "PARCIAL").length;
+
+      const montoTotal = (opsGanadasData ?? []).reduce((s: number, o: any) => s + (o.monto_estimado || 0), 0);
+
+      const vendedorMontos: Record<string, number> = {};
+      (opsGanadasData ?? []).forEach((o: any) => {
+        if (o.vendedor_id && o.monto_estimado) {
+          vendedorMontos[o.vendedor_id] = (vendedorMontos[o.vendedor_id] || 0) + o.monto_estimado;
+        }
+      });
+
+      let topVendedores: { nombre: string; monto: number }[] = [];
+      const vendedorIds = Object.keys(vendedorMontos);
+      if (vendedorIds.length) {
+        const { data: profiles } = await supabase.from("profiles").select("id, nombre_completo").in("id", vendedorIds);
+        topVendedores = (profiles ?? [])
+          .map((p: any) => ({ nombre: p.nombre_completo || "Sin nombre", monto: vendedorMontos[p.id] || 0 }))
+          .sort((a, b) => b.monto - a.monto)
+          .slice(0, 5);
+      }
+
+      if (mounted) {
+        setKpis({
+          motosTotal,
+          motosEntregados,
+          motosPorEntregar,
+          remisionesTotal,
+          remisionesCompletas,
+          remisionesParciales,
+          oportunidadesTotal: opsTotal || 0,
+          oportunidadesGanadas: opsGanadas || 0,
+          oportunidadesMonto: montoTotal,
+          actividadesMes: actividades || 0,
+          topVendedores,
+        });
+        setLoading(false);
+      }
+    };
+    cargar();
+    return () => { mounted = false; };
+  }, []);
+
+  if (loading) {
+    return <div className="text-center py-10 text-muted-foreground">Cargando resumen ejecutivo…</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-lg font-bold text-[#1F3864]">Resumen ejecutivo</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-4 bg-[#1F3864]/5 border-[#1F3864]/10">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Bike size={18} className="text-[#1F3864]" /> Motocarros totales
+          </div>
+          <div className="text-3xl font-extrabold text-[#1F3864] mt-1">{kpis.motosTotal}</div>
+        </Card>
+        <Card className="p-4 bg-emerald-50 border-emerald-100">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CheckCircle size={18} className="text-emerald-600" /> Entregados
+          </div>
+          <div className="text-3xl font-extrabold text-emerald-600 mt-1">{kpis.motosEntregados}</div>
+        </Card>
+        <Card className="p-4 bg-amber-50 border-amber-100">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Truck size={18} className="text-amber-600" /> Por entregar
+          </div>
+          <div className="text-3xl font-extrabold text-amber-600 mt-1">{kpis.motosPorEntregar}</div>
+        </Card>
+        <Card className="p-4 bg-blue-50 border-blue-100">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <BarChart3 size={18} className="text-blue-600" /> Remisiones
+          </div>
+          <div className="text-3xl font-extrabold text-blue-600 mt-1">{kpis.remisionesTotal}</div>
+        </Card>
+        <Card className="p-4 bg-purple-50 border-purple-100">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <TrendingUp size={18} className="text-purple-600" /> Oportunidades
+          </div>
+          <div className="text-3xl font-extrabold text-purple-600 mt-1">{kpis.oportunidadesTotal}</div>
+        </Card>
+        <Card className="p-4 bg-green-50 border-green-100">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CheckCircle size={18} className="text-green-600" /> Oportunidades ganadas
+          </div>
+          <div className="text-3xl font-extrabold text-green-600 mt-1">{kpis.oportunidadesGanadas}</div>
+        </Card>
+        <Card className="p-4 bg-yellow-50 border-yellow-100">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <DollarSign size={18} className="text-yellow-600" /> Monto ganado
+          </div>
+          <div className="text-2xl font-extrabold text-yellow-600 mt-1">{fmtMoneda(kpis.oportunidadesMonto)}</div>
+        </Card>
+        <Card className="p-4 bg-indigo-50 border-indigo-100">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Users size={18} className="text-indigo-600" /> Actividades (30d)
+          </div>
+          <div className="text-3xl font-extrabold text-indigo-600 mt-1">{kpis.actividadesMes}</div>
+        </Card>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card className="p-4">
+          <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
+            <Truck size={20} /> Estado de remisiones
+          </h3>
+          <div className="space-y-2">
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Completas</span><span className="font-bold text-emerald-600">{kpis.remisionesCompletas}</span></div>
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Parciales</span><span className="font-bold text-[#1F3864]">{kpis.remisionesParciales}</span></div>
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Otras</span><span className="font-bold text-slate-600">{kpis.remisionesTotal - kpis.remisionesCompletas - kpis.remisionesParciales}</span></div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
+            <Users size={20} /> Top vendedores (monto ganado)
+          </h3>
+          {kpis.topVendedores.length > 0 ? (
+            <div className="space-y-2">
+              {kpis.topVendedores.map((v, idx) => (
+                <div key={v.nombre} className="flex justify-between p-2 bg-slate-50 rounded">
+                  <span className="font-medium">{idx + 1}. {v.nombre}</span>
+                  <span className="font-bold text-[#1F3864]">{fmtMoneda(v.monto)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-muted-foreground">Sin ventas registradas</div>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }
