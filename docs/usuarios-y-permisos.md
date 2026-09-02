@@ -65,9 +65,18 @@ confundirla:
   obligatorio**: se guarda en `remisiones_bitacora` (con `CHECK` de 10
   caracteres en la propia tabla) *antes* de aplicar el cambio, así que una
   modificación sin justificación no llega a guardarse. El historial se ve en
-  «Ver remisión completa» y la tarjeta marca cuántas veces se modificó. Lo que
-  no cambia: bajar el total de unidades por debajo de los chasis ya asignados
-  sigue exigiendo liberarlos primero en Producción.
+  «Ver remisión completa» y la tarjeta marca cuántas veces se modificó.
+- **Fábrica no frena a Ventas.** La primera versión impedía bajar el total si ya
+  había chasis asignados. Se quitó: para Fábrica el cambio es indistinto — el
+  chasis vuelve a la fila y se va a otra orden. Ahora las unidades de más se
+  liberan solas (`ajustar_unidades_remision()`, las menos avanzadas primero) y
+  el aviso le llega a Fábrica y a Logística. El único piso que queda es que no
+  se puede bajar por debajo de lo ya **entregado o en ruta**: eso ya salió del
+  almacén.
+- **Lo que no hay, no se compromete.** Al capturar y al editar, una línea que
+  pida más de lo disponible no deja guardar: «estás pidiendo 3 de Azul y sólo
+  hay 1». Cuando no hay dato de inventario de ese color no se bloquea — no
+  saber no es lo mismo que no haber.
 - **Capturar.** `crear remisiones` y `remision_items_insert` existen en dos
   versiones con el mismo nombre: la original, que sólo conoce los roles legados
   (`admin`, `coordinador`, `ventas`) y por tanto no deja capturar al supervisor
@@ -122,7 +131,15 @@ sólo un filtro de vista del lado del cliente.
   que da lo mismo si los helpers están o no. Al correr, el script imprime cuáles
   encontró.
 - `src/lib/remisionesEdicion.ts` — reconstruye el formulario desde los
-  renglones guardados y calcula el alta/cambio/baja de cada renglón al guardar.
+  renglones guardados, calcula el alta/cambio/baja de cada renglón al guardar, y
+  decide qué líneas no alcanzan con el inventario.
+- `supabase/migrations/20260903000001_avisos_entre_areas.sql` — la tabla
+  `avisos` (el único canal entre áreas que hay) con acuse de «visto», y
+  `ajustar_unidades_remision()`, que libera las unidades sobrantes al bajar una
+  remisión y deja el aviso. El aviso no se puede editar después: un trigger
+  congela todo menos el acuse.
+- `src/components/BandejaAvisos.tsx` — la bandeja arriba de Producción y el
+  contador del tablero.
 
 ## Compatibilidad
 

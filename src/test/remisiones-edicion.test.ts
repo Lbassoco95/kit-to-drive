@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   agruparRenglones, planEditarRenglones, motivoValido, MOTIVO_MIN, ORDEN_FLETE,
+  faltantesDeExistencia, mensajeFaltantes,
   type LineaMoto, type RenglonRemision,
 } from "@/lib/remisionesEdicion";
 
@@ -174,5 +175,72 @@ describe("motivoValido", () => {
     expect(motivoValido("x".repeat(MOTIVO_MIN - 1))).toBe(false);
     expect(motivoValido("x".repeat(MOTIVO_MIN))).toBe(true);
     expect(motivoValido("El cliente pidió dos unidades más")).toBe(true);
+  });
+});
+
+describe("existencia · no comprometer lo que no hay", () => {
+  const pedido = (...ls: [string, string, number][]) =>
+    ls.map(([modelo, color, cantidad]) => ({ modelo, color, cantidad }));
+  // Inventario de la prueba, ya descontado el resto del pedido.
+  const inventario = (mapa: Record<string, number | null>) =>
+    (_i: number, modelo: string, color: string) => {
+      const v = mapa[`${modelo}|${color}`];
+      return v === undefined ? null : v;
+    };
+
+  it("deja pasar lo que sí alcanza", () => {
+    const f = faltantesDeExistencia(
+      pedido(["200cc 2026", "BLANCO", 2]),
+      inventario({ "200cc 2026|BLANCO": 5 }),
+    );
+    expect(f).toEqual([]);
+  });
+
+  it("marca la línea que pide de más", () => {
+    const f = faltantesDeExistencia(
+      pedido(["200cc 2026", "AZUL", 3]),
+      inventario({ "200cc 2026|AZUL": 1 }),
+    );
+    expect(f).toEqual([{ indice: 0, modelo: "200cc 2026", color: "AZUL", piden: 3, hay: 1 }]);
+    expect(mensajeFaltantes(f)).toBe("Estás pidiendo 3 de AZUL (200cc 2026) y sólo hay 1.");
+  });
+
+  it("distingue «sólo hay N» de «ya no hay»", () => {
+    const f = faltantesDeExistencia(
+      pedido(["200cc 2026", "AZUL", 3]),
+      inventario({ "200cc 2026|AZUL": 0 }),
+    );
+    expect(mensajeFaltantes(f)).toBe("Ya no hay existencia de AZUL (200cc 2026) y estás pidiendo 3.");
+  });
+
+  it("un disponible negativo se dice como «ya no hay», no como «hay -2»", () => {
+    const f = faltantesDeExistencia(
+      pedido(["200cc 2026", "ROJO", 1]),
+      inventario({ "200cc 2026|ROJO": -2 }),
+    );
+    expect(f[0].hay).toBe(0);
+    expect(mensajeFaltantes(f)).toContain("Ya no hay existencia");
+  });
+
+  it("sin dato de inventario NO se bloquea: no saber no es cero", () => {
+    const f = faltantesDeExistencia(
+      pedido(["Modelo nuevo", "VERDE", 9]),
+      inventario({}),
+    );
+    expect(f).toEqual([]);
+  });
+
+  it("junta varias líneas en un solo mensaje", () => {
+    const f = faltantesDeExistencia(
+      pedido(["200cc 2026", "AZUL", 3], ["200cc 2026", "BLANCO", 2], ["200cc 2026", "ROJO", 4]),
+      inventario({ "200cc 2026|AZUL": 1, "200cc 2026|BLANCO": 5, "200cc 2026|ROJO": 0 }),
+    );
+    expect(f).toHaveLength(2);
+    const msg = mensajeFaltantes(f, c => c.charAt(0) + c.slice(1).toLowerCase());
+    expect(msg).toBe("No alcanza el inventario: estás pidiendo 3 de Azul (200cc 2026) y sólo hay 1 · ya no hay existencia de Rojo (200cc 2026) y estás pidiendo 4.");
+  });
+
+  it("no dice nada cuando no falta nada", () => {
+    expect(mensajeFaltantes([])).toBe("");
   });
 });

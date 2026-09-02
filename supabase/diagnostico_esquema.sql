@@ -123,7 +123,16 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_delete_area'),
   ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_insert_area'),
   ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial edita sus remisiones'),
-  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial captura remisiones')
+  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial captura remisiones'),
+
+  -- Avisos entre áreas y liberación de unidades
+  ('20260903000001_avisos_entre_areas',           'tabla|avisos'),
+  ('20260903000001_avisos_entre_areas',           'funcion|recibe_avisos_de(user_area,uuid)'),
+  ('20260903000001_avisos_entre_areas',           'funcion|ajustar_unidades_remision(uuid,integer,text)'),
+  ('20260903000001_avisos_entre_areas',           'trigger|avisos.trg_avisos_solo_acuse'),
+  ('20260903000001_avisos_entre_areas',           'politica|avisos.leer avisos de mi area'),
+  ('20260903000001_avisos_entre_areas',           'politica|avisos.mandar aviso'),
+  ('20260903000001_avisos_entre_areas',           'politica|avisos.dar por visto')
 ), revisado AS (
   SELECT e.script, e.objeto,
          split_part(e.objeto, '|', 1) AS tipo,

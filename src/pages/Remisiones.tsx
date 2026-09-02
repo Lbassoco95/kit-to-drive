@@ -12,6 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, normColor, normModelo, StockColor } from "@/lib/dazon";
 import {
   agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, MOTIVOS_EDICION,
+  faltantesDeExistencia, mensajeFaltantes,
   type LineaMoto, type RenglonRemision,
 } from "@/lib/remisionesEdicion";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
@@ -37,6 +38,14 @@ import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 // llevaba la app entera en blanco al dar clic en «Nueva remisión». La opción de
 // «a mí mismo» viaja con un valor propio y se traduce a vacío al guardar.
 const ASIGNAR_A_MI = "__yo__";
+
+/**
+ * Unidades de la remisión que ya salieron del almacén. Son el único piso al
+ * bajar el total: un motocarro entregado o en ruta no se «des-entrega» desde
+ * una pantalla.
+ */
+const unidadesQueYaSalieron = (r: any): number =>
+  (r?.motocarros ?? []).filter((m: any) => ["ENTREGADA","EN_RUTA"].includes(m?.estatus_entrega)).length;
 
 /** Lo que se va a guardar en una columna JSONB, ya serializable. */
 const comoJson = (v: unknown): Json => JSON.parse(JSON.stringify(v ?? null));
@@ -239,12 +248,11 @@ function LineasMotocarro({
                       })}
                     </SelectContent>
                   </Select>
-                  {/* Qué tan cubierta queda esta línea con el color elegido.
-                      No se bloquea la captura: la remisión es una promesa
-                      al cliente y el sistema ya trabaja con demanda por
-                      encima del inventario (de ahí «déficit» en
-                      Producción). Lo que sí hace falta es que quien
-                      captura vea contra qué se está comprometiendo. */}
+                  {/* Contra qué se está comprometiendo esta línea.
+                      No se puede guardar pidiendo más de lo que hay, así que
+                      el aviso tiene que decir qué hacer, no sólo qué falta.
+                      Cuando no hay dato del color no se dice nada: no saber
+                      no es lo mismo que no haber. */}
                   {(() => {
                     const quedan = disponiblesPara(idx, moto.modelo, moto.color);
                     if (quedan === null) return null;
@@ -257,8 +265,8 @@ function LineasMotocarro({
                           <XCircle size={12} className="mt-0.5 shrink-0" />
                           <span>
                             {quedan <= 0
-                              ? `Sin existencia de ${colorLabel(moto.color)}: se piden ${piden} por armar.`
-                              : `Sólo quedan ${quedan} de ${colorLabel(moto.color)}: faltarían ${faltan} por armar.`}
+                              ? `Ya no hay existencia de ${colorLabel(moto.color)}. Cambia el color o quita la línea.`
+                              : `Sólo hay ${quedan} de ${colorLabel(moto.color)} y pides ${piden}. Baja la cantidad a ${quedan} o cambia el color.`}
                           </span>
                         </div>
                       );
@@ -722,6 +730,11 @@ export default function Remisiones() {
     if (activeFolios.includes(form.folio_remision.trim())) { toast.error("Ese folio ya está en uso por una remisión activa"); return; }
     if (totalUnidades===0) { toast.error("Agrega al menos un motocarro"); return; }
 
+    // No se compromete lo que no hay. Sin dato de inventario no se bloquea:
+    // ver faltantesDeExistencia().
+    const faltan = faltantesDeExistencia(motos, disponiblesPara);
+    if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel)); return; }
+
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
 
     // INSERT mínimo: solo columnas que siempre han existido en la tabla.
@@ -1043,14 +1056,20 @@ export default function Remisiones() {
     if (rows.some((r:any) => r.id !== editar.id && r.estatus !== "CANCELADA" && r.folio_remision === folio))
       return toast.error("Ese folio ya está en uso por otra remisión activa");
 
+    const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
+    if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel));
+
     const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
     if (!plan.totalUnidades) return toast.error("La remisión necesita al menos un motocarro");
 
-    // No se puede pedir menos de lo que ya se armó: esos chasis se liberan
-    // primero desde Producción, si no la remisión queda con unidades huérfanas.
+    // Bajar el total ya no frena a Comercial: las unidades de más se liberan y
+    // se le avisa a Fábrica (para ellos es indistinto, el chasis vuelve a la
+    // fila). Lo único que no se puede deshacer desde aquí es lo que ya salió
+    // del almacén.
     const asignadas = (editar.motocarros ?? []).length;
-    if (plan.totalUnidades < asignadas)
-      return toast.error(`Esta remisión ya tiene ${asignadas} chasis asignados: libéralos en Producción antes de bajarla a ${plan.totalUnidades} unidades`);
+    const yaSalieron = unidadesQueYaSalieron(editar);
+    if (plan.totalUnidades < yaSalieron)
+      return toast.error(`Esta remisión ya tiene ${yaSalieron} unidad(es) entregadas o en ruta: no se puede bajar a ${plan.totalUnidades}`);
 
     setGuardandoEdicion(true);
 
@@ -1119,10 +1138,32 @@ export default function Remisiones() {
 
     // 4. Renglones.
     const fallo = await aplicarPlanRenglones(plan);
-    setGuardandoEdicion(false);
-    if (fallo) return toast.error(`La remisión se actualizó, pero un renglón falló: ${fallo}`);
+    if (fallo) {
+      setGuardandoEdicion(false);
+      return toast.error(`La remisión se actualizó, pero un renglón falló: ${fallo}`);
+    }
 
-    toast.success("✓ Remisión actualizada — el motivo quedó en la bitácora");
+    // 5. Si el pedido se achicó, soltar las unidades de más y avisarle a
+    //    Fábrica y a Logística. Va al final: la RPC compara contra el total ya
+    //    guardado.
+    let liberadas = 0;
+    if (plan.totalUnidades < asignadas) {
+      const { data, error } = await supabase.rpc("ajustar_unidades_remision", {
+        _remision_id: editar.id,
+        _total_objetivo: plan.totalUnidades,
+        _motivo: motivo,
+      });
+      if (error) {
+        setGuardandoEdicion(false);
+        return toast.error(`La remisión se actualizó, pero las unidades de más no se liberaron: ${error.message}`);
+      }
+      liberadas = Number((data as any)?.liberadas ?? 0);
+    }
+
+    setGuardandoEdicion(false);
+    toast.success(liberadas
+      ? `✓ Remisión actualizada — se liberaron ${liberadas} unidad(es) y Fábrica ya fue avisada`
+      : "✓ Remisión actualizada — el motivo quedó en la bitácora");
     cerrarEdicion();
     load(); loadModificaciones();
   };
@@ -1737,15 +1778,32 @@ export default function Remisiones() {
 
           {editForm&&(
             <div className="space-y-4">
-              {(editar?.motocarros?.length ?? 0) > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
-                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5"/>
-                  <span>
-                    Esta remisión ya tiene <strong>{editar.motocarros.length}</strong> chasis asignados.
-                    Puedes agregar unidades, pero para bajar el total hay que liberarlos primero en Producción.
-                  </span>
-                </div>
-              )}
+              {(() => {
+                const asignadas  = editar?.motocarros?.length ?? 0;
+                if (!asignadas) return null;
+                const yaSalieron = unidadesQueYaSalieron(editar);
+                const seLiberan  = Math.max(0, asignadas - totalUnidadesEdit);
+                return (
+                  <div className={`rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${
+                    seLiberan ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-muted-foreground"
+                  }`}>
+                    <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5"/>
+                    <span>
+                      Esta remisión ya tiene <strong>{asignadas}</strong> chasis asignados
+                      {yaSalieron > 0 && <> ({yaSalieron} entregada{yaSalieron===1?"":"s"} o en ruta)</>}.
+                      {seLiberan > 0
+                        ? <> Al bajarla a {totalUnidadesEdit}, se <strong>liberarán {seLiberan}</strong> —
+                            vuelven al inventario y Fábrica queda avisada.</>
+                        : <> Puedes ajustarla libremente; si bajas el total, las de más se liberan solas.</>}
+                      {yaSalieron > 0 && totalUnidadesEdit < yaSalieron && (
+                        <strong className="block mt-1 text-red-700">
+                          No se puede bajar a {totalUnidadesEdit}: {yaSalieron} ya salieron del almacén.
+                        </strong>
+                      )}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Folio */}
               <div>

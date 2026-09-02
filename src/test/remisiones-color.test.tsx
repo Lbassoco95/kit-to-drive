@@ -69,14 +69,25 @@ describe("Remisiones · disponibilidad por color", () => {
     expect(await screen.findByText(/12 disponibles de Blanco/)).toBeInTheDocument();
   });
 
-  it("avisa cuando la cantidad pedida pasa de lo que hay", async () => {
+  it("avisa cuando la cantidad pedida pasa de lo que hay, y dice qué hacer", async () => {
     filas.v_stock_modelo_color = [
       { modelo_comercial: "200cc 2026", color: "BLANCO", unidades_libres: 0, piezas_disponibles: 2, demanda_pendiente: 0 },
     ];
     const cuerpo = await abrirNueva();
     const cantidad = cuerpo.querySelector('input[type="number"]') as HTMLInputElement;
     await act(async () => { fireEvent.change(cantidad, { target: { value: "5" } }); });
-    expect(await screen.findByText(/faltarían 3 por armar/)).toBeInTheDocument();
+    // Ya no se puede guardar por encima del inventario, así que el aviso tiene
+    // que decir la salida, no sólo el faltante.
+    expect(await screen.findByText(/Sólo hay 2 de Blanco y pides 5/)).toBeInTheDocument();
+    expect(await screen.findByText(/Baja la cantidad a 2 o cambia el color/)).toBeInTheDocument();
+  });
+
+  it("cuando el color se acabó, dice que ya no hay", async () => {
+    filas.v_stock_modelo_color = [
+      { modelo_comercial: "200cc 2026", color: "BLANCO", unidades_libres: 0, piezas_disponibles: 0, demanda_pendiente: 0 },
+    ];
+    await abrirNueva();
+    expect(await screen.findByText(/Ya no hay existencia de Blanco/)).toBeInTheDocument();
   });
 
   it("descuenta lo que ya apartaron las otras líneas de la misma orden", async () => {

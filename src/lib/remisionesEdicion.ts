@@ -302,6 +302,60 @@ export function planEditarRenglones(
   return { inserts, updates, deleteIds: [...new Set(deleteIds)], totalUnidades };
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Existencia: no comprometer lo que no hay
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Una línea que pide más unidades de las que quedan de ese color. */
+export interface Faltante {
+  indice: number;
+  modelo: string;
+  color: string;
+  piden: number;
+  /** Lo que queda de ese (modelo, color) una vez descontado el resto del pedido. */
+  hay: number;
+}
+
+/**
+ * Qué líneas del pedido no alcanzan con el inventario.
+ *
+ * `disponibles` devuelve `null` cuando no hay dato de ese (modelo, color): eso
+ * NO es cero. Sin información no se bloquea la captura — inventar un cero
+ * pararía la venta por un color que nunca se dio de alta en el catálogo.
+ */
+export function faltantesDeExistencia(
+  lineas: readonly { modelo: string; color: string; cantidad: number }[],
+  disponibles: (indice: number, modelo: string, color: string) => number | null,
+): Faltante[] {
+  const faltantes: Faltante[] = [];
+  lineas.forEach((l, indice) => {
+    const hay = disponibles(indice, l.modelo, l.color);
+    if (hay === null) return;
+    const piden = Math.max(1, Number(l.cantidad) || 1);
+    if (piden > hay) faltantes.push({ indice, modelo: l.modelo, color: l.color, piden, hay: Math.max(0, hay) });
+  });
+  return faltantes;
+}
+
+/** Lo que se le dice a quien captura cuando no alcanza el inventario. */
+export function mensajeFaltantes(
+  faltantes: Faltante[],
+  etiquetaColor: (c: string) => string = c => c,
+): string {
+  if (!faltantes.length) return "";
+
+  const frase = (f: Faltante) =>
+    f.hay <= 0
+      ? `ya no hay existencia de ${etiquetaColor(f.color)} (${f.modelo}) y estás pidiendo ${f.piden}`
+      : `estás pidiendo ${f.piden} de ${etiquetaColor(f.color)} (${f.modelo}) y sólo hay ${f.hay}`;
+
+  if (faltantes.length === 1) {
+    const t = frase(faltantes[0]);
+    return t.charAt(0).toUpperCase() + t.slice(1) + ".";
+  }
+  return `No alcanza el inventario: ${faltantes.map(frase).join(" · ")}.`;
+}
+
 /** Resumen legible de lo que cambió, para guardarlo junto al motivo. */
 export function describirCambios(
   antes: Record<string, unknown>,
