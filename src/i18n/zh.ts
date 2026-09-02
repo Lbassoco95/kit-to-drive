@@ -321,11 +321,11 @@ export const zh = {
     sinNombre: "无商业名称",
     sinResultados: "无结果",
     cargando: "正在加载客户…",
-    errorCarga: "无法加载客户列表",
     reintentar: "重试",
     editar: "编辑客户",
     creado: "✓ 客户已创建",
     actualizado: "✓ 客户已更新",
+    errorCargar: "加载客户时出错",
   },
 
   // Remisiones

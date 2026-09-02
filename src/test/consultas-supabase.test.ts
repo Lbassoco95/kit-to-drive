@@ -87,7 +87,7 @@ describe("consultas a Supabase", () => {
   });
 
   /**
-   * El catálogo de clientes se lee desde `@/lib/catalogoClientes`, que trae el
+   * El catálogo de clientes se lee con `cargarClientes()`, que trae el
    * respaldo para una base sin `folio_interno` y devuelve el `error` en vez de
    * tragárselo. Cuando cada pantalla lo leía por su cuenta, sólo una de las
    * dos tenía respaldo — y la que no lo tenía es la que se vació.
@@ -105,7 +105,7 @@ describe("consultas a Supabase", () => {
     }
     expect(
       sueltas,
-      "Usa cargarCatalogoClientes() de @/lib/catalogoClientes: trae el " +
+      "Usa cargarClientes() de @/lib/catalogoClientes: trae el " +
       "respaldo para una base sin folio_interno y no se traga el error:\n" +
       sueltas.map(l => `  · ${l}`).join("\n"),
     ).toEqual([]);

@@ -57,6 +57,7 @@ describe("explicarError · a qué script apunta cada objeto", () => {
     ["function public.puede_editar_remision(uuid, uuid) does not exist", "20260902000001"],
     ["column remision_items.orden_linea does not exist", "20260902000001"],
     ["function public.asignar_motocarro_a_remision(uuid, uuid) does not exist", "20260826000003"],
+    ["function public.desasignar_motocarro_de_remision(uuid) does not exist", "20260826000003"],
   ];
 
   for (const [crudo, esperado] of casos) {

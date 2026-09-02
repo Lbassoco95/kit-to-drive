@@ -54,19 +54,10 @@ BEGIN
   FROM public.clientes
   WHERE folio_interno ~ '^CLI-[0-9]{4}-[0-9]{3}$';
 
-  -- OJO: `setval(seq, 0)` NO es válido — la secuencia arranca en 1 y Postgres
-  -- contesta «value 0 is out of bounds for sequence». En el SQL editor de
-  -- Supabase todo el archivo va en UNA transacción, así que ese error tiraba
-  -- el script COMPLETO: `clientes.folio_interno` nunca se creaba, y sin rastro.
-  -- Así se quedó producción, y la lista de Clientes salía vacía porque la app
-  -- pedía una columna que no existía.
-  --
-  -- El caso es una base donde ningún cliente trae folio CLI-AAAA-NNN todavía
-  -- (max_seq = 0), que es justo el arranque. El tercer argumento (`is_called`)
-  -- resuelve las dos situaciones: en falso, el siguiente `nextval` devuelve el
-  -- valor tal cual (1, el primer folio); en verdadero, devuelve el siguiente
-  -- (max_seq + 1).
-  PERFORM setval('public.clientes_folio_interno_seq', GREATEST(max_seq, 1), max_seq > 0);
+  -- El sequence tiene MINVALUE 1; setval(0) falla y revierte toda la
+  -- transacción en el SQL editor. Arrancamos en max_seq + 1 con is_called=false
+  -- para que el primer nextval devuelva el siguiente número libre.
+  PERFORM setval('public.clientes_folio_interno_seq', GREATEST(max_seq, 0) + 1, false);
 END $$;
 
 -- 6. Funcion para generar el siguiente folio interno.

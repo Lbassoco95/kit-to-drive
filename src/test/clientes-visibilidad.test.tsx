@@ -112,7 +112,7 @@ describe("Clientes · la lista nunca se queda vacía en silencio", () => {
     expect(cuerpo.textContent).toContain("Motos del Bajío");
     expect(cuerpo.textContent).toContain("CLI-2026-004");
     expect(cuerpo.textContent).not.toContain("Sin resultados");
-    expect(cuerpo.textContent).not.toContain("No se pudo cargar la lista de clientes");
+    expect(cuerpo.textContent).not.toContain("Error al cargar clientes");
     // Un solo viaje: el respaldo no se pide cuando no hace falta.
     expect(intentos).toEqual([["folio_interno", "codigo_erp"]]);
   });
@@ -126,7 +126,7 @@ describe("Clientes · la lista nunca se queda vacía en silencio", () => {
     expect(cuerpo.textContent).toContain("Ferretería del Sur");
     expect(cuerpo.textContent).toContain("Motos del Bajío");
     expect(cuerpo.textContent).not.toContain("Sin resultados");
-    expect(cuerpo.textContent).not.toContain("No se pudo cargar la lista de clientes");
+    expect(cuerpo.textContent).not.toContain("Error al cargar clientes");
     // Primero con folio_interno; al fallar, el catálogo de siempre.
     expect(intentos).toEqual([["folio_interno", "codigo_erp"], ["codigo_erp"]]);
   });
@@ -135,7 +135,7 @@ describe("Clientes · la lista nunca se queda vacía en silencio", () => {
     fallaClientes = { code: "42501", message: "permission denied for table clientes" };
     const cuerpo = await dibujar();
 
-    expect(cuerpo.textContent).toContain("No se pudo cargar la lista de clientes");
+    expect(cuerpo.textContent).toContain("Error al cargar clientes");
     expect(cuerpo.textContent).toContain("permission denied for table clientes");
     expect(cuerpo.textContent).toContain("Reintentar");
     expect(cuerpo.textContent).not.toContain("Sin resultados");
@@ -154,7 +154,7 @@ describe("Clientes · la lista nunca se queda vacía en silencio", () => {
     const cuerpo = await dibujar();
 
     expect(cuerpo.textContent).toContain("Sin resultados");
-    expect(cuerpo.textContent).not.toContain("No se pudo cargar la lista de clientes");
+    expect(cuerpo.textContent).not.toContain("Error al cargar clientes");
   });
 
   it("las estadísticas de unidades no arrastran a la lista si fallan", async () => {
@@ -167,6 +167,6 @@ describe("Clientes · la lista nunca se queda vacía en silencio", () => {
 
     expect(cuerpo.textContent).toContain("Ferretería del Sur");
     expect(cuerpo.textContent).toContain("Motos del Bajío");
-    expect(cuerpo.textContent).not.toContain("No se pudo cargar la lista de clientes");
+    expect(cuerpo.textContent).not.toContain("Error al cargar clientes");
   });
 });

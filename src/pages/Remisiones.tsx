@@ -10,13 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, normColor, normModelo, StockColor, explicarError } from "@/lib/dazon";
-import { cargarCatalogoClientes, SCRIPT_FOLIO_INTERNO } from "@/lib/catalogoClientes";
 import {
   agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, MOTIVOS_EDICION,
   faltantesDeExistencia, mensajeFaltantes, repartoAlBajar,
   type LineaMoto, type RenglonRemision,
 } from "@/lib/remisionesEdicion";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
+import { cargarClientes } from "@/lib/catalogoClientes";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -422,37 +422,17 @@ export default function Remisiones() {
   /**
    * Catálogo de clientes para el selector de la remisión.
    *
-   * La lectura vive en `@/lib/catalogoClientes` porque esta pantalla y la de
-   * Clientes leían el mismo catálogo de dos maneras distintas, y sólo una
-   * tenía respaldo: el selector aguantaba una base sin `folio_interno` y la
-   * lista de Clientes se quedaba vacía. Ahí está contado el incidente.
-   *
-   * Sin clientes no hay remisión, así que aquí nunca se falla en silencio.
+   * OJO con el `order`: `supabase-js` no acepta varias columnas en una sola
+   * llamada. `.order("folio_interno, codigo_erp")` viaja como
+   * `order=folio_interno, codigo_erp.asc`, PostgREST no puede leer el segundo
+   * término (le queda un espacio pegado al nombre) y responde 400. La lista
+   * llegaba vacía y el desplegable «Selecciona cliente» no ofrecía nada: se
+   * veía como que el sistema no permitía elegir cliente. Van encadenados.
    */
   const loadClientes = async () => {
-    const carga = await cargarCatalogoClientes((conFolioInterno) => {
-      const columnas = conFolioInterno
-        ? "id,codigo_erp,folio_interno,nombre_comercial"
-        : "id,codigo_erp,nombre_comercial";
-      const q = supabase.from("clientes").select(columnas);
-      // OJO con el `order`: `supabase-js` no acepta varias columnas en una
-      // sola llamada. `.order("folio_interno, codigo_erp")` viaja como
-      // `order=folio_interno, codigo_erp.asc`, PostgREST no puede leer el
-      // segundo término y responde 400. Van encadenados.
-      return conFolioInterno
-        ? q.order("folio_interno", { nullsFirst: false }).order("codigo_erp", { nullsFirst: false })
-        : q.order("codigo_erp", { nullsFirst: false });
-    });
-
-    if (carga.error) {
-      setClientes([]);
-      toast.error(explicarError(carga.error, "No se pudo cargar el catálogo de clientes"));
-      return;
-    }
-    if (carga.degradado) {
-      console.warn(`clientes sin folio_interno: falta correr supabase/migrations/${SCRIPT_FOLIO_INTERNO}`);
-    }
-    setClientes(carga.clientes);
+    const { data, error } = await cargarClientes();
+    if (error) toast.error(explicarError(error, t.clientes.errorCargar));
+    setClientes(data ?? []);
   };
   const loadVendedores = async () => {
     const { data: roles } = await supabase.from("user_roles").select("user_id,area").eq("area","comercial");

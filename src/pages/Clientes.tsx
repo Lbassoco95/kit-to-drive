@@ -12,8 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
+import { cargarClientes, displayCliente } from "@/lib/catalogoClientes";
 import { explicarError } from "@/lib/dazon";
-import { cargarCatalogoClientes, SCRIPT_FOLIO_INTERNO } from "@/lib/catalogoClientes";
 import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History, AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function Clientes() {
@@ -57,43 +57,34 @@ export default function Clientes() {
   /**
    * Carga la lista de clientes y, aparte, las estadísticas de unidades.
    *
-   * Van separadas a propósito. Antes iban en un `Promise.all` que descartaba
-   * los dos `error` y se quedaba con `data ?? []`: cualquier falla —la base
-   * sin `folio_interno`, un permiso, la red— dejaba la pantalla diciendo «Sin
-   * resultados», igual que si la empresa no tuviera clientes. Las unidades
-   * entregadas son un adorno de la tarjeta; los clientes son la pantalla. Si
-   * fallan las estadísticas se pinta la lista igual, y si fallan los clientes
-   * se dice qué pasó y qué hay que correr.
+   * Las unidades entregadas son un adorno de la tarjeta; los clientes son la
+   * pantalla. Van en consultas separadas y sólo la del catálogo decide si se
+   * avisa: antes las dos iban en un `Promise.all` que descartaba los dos
+   * `error` y se quedaba con `data ?? []`, así que cualquier falla dejaba la
+   * pantalla diciendo «Sin resultados» — lo mismo que se ve cuando de verdad
+   * no hay clientes. Por eso el incidente se leyó como «se perdieron los
+   * clientes».
+   *
+   * `degradado` no es una falla: la base va atrás pero los clientes se ven.
+   * Eso se avisa en consola, no en la cara del usuario.
    */
   const load = async () => {
     setCargando(true);
-    const [carga, stats] = await Promise.all([
-      cargarCatalogoClientes((conFolioInterno) => {
-        const q = supabase.from("clientes").select("*");
-        return conFolioInterno
-          // `order` encadenado: supabase-js manda una sola columna por llamada
-          // y "folio_interno, codigo_erp" se va como un nombre de columna
-          // inválido (PostgREST responde 400 y la lista queda vacía).
-          ? q.order("folio_interno", { nullsFirst: false }).order("codigo_erp", { nullsFirst: false })
-          : q.order("codigo_erp", { nullsFirst: false });
-      }),
+    const [cat, stats] = await Promise.all([
+      cargarClientes(),
       supabase.from("motocarros").select("id, estatus_entrega, remisiones!inner(cliente_id)"),
     ]);
 
-    if (carga.error) {
+    if (cat.error && !cat.degradado) {
       // La lista anterior no se borra: un error pasajero no debe dejar la
       // pantalla en blanco cuando ya había datos buenos en la mano.
-      const aviso = explicarError(carga.error, "No se pudo leer el catálogo de clientes");
+      const aviso = explicarError(cat.error, t.clientes.errorCargar);
       setErrorCarga(aviso);
       toast.error(aviso);
     } else {
       setErrorCarga(null);
-      setRows(carga.clientes);
-      if (carga.degradado) {
-        console.warn(
-          `clientes sin folio_interno: falta correr supabase/migrations/${SCRIPT_FOLIO_INTERNO}`,
-        );
-      }
+      setRows(cat.data ?? []);
+      if (cat.degradado) console.warn("clientes leídos sin folio_interno:", cat.error?.message);
     }
 
     if (stats.error) console.warn("estadísticas de clientes no disponibles:", stats.error.message);
@@ -166,7 +157,7 @@ export default function Clientes() {
     return `CLI-${year}-${seq}`;
   };
 
-  const clienteCodigoDisplay = (c: any) => c?.folio_interno || c?.codigo_erp || "—";
+  const clienteCodigoDisplay = (c: any) => displayCliente(c);
   const clienteEsMigrado = (c: any) => !!c?.codigo_erp;
 
   const save = async () => {
@@ -463,15 +454,15 @@ export default function Clientes() {
       {/*
         Cuando el catálogo no se pudo leer, la pantalla lo dice. Antes salía
         «Sin resultados», que es lo mismo que se ve cuando de verdad no hay
-        clientes: por eso el incidente de producción se leyó como «se
-        perdieron los clientes» en lugar de «falta correr un script».
+        clientes: por eso el incidente se leyó como «se perdieron los
+        clientes» en lugar de «falta correr un script».
       */}
       {errorCarga && (
         <Card className="p-4 border-red-300 bg-red-50">
           <div className="flex items-start gap-3 flex-wrap">
             <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-[16rem]">
-              <div className="font-semibold text-red-800">{t.clientes.errorCarga}</div>
+              <div className="font-semibold text-red-800">{t.clientes.errorCargar}</div>
               <div className="text-sm text-red-700 mt-1 break-words">{errorCarga}</div>
             </div>
             <Button variant="outline" size="sm" className="h-10 shrink-0" onClick={load}>

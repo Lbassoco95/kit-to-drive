@@ -66,10 +66,12 @@ y si alguien recarga en esos minutos, ve la pantalla rota. Así que:
   también a `SCRIPT_DE_OBJETO` — si no, el usuario recibe el error crudo de
   Postgres y nadie sabe qué hacer.
 - **Deja respaldo cuando la columna es opcional para trabajar.** El catálogo de
-  clientes se lee con `cargarCatalogoClientes()`
-  (`src/lib/catalogoClientes.ts`): intenta con `folio_interno` y, si la base va
-  atrás, vuelve a pedir el catálogo de siempre. La pantalla funciona degradada en
-  vez de no funcionar.
+  clientes se lee con `cargarClientes()` (`src/lib/catalogoClientes.ts`):
+  intenta con `folio_interno` y, si la base va atrás, vuelve a pedir el
+  catálogo de siempre. La pantalla funciona degradada en vez de no funcionar.
+  Ojo con la bandera `degradado`: «funcionó degradado» y «no se pudo leer»
+  tienen que verse distinto, porque confundirlos es lo que dejó la lista
+  vacía en silencio.
 - **Distingue «vacío» de «falló».** «Sin resultados» y «no se pudo leer» son
   dos estados distintos y tienen que verse distintos.
 - **Una sola forma de leer cada cosa.** Clientes y Remisiones leían el mismo
@@ -88,8 +90,9 @@ Un archivo sin registrar es un hueco invisible — así estuvo `20260827000001`
 mientras Clientes salía vacía.
 
 Al agregar una migración, agrega también uno o más renglones a `esperado` con un
-objeto que ese script deje: una tabla, una columna, una función, una política, un
-índice, un valor de enum, una restricción, o el default de una columna. La
+objeto que ese script deje: una tabla, una columna, una función, una política,
+un índice, una secuencia, un valor de enum, una restricción, o el default de
+una columna. La
 cabecera del archivo lista los tipos disponibles y su sintaxis. Si otro script
 posterior lo reemplaza por completo, va a `superado` en vez de `esperado`.
 

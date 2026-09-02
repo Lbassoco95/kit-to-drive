@@ -1,119 +1,120 @@
-import { describe, it, expect } from "vitest";
-import {
-  cargarCatalogoClientes, faltaFolioInterno, codigoCliente, etiquetaCliente,
-  type RespuestaCatalogo,
-} from "@/lib/catalogoClientes";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ClienteCatalogo } from "@/lib/catalogoClientes";
 
-/**
- * El incidente: la lista de Clientes salió vacía en producción y se leyó como
- * «se perdieron los clientes». La base contestaba 42703 —le faltaba
- * `clientes.folio_interno`, el script 20260827000001 nunca se corrió— y la
- * pantalla tiraba el error a la basura y pintaba «Sin resultados».
- *
- * Estas pruebas fijan las tres salidas que importan: se leyó bien, se leyó con
- * respaldo, y no se pudo leer (y entonces hay que avisar).
- */
+type Respuesta = { data: Record<string, unknown>[] | null; error: { code?: string; message: string } | null };
 
-const ok = (filas: Record<string, unknown>[]): RespuestaCatalogo => ({ data: filas, error: null });
-const falla = (code: string, message: string): RespuestaCatalogo => ({ data: null, error: { code, message } });
+const respuesta: Respuesta = { data: [], error: null };
+const respuestaFallback: { data: Record<string, unknown>[] | null; error?: Respuesta["error"] } = { data: [] };
+/** Cuántas consultas se hicieron, para probar que el respaldo no se pide de gratis. */
+let consultas = 0;
 
-const SIN_COLUMNA = falla("42703", 'column clientes.folio_interno does not exist');
-const R195 = { id: "c1", codigo_erp: "R195", nombre_comercial: "Ferretería del Sur" };
-const CLI4 = { id: "c2", codigo_erp: null, folio_interno: "CLI-2026-004", nombre_comercial: "Motos del Bajío" };
+interface MockQuery {
+  _select?: string;
+  select: (arg: string) => MockQuery;
+  order: () => MockQuery;
+  then: (cb: (r: { data: Record<string, unknown>[] | null; error: unknown }) => unknown) => unknown;
+}
 
-/** Lector de prueba: registra con qué se le llamó y contesta por turno. */
-const lector = (...respuestas: RespuestaCatalogo[]) => {
-  const llamadas: boolean[] = [];
-  const leer = (conFolioInterno: boolean) => {
-    llamadas.push(conFolioInterno);
-    return Promise.resolve(respuestas[llamadas.length - 1] ?? respuestas[respuestas.length - 1]);
-  };
-  return { leer, llamadas };
-};
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: {
+    from: () => {
+      const q: MockQuery = {
+        _select: "*",
+        select: (arg: string) => { q._select = arg; return q; },
+        order: () => q,
+        then: (cb) => {
+          consultas++;
+          if (q._select === "*") {
+            return cb({ data: respuesta.data, error: respuesta.error });
+          }
+          return cb({ data: respuestaFallback.data, error: respuestaFallback.error ?? null });
+        },
+      };
+      return q;
+    },
+  },
+}));
 
-describe("cargarCatalogoClientes", () => {
-  it("devuelve el catálogo cuando la base está al día", async () => {
-    const { leer, llamadas } = lector(ok([R195, CLI4]));
-    const carga = await cargarCatalogoClientes(leer);
+import { cargarClientes, displayCliente } from "@/lib/catalogoClientes";
 
-    expect(carga.clientes.map(c => c.id)).toEqual(["c1", "c2"]);
-    expect(carga.degradado).toBe(false);
-    expect(carga.error).toBeNull();
-    // Una sola ida a la base: el respaldo no se pide de gratis.
-    expect(llamadas).toEqual([true]);
+describe("catálogo de clientes", () => {
+  beforeEach(() => {
+    respuesta.data = [];
+    respuesta.error = null;
+    respuestaFallback.data = [];
+    respuestaFallback.error = null;
+    consultas = 0;
   });
 
-  it("cae al catálogo sin folio_interno cuando la base va atrás", async () => {
-    const { leer, llamadas } = lector(SIN_COLUMNA, ok([R195]));
-    const carga = await cargarCatalogoClientes(leer);
-
-    // Lo que importa: los clientes SE VEN aunque falte el script.
-    expect(carga.clientes.map(c => c.id)).toEqual(["c1"]);
-    expect(carga.degradado).toBe(true);
-    expect(carga.error).toBeNull();
-    expect(llamadas).toEqual([true, false]);
+  it("lee folio_interno cuando la columna existe", async () => {
+    respuesta.data = [{ id: "1", folio_interno: "CLI-2026-001", nombre_comercial: "Cliente A", activo: true, codigo_erp: null, telefono: null }];
+    const { data, error } = await cargarClientes();
+    expect(error).toBeUndefined();
+    expect(data[0].folio_interno).toBe("CLI-2026-001");
   });
 
-  it("reconoce el hueco por el nombre de la columna aunque no venga el código", async () => {
-    const { leer, llamadas } = lector(
-      { data: null, error: { message: 'column "folio_interno" does not exist' } },
-      ok([R195]),
-    );
-    const carga = await cargarCatalogoClientes(leer);
-
-    expect(carga.degradado).toBe(true);
-    expect(carga.clientes).toHaveLength(1);
-    expect(llamadas).toEqual([true, false]);
+  it("cae a columnas de respaldo si folio_interno falta", async () => {
+    respuesta.error = { code: "42703", message: "column clientes.folio_interno does not exist" };
+    respuestaFallback.data = [{ id: "1", codigo_erp: "R123", nombre_comercial: "Cliente A", activo: true, telefono: null }];
+    const { data, error } = await cargarClientes();
+    expect(data).toHaveLength(1);
+    expect(data[0].codigo_erp).toBe("R123");
+    // Conserva el error original para que la UI pueda advertir que falta la migración.
+    expect(error?.message).toContain("folio_interno");
   });
 
-  it("no se reintenta —y reporta— cuando el problema no es folio_interno", async () => {
-    const { leer, llamadas } = lector(falla("42501", "permission denied for table clientes"));
-    const carga = await cargarCatalogoClientes(leer);
+  /*
+   * `error` viene lleno tanto cuando el respaldo funcionó como cuando no se
+   * pudo leer nada, así que quien llama no puede distinguir «funcionó
+   * degradado» de «falló» — y esa confusión es justo la que dejó la pantalla
+   * de Clientes diciendo «Sin resultados». De eso responde `degradado`.
+   */
+  it("marca `degradado` sólo cuando se leyó con el respaldo", async () => {
+    respuesta.data = [{ id: "1", folio_interno: "CLI-2026-001", codigo_erp: null, nombre_comercial: "A", telefono: null, activo: true }];
+    expect((await cargarClientes()).degradado).toBeFalsy();
+    expect(consultas).toBe(1);
 
-    expect(carga.clientes).toEqual([]);
-    expect(carga.degradado).toBe(false);
-    expect(carga.error?.code).toBe("42501");
-    expect(llamadas).toEqual([true]);
+    respuesta.error = { code: "42703", message: "column clientes.folio_interno does not exist" };
+    respuestaFallback.data = [{ id: "1", codigo_erp: "R123", nombre_comercial: "A", telefono: null, activo: true }];
+    const degradada = await cargarClientes();
+    expect(degradada.degradado).toBe(true);
+    expect(degradada.data).toHaveLength(1);
   });
 
-  it("devuelve el error del respaldo cuando tampoco se pudo leer sin folio", async () => {
-    const { leer } = lector(SIN_COLUMNA, falla("42P01", 'relation "public.clientes" does not exist'));
-    const carga = await cargarCatalogoClientes(leer);
+  it("no hay `degradado` si el respaldo tampoco se pudo leer", async () => {
+    respuesta.error = { code: "42703", message: "column clientes.folio_interno does not exist" };
+    respuestaFallback.error = { code: "42501", message: "permission denied for table clientes" };
 
-    // Nunca «vacío en silencio»: quien llama tiene con qué avisar.
-    expect(carga.clientes).toEqual([]);
-    expect(carga.error?.code).toBe("42P01");
+    const { data, error, degradado } = await cargarClientes();
+    // Nada que mostrar y nada que fingir: la pantalla tiene que avisar.
+    expect(data).toEqual([]);
+    expect(degradado).toBeFalsy();
+    expect(error?.message).toContain("permission denied");
+  });
+
+  it("un error que no es folio_interno se reporta sin reintentar", async () => {
+    respuesta.error = { code: "42501", message: "permission denied for table clientes" };
+
+    const { data, error, degradado } = await cargarClientes();
+    expect(data).toEqual([]);
+    expect(degradado).toBeFalsy();
+    expect(error?.code).toBe("42501");
+    // Un permiso o la red no se arreglan pidiendo menos columnas.
+    expect(consultas).toBe(1);
   });
 
   it("una tabla vacía de verdad no se confunde con una falla", async () => {
-    const carga = await cargarCatalogoClientes(lector(ok([])).leer);
-    expect(carga.clientes).toEqual([]);
-    expect(carga.error).toBeNull();
+    const { data, error, degradado } = await cargarClientes();
+    expect(data).toEqual([]);
+    expect(error).toBeUndefined();
+    expect(degradado).toBeFalsy();
   });
 
-  it("aguanta un data que no es arreglo sin tronar la pantalla", async () => {
-    const carga = await cargarCatalogoClientes(() => Promise.resolve({ data: null, error: null }));
-    expect(carga.clientes).toEqual([]);
-    expect(carga.error).toBeNull();
-  });
-});
-
-describe("faltaFolioInterno", () => {
-  it("distingue el hueco de esquema de los demás errores", () => {
-    expect(faltaFolioInterno({ code: "42703", message: "column clientes.folio_interno does not exist" })).toBe(true);
-    expect(faltaFolioInterno({ message: 'column "folio_interno" does not exist' })).toBe(true);
-    expect(faltaFolioInterno({ code: "42501", message: "permission denied" })).toBe(false);
-    expect(faltaFolioInterno({ message: "Failed to fetch" })).toBe(false);
-    expect(faltaFolioInterno(null)).toBe(false);
-  });
-});
-
-describe("codigoCliente / etiquetaCliente", () => {
-  it("usa el folio interno de los clientes nuevos y el ERP de los migrados", () => {
-    expect(codigoCliente(CLI4)).toBe("CLI-2026-004");
-    expect(codigoCliente(R195)).toBe("R195");
-    expect(codigoCliente({ id: "c3" })).toBe("—");
-    expect(etiquetaCliente(CLI4)).toBe("CLI-2026-004 — Motos del Bajío");
-    expect(etiquetaCliente({ id: "c3" })).toBe("—");
+  it("displayCliente muestra folio, código ERP o guión", () => {
+    const c1 = { id: "1", folio_interno: "CLI-2026-001", codigo_erp: null, nombre_comercial: "A", telefono: null, activo: true } as ClienteCatalogo;
+    const c2 = { id: "2", folio_interno: null, codigo_erp: "R123", nombre_comercial: "B", telefono: null, activo: true } as ClienteCatalogo;
+    expect(displayCliente(c1)).toBe("CLI-2026-001");
+    expect(displayCliente(c2)).toBe("R123");
+    expect(displayCliente(null)).toBe("—");
   });
 });

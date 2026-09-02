@@ -32,6 +32,7 @@
 --   columna|tabla.columna|texto        · el DEFAULT debe contener ese texto
 --   funcion|nombre(tipos)|texto        · el cuerpo debe contener ese texto
 --   trigger|tabla.trigger              · indice|nombre[|texto del índice]
+--   secuencia|nombre                  · tabla|nombre y vista|nombre
 --   politica|tabla.politica[|texto]    · tipo|enum.valor
 --   restriccion|tabla.restriccion[|texto]
 --   sin_privilegio|funcion(tipos)|rol  · ese rol NO debe poder ejecutarla
@@ -175,16 +176,24 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area'),
 
   -- Reutilizar el folio de una remisión cancelada: el UNIQUE completo se
-  -- cambió por un índice único parcial que excluye las CANCELADA.
+  -- cambió por un índice único parcial que excluye las CANCELADA. Se pide con
+  -- el texto, porque un índice con ese nombre pero sin el WHERE no es éste.
   ('20260826000002_folio_reutilizable_canceladas','indice|idx_remisiones_folio_activas|CANCELADA'),
-  ('20260826000003_asignacion_manual_remisiones', 'funcion|asignar_motocarro_a_remision(uuid,uuid)'),
-  ('20260826000003_asignacion_manual_remisiones', 'funcion|desasignar_motocarro_de_remision(uuid)'),
+
+  -- Asignación manual de motocarros a remisiones. `desasignar_` faltaba en
+  -- producción aunque su gemela del mismo archivo sí estaba: el botón de
+  -- liberar una unidad no servía.
+  ('20260826000003_asignacion_manual_remisiones','funcion|asignar_motocarro_a_remision(uuid,uuid)'),
+  ('20260826000003_asignacion_manual_remisiones','funcion|desasignar_motocarro_de_remision(uuid)'),
 
   -- Folio interno de clientes nuevos. ESTE es el que dejó a Clientes sin
   -- lista en producción: la pantalla pedía `clientes.folio_interno` y la base
-  -- no la tenía.
+  -- no la tenía, porque el script tronaba en su setval y se revertía entero.
   ('20260827000001_folio_interno_clientes_nuevos','columna|clientes.folio_interno'),
+  ('20260827000001_folio_interno_clientes_nuevos','indice|idx_clientes_folio_interno_unico'),
+  ('20260827000001_folio_interno_clientes_nuevos','secuencia|clientes_folio_interno_seq'),
   ('20260827000001_folio_interno_clientes_nuevos','funcion|generar_folio_interno_cliente()'),
+  ('20260827000001_folio_interno_clientes_nuevos','trigger|clientes.trg_clientes_folio_interno'),
 
   -- Motocarro ya armado desde remisiones
   ('20260828000001_motocarro_ya_armado',          'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)'),
@@ -306,6 +315,8 @@ WITH esperado(script, objeto) AS (VALUES
                    AND p.policyname = split_part(r.nombre, '.', 2)
                    AND (r.detalle IS NULL
                         OR COALESCE(p.qual,'') || ' ' || COALESCE(p.with_check,'') LIKE '%' || r.detalle || '%'))
+      WHEN 'secuencia' THEN
+        to_regclass('public.' || quote_ident(r.nombre)) IS NOT NULL
     END AS existe
   FROM revisado r
 )
