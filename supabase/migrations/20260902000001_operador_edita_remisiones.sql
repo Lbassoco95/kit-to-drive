@@ -6,47 +6,207 @@
 -- ------------------
 -- Corregir una remisión ya capturada era, en la práctica, cosa del
 -- administrador: `remision_items` nunca tuvo política de UPDATE (nadie podía
--- cambiar un renglón) y su DELETE seguía pidiendo el rol legado `admin`, o sea
--- sólo el administrador global. El encabezado sí lo podía editar su dueño
+-- cambiar un renglón) y su DELETE pide el rol legado `admin`, o sea sólo el
+-- administrador global. El encabezado sí lo puede editar su dueño
 -- (`actualizar remisiones` cae a `vendedor_id = auth.uid()`), pero sin poder
--- tocar los renglones no se podía cambiar un modelo, un color, una cantidad,
+-- tocar los renglones no se puede cambiar un modelo, un color, una cantidad,
 -- ni agregar unidades a una remisión pasada — el «complemento» que pide
 -- Comercial.
 --
 -- Qué queda
 -- ---------
---  1. `remision_items` gana UPDATE y DELETE con la misma escalera del área:
---     el operador sobre las remisiones que capturó, supervisor y administrador
---     de Comercial sobre las de todo su área, y Dirección sobre todas.
---  2. `remisiones` gana una política de UPDATE por área para el operador dueño,
---     equivalente a la que ya existía por rol legado (así el permiso no depende
---     de que el rol legado siga derivándose bien).
---  3. `remision_items.orden_linea`: a qué línea del pedido pertenece cada
+--  1. `public.puede_editar_remision(remision, usuario)`: la escalera de
+--     Comercial en una sola función. Dirección con mando y el administrador
+--     global pueden todo; supervisor y administrador de Comercial, todo lo de
+--     su área; el operador, lo que él capturó. Quien está dado de baja
+--     (`profiles.activo = false`) no pasa.
+--  2. `remision_items` gana UPDATE y DELETE con esa escalera, y su INSERT pasa
+--     a regirse por ella (antes dejaba fuera al supervisor y, a la vez, dejaba
+--     que cualquier vendedor metiera renglones en la remisión de otro).
+--  3. `remisiones` gana un UPDATE por la misma escalera, y un INSERT que le
+--     devuelve al supervisor de Comercial la capacidad de capturar (hoy no
+--     puede: `crear remisiones` sólo conoce los roles legados viejos).
+--  4. `remision_items.orden_linea`: a qué línea del pedido pertenece cada
 --     renglón. Antes la jerarquía «motocarro + sus servicios» vivía en el orden
 --     de inserción, y al editar se desordenaba (una cabina agregada después
 --     aparecía colgada de otra unidad). Se rellena para lo ya capturado con el
 --     orden en que se insertó.
---  4. `remisiones_bitacora`: quién modificó qué remisión, cuándo y **por qué**.
+--  5. `remisiones_bitacora`: quién modificó qué remisión, cuándo y **por qué**.
 --     El motivo es obligatorio en la tabla, no sólo en la pantalla.
 --
--- Nadie gana acceso fuera de su área, y quien está dado de baja sigue fuera
--- (`usuario_activo` vive dentro de `es_area` y `supervisa_area`).
+-- Las políticas nuevas son ADITIVAS salvo una: en RLS lo permisivo se suma con
+-- OR, así que agregar no le quita permisos a nadie. La excepción es el INSERT
+-- de `remision_items`, que sí se reemplaza — ver el bloque 3, donde se explica
+-- por qué la vieja dejaba de menos y de más a la vez.
+--
+-- Por qué no usa `es_area()` / `supervisa_area()`
+-- ----------------------------------------------
+-- Porque en esta base **no existen**: de 20260823000005 quedaron el enum
+-- `user_area` y las columnas `user_roles.area/nivel`, pero no los helpers ni
+-- sus políticas (corre `supabase/diagnostico_esquema.sql` para verlo). Pedirlos
+-- dejaba este arreglo bloqueado detrás de otro script. La función de aquí lee
+-- las mismas columnas y, cuando `area`/`nivel` vienen vacíos (usuario sin
+-- migrar), deduce el par del rol legado igual que `desdeRolLegacy()` en la app.
+-- Si más adelante se corren 20260823000005 y 20260824000003, esto sigue siendo
+-- correcto: se apoya en los mismos datos, no en los helpers.
 --
 -- ADVERTENCIA: idempotente, para el SQL editor de Supabase. NO usar
 -- `supabase db push`.
 -- ============================================================================
 
 DO $preflight$
+DECLARE _faltan text[] := ARRAY[]::text[];
 BEGIN
-  IF to_regprocedure('public.es_area(uuid,public.user_area)') IS NULL
-     OR to_regprocedure('public.supervisa_area(uuid,public.user_area)') IS NULL THEN
-    RAISE EXCEPTION 'Faltan los helpers de ÁREA × NIVEL. Corre antes 20260823000005_usuarios_niveles_areas.sql y 20260824000003_usuario_activo_se_aplica.sql. No se modificó nada.';
+  IF to_regclass('public.remisiones')     IS NULL THEN _faltan := _faltan || 'tabla remisiones'::text;     END IF;
+  IF to_regclass('public.remision_items') IS NULL THEN _faltan := _faltan || 'tabla remision_items'::text; END IF;
+  IF to_regclass('public.user_roles')     IS NULL THEN _faltan := _faltan || 'tabla user_roles'::text;     END IF;
+  IF to_regclass('public.profiles')       IS NULL THEN _faltan := _faltan || 'tabla profiles'::text;       END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='user_roles' AND column_name='area') THEN
+    _faltan := _faltan || 'columna user_roles.area (corre 20260823000005_usuarios_niveles_areas.sql)'::text;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema='public' AND table_name='user_roles' AND column_name='nivel') THEN
+    _faltan := _faltan || 'columna user_roles.nivel (corre 20260823000005_usuarios_niveles_areas.sql)'::text;
+  END IF;
+
+  IF array_length(_faltan,1) > 0 THEN
+    RAISE EXCEPTION E'Falta lo mínimo para aplicar esto, no se modificó nada:\n  · %',
+      array_to_string(_faltan, E'\n  · ');
   END IF;
 END $preflight$;
 
 
 -- ============================================================================
--- BLOQUE 1 · A qué línea del pedido pertenece cada renglón
+-- BLOQUE 1 · La escalera de Comercial, en un solo lugar
+-- ============================================================================
+-- SECURITY DEFINER a propósito: estas funciones leen `user_roles` y `profiles`,
+-- que tienen su propio RLS. Sin esto, una política que las consultara vería la
+-- tabla vacía y contestaría «no» a todo el mundo. Es el mismo patrón que
+-- `has_role()`, que existe desde el primer día del proyecto.
+
+/**
+ * Qué tanto manda alguien en las remisiones de Comercial:
+ *   'global'     — administrador global (admin de Dirección o rol legado admin)
+ *   'supervisor' — supervisor o administrador de Comercial: todo lo de su área
+ *   'operador'   — vendedor de Comercial: lo suyo
+ *   'ninguno'    — no le toca (otra área, sin rol, o dado de baja)
+ */
+CREATE OR REPLACE FUNCTION public.rol_comercial(_user_id uuid DEFAULT auth.uid())
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _area   text;
+  _nivel  text;
+  _role   text;
+  _activo boolean;
+BEGIN
+  IF _user_id IS NULL THEN RETURN 'ninguno'; END IF;
+
+  SELECT ur.area::text, ur.nivel::text, ur.role::text, COALESCE(p.activo, true)
+    INTO _area, _nivel, _role, _activo
+    FROM public.user_roles ur
+    LEFT JOIN public.profiles p ON p.id = ur.user_id
+   WHERE ur.user_id = _user_id
+   LIMIT 1;
+
+  -- Sin fila de rol, o dado de baja: no entra.
+  IF _area IS NULL AND _nivel IS NULL AND _role IS NULL THEN RETURN 'ninguno'; END IF;
+  IF NOT COALESCE(_activo, true) THEN RETURN 'ninguno'; END IF;
+
+  -- Usuario sin migrar a ÁREA × NIVEL: se deduce del rol legado, con la misma
+  -- tabla de equivalencias que usa la aplicación (desdeRolLegacy).
+  IF _area IS NULL OR _nivel IS NULL THEN
+    CASE _role
+      WHEN 'admin'              THEN _area := 'direccion'; _nivel := 'admin';
+      WHEN 'director_ventas'    THEN _area := 'comercial'; _nivel := 'admin';
+      WHEN 'coordinador_ventas' THEN _area := 'comercial'; _nivel := 'supervisor';
+      WHEN 'coordinador'        THEN _area := 'comercial'; _nivel := 'supervisor';
+      WHEN 'ventas'             THEN _area := 'comercial'; _nivel := 'operador';
+      WHEN 'auxiliar_ventas'    THEN _area := 'comercial'; _nivel := 'operador';
+      ELSE RETURN 'ninguno';
+    END CASE;
+  END IF;
+
+  -- Administrador global: el admin de Dirección, y el rol legado 'admin', que
+  -- es su equivalente en las bases que aún no migran.
+  IF (_area = 'direccion' AND _nivel = 'admin') OR _role = 'admin' THEN RETURN 'global'; END IF;
+
+  -- Fuera de Comercial nadie trabaja el pedido (Fábrica y Logística trabajan
+  -- las unidades).
+  IF _area <> 'comercial' THEN RETURN 'ninguno'; END IF;
+
+  IF _nivel IN ('supervisor','admin') THEN RETURN 'supervisor'; END IF;
+  RETURN 'operador';
+END;
+$$;
+
+/** ¿Puede corregir o complementar ESTA remisión? */
+CREATE OR REPLACE FUNCTION public.puede_editar_remision(
+  _remision_id uuid,
+  _user_id     uuid DEFAULT auth.uid()
+)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE _rol text;
+BEGIN
+  IF _remision_id IS NULL THEN RETURN false; END IF;
+  _rol := public.rol_comercial(_user_id);
+  IF _rol IN ('global','supervisor') THEN RETURN true; END IF;
+  IF _rol <> 'operador' THEN RETURN false; END IF;
+  -- El operador, sólo lo que él capturó.
+  RETURN EXISTS (
+    SELECT 1 FROM public.remisiones r
+     WHERE r.id = _remision_id AND r.vendedor_id = _user_id
+  );
+END;
+$$;
+
+/** ¿Puede capturar una remisión a nombre de este vendedor? */
+CREATE OR REPLACE FUNCTION public.puede_capturar_remision(
+  _vendedor_id uuid,
+  _user_id     uuid DEFAULT auth.uid()
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT CASE public.rol_comercial(_user_id)
+           WHEN 'global'     THEN true
+           WHEN 'supervisor' THEN true          -- cubre a quien sea de su área
+           WHEN 'operador'   THEN _vendedor_id = _user_id
+           ELSE false
+         END;
+$$;
+
+COMMENT ON FUNCTION public.rol_comercial(uuid) IS
+  'Escalera de Comercial: global | supervisor | operador | ninguno. Deduce el par (área, nivel) del rol legado cuando el usuario aún no está migrado, y deja fuera a quien está dado de baja.';
+COMMENT ON FUNCTION public.puede_editar_remision(uuid, uuid) IS
+  'Quién puede corregir o complementar una remisión: administrador global y supervisor/administrador de Comercial, todas las de su área; el operador, las que capturó.';
+COMMENT ON FUNCTION public.puede_capturar_remision(uuid, uuid) IS
+  'Quién puede capturar una remisión a nombre de un vendedor: supervisor para arriba, a nombre de quien sea de su área; el operador, sólo al suyo.';
+
+REVOKE EXECUTE ON FUNCTION public.rol_comercial(uuid)                    FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.puede_editar_remision(uuid, uuid)      FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.puede_capturar_remision(uuid, uuid)    FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.rol_comercial(uuid)                    TO authenticated;
+GRANT  EXECUTE ON FUNCTION public.puede_editar_remision(uuid, uuid)      TO authenticated;
+GRANT  EXECUTE ON FUNCTION public.puede_capturar_remision(uuid, uuid)    TO authenticated;
+
+
+-- ============================================================================
+-- BLOQUE 2 · A qué línea del pedido pertenece cada renglón
 -- ============================================================================
 
 ALTER TABLE public.remision_items
@@ -81,54 +241,75 @@ CREATE INDEX IF NOT EXISTS idx_remision_items_remision_linea
 
 
 -- ============================================================================
--- BLOQUE 2 · Corregir los renglones de una remisión
+-- BLOQUE 3 · Corregir los renglones de una remisión
 -- ============================================================================
--- Misma escalera que para capturar (20260825000001): lo suyo el operador, todo
--- lo del área de supervisor para arriba.
+-- Políticas NUEVAS, con nombre propio. Las viejas se quedan como están: en RLS
+-- lo permisivo se suma, así que esto sólo puede abrir, nunca cerrar.
 
-DROP POLICY IF EXISTS "remision_items_update" ON public.remision_items;
-CREATE POLICY "remision_items_update" ON public.remision_items
-  FOR UPDATE TO authenticated USING (
-    public.es_area(auth.uid(), 'direccion'::public.user_area)
-    OR public.supervisa_area(auth.uid(), 'comercial'::public.user_area)
-    OR (public.es_area(auth.uid(), 'comercial'::public.user_area)
-        AND EXISTS (SELECT 1 FROM public.remisiones r
-                     WHERE r.id = remision_id AND r.vendedor_id = auth.uid()))
-  );
+-- Faltaba por completo: sin UPDATE nadie podía cambiar un modelo, un color ni
+-- una cantidad ya capturados.
+DROP POLICY IF EXISTS "remision_items_update_area" ON public.remision_items;
+CREATE POLICY "remision_items_update_area" ON public.remision_items
+  FOR UPDATE TO authenticated
+  USING (public.puede_editar_remision(remision_id))
+  WITH CHECK (public.puede_editar_remision(remision_id));
 
--- El DELETE pedía el rol legado `admin`: sólo el administrador global podía
--- quitar un renglón. Quitar una unidad de la remisión que capturaste es parte
--- de corregirla.
-DROP POLICY IF EXISTS "remision_items_delete" ON public.remision_items;
-CREATE POLICY "remision_items_delete" ON public.remision_items
-  FOR DELETE TO authenticated USING (
-    public.es_area(auth.uid(), 'direccion'::public.user_area)
-    OR public.supervisa_area(auth.uid(), 'comercial'::public.user_area)
-    OR (public.es_area(auth.uid(), 'comercial'::public.user_area)
-        AND EXISTS (SELECT 1 FROM public.remisiones r
-                     WHERE r.id = remision_id AND r.vendedor_id = auth.uid()))
-  );
+-- El DELETE que ya existía pide el rol legado `admin`. Quitar una unidad de la
+-- remisión que capturaste es parte de corregirla.
+DROP POLICY IF EXISTS "remision_items_delete_area" ON public.remision_items;
+CREATE POLICY "remision_items_delete_area" ON public.remision_items
+  FOR DELETE TO authenticated
+  USING (public.puede_editar_remision(remision_id));
+
+-- Complementar es agregar renglones. Aquí SÍ se reemplaza la política vieja —
+-- es la única del archivo que no es aditiva, y va con razón:
+--   · `remision_items_insert` pedía los roles legados `admin`, `ventas` o
+--     `coordinador`, así que dejaba fuera al supervisor y al administrador de
+--     Comercial (`coordinador_ventas` / `director_ventas`): no podían agregar
+--     un renglón ni al capturar.
+--   · Y al mismo tiempo dejaba de más: cualquier `ventas` podía meter renglones
+--     en la remisión de OTRO vendedor. Con la edición abierta, esa puerta ya no
+--     puede quedarse abierta.
+-- Nadie pierde nada de lo que hace a diario: se captura sobre la remisión que
+-- uno acaba de crear (uno es el vendedor), y el supervisor captura a nombre de
+-- quien sea de su área.
+DROP POLICY IF EXISTS "remision_items_insert"      ON public.remision_items;
+DROP POLICY IF EXISTS "remision_items_insert_area" ON public.remision_items;
+CREATE POLICY "remision_items_insert_area" ON public.remision_items
+  FOR INSERT TO authenticated
+  WITH CHECK (public.puede_editar_remision(remision_id));
 
 
 -- ============================================================================
--- BLOQUE 3 · Editar el encabezado de la remisión
+-- BLOQUE 4 · Editar el encabezado de la remisión
 -- ============================================================================
--- Ya existían `actualizar remisiones` (por rol legado, incluye al dueño) y
--- `comercial supervisa remisiones` (supervisor para arriba). Falta la del
--- operador escrita por ÁREA, para que su permiso no dependa de que el rol
--- legado se siga derivando.
+-- `actualizar remisiones` ya deja al dueño y al rol legado `coordinador`. Esta
+-- suma al supervisor y al administrador de Comercial por área, sin depender de
+-- que el rol legado se siga derivando bien.
 
 DROP POLICY IF EXISTS "comercial edita sus remisiones" ON public.remisiones;
 CREATE POLICY "comercial edita sus remisiones" ON public.remisiones
-  FOR UPDATE TO authenticated USING (
-    public.es_area(auth.uid(), 'direccion'::public.user_area)
-    OR public.supervisa_area(auth.uid(), 'comercial'::public.user_area)
-    OR (public.es_area(auth.uid(), 'comercial'::public.user_area) AND vendedor_id = auth.uid())
-  );
+  FOR UPDATE TO authenticated
+  USING (public.puede_editar_remision(id))
+  WITH CHECK (public.puede_editar_remision(id));
+
+-- Y de paso, el hueco de la captura, que es la misma causa: `crear remisiones`
+-- pide los roles legados `admin`, `coordinador` o `ventas`, así que un
+-- supervisor de Comercial (`coordinador_ventas`) o su administrador
+-- (`director_ventas`) NO puede dar de alta una remisión — ni siquiera a su
+-- nombre. Sin esto quedaría el absurdo de que el supervisor puede corregir
+-- todas las remisiones de su área pero no capturar una. Es aditiva: la política
+-- vieja se queda como está.
+-- (Es el mismo arreglo del bloque 1 de 20260825000001, que no se puede correr
+-- en esta base porque le faltan los helpers de ÁREA × NIVEL.)
+DROP POLICY IF EXISTS "comercial captura remisiones" ON public.remisiones;
+CREATE POLICY "comercial captura remisiones" ON public.remisiones
+  FOR INSERT TO authenticated
+  WITH CHECK (public.puede_capturar_remision(vendedor_id));
 
 
 -- ============================================================================
--- BLOQUE 4 · Bitácora de modificaciones de remisión
+-- BLOQUE 5 · Bitácora de modificaciones de remisión
 -- ============================================================================
 -- El motivo es NOT NULL con un mínimo de 10 caracteres: si la pantalla se
 -- brinca el recuadro, la base no acepta el registro. Y el registro se escribe
@@ -154,8 +335,8 @@ CREATE INDEX IF NOT EXISTS idx_remisiones_bitacora_usuario  ON public.remisiones
 ALTER TABLE public.remisiones_bitacora ENABLE ROW LEVEL SECURITY;
 
 -- Se lee junto con la remisión: quien puede ver la remisión ve su historial.
--- El chisme de "quién le movió y por qué" es justo lo que hace que abrir la
--- edición a todo el área no se vuelva un agujero.
+-- Saber quién le movió y por qué es justo lo que hace que abrir la edición a
+-- todo el área no se vuelva un agujero.
 DROP POLICY IF EXISTS "leer bitacora de remisiones" ON public.remisiones_bitacora;
 CREATE POLICY "leer bitacora de remisiones" ON public.remisiones_bitacora
   FOR SELECT TO authenticated USING (
@@ -172,29 +353,35 @@ CREATE POLICY "registrar cambio de remision" ON public.remisiones_bitacora
 
 
 -- ============================================================================
--- BLOQUE 5 · Comprobación
+-- BLOQUE 6 · Comprobación
 -- ============================================================================
 
 DO $postflight$
-DECLARE _faltan text[] := ARRAY[]::text[];
+DECLARE _faltan text[] := ARRAY[]::text[]; _p text;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                   WHERE table_schema='public' AND table_name='remision_items'
                     AND column_name='orden_linea') THEN
     _faltan := _faltan || 'remision_items.orden_linea'::text; END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
-                   AND tablename='remision_items' AND policyname='remision_items_update') THEN
-    _faltan := _faltan || 'remision_items_update'::text; END IF;
+  IF to_regprocedure('public.rol_comercial(uuid)') IS NULL THEN
+    _faltan := _faltan || 'rol_comercial()'::text; END IF;
+  IF to_regprocedure('public.puede_editar_remision(uuid,uuid)') IS NULL THEN
+    _faltan := _faltan || 'puede_editar_remision()'::text; END IF;
+  IF to_regprocedure('public.puede_capturar_remision(uuid,uuid)') IS NULL THEN
+    _faltan := _faltan || 'puede_capturar_remision()'::text; END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
-                   AND tablename='remision_items' AND policyname='remision_items_delete'
-                   AND qual LIKE '%es_area%') THEN
-    _faltan := _faltan || 'remision_items_delete (por área)'::text; END IF;
+  FOREACH _p IN ARRAY ARRAY['remision_items_update_area','remision_items_delete_area','remision_items_insert_area'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
+                     AND tablename='remision_items' AND policyname=_p) THEN
+      _faltan := _faltan || _p; END IF;
+  END LOOP;
 
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
-                   AND tablename='remisiones' AND policyname='comercial edita sus remisiones') THEN
-    _faltan := _faltan || 'comercial edita sus remisiones'::text; END IF;
+  FOREACH _p IN ARRAY ARRAY['comercial edita sus remisiones','comercial captura remisiones'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
+                     AND tablename='remisiones' AND policyname=_p) THEN
+      _faltan := _faltan || _p; END IF;
+  END LOOP;
 
   IF to_regclass('public.remisiones_bitacora') IS NULL THEN
     _faltan := _faltan || 'remisiones_bitacora'::text; END IF;
@@ -205,11 +392,14 @@ BEGIN
   RAISE NOTICE 'Listo: el operador de Comercial corrige y complementa sus remisiones, y cada cambio queda con motivo en remisiones_bitacora.';
 END $postflight$;
 
--- Verificación a ojo — qué puede hacer cada quien sobre los renglones:
---   SELECT tablename, policyname, cmd
---     FROM pg_policies
---    WHERE schemaname='public' AND tablename IN ('remisiones','remision_items','remisiones_bitacora')
---    ORDER BY tablename, cmd, policyname;
+-- Verificación a ojo — quién puede corregir qué (cámbiale el folio):
+--   SELECT p.nombre_completo, ur.area, ur.nivel, ur.role,
+--          public.rol_comercial(ur.user_id)               AS escalon,
+--          public.puede_editar_remision(r.id, ur.user_id) AS puede
+--     FROM public.user_roles ur
+--     JOIN public.profiles p ON p.id = ur.user_id
+--     CROSS JOIN LATERAL (SELECT id FROM public.remisiones WHERE folio_remision='REM-012') r
+--    ORDER BY ur.area, ur.nivel;
 --
 -- Y el historial de una remisión:
 --   SELECT b.created_at, b.nombre_usuario, b.tipo_cambio, b.motivo

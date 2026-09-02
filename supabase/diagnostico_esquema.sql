@@ -82,7 +82,26 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260824000003_usuario_activo_se_aplica',     'funcion|usuario_activo(uuid)'),
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_oportunidades.crm_oportunidades_insert_area'),
   ('20260825000001_comercial_escalera_de_permisos','politica|crm_actividades.crm_actividades_insert_area'),
-  ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area')
+  ('20260825000001_comercial_escalera_de_permisos','politica|crm_rutas.crm_rutas_insert_area'),
+
+  -- Folio interno de clientes nuevos
+  ('20260827000001_folio_interno_clientes_nuevos','columna|clientes.folio_interno'),
+  ('20260827000001_folio_interno_clientes_nuevos','funcion|generar_folio_interno_cliente()'),
+
+  -- Motocarro ya armado desde remisiones
+  ('20260828000001_motocarro_ya_armado',          'funcion|crear_motocarro_ya_armado(uuid,text,text,text,text,integer)'),
+
+  -- El operador corrige y complementa sus remisiones, con motivo
+  ('20260902000001_operador_edita_remisiones',    'funcion|rol_comercial(uuid)'),
+  ('20260902000001_operador_edita_remisiones',    'funcion|puede_editar_remision(uuid,uuid)'),
+  ('20260902000001_operador_edita_remisiones',    'funcion|puede_capturar_remision(uuid,uuid)'),
+  ('20260902000001_operador_edita_remisiones',    'columna|remision_items.orden_linea'),
+  ('20260902000001_operador_edita_remisiones',    'tabla|remisiones_bitacora'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_update_area'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_delete_area'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remision_items.remision_items_insert_area'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial edita sus remisiones'),
+  ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial captura remisiones')
 ), revisado AS (
   SELECT e.script, e.objeto,
          split_part(e.objeto, '|', 1) AS tipo,

@@ -68,6 +68,13 @@ confundirla:
   «Ver remisión completa» y la tarjeta marca cuántas veces se modificó. Lo que
   no cambia: bajar el total de unidades por debajo de los chasis ya asignados
   sigue exigiendo liberarlos primero en Producción.
+- **Capturar.** La misma migración destapa un hueco viejo de la captura: la
+  política `crear remisiones` sólo conoce los roles legados `admin`,
+  `coordinador` y `ventas`, de modo que un supervisor de Comercial
+  (`coordinador_ventas`) o su administrador (`director_ventas`) no podía dar de
+  alta una remisión ni a su nombre. Ya pueden, por área. Y al revés: el INSERT
+  de `remision_items` dejaba que cualquier vendedor metiera renglones en la
+  remisión de otro — eso se cerró.
 
 En la UI eso es `editaTodas = perms.puedeEditar("remisiones")` en
 `src/pages/Remisiones.tsx`, que gobierna **acciones**, nunca visibilidad. Qué
@@ -89,10 +96,19 @@ sólo un filtro de vista del lado del cliente.
 - `supabase/migrations/20260824000002_comercial_lee_toda_la_bandeja.sql` —
   corrige la lectura de remisiones y motocarros para que sea por área y no por
   nivel (ver la sección anterior).
-- `supabase/migrations/20260902000001_operador_edita_remisiones.sql` — abre
-  UPDATE/DELETE de `remision_items` al operador dueño y al supervisor del área,
+- `supabase/migrations/20260902000001_operador_edita_remisiones.sql` — la
+  escalera de Comercial en `rol_comercial()` (global / supervisor / operador /
+  ninguno) y dos predicados encima: `puede_editar_remision()` y
+  `puede_capturar_remision()`. Con ellos abre UPDATE/DELETE/INSERT de
+  `remision_items`, el UPDATE del encabezado y el INSERT de `remisiones`;
   agrega `remision_items.orden_linea` y crea `remisiones_bitacora` (motivo
   obligatorio, sin políticas de UPDATE ni DELETE: la bitácora no se corrige).
+  **No usa `es_area()` / `supervisa_area()` a propósito**: esos helpers no
+  llegaron a la base de producción (de 20260823000005 sólo quedaron el enum y
+  las columnas), así que `rol_comercial()` lee `user_roles.area/nivel`
+  directamente y, cuando vienen vacíos, deduce el par del rol legado igual que
+  `desdeRolLegacy()`. Corre `supabase/diagnostico_esquema.sql` para ver qué
+  scripts faltan de verdad en una base.
 - `src/lib/remisionesEdicion.ts` — reconstruye el formulario desde los
   renglones guardados y calcula el alta/cambio/baja de cada renglón al guardar.
 
