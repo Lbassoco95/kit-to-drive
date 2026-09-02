@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, StockColor } from "@/lib/dazon";
+import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, normColor, normModelo, StockColor } from "@/lib/dazon";
+import {
+  agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, MOTIVOS_EDICION,
+  type LineaMoto, type RenglonRemision,
+} from "@/lib/remisionesEdicion";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
@@ -16,7 +21,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
   Plus, Upload, Wand2, Eye, Download, FileDown, FileText, ChevronDown,
-  UserPlus, CalendarClock, CheckCircle2, Factory, Truck,
+  UserPlus, CalendarClock, CheckCircle2, Factory, Truck, Pencil, History,
   DollarSign, Trash2, Package, CheckCheck, XCircle, AlertTriangle
 } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -32,6 +37,9 @@ import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 // llevaba la app entera en blanco al dar clic en «Nueva remisión». La opción de
 // «a mí mismo» viaja con un valor propio y se traduce a vacío al guardar.
 const ASIGNAR_A_MI = "__yo__";
+
+/** Lo que se va a guardar en una columna JSONB, ya serializable. */
+const comoJson = (v: unknown): Json => JSON.parse(JSON.stringify(v ?? null));
 const colorLabel = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 
 const tipoBadgeClass: Record<string, string> = {
@@ -50,20 +58,14 @@ const tipoLabel: Record<string, string> = {
 };
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
-interface MotoItem {
-  _key: string;
-  modelo: string;
-  color: string;
-  cantidad: number;
-  con_caja: boolean;
-  // Servicios adicionales por este motocarro
-  con_cabina: boolean;
-  con_instalacion: boolean;
-  con_activacion: boolean;
-}
+// Una línea del pedido. Al capturar viene en blanco; al editar trae además el
+// id del renglón guardado (`_itemId` / `_svcIds`) para poder corregirlo en su
+// lugar en vez de borrar y volver a insertar — ver src/lib/remisionesEdicion.ts.
+type MotoItem = LineaMoto;
 
 const defaultMoto = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
   _key: crypto.randomUUID(),
+  _svcIds: {},
   modelo,
   color: "BLANCO",
   cantidad: 1,
@@ -72,6 +74,261 @@ const defaultMoto = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
   con_instalacion: false,
   con_activacion: false,
 });
+
+export interface NuevoCliente { nombre_comercial: string; codigo_erp: string; telefono: string }
+
+// ─── CampoCliente ───────────────────────────────────────────────────────────────
+/**
+ * Selector de cliente con buscador y alta en línea.
+ *
+ * El buscador no va DENTRO del desplegable a propósito: Radix se queda con las
+ * teclas para su propio salto por letra y un input ahí adentro no recibe lo que
+ * se escribe. Filtrando desde fuera se puede teclear el nombre del cliente con
+ * cientos de folios en el catálogo.
+ */
+function CampoCliente({ clientes, value, onChange, onCrearCliente }:{
+  clientes: any[];
+  value: string;
+  onChange: (id: string) => void;
+  onCrearCliente: (datos: NuevoCliente) => Promise<string|null>;
+}) {
+  const [creando, setCreando]   = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [guardando, setGuardando] = useState(false);
+  const [nuevo, setNuevo] = useState<NuevoCliente>({ nombre_comercial:"", codigo_erp:"", telefono:"" });
+
+  const etiqueta = (c:any) =>
+    `${c.codigo_erp || c.folio_interno || "—"}${c.nombre_comercial ? ` — ${c.nombre_comercial}` : ""}`;
+
+  const q = busqueda.trim().toLowerCase();
+  const filtrados = q ? clientes.filter(c => etiqueta(c).toLowerCase().includes(q)) : clientes;
+  // El cliente ya elegido tiene que seguir dibujado aunque el filtro lo deje
+  // fuera: Radix necesita su <SelectItem> para poder mostrar la selección.
+  const elegido = clientes.find(c => c.id === value);
+  const visibles = elegido && !filtrados.some(c => c.id === value) ? [elegido, ...filtrados] : filtrados;
+
+  const guardar = async () => {
+    setGuardando(true);
+    const id = await onCrearCliente(nuevo);
+    setGuardando(false);
+    if (!id) return;
+    onChange(id);
+    setNuevo({ nombre_comercial:"", codigo_erp:"", telefono:"" });
+    setCreando(false); setBusqueda("");
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <Label className="text-base">Cliente</Label>
+        <button type="button" onClick={()=>setCreando(s=>!s)} className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
+          <UserPlus className="h-3.5 w-3.5" /> {creando?"Cancelar":"Nuevo cliente"}
+        </button>
+      </div>
+
+      {creando ? (
+        <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
+          <Input placeholder="Nombre comercial *" value={nuevo.nombre_comercial} onChange={e=>setNuevo({...nuevo,nombre_comercial:e.target.value})} className="h-11"/>
+          <Input placeholder="Código ERP (solo si es cliente migrado)" value={nuevo.codigo_erp} onChange={e=>setNuevo({...nuevo,codigo_erp:e.target.value})} className="h-11"/>
+          <Input placeholder="Teléfono" value={nuevo.telefono} onChange={e=>setNuevo({...nuevo,telefono:e.target.value})} className="h-11"/>
+          <Button type="button" onClick={guardar} disabled={guardando} className="w-full h-11 bg-[#2E75B6] hover:bg-[#246094]">
+            {guardando?"Guardando…":"Guardar cliente"}
+          </Button>
+        </div>
+      ) : (
+        <>
+          {clientes.length > 8 && (
+            <Input
+              value={busqueda}
+              onChange={e=>setBusqueda(e.target.value)}
+              placeholder="Buscar por folio o nombre…"
+              className="h-10 text-sm mb-1.5"
+            />
+          )}
+          <Select value={value} onValueChange={onChange}>
+            <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente"/></SelectTrigger>
+            <SelectContent>
+              {visibles.map(c => <SelectItem key={c.id} value={c.id}>{etiqueta(c)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {/* Un desplegable vacío se ve igual que uno roto: hay que decir por qué. */}
+          {!visibles.length && (
+            <p className="text-xs text-amber-700 mt-1">
+              {clientes.length
+                ? "Ningún cliente coincide con la búsqueda."
+                : "El catálogo de clientes está vacío. Da de alta el cliente con «Nuevo cliente»."}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── LineasMotocarro ────────────────────────────────────────────────────────────
+/**
+ * Las líneas del pedido: un motocarro por bloque, con sus servicios y el flete
+ * de toda la orden. Se comparte entre capturar una remisión nueva y corregir o
+ * complementar una ya capturada, para que ambas pantallas pidan exactamente lo
+ * mismo y validen igual.
+ */
+function LineasMotocarro({
+  motos, modelos, totalUnidades, disponiblesPara,
+  onAdd, onRemove, onUpdate, conFlete, onFlete,
+}:{
+  motos: MotoItem[];
+  modelos: string[];
+  totalUnidades: number;
+  disponiblesPara: (idx: number, modelo: string, color: string) => number | null;
+  onAdd: () => void;
+  onRemove: (idx: number) => void;
+  onUpdate: (idx: number, campo: keyof MotoItem, valor: unknown) => void;
+  conFlete: boolean;
+  onFlete: (v: boolean) => void;
+}) {
+  return (
+    <>
+      {/* ── MOTOCARROS ──────────────────────────────────── */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Label className="text-base font-semibold">Motocarros</Label>
+          <span className="text-sm font-semibold text-[#1F3864]">{totalUnidades} unidades</span>
+        </div>
+
+        {motos.map((moto, idx) => (
+          <div key={moto._key} className="border rounded-xl overflow-hidden">
+            {/* Header motocarro */}
+            <div className="flex items-center justify-between px-3 py-2 bg-[#1F3864]/5 border-b">
+              <span className="text-xs font-bold text-[#1F3864] uppercase tracking-wide">🏍️ Motocarro {idx+1}</span>
+              {motos.length>1&&(
+                <button type="button" onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
+              )}
+            </div>
+
+            {/* Modelo / color / cantidad / caja */}
+            <div className="p-3 space-y-2 bg-slate-50">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Modelo</Label>
+                  <Select value={moto.modelo} onValueChange={v=>onUpdate(idx,"modelo",v)}>
+                    <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
+                    <SelectContent>{modelos.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Color</Label>
+                  <Select value={moto.color} onValueChange={v=>onUpdate(idx,"color",v)}>
+                    <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
+                    <SelectContent>
+                      {COLORES.map(c=>{
+                        const quedan = disponiblesPara(idx, moto.modelo, c);
+                        return (
+                          <SelectItem key={c} value={c}>
+                            <div className="flex items-center justify-between w-full gap-3">
+                              <span>{colorLabel(c)}</span>
+                              {quedan === null ? null : quedan <= 0 ? (
+                                <span className="text-red-600 text-xs whitespace-nowrap">Sin existencia</span>
+                              ) : (
+                                <span className={`text-xs whitespace-nowrap ${quedan <= 3 ? "text-amber-600" : "text-muted-foreground"}`}>
+                                  {quedan} disponible{quedan === 1 ? "" : "s"}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  {/* Qué tan cubierta queda esta línea con el color elegido.
+                      No se bloquea la captura: la remisión es una promesa
+                      al cliente y el sistema ya trabaja con demanda por
+                      encima del inventario (de ahí «déficit» en
+                      Producción). Lo que sí hace falta es que quien
+                      captura vea contra qué se está comprometiendo. */}
+                  {(() => {
+                    const quedan = disponiblesPara(idx, moto.modelo, moto.color);
+                    if (quedan === null) return null;
+                    const piden = Number(moto.cantidad || 0);
+                    const faltan = piden - quedan;
+
+                    if (faltan > 0) {
+                      return (
+                        <div className="mt-1 text-xs text-red-600 font-medium flex items-start gap-1">
+                          <XCircle size={12} className="mt-0.5 shrink-0" />
+                          <span>
+                            {quedan <= 0
+                              ? `Sin existencia de ${colorLabel(moto.color)}: se piden ${piden} por armar.`
+                              : `Sólo quedan ${quedan} de ${colorLabel(moto.color)}: faltarían ${faltan} por armar.`}
+                          </span>
+                        </div>
+                      );
+                    }
+                    if (quedan - piden <= 3) {
+                      return (
+                        <div className="mt-1 text-xs text-amber-600 font-medium flex items-center gap-1">
+                          <AlertTriangle size={12} /> Quedan {quedan} de {colorLabel(moto.color)}; con esta orden se van {piden}.
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                        <CheckCircle2 size={12} className="text-emerald-600" /> {quedan} disponibles de {colorLabel(moto.color)}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-28">
+                  <Label className="text-xs text-muted-foreground">Cantidad</Label>
+                  <Input type="number" min={1} value={moto.cantidad}
+                    onChange={e=>onUpdate(idx,"cantidad",Math.max(1,parseInt(e.target.value)||1))}
+                    className="h-10 text-sm"/>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer pt-5 flex-1">
+                  <input type="checkbox" checked={moto.con_caja} onChange={e=>onUpdate(idx,"con_caja",e.target.checked)} className="w-4 h-4 accent-[#1F3864]"/>
+                  <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-[#1F3864]"/> Con caja montada</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Servicios adicionales por motocarro */}
+            <div className="px-3 py-2.5 bg-white border-t space-y-1.5">
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Servicios adicionales</div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={moto.con_cabina} onChange={e=>onUpdate(idx,"con_cabina",e.target.checked)} className="w-3.5 h-3.5 accent-violet-600"/>
+                <span className="text-sm">🛖 Cabina</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={moto.con_instalacion} onChange={e=>onUpdate(idx,"con_instalacion",e.target.checked)} className="w-3.5 h-3.5 accent-purple-600"/>
+                <span className="text-sm">🔧 Instalación de cabina</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={moto.con_activacion} onChange={e=>onUpdate(idx,"con_activacion",e.target.checked)} className="w-3.5 h-3.5 accent-amber-500"/>
+                <span className="text-sm">⚡ Activación</span>
+              </label>
+            </div>
+          </div>
+        ))}
+
+        <Button type="button" variant="outline" onClick={onAdd}
+          className="w-full h-10 border-dashed border-[#2E75B6]/50 text-[#2E75B6] hover:bg-[#DBEAFE]/30">
+          <Plus className="h-4 w-4 mr-2"/> Agregar motocarro
+        </Button>
+      </div>
+
+      {/* ── FLETE — toda la orden ──────────────────────── */}
+      <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={conFlete} onChange={e=>onFlete(e.target.checked)} className="w-4 h-4 accent-blue-600"/>
+          <span className="text-sm font-medium flex items-center gap-1.5">
+            🚛 Flete <span className="text-xs text-muted-foreground font-normal">(servicio para toda la orden)</span>
+          </span>
+        </label>
+      </div>
+    </>
+  );
+}
 
 // ─── Folio suggester ────────────────────────────────────────────────────────────
 // Siempre sugiere el siguiente número consecutivo (max + 1), sin regresar a folios
@@ -111,8 +368,6 @@ export default function Remisiones() {
   const [expanded, setExpanded]     = useState<Record<string,boolean>>({});
   const [recentFolios, setRecentFolios] = useState<string[]>([]);
   const [activeFolios, setActiveFolios] = useState<string[]>([]);
-  const [creandoCliente, setCreandoCliente] = useState(false);
-  const [nuevoCliente, setNuevoCliente] = useState({ codigo_erp:"", folio_interno:"", nombre_comercial:"", telefono:"" });
   // Disponibilidad por (modelo comercial, color). Llave: claveStock().
   const [colorInventory, setColorInventory] = useState<Map<string, StockColor>>(new Map());
 
@@ -137,6 +392,20 @@ export default function Remisiones() {
   const [notifOpen, setNotifOpen]             = useState(false);
   const [detalleRemision, setDetalleRemision] = useState<any|null>(null);
   const [previewPath, setPreviewPath] = useState<string|null>(null);
+
+  // ── Edición / complemento de una remisión ya capturada ────────────────────
+  const [editar, setEditar]               = useState<any|null>(null);
+  const [editForm, setEditForm]           = useState<any>(null);
+  const [editMotos, setEditMotos]         = useState<MotoItem[]>([]);
+  const [editFlete, setEditFlete]         = useState(false);
+  const [editItems, setEditItems]         = useState<RenglonRemision[]>([]);
+  const [editMotivo, setEditMotivo]       = useState("");
+  const [editMotivoSugerido, setEditMotivoSugerido] = useState("");
+  const [guardandoEdicion, setGuardandoEdicion]     = useState(false);
+  /** Cuántas veces se ha modificado cada remisión, para marcarlo en la tarjeta. */
+  const [modificaciones, setModificaciones] = useState<Record<string, number>>({});
+  /** Historial de la remisión abierta en «Ver remisión completa». */
+  const [historial, setHistorial] = useState<any[]>([]);
   // Alcance de la bandeja: todo el equipo comercial comparte la misma información,
   // pero cada quien puede acotar la vista a lo suyo sin perder el panorama.
   const [scope, setScope]                     = useState<'todas'|'mias'>('todas');
@@ -145,9 +414,39 @@ export default function Remisiones() {
   const totalUnidades = motos.reduce((s,m) => s + Number(m.cantidad||0), 0);
 
   // ── Loaders ────────────────────────────────────────────────────────────────
+  /**
+   * Catálogo de clientes para el selector de la remisión.
+   *
+   * OJO con el `order`: `supabase-js` no acepta varias columnas en una sola
+   * llamada. `.order("folio_interno, codigo_erp")` viaja como
+   * `order=folio_interno, codigo_erp.asc`, PostgREST no puede leer el segundo
+   * término (le queda un espacio pegado al nombre) y responde 400. La lista
+   * llegaba vacía y el desplegable «Selecciona cliente» no ofrecía nada: se
+   * veía como que el sistema no permitía elegir cliente. Van encadenados.
+   */
   const loadClientes = async () => {
-    const { data } = await supabase.from("clientes").select("id,codigo_erp,folio_interno,nombre_comercial").order("folio_interno, codigo_erp");
-    setClientes(data ?? []);
+    const { data, error } = await supabase
+      .from("clientes")
+      .select("id,codigo_erp,folio_interno,nombre_comercial")
+      .order("folio_interno", { nullsFirst: false })
+      .order("codigo_erp", { nullsFirst: false });
+
+    if (!error) { setClientes(data ?? []); return; }
+
+    // Respaldo: si `folio_interno` todavía no existe en la base (falta correr
+    // 20260827000001), se pide lo de siempre. Sin clientes no hay remisión, así
+    // que aquí nunca se falla en silencio.
+    console.warn("clientes con folio_interno no disponible:", error.message);
+    const { data: previo, error: error2 } = await supabase
+      .from("clientes")
+      .select("id,codigo_erp,nombre_comercial")
+      .order("codigo_erp", { nullsFirst: false });
+    if (error2) {
+      setClientes([]);
+      toast.error(`No se pudo cargar el catálogo de clientes: ${error2.message}`);
+      return;
+    }
+    setClientes(previo ?? []);
   };
   const loadVendedores = async () => {
     const { data: roles } = await supabase.from("user_roles").select("user_id,area").eq("area","comercial");
@@ -289,7 +588,32 @@ export default function Remisiones() {
     } catch (_) { /* cache stale — ignorar */ }
   };
 
-  useEffect(() => { load(); loadClientes(); loadVendedores(); }, [user?.id, perms.nivel, perms.area]);
+  /**
+   * Cuántas veces se modificó cada remisión. Es un solo query para toda la
+   * bandeja; si la tabla todavía no existe (falta 20260902000001) no pasa nada:
+   * simplemente no se marca ninguna tarjeta.
+   */
+  const loadModificaciones = async () => {
+    const { data, error } = await supabase.from("remisiones_bitacora").select("remision_id");
+    if (error) { setModificaciones({}); return; }
+    const cuenta: Record<string, number> = {};
+    (data ?? []).forEach(b => { cuenta[b.remision_id] = (cuenta[b.remision_id] ?? 0) + 1; });
+    setModificaciones(cuenta);
+  };
+
+  useEffect(() => { load(); loadClientes(); loadVendedores(); loadModificaciones(); }, [user?.id, perms.nivel, perms.area]);
+
+  // Historial de la remisión que se está viendo en detalle.
+  useEffect(() => {
+    if (!detalleRemision?.id) { setHistorial([]); return; }
+    let vigente = true;
+    supabase.from("remisiones_bitacora")
+      .select("id,created_at,nombre_usuario,tipo_cambio,motivo")
+      .eq("remision_id", detalleRemision.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => { if (vigente) setHistorial(error ? [] : (data ?? [])); });
+    return () => { vigente = false; };
+  }, [detalleRemision?.id]);
   useEffect(() => {
     if (user?.id) supabase.from("profiles").select("nombre_completo").eq("id",user.id).single().then(({data})=>{ if(data) setMyProfile(data); });
   }, [user?.id]);
@@ -319,16 +643,7 @@ export default function Remisiones() {
   const addMoto   = () => setMotos(m => [...m, defaultMoto(modelos[0])]);
   const removeMoto = (idx:number) => setMotos(m => m.filter((_,i)=>i!==idx));
   const updateMoto = (idx:number, field:keyof MotoItem, val:any) =>
-    setMotos(m => m.map((item,i) => {
-      if (i !== idx) return item;
-      const next = { ...item, [field]: val };
-      // Instalación de cabina implica caja montada
-      if (field === "con_instalacion" && val === true)  next.con_caja = true;
-      if (field === "con_instalacion" && val === false) next.con_caja = false;
-      // Si marcan caja pero tienen instalación activa, no dejar desmarcar la caja
-      if (field === "con_caja" && val === false && item.con_instalacion) next.con_caja = true;
-      return next;
-    }));
+    setMotos(m => m.map((item,i) => (i===idx ? aplicarCambioMoto(item, field, val) : item)));
 
   // ── Disponibilidad por color dentro de la orden ─────────────────────────────
   /**
@@ -365,21 +680,24 @@ export default function Remisiones() {
   };
 
   // ── Nuevo cliente ───────────────────────────────────────────────────────────
-  const guardarNuevoCliente = async () => {
-    if (!nuevoCliente.nombre_comercial.trim() && !nuevoCliente.codigo_erp.trim()) return toast.error("El nombre comercial o el código ERP es obligatorio");
-    if (nuevoCliente.codigo_erp.trim()) {
-      const { count } = await supabase.from("clientes").select("*", { count: "exact", head: true }).eq("codigo_erp", nuevoCliente.codigo_erp.trim());
-      if (count && count > 0) return toast.error(`El código ERP ${nuevoCliente.codigo_erp.trim()} ya existe`);
+  /** Da de alta el cliente y devuelve su id (o `null` si no se pudo). */
+  const crearCliente = async (datos: NuevoCliente): Promise<string|null> => {
+    const nombre = datos.nombre_comercial.trim();
+    const erp    = datos.codigo_erp.trim();
+    if (!nombre && !erp) { toast.error("El nombre comercial o el código ERP es obligatorio"); return null; }
+    if (erp) {
+      const { count } = await supabase.from("clientes").select("*", { count: "exact", head: true }).eq("codigo_erp", erp);
+      if (count && count > 0) { toast.error(`El código ERP ${erp} ya existe`); return null; }
     }
 
     const payload: any = {
-      nombre_comercial: nuevoCliente.nombre_comercial.trim() || null,
-      telefono: nuevoCliente.telefono.trim() || null,
-      codigo_erp: nuevoCliente.codigo_erp.trim() || null,
+      nombre_comercial: nombre || null,
+      telefono: datos.telefono.trim() || null,
+      codigo_erp: erp || null,
     };
 
     const { data, error } = await supabase.from("clientes").insert(payload).select("id,codigo_erp,folio_interno,nombre_comercial").single();
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return null; }
 
     await supabase.from("clientes_bitacora").insert({
       cliente_id: data.id,
@@ -389,9 +707,13 @@ export default function Remisiones() {
       datos_nuevos: data,
     });
 
-    toast.success("✓ Cliente creado"); await loadClientes();
-    setForm((f:any)=>({...f, cliente_id: data.id}));
-    setNuevoCliente({codigo_erp:"",folio_interno:"",nombre_comercial:"",telefono:""}); setCreandoCliente(false);
+    toast.success("✓ Cliente creado");
+    // El catálogo se recarga, pero el cliente recién creado se agrega de una
+    // vez: si la recarga tarda (o falla), el selector ya lo tiene y la remisión
+    // se puede guardar.
+    setClientes(prev => prev.some((c:any)=>c.id===data.id) ? prev : [...prev, data]);
+    await loadClientes();
+    return data.id;
   };
 
   // ── Create remisión ─────────────────────────────────────────────────────────
@@ -627,6 +949,217 @@ export default function Remisiones() {
     toast.success("✓ Remisión restaurada a activa"); load();
   };
 
+  // ── Editar / complementar una remisión ─────────────────────────────────────
+  /**
+   * Lee los renglones de la remisión y arma el formulario de edición.
+   *
+   * Se vuelven a pedir a la base en vez de usar los de la tarjeta: la carga de
+   * la bandeja es tolerante a fallos (si el cache de PostgREST estaba frío, la
+   * tarjeta puede haberse quedado sin renglones) y editar con una lista
+   * incompleta borraría lo que no se alcanzó a leer.
+   */
+  const abrirEdicion = async (r:any) => {
+    const columnas = "id,remision_id,tipo_servicio,modelo,color,cantidad,con_caja";
+    let items: RenglonRemision[] | null = null;
+
+    const { data, error } = await supabase
+      .from("remision_items")
+      .select(`${columnas},orden_linea`)
+      .eq("remision_id", r.id)
+      .order("orden_linea", { nullsFirst: true })
+      .order("created_at", { nullsFirst: true });
+    if (!error) items = data ?? [];
+
+    if (items === null) {
+      // `orden_linea` es de la migración 20260902000001: si no se ha aplicado,
+      // se editan igual y se agrupa por posición.
+      console.warn("remision_items.orden_linea no disponible:", error?.message);
+      const { data: previo, error: error2 } = await supabase
+        .from("remision_items").select(columnas)
+        .eq("remision_id", r.id).order("created_at", { nullsFirst: true });
+      if (error2) return toast.error(`No se pudieron leer los renglones: ${error2.message}`);
+      items = previo ?? [];
+    }
+
+    const agrupado = agruparRenglones(items!, { modeloPorDefecto: modelos[0] });
+    setEditItems(items!);
+    setEditMotos(agrupado.lineas.length ? agrupado.lineas : [defaultMoto(modelos[0])]);
+    setEditFlete(agrupado.conFlete);
+    setEditForm({
+      folio_remision: r.folio_remision ?? "",
+      cliente_id: r.cliente_id ?? "",
+      nombre_vendedor: r.nombre_vendedor ?? r.profiles?.nombre_completo ?? "",
+      fecha_remision: r.fecha_remision ?? new Date().toISOString().slice(0,10),
+      notas: r.notas ?? "",
+      tipo_pago: r.tipo_pago ?? "anticipado",
+    });
+    setEditMotivo(""); setEditMotivoSugerido("");
+    setEditar(r);
+  };
+
+  const cerrarEdicion = () => {
+    setEditar(null); setEditForm(null); setEditMotos([]); setEditItems([]);
+    setEditFlete(false); setEditMotivo(""); setEditMotivoSugerido("");
+  };
+
+  const addMotoEdit    = () => setEditMotos(m => [...m, defaultMoto(modelos[0])]);
+  const removeMotoEdit = (idx:number) => setEditMotos(m => m.filter((_,i)=>i!==idx));
+  const updateMotoEdit = (idx:number, campo:keyof MotoItem, valor:unknown) =>
+    setEditMotos(m => m.map((item,i) => (i===idx ? aplicarCambioMoto(item, campo, valor) : item)));
+
+  const totalUnidadesEdit = editMotos.reduce((s,m)=>s+Number(m.cantidad||0),0);
+
+  /**
+   * Disponibilidad por color al editar.
+   *
+   * A lo que reporta el inventario hay que devolverle lo que ESTA remisión ya
+   * tenía comprometido: su demanda ya está descontada en la vista, así que sin
+   * regresarla su propio pedido se vería como agotado.
+   */
+  const disponiblesParaEdicion = (idx:number, modelo:string, color:string): number | null => {
+    const base = disponiblesEnOrden(
+      colorInventory.get(claveStock(modelo, color)),
+      editMotos.map((m,i) => (i===idx ? {...m, modelo, color} : m)),
+      idx,
+    );
+    if (base === null) return null;
+    const yaComprometido = editItems
+      .filter(i => i.tipo_servicio === "motocarro"
+        && normModelo(i.modelo) === normModelo(modelo)
+        && normColor(i.color) === normColor(color))
+      .reduce((suma, i) => suma + Number(i.cantidad || 0), 0);
+    return base + yaComprometido;
+  };
+
+  const guardarEdicion = async () => {
+    if (!editar || !editForm) return;
+
+    const motivo = editMotivo.trim();
+    if (!motivoValido(motivo)) return toast.error(`Escribe el motivo de la modificación (mínimo ${MOTIVO_MIN} caracteres)`);
+
+    const folio = (editForm.folio_remision||"").trim();
+    if (!folio || !editForm.cliente_id) return toast.error("Folio y cliente son obligatorios");
+    // El folio es único entre las remisiones activas — sin contarse a sí misma.
+    if (rows.some((r:any) => r.id !== editar.id && r.estatus !== "CANCELADA" && r.folio_remision === folio))
+      return toast.error("Ese folio ya está en uso por otra remisión activa");
+
+    const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
+    if (!plan.totalUnidades) return toast.error("La remisión necesita al menos un motocarro");
+
+    // No se puede pedir menos de lo que ya se armó: esos chasis se liberan
+    // primero desde Producción, si no la remisión queda con unidades huérfanas.
+    const asignadas = (editar.motocarros ?? []).length;
+    if (plan.totalUnidades < asignadas)
+      return toast.error(`Esta remisión ya tiene ${asignadas} chasis asignados: libéralos en Producción antes de bajarla a ${plan.totalUnidades} unidades`);
+
+    setGuardandoEdicion(true);
+
+    const antes = {
+      folio_remision: editar.folio_remision, cliente_id: editar.cliente_id,
+      fecha_remision: editar.fecha_remision, notas: editar.notas,
+      tipo_pago: editar.tipo_pago, nombre_vendedor: editar.nombre_vendedor,
+      total_unidades_solicitadas: editar.total_unidades_solicitadas,
+      renglones: editItems,
+    };
+    const despues = {
+      folio_remision: folio, cliente_id: editForm.cliente_id,
+      fecha_remision: editForm.fecha_remision, notas: editForm.notas || null,
+      tipo_pago: editForm.tipo_pago, nombre_vendedor: editForm.nombre_vendedor || null,
+      total_unidades_solicitadas: plan.totalUnidades,
+      renglones: { agregados: plan.inserts, corregidos: plan.updates, quitados: plan.deleteIds },
+    };
+
+    // 1. Primero la constancia. Si el motivo no se puede registrar, la remisión
+    //    no se toca: una modificación sin justificación no debe existir. El
+    //    costo de este orden es que un intento rechazado por RLS (paso 2) deja
+    //    su registro — que de todos modos es información útil.
+    const { error: errBitacora } = await supabase.from("remisiones_bitacora").insert({
+      remision_id: editar.id,
+      usuario_id: user?.id,
+      nombre_usuario: myProfile?.nombre_completo || user?.email,
+      tipo_cambio: "edicion",
+      motivo,
+      // `Json` no acepta interfaces de TypeScript sin índice: se serializa,
+      // que es justo lo que hace supabase-js al mandarlo.
+      datos_antes: comoJson(antes),
+      datos_despues: comoJson(despues),
+    });
+    if (errBitacora) {
+      setGuardandoEdicion(false);
+      return toast.error(`No se pudo registrar el motivo, la remisión no se modificó: ${errBitacora.message}`);
+    }
+
+    // 2. Encabezado — columnas que siempre han existido.
+    //    El `.select("id")` no es de adorno: un UPDATE que el RLS filtra NO es
+    //    un error para PostgREST, contesta 200 sin filas. Sin revisar que
+    //    regresara la remisión, a quien no tiene permiso se le diría
+    //    «actualizada» sin haber cambiado nada.
+    const { data: actualizada, error: errCore } = await supabase.from("remisiones").update({
+      folio_remision: folio,
+      cliente_id: editForm.cliente_id,
+      fecha_remision: editForm.fecha_remision,
+      notas: editForm.notas || null,
+    }).eq("id", editar.id).select("id");
+    if (errCore) { setGuardandoEdicion(false); return toast.error(errCore.message); }
+    if (!actualizada?.length) {
+      setGuardandoEdicion(false);
+      return toast.error("No se guardó nada: no tienes permiso para modificar esta remisión, o ya no existe. Pídele el cambio a tu supervisor.");
+    }
+
+    // 3. Columnas extendidas — tolerante a cache stale, igual que al capturar.
+    await supabase.from("remisiones").update({
+      tipo_pago: editForm.tipo_pago,
+      // Pasar a contra entrega no da por pagado lo que no lo está; el
+      // comprobante ya subido sí se respeta.
+      pagado: editForm.tipo_pago === "anticipado" ? true : !!editar.comprobante_pago_url,
+      nombre_vendedor: editForm.nombre_vendedor || null,
+      color_solicitado: editMotos[0]?.color || "BLANCO",
+      total_unidades_solicitadas: plan.totalUnidades,
+    }).eq("id", editar.id);
+
+    // 4. Renglones.
+    const fallo = await aplicarPlanRenglones(plan);
+    setGuardandoEdicion(false);
+    if (fallo) return toast.error(`La remisión se actualizó, pero un renglón falló: ${fallo}`);
+
+    toast.success("✓ Remisión actualizada — el motivo quedó en la bitácora");
+    cerrarEdicion();
+    load(); loadModificaciones();
+  };
+
+  /**
+   * Escribe el plan de renglones. Devuelve el mensaje del primer error, o
+   * `null` si todo quedó.
+   *
+   * `orden_linea` es de la migración 20260902000001: si todavía no se aplicó,
+   * se reintenta sin esa columna para no bloquear la corrección.
+   */
+  const aplicarPlanRenglones = async (plan: ReturnType<typeof planEditarRenglones>): Promise<string|null> => {
+    const sinOrden = <T extends { orden_linea?: number }>(o: T) => {
+      const { orden_linea, ...resto } = o;
+      return resto;
+    };
+
+    for (const u of plan.updates) {
+      let { error } = await supabase.from("remision_items").update(u.cambios).eq("id", u.id);
+      if (error) ({ error } = await supabase.from("remision_items").update(sinOrden(u.cambios)).eq("id", u.id));
+      if (error) return error.message;
+    }
+
+    if (plan.inserts.length) {
+      let { error } = await supabase.from("remision_items").insert(plan.inserts);
+      if (error) ({ error } = await supabase.from("remision_items").insert(plan.inserts.map(sinOrden)));
+      if (error) return error.message;
+    }
+
+    if (plan.deleteIds.length) {
+      const { error } = await supabase.from("remision_items").delete().in("id", plan.deleteIds);
+      if (error) return error.message;
+    }
+
+    return null;
+  };
+
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
@@ -668,30 +1201,12 @@ export default function Remisiones() {
                 </div>
 
                 {/* Cliente */}
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-base">Cliente</Label>
-                    <button type="button" onClick={()=>setCreandoCliente(s=>!s)} className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
-                      <UserPlus className="h-3.5 w-3.5" /> {creandoCliente?"Cancelar":"Nuevo cliente"}
-                    </button>
-                  </div>
-                  {!creandoCliente ? (
-                    <Select value={form.cliente_id} onValueChange={v=>setForm({...form,cliente_id:v})}>
-                      <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente"/></SelectTrigger>
-                      <SelectContent>{clientes.map(c=>{
-                        const label = c.codigo_erp || c.folio_interno || "—";
-                        return <SelectItem key={c.id} value={c.id}>{label}{c.nombre_comercial?` — ${c.nombre_comercial}`:""}</SelectItem>;
-                      })}</SelectContent>
-                    </Select>
-                  ):(
-                    <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
-                      <Input placeholder="Nombre comercial *" value={nuevoCliente.nombre_comercial} onChange={e=>setNuevoCliente({...nuevoCliente,nombre_comercial:e.target.value})} className="h-11"/>
-                      <Input placeholder="Código ERP (solo si es cliente migrado)" value={nuevoCliente.codigo_erp} onChange={e=>setNuevoCliente({...nuevoCliente,codigo_erp:e.target.value})} className="h-11"/>
-                      <Input placeholder="Teléfono" value={nuevoCliente.telefono} onChange={e=>setNuevoCliente({...nuevoCliente,telefono:e.target.value})} className="h-11"/>
-                      <Button type="button" onClick={guardarNuevoCliente} className="w-full h-11 bg-[#2E75B6] hover:bg-[#246094]">Guardar cliente</Button>
-                    </div>
-                  )}
-                </div>
+                <CampoCliente
+                  clientes={clientes}
+                  value={form.cliente_id}
+                  onChange={id=>setForm({...form,cliente_id:id})}
+                  onCrearCliente={crearCliente}
+                />
 
                 {/* Vendedor selector (admin/coord) */}
                 {canAssignVendedor&&(
@@ -717,145 +1232,18 @@ export default function Remisiones() {
                   <Input value={form.nombre_vendedor} onChange={e=>setForm({...form,nombre_vendedor:e.target.value})} placeholder="Nombre completo del vendedor" className="h-12 text-base"/>
                 </div>
 
-                {/* ── MOTOCARROS ──────────────────────────────────── */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-base font-semibold">Motocarros</Label>
-                    <span className="text-sm font-semibold text-[#1F3864]">{totalUnidades} unidades</span>
-                  </div>
-
-                  {motos.map((moto, idx) => (
-                    <div key={moto._key} className="border rounded-xl overflow-hidden">
-                      {/* Header motocarro */}
-                      <div className="flex items-center justify-between px-3 py-2 bg-[#1F3864]/5 border-b">
-                        <span className="text-xs font-bold text-[#1F3864] uppercase tracking-wide">🏍️ Motocarro {idx+1}</span>
-                        {motos.length>1&&(
-                          <button type="button" onClick={()=>removeMoto(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
-                        )}
-                      </div>
-
-                      {/* Modelo / color / cantidad / caja */}
-                      <div className="p-3 space-y-2 bg-slate-50">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Modelo</Label>
-                            <Select value={moto.modelo} onValueChange={v=>updateMoto(idx,"modelo",v)}>
-                              <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
-                              <SelectContent>{modelos.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Color</Label>
-                            <Select value={moto.color} onValueChange={v=>updateMoto(idx,"color",v)}>
-                              <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
-                              <SelectContent>
-                                {COLORES.map(c=>{
-                                  const quedan = disponiblesPara(idx, moto.modelo, c);
-                                  return (
-                                    <SelectItem key={c} value={c}>
-                                      <div className="flex items-center justify-between w-full gap-3">
-                                        <span>{colorLabel(c)}</span>
-                                        {quedan === null ? null : quedan <= 0 ? (
-                                          <span className="text-red-600 text-xs whitespace-nowrap">Sin existencia</span>
-                                        ) : (
-                                          <span className={`text-xs whitespace-nowrap ${quedan <= 3 ? "text-amber-600" : "text-muted-foreground"}`}>
-                                            {quedan} disponible{quedan === 1 ? "" : "s"}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectContent>
-                            </Select>
-                            {/* Qué tan cubierta queda esta línea con el color elegido.
-                                No se bloquea la captura: la remisión es una promesa
-                                al cliente y el sistema ya trabaja con demanda por
-                                encima del inventario (de ahí «déficit» en
-                                Producción). Lo que sí hace falta es que quien
-                                captura vea contra qué se está comprometiendo. */}
-                            {(() => {
-                              const quedan = disponiblesPara(idx, moto.modelo, moto.color);
-                              if (quedan === null) return null;
-                              const piden = Number(moto.cantidad || 0);
-                              const faltan = piden - quedan;
-
-                              if (faltan > 0) {
-                                return (
-                                  <div className="mt-1 text-xs text-red-600 font-medium flex items-start gap-1">
-                                    <XCircle size={12} className="mt-0.5 shrink-0" />
-                                    <span>
-                                      {quedan <= 0
-                                        ? `Sin existencia de ${colorLabel(moto.color)}: se piden ${piden} por armar.`
-                                        : `Sólo quedan ${quedan} de ${colorLabel(moto.color)}: faltarían ${faltan} por armar.`}
-                                    </span>
-                                  </div>
-                                );
-                              }
-                              if (quedan - piden <= 3) {
-                                return (
-                                  <div className="mt-1 text-xs text-amber-600 font-medium flex items-center gap-1">
-                                    <AlertTriangle size={12} /> Quedan {quedan} de {colorLabel(moto.color)}; con esta orden se van {piden}.
-                                  </div>
-                                );
-                              }
-                              return (
-                                <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-                                  <CheckCircle2 size={12} className="text-emerald-600" /> {quedan} disponibles de {colorLabel(moto.color)}
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="w-28">
-                            <Label className="text-xs text-muted-foreground">Cantidad</Label>
-                            <Input type="number" min={1} value={moto.cantidad}
-                              onChange={e=>updateMoto(idx,"cantidad",Math.max(1,parseInt(e.target.value)||1))}
-                              className="h-10 text-sm"/>
-                          </div>
-                          <label className="flex items-center gap-2 cursor-pointer pt-5 flex-1">
-                            <input type="checkbox" checked={moto.con_caja} onChange={e=>updateMoto(idx,"con_caja",e.target.checked)} className="w-4 h-4 accent-[#1F3864]"/>
-                            <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-[#1F3864]"/> Con caja montada</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {/* Servicios adicionales por motocarro */}
-                      <div className="px-3 py-2.5 bg-white border-t space-y-1.5">
-                        <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Servicios adicionales</div>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={moto.con_cabina} onChange={e=>updateMoto(idx,"con_cabina",e.target.checked)} className="w-3.5 h-3.5 accent-violet-600"/>
-                          <span className="text-sm">🛖 Cabina</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={moto.con_instalacion} onChange={e=>updateMoto(idx,"con_instalacion",e.target.checked)} className="w-3.5 h-3.5 accent-purple-600"/>
-                          <span className="text-sm">🔧 Instalación de cabina</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={moto.con_activacion} onChange={e=>updateMoto(idx,"con_activacion",e.target.checked)} className="w-3.5 h-3.5 accent-amber-500"/>
-                          <span className="text-sm">⚡ Activación</span>
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-
-                  <Button type="button" variant="outline" onClick={addMoto}
-                    className="w-full h-10 border-dashed border-[#2E75B6]/50 text-[#2E75B6] hover:bg-[#DBEAFE]/30">
-                    <Plus className="h-4 w-4 mr-2"/> Agregar motocarro
-                  </Button>
-                </div>
-
-                {/* ── FLETE — toda la orden ──────────────────────── */}
-                <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={conFlete} onChange={e=>setConFlete(e.target.checked)} className="w-4 h-4 accent-blue-600"/>
-                    <span className="text-sm font-medium flex items-center gap-1.5">
-                      🚛 Flete <span className="text-xs text-muted-foreground font-normal">(servicio para toda la orden)</span>
-                    </span>
-                  </label>
-                </div>
-
+                {/* ── MOTOCARROS + FLETE ─────────────────────────── */}
+                <LineasMotocarro
+                  motos={motos}
+                  modelos={modelos}
+                  totalUnidades={totalUnidades}
+                  disponiblesPara={disponiblesPara}
+                  onAdd={addMoto}
+                  onRemove={removeMoto}
+                  onUpdate={updateMoto}
+                  conFlete={conFlete}
+                  onFlete={setConFlete}
+                />
                 {/* Fecha */}
                 <div>
                   <Label>Fecha</Label>
@@ -1029,6 +1417,17 @@ export default function Remisiones() {
                   <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
                   <div className="text-2xl font-bold text-[#1F3864] leading-tight">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
+                  {!!modificaciones[r.id] && (
+                    <button
+                      type="button"
+                      onClick={()=>setDetalleRemision(r)}
+                      className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 hover:underline"
+                      title="Ver el historial de modificaciones"
+                    >
+                      <History className="h-3 w-3"/>
+                      Modificada {modificaciones[r.id]} {modificaciones[r.id]===1?"vez":"veces"}
+                    </button>
+                  )}
                 </div>
                 <EstatusBadge estatus={r.estatus} size="md"/>
               </div>
@@ -1113,6 +1512,13 @@ export default function Remisiones() {
                 <Button variant="outline" onClick={()=>setDetalleRemision(r)} className="basis-full h-12 text-base">
                   <FileText className="h-5 w-5 mr-2"/> Ver remisión completa
                 </Button>
+                {/* Editar / complementar — operador en las suyas, supervisor y
+                    administrador en las de todo el área. Cada cambio pide motivo. */}
+                {puedeGestionar&&(
+                  <Button variant="outline" onClick={()=>abrirEdicion(r)} className="flex-1 h-12 text-base min-w-[100px] border-[#1F3864]/40 text-[#1F3864] hover:bg-[#DBEAFE]">
+                    <Pencil className="h-5 w-5 mr-2"/> Editar
+                  </Button>
+                )}
                 {canAssign&&asignadas<total&&r.estatus!=="COMPLETA"&&r.estatus!=="CANCELADA"&&(
                   <Button onClick={()=>asignarChasis(r)} className="flex-1 h-12 bg-[#2E75B6] hover:bg-[#246094] text-base min-w-[100px]">
                     <Wand2 className="h-5 w-5 mr-2"/> Asignar
@@ -1278,6 +1684,26 @@ export default function Remisiones() {
                 </div>
               )}
 
+              {/* Quién le movió, cuándo y por qué. Es lo que hace que abrir la
+                  edición a todo el equipo siga siendo rastreable. */}
+              {historial.length>0&&(
+                <div>
+                  <h3 className="text-base mb-2 flex items-center gap-2"><History className="h-4 w-4"/> Modificaciones</h3>
+                  <div className="space-y-2">
+                    {historial.map((h:any)=>(
+                      <div key={h.id} className="rounded-lg border bg-amber-50/50 p-3 text-sm">
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <strong className="text-[#1F3864]">{h.nombre_usuario||"—"}</strong>
+                          <span>{new Date(h.created_at).toLocaleString("es-MX")}</span>
+                          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold uppercase tracking-wide">{h.tipo_cambio}</span>
+                        </div>
+                        <div className="mt-1 whitespace-pre-wrap break-words">{h.motivo}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2 border-t pt-4">
                 {detalleRemision.documento_url?(
                   <>
@@ -1293,6 +1719,132 @@ export default function Remisiones() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Editar / complementar remisión — con motivo obligatorio ────────── */}
+      <Dialog open={!!editar} onOpenChange={o=>{ if(!o) cerrarEdicion(); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#1F3864]">
+              <Pencil className="h-5 w-5"/> Editar remisión {editar?.folio_remision}
+            </DialogTitle>
+            <DialogDescription>
+              Corrige lo que se capturó mal o agrega unidades y servicios a esta remisión.
+              Todo cambio queda registrado con tu nombre y el motivo que escribas.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editForm&&(
+            <div className="space-y-4">
+              {(editar?.motocarros?.length ?? 0) > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5"/>
+                  <span>
+                    Esta remisión ya tiene <strong>{editar.motocarros.length}</strong> chasis asignados.
+                    Puedes agregar unidades, pero para bajar el total hay que liberarlos primero en Producción.
+                  </span>
+                </div>
+              )}
+
+              {/* Folio */}
+              <div>
+                <Label className="text-base">{t.remisiones.folioRemision}</Label>
+                <Input value={editForm.folio_remision} onChange={e=>setEditForm({...editForm,folio_remision:e.target.value})} className="h-12 text-base font-mono"/>
+              </div>
+
+              {/* Cliente */}
+              <CampoCliente
+                clientes={clientes}
+                value={editForm.cliente_id}
+                onChange={id=>setEditForm({...editForm,cliente_id:id})}
+                onCrearCliente={crearCliente}
+              />
+
+              {/* Nombre del vendedor */}
+              <div>
+                <Label className="text-base">Nombre del vendedor</Label>
+                <Input value={editForm.nombre_vendedor} onChange={e=>setEditForm({...editForm,nombre_vendedor:e.target.value})} placeholder="Nombre completo del vendedor" className="h-12 text-base"/>
+              </div>
+
+              {/* Líneas del pedido — mismas reglas que al capturar */}
+              <LineasMotocarro
+                motos={editMotos}
+                modelos={modelos}
+                totalUnidades={totalUnidadesEdit}
+                disponiblesPara={disponiblesParaEdicion}
+                onAdd={addMotoEdit}
+                onRemove={removeMotoEdit}
+                onUpdate={updateMotoEdit}
+                conFlete={editFlete}
+                onFlete={setEditFlete}
+              />
+
+              {/* Fecha */}
+              <div>
+                <Label>Fecha</Label>
+                <Input type="date" value={editForm.fecha_remision} onChange={e=>setEditForm({...editForm,fecha_remision:e.target.value})} className="h-12 text-base"/>
+              </div>
+
+              {/* Tipo de pago */}
+              <div>
+                <Label>{t.pago.tipo}</Label>
+                <Select value={editForm.tipo_pago} onValueChange={v=>setEditForm({...editForm,tipo_pago:v})}>
+                  <SelectTrigger className="h-12 text-base"><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="anticipado">{t.remisiones.anticipado}</SelectItem>
+                    <SelectItem value="contra_entrega">{t.remisiones.contraEntrega}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Notas */}
+              <div>
+                <Label>Notas</Label>
+                <Input value={editForm.notas} onChange={e=>setEditForm({...editForm,notas:e.target.value})} className="h-12 text-base"/>
+              </div>
+
+              {/* ── Motivo — obligatorio ───────────────────────────────── */}
+              <div className="rounded-xl border-2 border-[#2E75B6]/40 bg-[#DBEAFE]/30 p-3 space-y-2">
+                <Label className="text-base font-semibold">
+                  Motivo de la modificación <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={editMotivoSugerido}
+                  onValueChange={v=>{
+                    setEditMotivoSugerido(v);
+                    // Sirve de arranque: se puede completar o cambiar a mano.
+                    setEditMotivo(m => (m.trim() && m !== editMotivoSugerido ? m : v));
+                  }}
+                >
+                  <SelectTrigger className="h-11 text-sm"><SelectValue placeholder="Motivo frecuente (opcional)"/></SelectTrigger>
+                  <SelectContent>
+                    {MOTIVOS_EDICION.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Textarea
+                  value={editMotivo}
+                  onChange={e=>setEditMotivo(e.target.value)}
+                  placeholder="¿Por qué se modifica esta remisión? Ej: el cliente agregó 2 unidades azules el 2 de septiembre."
+                  className="min-h-[90px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Mínimo {MOTIVO_MIN} caracteres. Queda en la bitácora de la remisión, junto con tu nombre y la fecha.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={cerrarEdicion}>{t.actions.cancel}</Button>
+            <Button
+              onClick={guardarEdicion}
+              disabled={guardandoEdicion||!motivoValido(editMotivo)}
+              className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
+            >
+              {guardandoEdicion?"Guardando…":"Guardar cambios"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

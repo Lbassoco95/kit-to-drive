@@ -57,6 +57,17 @@ confundirla:
 - **Escribir.** Sigue el nivel, sin excepción. El operador captura y edita
   **lo suyo**; el supervisor corrige lo de cualquiera de su área; sólo el
   administrador de área borra.
+- **Corregir y complementar, con motivo.** Hasta 2026-09-02 corregir una
+  remisión ya capturada era en la práctica cosa del administrador: los
+  renglones (`remision_items`) no tenían política de UPDATE y su DELETE pedía el
+  rol legado `admin`. Ahora el operador corrige y complementa **las que
+  capturó** y el supervisor las de todo su área, pero **el motivo es
+  obligatorio**: se guarda en `remisiones_bitacora` (con `CHECK` de 10
+  caracteres en la propia tabla) *antes* de aplicar el cambio, así que una
+  modificación sin justificación no llega a guardarse. El historial se ve en
+  «Ver remisión completa» y la tarjeta marca cuántas veces se modificó. Lo que
+  no cambia: bajar el total de unidades por debajo de los chasis ya asignados
+  sigue exigiendo liberarlos primero en Producción.
 
 En la UI eso es `editaTodas = perms.puedeEditar("remisiones")` en
 `src/pages/Remisiones.tsx`, que gobierna **acciones**, nunca visibilidad. Qué
@@ -78,6 +89,12 @@ sólo un filtro de vista del lado del cliente.
 - `supabase/migrations/20260824000002_comercial_lee_toda_la_bandeja.sql` —
   corrige la lectura de remisiones y motocarros para que sea por área y no por
   nivel (ver la sección anterior).
+- `supabase/migrations/20260902000001_operador_edita_remisiones.sql` — abre
+  UPDATE/DELETE de `remision_items` al operador dueño y al supervisor del área,
+  agrega `remision_items.orden_linea` y crea `remisiones_bitacora` (motivo
+  obligatorio, sin políticas de UPDATE ni DELETE: la bitácora no se corrige).
+- `src/lib/remisionesEdicion.ts` — reconstruye el formulario desde los
+  renglones guardados y calcula el alta/cambio/baja de cada renglón al guardar.
 
 ## Compatibilidad
 
