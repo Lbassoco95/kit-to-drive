@@ -123,7 +123,7 @@ export default function Usuarios() {
     });
     if (rolErr) { toast.error(rolErr.message); setSaving(false); return; }
 
-    toast.success("✓ Usuario actualizado");
+    toast.success(t.usuarios.actualizado);
     setSaving(false);
     setEditTarget(null);
     load();
@@ -132,16 +132,16 @@ export default function Usuarios() {
   const toggleActivo = async (u: Usuario) => {
     const { error } = await supabase.from("profiles").update({ activo: !u.activo }).eq("id", u.id);
     if (error) toast.error(error.message);
-    else { toast.success(u.activo ? "Usuario desactivado" : "Usuario activado"); load(); }
+    else { toast.success(u.activo ? t.usuarios.desactivado : t.usuarios.activado); load(); }
   };
 
   // ── Crear usuario (Edge Function) ──────────────────────────────────
   const createUser = async () => {
     if (!newForm.email || !newForm.password || !newForm.nombre_completo) {
-      toast.error("Email, contraseña y nombre son obligatorios"); return;
+      toast.error(t.usuarios.camposObligatorios); return;
     }
     if (newForm.password.length < 8) {
-      toast.error("La contraseña debe tener al menos 8 caracteres"); return;
+      toast.error(t.usuarios.passwordCorta); return;
     }
     setSaving(true);
     const { data, error } = await supabase.functions.invoke("admin-create-user", {
@@ -156,10 +156,10 @@ export default function Usuarios() {
     });
     setSaving(false);
     if (error || data?.error) {
-      toast.error(data?.error ?? error?.message ?? "Error al crear usuario");
+      toast.error(data?.error ?? error?.message ?? t.usuarios.errorCrear);
       return;
     }
-    toast.success(`✓ Usuario ${newForm.email} creado`);
+    toast.success(t.usuarios.creado(newForm.email));
     setNewOpen(false);
     setNewForm({ ...EMPTY_NEW, area: areasDisponibles[0] ?? "comercial" });
     load();
@@ -176,14 +176,14 @@ export default function Usuarios() {
             <ShieldCheck size={28} className="text-[#1F3864]" />
             {t.usuarios.title}
           </h1>
-          <p className="text-base text-muted-foreground mt-1">{filtered.length} de {rows.length} usuarios</p>
+          <p className="text-base text-muted-foreground mt-1">{t.usuarios.subtitle(filtered.length, rows.length)}</p>
         </div>
         {perms.gestionaUsuarios && (
           <Button
             onClick={() => { setNewForm({ ...EMPTY_NEW, area: areasDisponibles[0] ?? "comercial" }); setNewOpen(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
           >
-            <Plus className="h-5 w-5 mr-2" /> Nuevo usuario
+            <Plus className="h-5 w-5 mr-2" /> {t.usuarios.nuevo}
           </Button>
         )}
       </div>
@@ -191,7 +191,7 @@ export default function Usuarios() {
       {/* Los tres tipos de usuario */}
       <Card className="p-4">
         <div className="flex items-center gap-2 text-sm font-semibold text-[#1F3864] mb-3">
-          <Info size={16} /> Tipos de usuario
+          <Info size={16} /> {t.usuarios.tiposUsuario}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {NIVELES.map(n => (
@@ -204,8 +204,9 @@ export default function Usuarios() {
           ))}
         </div>
         <p className="text-xs text-muted-foreground mt-3">
-          El <strong>área</strong> define qué módulos ve el usuario ({AREAS.map(a => t.areas[a]).join(" · ")}).
-          El <strong>tipo de usuario</strong> define qué puede hacer dentro de ellos.
+          {t.usuarios.ayudaArea1} <strong>{t.usuarios.ayudaArea2}</strong>{" "}
+          {t.usuarios.ayudaArea3(AREAS.map(a => t.areas[a]).join(" · "))}{" "}
+          {t.usuarios.ayudaNivel1} <strong>{t.usuarios.ayudaNivel2}</strong> {t.usuarios.ayudaNivel3}
         </p>
       </Card>
 
@@ -213,19 +214,19 @@ export default function Usuarios() {
       <Card className="p-3 flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input className="pl-10 h-12 text-base" placeholder="Buscar por nombre, email, área…" value={q} onChange={e => setQ(e.target.value)} />
+          <Input className="pl-10 h-12 text-base" placeholder={t.usuarios.buscar} value={q} onChange={e => setQ(e.target.value)} />
         </div>
         <Select value={fArea} onValueChange={v => setFArea(v as Area | "todas")}>
-          <SelectTrigger className="h-12 md:w-56"><SelectValue placeholder="Área" /></SelectTrigger>
+          <SelectTrigger className="h-12 md:w-56"><SelectValue placeholder={t.usuarios.area} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas las áreas</SelectItem>
+            <SelectItem value="todas">{t.usuarios.todasAreas}</SelectItem>
             {AREAS.map(a => <SelectItem key={a} value={a}>{t.areas[a]}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={fNivel} onValueChange={v => setFNivel(v as Nivel | "todos")}>
-          <SelectTrigger className="h-12 md:w-52"><SelectValue placeholder="Tipo" /></SelectTrigger>
+          <SelectTrigger className="h-12 md:w-52"><SelectValue placeholder={t.usuarios.tipo} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos los tipos</SelectItem>
+            <SelectItem value="todos">{t.usuarios.todosTipos}</SelectItem>
             {NIVELES.map(n => <SelectItem key={n} value={n}>{t.niveles[n]}</SelectItem>)}
           </SelectContent>
         </Select>
@@ -240,14 +241,14 @@ export default function Usuarios() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-[#1F3864] text-lg truncate">{u.nombre_completo || "—"}</div>
-                  <div className="text-sm text-muted-foreground truncate">{u.email || <em className="text-xs">Sin email registrado</em>}</div>
+                  <div className="text-sm text-muted-foreground truncate">{u.email || <em className="text-xs">{t.usuarios.sinEmail}</em>}</div>
                 </div>
                 {editable && (
                   <div className="flex gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openEdit(u)} title="Editar">
+                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openEdit(u)} title={t.actions.edit}>
                       <Pencil size={15} />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar" : "Activar"}>
+                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => toggleActivo(u)} title={u.activo ? t.usuarios.desactivar : t.usuarios.activar}>
                       {u.activo ? <UserX size={15} className="text-red-400" /> : <UserCheck size={15} className="text-emerald-500" />}
                     </Button>
                   </div>
@@ -267,7 +268,7 @@ export default function Usuarios() {
                 )}
                 {!u.area && !u.nivel && (
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border text-xs">
-                    Sin asignar
+                    {t.usuarios.sinAsignar}
                   </span>
                 )}
                 {u.codigo_vendedor && (
@@ -277,7 +278,7 @@ export default function Usuarios() {
                 )}
                 {!u.activo && (
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 border text-xs">
-                    Inactivo
+                    {t.usuarios.estadoInactivo}
                   </span>
                 )}
               </div>
@@ -286,7 +287,7 @@ export default function Usuarios() {
         })}
         {!filtered.length && (
           <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">
-            No se encontraron usuarios
+            {t.usuarios.sinResultados}
           </div>
         )}
       </div>
@@ -294,18 +295,18 @@ export default function Usuarios() {
       {/* ── Editar ── */}
       <Dialog open={!!editTarget} onOpenChange={o => { if (!o) setEditTarget(null); }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Editar usuario</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.usuarios.editarTitulo}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Nombre completo</Label>
+              <Label>{t.usuarios.nombreCompleto}</Label>
               <Input value={editForm.nombre_completo} onChange={e => setEditForm({ ...editForm, nombre_completo: e.target.value })} className="h-11" />
             </div>
             <div>
-              <Label>Email</Label>
-              <Input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} className="h-11" placeholder="correo@ejemplo.com" />
+              <Label>{t.usuarios.email}</Label>
+              <Input type="email" value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} className="h-11" placeholder={t.usuarios.emailPlaceholder} />
             </div>
             <div>
-              <Label>Área *</Label>
+              <Label>{t.usuarios.areaReq}</Label>
               <Select value={editForm.area} onValueChange={v => setEditForm({ ...editForm, area: v as Area })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -314,7 +315,7 @@ export default function Usuarios() {
               </Select>
             </div>
             <div>
-              <Label>Tipo de usuario *</Label>
+              <Label>{t.usuarios.tipoUsuarioReq}</Label>
               <Select value={editForm.nivel} onValueChange={v => setEditForm({ ...editForm, nivel: v as Nivel })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -326,7 +327,7 @@ export default function Usuarios() {
             {esComercial(editForm.area) && (
               <div>
                 <Label>{t.usuarios.codigoVendedor}</Label>
-                <Input value={editForm.codigo_vendedor} onChange={e => setEditForm({ ...editForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder="ej. VEN001" />
+                <Input value={editForm.codigo_vendedor} onChange={e => setEditForm({ ...editForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder={t.usuarios.codigoVendedorPlaceholder} />
               </div>
             )}
             <div className="flex items-center gap-3 pt-1">
@@ -337,13 +338,13 @@ export default function Usuarios() {
               >
                 <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${editForm.activo ? "left-5" : "left-0.5"}`} />
               </button>
-              <span className="text-sm font-medium">{editForm.activo ? "Activo" : "Inactivo"}</span>
+              <span className="text-sm font-medium">{editForm.activo ? t.usuarios.estadoActivo : t.usuarios.estadoInactivo}</span>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTarget(null)} className="h-11">Cancelar</Button>
+            <Button variant="outline" onClick={() => setEditTarget(null)} className="h-11">{t.actions.cancel}</Button>
             <Button onClick={saveEdit} disabled={saving} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
-              {saving ? "Guardando…" : "Guardar"}
+              {saving ? t.usuarios.guardando : t.actions.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -352,22 +353,22 @@ export default function Usuarios() {
       {/* ── Nuevo usuario ── */}
       <Dialog open={newOpen} onOpenChange={o => { if (!o) setNewOpen(false); }}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Plus size={18}/> Nuevo usuario</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Plus size={18}/> {t.usuarios.nuevo}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Email *</Label>
-              <Input type="email" value={newForm.email} onChange={e => setNewForm({ ...newForm, email: e.target.value })} className="h-11" placeholder="correo@grupodalzon.com" />
+              <Label>{t.usuarios.emailReq}</Label>
+              <Input type="email" value={newForm.email} onChange={e => setNewForm({ ...newForm, email: e.target.value })} className="h-11" placeholder={t.usuarios.emailNuevoPlaceholder} />
             </div>
             <div>
-              <Label>Contraseña temporal *</Label>
-              <Input type="password" value={newForm.password} onChange={e => setNewForm({ ...newForm, password: e.target.value })} className="h-11" placeholder="Mínimo 8 caracteres" />
+              <Label>{t.usuarios.passwordReq}</Label>
+              <Input type="password" value={newForm.password} onChange={e => setNewForm({ ...newForm, password: e.target.value })} className="h-11" placeholder={t.usuarios.passwordPlaceholder} />
             </div>
             <div>
-              <Label>Nombre completo *</Label>
-              <Input value={newForm.nombre_completo} onChange={e => setNewForm({ ...newForm, nombre_completo: e.target.value })} className="h-11" placeholder="Nombre Apellido" />
+              <Label>{t.usuarios.nombreCompletoReq}</Label>
+              <Input value={newForm.nombre_completo} onChange={e => setNewForm({ ...newForm, nombre_completo: e.target.value })} className="h-11" placeholder={t.usuarios.nombrePlaceholder} />
             </div>
             <div>
-              <Label>Área *</Label>
+              <Label>{t.usuarios.areaReq}</Label>
               <Select value={newForm.area} onValueChange={v => setNewForm({ ...newForm, area: v as Area })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -376,7 +377,7 @@ export default function Usuarios() {
               </Select>
             </div>
             <div>
-              <Label>Tipo de usuario *</Label>
+              <Label>{t.usuarios.tipoUsuarioReq}</Label>
               <Select value={newForm.nivel} onValueChange={v => setNewForm({ ...newForm, nivel: v as Nivel })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -388,17 +389,17 @@ export default function Usuarios() {
             {esComercial(newForm.area) && (
               <div>
                 <Label>{t.usuarios.codigoVendedor}</Label>
-                <Input value={newForm.codigo_vendedor} onChange={e => setNewForm({ ...newForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder="ej. VEN001" />
+                <Input value={newForm.codigo_vendedor} onChange={e => setNewForm({ ...newForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder={t.usuarios.codigoVendedorPlaceholder} />
               </div>
             )}
             <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-md p-2">
-              ⚠ El usuario recibirá acceso inmediato. Comparte la contraseña temporal de forma segura y pídele que la cambie.
+              {t.usuarios.avisoAcceso}
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNewOpen(false)} className="h-11">Cancelar</Button>
+            <Button variant="outline" onClick={() => setNewOpen(false)} className="h-11">{t.actions.cancel}</Button>
             <Button onClick={createUser} disabled={saving} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
-              {saving ? "Creando…" : "Crear usuario"}
+              {saving ? t.usuarios.creando : t.usuarios.crearUsuario}
             </Button>
           </DialogFooter>
         </DialogContent>

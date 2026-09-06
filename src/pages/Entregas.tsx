@@ -82,7 +82,7 @@ export default function Entregas() {
               <div className="p-4 flex items-center gap-3" style={{ background: colorBg }}>
                 <div className="p-2.5 rounded-lg bg-white/70"><Bike size={36} color={colorBike} strokeWidth={2}/></div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs text-muted-foreground">Chasis</div>
+                  <div className="text-xs text-muted-foreground">{t.fields.chasis}</div>
                   <div className="text-xl font-bold text-[#1F3864] truncate">{r.chasis_asignado || `#${r.orden_armado}`}</div>
                 </div>
                 <EstatusBadge estatus={r.estatus_entrega} size="sm" />

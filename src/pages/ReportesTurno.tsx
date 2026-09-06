@@ -283,7 +283,7 @@ export default function ReportesTurno() {
             )}
             {!editing && autoArmados.length === 0 && (
               <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-muted-foreground">
-                Sin motocarros marcados como ARMADO hoy — captura el número manualmente o ve a Producción a marcarlos primero.
+                {tr.sinArmadosHoy}
               </div>
             )}
 
