@@ -9,6 +9,7 @@ import { Upload, FileSpreadsheet, Package, CheckCircle2, AlertTriangle } from "l
 import { toast } from "sonner";
 import { parsePackingListExcel, ParteFromExcel } from "@/lib/excelParser";
 import { explicarError } from "@/lib/dazon";
+import { useLang } from "@/contexts/LangContext";
 
 type Parte = {
   id: string;
@@ -29,6 +30,7 @@ export function ContenedorPartes({
   open: boolean; 
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useLang();
   const [partes, setPartes] = useState<Parte[]>([]);
   const [busy, setBusy] = useState(false);
   const [packingListFile, setPackingListFile] = useState<File | null>(null);
@@ -47,7 +49,7 @@ export function ContenedorPartes({
       .order("descripcion");
 
     if (error) {
-      toast.error("Error al cargar partes");
+      toast.error(t.componentes.contenedorPartes.errorCargar);
       return;
     }
 
@@ -63,7 +65,7 @@ export function ContenedorPartes({
       const partesExcel = await parsePackingListExcel(file);
       
       if (partesExcel.length === 0) {
-        toast.error("No se encontraron partes válidas en el archivo Excel");
+        toast.error(t.componentes.contenedorPartes.sinPartesValidas);
         setBusy(false);
         return;
       }
@@ -77,17 +79,17 @@ export function ContenedorPartes({
         // Igual que en la bandeja: un «function ... does not exist» crudo no
         // dice qué correr. `importar_packing_list` (20260819000009) es de los
         // scripts que no habían llegado a producción.
-        toast.error(explicarError(error, "No se pudo importar el packing list"));
+        toast.error(explicarError(error, t.componentes.contenedorPartes.errorImportar));
         setBusy(false);
         return;
       }
 
-      toast.success(`✓ ${partesExcel.length} parte(s) importada(s)`);
+      toast.success(t.componentes.contenedorPartes.okImportadas(partesExcel.length));
       setPackingListFile(file);
       await cargarPartes();
     } catch (error) {
       console.error("Error parsing packing list:", error);
-      toast.error("Error al procesar el archivo Excel. Verifica el formato.");
+      toast.error(t.componentes.contenedorPartes.errorExcel);
     } finally {
       setBusy(false);
     }
@@ -100,7 +102,7 @@ export function ContenedorPartes({
       .eq("id", parteId);
 
     if (error) {
-      toast.error("Error al actualizar cantidad recibida");
+      toast.error(t.componentes.contenedorPartes.errorActualizar);
       return;
     }
 
@@ -123,22 +125,17 @@ export function ContenedorPartes({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <Package className="h-6 w-6 text-[#065F46]" />
-            Inventario de partes — {folioContenedor}
+            {t.componentes.contenedorPartes.titulo(folioContenedor)}
           </DialogTitle>
-          <DialogDescription>
-            Importa el packing list de partes y marca lo recibido en fábrica
-          </DialogDescription>
+          <DialogDescription>{t.componentes.contenedorPartes.desc}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Upload Section */}
           <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
             <Upload className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-            <p className="text-sm font-medium mb-2">Importar Packing List</p>
-            <p className="text-xs text-muted-foreground mb-3">
-              Sube el archivo Excel con las partes (DESCRIPTIONS, MODEL, QUANTITY). 
-              Se ignorarán las primeras 15 filas con datos del proveedor.
-            </p>
+            <p className="text-sm font-medium mb-2">{t.componentes.contenedorPartes.importar}</p>
+            <p className="text-xs text-muted-foreground mb-3">{t.componentes.contenedorPartes.importarDesc}</p>
             <Input
               type="file"
               accept=".xlsx,.xls"
@@ -146,7 +143,7 @@ export function ContenedorPartes({
               disabled={busy}
               className="max-w-xs mx-auto"
             />
-            {busy && <p className="text-xs text-muted-foreground mt-2">Procesando archivo...</p>}
+            {busy && <p className="text-xs text-muted-foreground mt-2">{t.componentes.contenedorPartes.procesando}</p>}
           </div>
 
           {/* Summary */}
@@ -155,11 +152,9 @@ export function ContenedorPartes({
               {totalDiferencia === 0 ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
               <div>
                 <div className="font-bold text-lg">
-                  {totalDiferencia === 0 ? "Inventario completo" : `Diferencia: ${totalDiferencia > 0 ? '+' : ''}${totalDiferencia}`}
+                  {totalDiferencia === 0 ? t.componentes.contenedorPartes.completo : t.componentes.contenedorPartes.diferencia(totalDiferencia)}
                 </div>
-                <div className="text-sm">
-                  Esperado: {totalEsperado} | Recibido: {totalRecibido}
-                </div>
+                <div className="text-sm">{t.componentes.contenedorPartes.esperadoRecibido(totalEsperado, totalRecibido)}</div>
               </div>
             </div>
           )}
@@ -170,11 +165,11 @@ export function ContenedorPartes({
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Parte</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead className="text-right">Esperada</TableHead>
-                    <TableHead className="text-right">Recibida</TableHead>
-                    <TableHead className="text-right">Diferencia</TableHead>
+                    <TableHead>{t.inventario.col.parte}</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.esperada}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.recibida}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.diferencia}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -205,13 +200,13 @@ export function ContenedorPartes({
           {partes.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
               <FileSpreadsheet className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p>No hay partes registradas. Importa un packing list para comenzar.</p>
+              <p>{t.componentes.contenedorPartes.vacio}</p>
             </div>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t.actions.close}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

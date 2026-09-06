@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Bell, Check, ChevronDown, ThumbsUp, ThumbsDown } from "lucide-react";
 
@@ -78,11 +79,13 @@ function useAvisosPendientes() {
   return { avisos, listo, recargar: cargar };
 }
 
-const fechaCorta = (iso: string) =>
-  new Date(iso).toLocaleString("es-MX", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+const fechaCorta = (iso: string, locale: string) =>
+  new Date(iso).toLocaleString(locale, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
   const { user } = useAuth();
+  const { t, lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
   const { avisos, recargar } = useAvisosPendientes();
   const [abierto, setAbierto]   = useState(true);
   const [ocupado, setOcupado]   = useState<string | null>(null);
@@ -96,7 +99,7 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
     let { error } = await supabase.from("avisos").update({ ...sello, estado: "visto" }).eq("id", id);
     if (error) ({ error } = await supabase.from("avisos").update(sello).eq("id", id));
     setOcupado(null);
-    if (error) return toast.error(`No se pudo marcar como visto: ${error.message}`);
+    if (error) return toast.error(t.componentes.avisos.errorVisto(error.message));
     await recargar();
     onChange?.();
   };
@@ -110,8 +113,8 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
     if (error) return toast.error(error.message);
     const liberadas = Number((data as { liberadas?: number } | null)?.liberadas ?? 0);
     toast.success(aceptar
-      ? `✓ Aceptada — ${liberadas} unidad(es) volvieron al inventario`
-      : "Solicitud rechazada — Comercial ya fue avisado");
+      ? t.componentes.avisos.aceptada(liberadas)
+      : t.componentes.avisos.rechazada);
     setRespuestas(r => ({ ...r, [id]: "" }));
     await recargar();
     onChange?.();
@@ -125,10 +128,10 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-amber-700" />
           <span className="font-semibold text-amber-800 text-sm">
-            {avisos.length} aviso{avisos.length > 1 ? "s" : ""} de otra área
+            {t.componentes.avisos.titulo(avisos.length)}
             {(() => {
               const piden = avisos.filter(a => a.requiere_respuesta).length;
-              return piden ? <> · <strong>{piden} espera{piden > 1 ? "n" : ""} tu respuesta</strong></> : null;
+              return piden ? <> · <strong>{t.componentes.avisos.esperanRespuesta(piden)}</strong></> : null;
             })()}
           </span>
         </div>
@@ -146,14 +149,14 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
                     <div className="font-semibold text-sm text-[#1F3864] break-words">
                       {esSolicitud && (
                         <span className="mr-1.5 px-1.5 py-0.5 rounded bg-[#DBEAFE] text-[#1E40AF] text-[10px] font-bold uppercase tracking-wide align-middle">
-                          Necesita tu respuesta
+                          {t.componentes.avisos.necesitaRespuesta}
                         </span>
                       )}
                       {a.titulo}
                     </div>
                     {a.cuerpo && <div className="text-sm text-slate-700 mt-0.5 break-words">{a.cuerpo}</div>}
                     <div className="text-xs text-muted-foreground mt-1">
-                      {a.nombre_creador || "—"} · {fechaCorta(a.created_at)}
+                      {a.nombre_creador || "—"} · {fechaCorta(a.created_at, locale)}
                     </div>
                   </div>
                   {!esSolicitud && (
@@ -163,7 +166,7 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
                       disabled={ocupado === a.id}
                       className="h-9 shrink-0 border-amber-300 text-amber-800 hover:bg-amber-100"
                     >
-                      <Check className="h-4 w-4 mr-1" /> {ocupado === a.id ? "…" : "Visto"}
+                      <Check className="h-4 w-4 mr-1" /> {ocupado === a.id ? "…" : t.componentes.avisos.visto}
                     </Button>
                   )}
                 </div>
@@ -173,7 +176,7 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
                     <Textarea
                       value={respuestas[a.id] ?? ""}
                       onChange={e => setRespuestas(r => ({ ...r, [a.id]: e.target.value }))}
-                      placeholder="Respuesta para Comercial (opcional)"
+                      placeholder={t.componentes.avisos.respuestaPlaceholder}
                       className="min-h-[60px] text-sm"
                     />
                     <div className="flex gap-2">
@@ -181,13 +184,13 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
                         size="sm" onClick={() => contestar(a.id, true)} disabled={ocupado === a.id}
                         className="h-9 flex-1 bg-emerald-700 hover:bg-emerald-800"
                       >
-                        <ThumbsUp className="h-4 w-4 mr-1" /> Aceptar y liberar
+                        <ThumbsUp className="h-4 w-4 mr-1" /> {t.componentes.avisos.aceptar}
                       </Button>
                       <Button
                         size="sm" variant="outline" onClick={() => contestar(a.id, false)} disabled={ocupado === a.id}
                         className="h-9 flex-1 border-red-200 text-red-600 hover:bg-red-50"
                       >
-                        <ThumbsDown className="h-4 w-4 mr-1" /> No se puede
+                        <ThumbsDown className="h-4 w-4 mr-1" /> {t.componentes.avisos.rechazar}
                       </Button>
                     </div>
                   </div>
@@ -204,6 +207,7 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
 /** Contador compacto para el tablero. No se dibuja si no hay nada pendiente. */
 export function ResumenAvisos({ onClick }: { onClick?: () => void }) {
   const { avisos } = useAvisosPendientes();
+  const { t } = useLang();
   if (!avisos.length) return null;
 
   return (
@@ -215,12 +219,12 @@ export function ResumenAvisos({ onClick }: { onClick?: () => void }) {
       <div className="flex items-center gap-2">
         <Bell className="h-4 w-4 text-amber-700" />
         <span className="font-semibold text-amber-800 text-sm">
-          {avisos.length} aviso{avisos.length > 1 ? "s" : ""} sin ver
+          {t.componentes.avisos.sinVer(avisos.length)}
         </span>
       </div>
       <div className="text-xs text-amber-900/80 mt-1 break-words">
         {avisos[0].titulo}
-        {avisos.length > 1 && <> · y {avisos.length - 1} más</>}
+        {avisos.length > 1 && <>{t.componentes.avisos.yMas(avisos.length - 1)}</>}
       </div>
     </button>
   );
