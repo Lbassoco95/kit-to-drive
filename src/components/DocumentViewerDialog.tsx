@@ -35,7 +35,7 @@ export function DocumentViewerDialog({ path, open, onOpenChange }: DocumentViewe
       setUrl(data.signedUrl);
     });
     return () => { cancelled = true; };
-  }, [open, path]);
+  }, [open, path, t.componentes.visor.errorCargar]);
 
   const download = async () => {
     if (!path) return;

@@ -21,7 +21,7 @@ export default function Configuracion() {
       setCfg(data);
       setCargando(false);
     });
-  }, []);
+  }, [t.configuracion.errorLeer]);
 
   const save = async () => {
     const { error } = await supabase.from("config_general").update(cfg).eq("id", 1);

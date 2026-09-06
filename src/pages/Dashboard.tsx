@@ -118,7 +118,7 @@ export default function Dashboard() {
     }
     fetchData();
     return () => { cancelled = true; };
-  }, [user, retry]);
+  }, [user, retry, t.dashboard.errorInesperado]);
 
   // El tablero general es de Dirección; las demás áreas entran a su módulo.
   useEffect(() => {
@@ -210,7 +210,7 @@ export default function Dashboard() {
       const count = motos.filter(m => m.fecha_real_armado === iso).length;
       const isFuture = iso > today;
       const status = isFuture ? "future" : count >= CAPACIDAD ? "ok" : count > 0 ? "partial" : "miss";
-      return { iso, label: ["L","M","M","J","V"][i], count, status };
+      return { iso, label: t.dashboard.diasSemana[i], count, status };
     });
   })();
 
@@ -274,7 +274,7 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-2 mt-5">
                 {weekDays.map(d => (
-                  <div key={d.iso} className="flex-1 text-center" title={`${d.iso}: ${d.count} armados`}>
+                  <div key={d.iso} className="flex-1 text-center" title={t.dashboard.armadosDia(d.iso, d.count)}>
                     <div className="text-xs text-muted-foreground mb-1 font-medium">{d.label}</div>
                     <div
                       className="h-12 rounded-md flex items-center justify-center text-sm font-bold border-2"
@@ -540,7 +540,7 @@ function ResumenEjecutivo() {
     };
     cargar();
     return () => { mounted = false; };
-  }, []);
+  }, [e.sinNombre]);
 
   if (loading) {
     return <div className="text-center py-10 text-muted-foreground">{e.cargando}</div>;
