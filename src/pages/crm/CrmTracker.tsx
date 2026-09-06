@@ -84,7 +84,7 @@ export default function CrmTracker() {
   if (!perms.puedeVer("crmEquipo")) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">No tienes permiso para ver esta página</p>
+        <p className="text-muted-foreground">{t.crm.tracker.sinPermiso}</p>
       </div>
     );
   }
@@ -92,12 +92,12 @@ export default function CrmTracker() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#1F3864]">Tracker de Vendedores</h1>
-        <p className="text-muted-foreground mt-1">Seguimiento de rendimiento y limitantes por vendedor</p>
+        <h1 className="text-2xl font-bold text-[#1F3864]">{t.crm.tracker.title}</h1>
+        <p className="text-muted-foreground mt-1">{t.crm.tracker.subtitle}</p>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Cargando datos...</div>
+        <div className="text-center py-12 text-muted-foreground">{t.crm.tracker.cargando}</div>
       ) : (
         <>
           {/* Sellers Table */}
@@ -106,13 +106,13 @@ export default function CrmTracker() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="text-left p-4 font-medium">Vendedor</th>
-                    <th className="text-right p-4 font-medium">Opors activas</th>
-                    <th className="text-right p-4 font-medium">Valor pipeline</th>
-                    <th className="text-right p-4 font-medium">Vencidas</th>
-                    <th className="text-right p-4 font-medium">Ganadas mes</th>
-                    <th className="text-right p-4 font-medium">Perdidas mes</th>
-                    <th className="text-right p-4 font-medium">Con limitantes</th>
+                    <th className="text-left p-4 font-medium">{t.crm.tracker.vendedor}</th>
+                    <th className="text-right p-4 font-medium">{t.crm.tracker.oporsActivas}</th>
+                    <th className="text-right p-4 font-medium">{t.crm.tracker.valorPipeline}</th>
+                    <th className="text-right p-4 font-medium">{t.crm.tracker.vencidas}</th>
+                    <th className="text-right p-4 font-medium">{t.crm.tracker.ganadasMes}</th>
+                    <th className="text-right p-4 font-medium">{t.crm.tracker.perdidasMes}</th>
+                    <th className="text-right p-4 font-medium">{t.crm.tracker.conLimitantes}</th>
                     <th className="p-4"></th>
                   </tr>
                 </thead>
@@ -158,9 +158,9 @@ export default function CrmTracker() {
                           <tr className="bg-muted/20">
                             <td colSpan={8} className="p-4">
                               <div className="space-y-3">
-                                <h4 className="font-medium text-sm text-muted-foreground">Oportunidades activas ({sellerOps.length})</h4>
+                                <h4 className="font-medium text-sm text-muted-foreground">{t.crm.tracker.oportunidadesActivas(sellerOps.length)}</h4>
                                 {sellerOps.length === 0 ? (
-                                  <p className="text-sm text-muted-foreground">Sin oportunidades activas</p>
+                                  <p className="text-sm text-muted-foreground">{t.crm.tracker.sinOportunidadesActivas}</p>
                                 ) : (
                                   <div className="grid gap-2">
                                     {sellerOps.map((op) => {
@@ -172,33 +172,33 @@ export default function CrmTracker() {
                                           <div className="flex items-start justify-between gap-2">
                                             <div className="flex-1 min-w-0">
                                               <div className="font-medium text-sm truncate">
-                                                {cliente?.nombre_comercial || "Sin cliente"} ({cliente?.codigo_erp || "N/A"})
+                                                {cliente?.nombre_comercial || t.crm.sinCliente} ({cliente?.codigo_erp || "N/A"})
                                               </div>
                                               <div className="text-xs text-muted-foreground mt-1">
-                                                {op.tipo_venta} · {op.etapa}
+                                                {t.crm.tipoVenta(op.tipo_venta)} · {t.crm.etapa(op.etapa)}
                                               </div>
                                               <div className="flex items-center gap-3 mt-2 text-xs">
                                                 <span>${op.monto_estimado?.toLocaleString() || "0"}</span>
-                                                <span>{op.cantidad_estimada || 0} unid</span>
+                                                <span>{op.cantidad_estimada || 0} {t.crm.tracker.unid}</span>
                                                 <span className={isVencida ? "text-red-600 font-medium" : ""}>
-                                                  {op.fecha_cierre_estimada ? new Date(op.fecha_cierre_estimada).toLocaleDateString() : "Sin fecha"}
+                                                  {op.fecha_cierre_estimada ? new Date(op.fecha_cierre_estimada).toLocaleDateString() : t.crm.sinFecha}
                                                 </span>
                                               </div>
                                             </div>
                                             <div className="flex flex-wrap gap-1">
                                               {op.limitante_descuento && (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs">
-                                                  <AlertTriangle className="h-3 w-3" /> Descuento
+                                                  <AlertTriangle className="h-3 w-3" /> {t.crm.limitantes.descuento}
                                                 </span>
                                               )}
                                               {op.limitante_flete && (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-xs">
-                                                  <AlertTriangle className="h-3 w-3" /> Flete
+                                                  <AlertTriangle className="h-3 w-3" /> {t.crm.limitantes.flete}
                                                 </span>
                                               )}
                                               {op.limitante_precio && (
                                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs">
-                                                  <AlertTriangle className="h-3 w-3" /> Precio
+                                                  <AlertTriangle className="h-3 w-3" /> {t.crm.limitantes.precio}
                                                 </span>
                                               )}
                                             </div>
@@ -224,28 +224,28 @@ export default function CrmTracker() {
           <Card className="p-5">
             <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-orange-500" />
-              Limitantes activas
+              {t.crm.limitantes.title}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="text-sm text-red-600 font-medium">Descuento</div>
+                <div className="text-sm text-red-600 font-medium">{t.crm.limitantes.descuento}</div>
                 <div className="text-2xl font-bold text-red-700 mt-1">{limitantesSummary.descuento}</div>
                 <div className="text-xs text-red-500 mt-1">
-                  Vendedores: {sellersWithDescuento.length > 0 ? sellersWithDescuento.join(", ") : "Ninguno"}
+                  {t.crm.limitantes.vendedores}: {sellersWithDescuento.length > 0 ? sellersWithDescuento.join(", ") : t.crm.limitantes.ninguno}
                 </div>
               </div>
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <div className="text-sm text-orange-600 font-medium">Flete</div>
+                <div className="text-sm text-orange-600 font-medium">{t.crm.limitantes.flete}</div>
                 <div className="text-2xl font-bold text-orange-700 mt-1">{limitantesSummary.flete}</div>
                 <div className="text-xs text-orange-500 mt-1">
-                  Vendedores: {sellersWithFlete.length > 0 ? sellersWithFlete.join(", ") : "Ninguno"}
+                  {t.crm.limitantes.vendedores}: {sellersWithFlete.length > 0 ? sellersWithFlete.join(", ") : t.crm.limitantes.ninguno}
                 </div>
               </div>
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="text-sm text-red-600 font-medium">Precio</div>
+                <div className="text-sm text-red-600 font-medium">{t.crm.limitantes.precio}</div>
                 <div className="text-2xl font-bold text-red-700 mt-1">{limitantesSummary.precio}</div>
                 <div className="text-xs text-red-500 mt-1">
-                  Vendedores: {sellersWithPrecio.length > 0 ? sellersWithPrecio.join(", ") : "Ninguno"}
+                  {t.crm.limitantes.vendedores}: {sellersWithPrecio.length > 0 ? sellersWithPrecio.join(", ") : t.crm.limitantes.ninguno}
                 </div>
               </div>
             </div>

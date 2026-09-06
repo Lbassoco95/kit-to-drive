@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,12 +18,6 @@ import {
 } from "lucide-react";
 import { fdb } from "@/lib/finanzasDb";
 import { MONEDAS, fmtMoneda, type Proveedor } from "@/lib/finanzas";
-
-const CATEGORIAS = [
-  "Partes y refacciones", "Fletes y transporte", "Aduana y comercio exterior",
-  "Servicios profesionales", "Servicios (luz, agua, renta)", "Mantenimiento",
-  "Papelería y oficina", "Impuestos y gobierno", "Otro",
-];
 
 interface FormProveedor {
   codigo: string;
@@ -51,6 +46,8 @@ const FORM_VACIO: FormProveedor = {
 
 export default function Proveedores() {
   const { user, role } = useAuth();
+  const { t, lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
   const navigate = useNavigate();
 
   const [rows, setRows] = useState<Proveedor[]>([]);
@@ -146,14 +143,14 @@ export default function Proveedores() {
   });
 
   const validar = () => {
-    if (!form.nombre_comercial.trim()) { toast.error("El nombre del proveedor es obligatorio"); return false; }
+    if (!form.nombre_comercial.trim()) { toast.error(t.proveedores.errores.nombre); return false; }
     const rfc = form.rfc.trim();
     if (rfc && rfc.length !== 12 && rfc.length !== 13) {
-      toast.error("El RFC debe tener 12 o 13 caracteres"); return false;
+      toast.error(t.proveedores.errores.rfc); return false;
     }
     const clabe = form.clabe.trim();
     if (clabe && !/^\d{18}$/.test(clabe)) {
-      toast.error("La CLABE debe tener 18 dígitos"); return false;
+      toast.error(t.proveedores.errores.clabe); return false;
     }
     return true;
   };
@@ -164,7 +161,7 @@ export default function Proveedores() {
     const { error } = await fdb.from("proveedores").insert({ ...aPayload(), created_by: user?.id });
     setGuardando(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("✓ Proveedor dado de alta");
+    toast.success(t.proveedores.ok.alta);
     setAltaAbierta(false);
     cargar();
   };
@@ -175,7 +172,7 @@ export default function Proveedores() {
     const { error } = await fdb.from("proveedores").update(aPayload()).eq("id", editando.id);
     setGuardando(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("✓ Proveedor actualizado");
+    toast.success(t.proveedores.ok.actualizado);
     setEditando(null);
     cargar();
   };
@@ -183,7 +180,7 @@ export default function Proveedores() {
   const alternarArchivo = async (p: Proveedor) => {
     const { error } = await fdb.from("proveedores").update({ activo: !p.activo }).eq("id", p.id);
     if (error) { toast.error(error.message); return; }
-    toast.success(p.activo ? "Proveedor archivado" : "Proveedor reactivado");
+    toast.success(p.activo ? t.proveedores.ok.archivado : t.proveedores.ok.reactivado);
     cargar();
   };
 
@@ -191,10 +188,10 @@ export default function Proveedores() {
     if (!borrarTarget) return;
     const { error } = await fdb.from("proveedores").delete().eq("id", borrarTarget.id);
     if (error) {
-      toast.error("No se pudo eliminar; probablemente tiene pagos ligados. Archívalo en su lugar.");
+      toast.error(t.proveedores.errores.noEliminable);
       return;
     }
-    toast.success("Proveedor eliminado");
+    toast.success(t.proveedores.ok.eliminado);
     setBorrarTarget(null);
     cargar();
   };
@@ -204,16 +201,16 @@ export default function Proveedores() {
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <Label>Nombre comercial *</Label>
+          <Label>{t.proveedores.campos.nombreComercial}</Label>
           <Input
             className="h-11"
             value={form.nombre_comercial}
             onChange={e => setForm({ ...form, nombre_comercial: e.target.value })}
-            placeholder="Como le dicen en la operación"
+            placeholder={t.proveedores.campos.nombreComercialPlaceholder}
           />
         </div>
         <div>
-          <Label>Código interno</Label>
+          <Label>{t.proveedores.campos.codigoInterno}</Label>
           <Input
             className="h-11"
             value={form.codigo}
@@ -225,7 +222,7 @@ export default function Proveedores() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <Label>Razón social</Label>
+          <Label>{t.proveedores.campos.razonSocial}</Label>
           <Input
             className="h-11"
             value={form.razon_social}
@@ -233,28 +230,28 @@ export default function Proveedores() {
           />
         </div>
         <div>
-          <Label>RFC</Label>
+          <Label>{t.proveedores.campos.rfc}</Label>
           <Input
             className="h-11"
             value={form.rfc}
             onChange={e => setForm({ ...form, rfc: e.target.value.toUpperCase() })}
-            placeholder="12 o 13 caracteres"
+            placeholder={t.proveedores.campos.rfcPlaceholder}
           />
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <Label>Categoría</Label>
+          <Label>{t.proveedores.campos.categoria}</Label>
           <Select value={form.categoria || undefined} onValueChange={v => setForm({ ...form, categoria: v })}>
-            <SelectTrigger className="h-11"><SelectValue placeholder="Selecciona…" /></SelectTrigger>
+            <SelectTrigger className="h-11"><SelectValue placeholder={t.proveedores.campos.selecciona} /></SelectTrigger>
             <SelectContent>
-              {CATEGORIAS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {t.proveedores.categorias.map(c => <SelectItem key={c} value={c}>{t.finanzas.categoriaProveedor(c)}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label>Contacto</Label>
+          <Label>{t.proveedores.campos.contacto}</Label>
           <Input
             className="h-11"
             value={form.nombre_contacto}
@@ -265,44 +262,44 @@ export default function Proveedores() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <Label>Teléfono</Label>
+          <Label>{t.proveedores.campos.telefono}</Label>
           <Input className="h-11" value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })} />
         </div>
         <div>
-          <Label>Correo</Label>
+          <Label>{t.proveedores.campos.correo}</Label>
           <Input className="h-11" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
         </div>
       </div>
 
       <div>
-        <Label>Dirección</Label>
+        <Label>{t.proveedores.campos.direccion}</Label>
         <Input className="h-11" value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} />
       </div>
 
       <div className="rounded-lg border p-3 space-y-3">
-        <p className="text-sm font-semibold text-[#1F3864]">Datos para pagarle</p>
+        <p className="text-sm font-semibold text-[#1F3864]">{t.proveedores.campos.datosPago}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>Banco</Label>
+            <Label>{t.proveedores.campos.banco}</Label>
             <Input className="h-11" value={form.banco} onChange={e => setForm({ ...form, banco: e.target.value })} />
           </div>
           <div>
-            <Label>CLABE</Label>
+            <Label>{t.proveedores.campos.clabe}</Label>
             <Input
               className="h-11"
               value={form.clabe}
               onChange={e => setForm({ ...form, clabe: e.target.value.replace(/\D/g, "") })}
-              placeholder="18 dígitos"
+              placeholder={t.proveedores.campos.clabePlaceholder}
               maxLength={18}
             />
           </div>
           <div>
-            <Label>Cuenta / tarjeta</Label>
+            <Label>{t.proveedores.campos.cuentaTarjeta}</Label>
             <Input className="h-11" value={form.cuenta_bancaria} onChange={e => setForm({ ...form, cuenta_bancaria: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Moneda</Label>
+              <Label>{t.proveedores.campos.moneda}</Label>
               <Select value={form.moneda_preferida} onValueChange={v => setForm({ ...form, moneda_preferida: v })}>
                 <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -311,7 +308,7 @@ export default function Proveedores() {
               </Select>
             </div>
             <div>
-              <Label>Días crédito</Label>
+              <Label>{t.proveedores.campos.diasCredito}</Label>
               <Input
                 className="h-11"
                 type="number"
@@ -325,7 +322,7 @@ export default function Proveedores() {
       </div>
 
       <div>
-        <Label>Notas</Label>
+        <Label>{t.proveedores.campos.notas}</Label>
         <Textarea value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2} />
       </div>
     </div>
@@ -334,22 +331,20 @@ export default function Proveedores() {
   return (
     <div className="space-y-5">
       <Button variant="ghost" className="-ml-2 h-9" onClick={() => navigate("/finanzas")}>
-        <ArrowLeft size={16} className="mr-2" /> Control Financiero
+        <ArrowLeft size={16} className="mr-2" /> {t.finanzas.title}
       </Button>
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2">
             <Building2 size={28} className="text-[#1F3864]" />
-            Proveedores
+            {t.proveedores.title}
           </h1>
-          <p className="mt-1 text-base text-muted-foreground">
-            {filtrados.length} {verArchivados ? "archivados" : "activos"}
-          </p>
+          <p className="mt-1 text-base text-muted-foreground">{t.proveedores.subtitle(filtrados.length, verArchivados)}</p>
         </div>
         {puedeEditar && (
           <Button onClick={abrirAlta} className="h-12 bg-[#1F3864] px-5 text-base hover:bg-[#162a4d]">
-            <Plus className="mr-2 h-5 w-5" /> Nuevo proveedor
+            <Plus className="mr-2 h-5 w-5" /> {t.proveedores.nuevo}
           </Button>
         )}
       </div>
@@ -362,7 +357,7 @@ export default function Proveedores() {
               !verArchivados ? "bg-[#1F3864] text-white" : "bg-[#2E75B6]/10 text-[#1F3864]"
             }`}
           >
-            Activos
+            {t.proveedores.activos}
           </button>
           <button
             onClick={() => setVerArchivados(true)}
@@ -370,14 +365,14 @@ export default function Proveedores() {
               verArchivados ? "bg-[#1F3864] text-white" : "bg-[#2E75B6]/10 text-[#1F3864]"
             }`}
           >
-            Archivados
+            {t.proveedores.archivados}
           </button>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
           <Input
             className="h-12 pl-10 text-base"
-            placeholder="Buscar por nombre, RFC, código, contacto…"
+            placeholder={t.proveedores.buscar}
             value={q}
             onChange={e => setQ(e.target.value)}
           />
@@ -385,10 +380,10 @@ export default function Proveedores() {
       </Card>
 
       {cargando ? (
-        <div className="py-16 text-center text-muted-foreground">Cargando…</div>
+        <div className="py-16 text-center text-muted-foreground">{t.finanzas.cargando}</div>
       ) : filtrados.length === 0 ? (
         <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
-          {rows.length === 0 ? "Aún no hay proveedores. Da de alta el primero." : "Sin resultados."}
+          {rows.length === 0 ? t.proveedores.vacio : t.proveedores.sinResultados}
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -401,12 +396,12 @@ export default function Proveedores() {
                     {p.codigo && <Badge variant="outline" className="text-[11px]">{p.codigo}</Badge>}
                     {p.categoria && (
                       <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[11px] text-blue-700">
-                        {p.categoria}
+                        {t.finanzas.categoriaProveedor(p.categoria)}
                       </Badge>
                     )}
                     {!p.activo && (
                       <Badge variant="outline" className="border-slate-200 bg-slate-50 text-[11px] text-slate-500">
-                        archivado
+                        {t.proveedores.archivado}
                       </Badge>
                     )}
                   </div>
@@ -420,20 +415,20 @@ export default function Proveedores() {
                     {p.telefono && <span>· {p.telefono}</span>}
                     {p.email && <span>· {p.email}</span>}
                     {p.banco && <span>· {p.banco}</span>}
-                    {p.dias_credito > 0 && <span>· {p.dias_credito} días crédito</span>}
+                    {p.dias_credito > 0 && <span>· {t.proveedores.diasCreditoCorto(p.dias_credito)}</span>}
                   </div>
                 </div>
 
                 {esFinanzas && gastoPorProveedor[p.id] != null && (
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Pagado</p>
-                    <p className="font-bold text-[#1F3864]">{fmtMoneda(gastoPorProveedor[p.id])}</p>
+                    <p className="text-xs text-muted-foreground">{t.proveedores.pagado}</p>
+                    <p className="font-bold text-[#1F3864]">{fmtMoneda(gastoPorProveedor[p.id], "MXN", locale)}</p>
                   </div>
                 )}
 
                 <div className="flex shrink-0 gap-1 self-start">
                   {puedeEditar && (
-                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => abrirEdicion(p)} title="Editar">
+                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => abrirEdicion(p)} title={t.actions.edit}>
                       <Pencil size={15} />
                     </Button>
                   )}
@@ -441,13 +436,13 @@ export default function Proveedores() {
                     <Button
                       size="icon" variant="ghost" className="h-9 w-9"
                       onClick={() => alternarArchivo(p)}
-                      title={p.activo ? "Archivar" : "Reactivar"}
+                      title={p.activo ? t.proveedores.archivar : t.proveedores.reactivar}
                     >
                       {p.activo ? <Archive size={15} /> : <ArchiveRestore size={15} className="text-emerald-600" />}
                     </Button>
                   )}
                   {puedeBorrar && (
-                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setBorrarTarget(p)} title="Eliminar">
+                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => setBorrarTarget(p)} title={t.actions.delete}>
                       <Trash2 size={15} className="text-red-400" />
                     </Button>
                   )}
@@ -462,17 +457,17 @@ export default function Proveedores() {
       <Dialog open={altaAbierta} onOpenChange={o => { if (!o) setAltaAbierta(false); }}>
         <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Plus size={18} /> Nuevo proveedor</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Plus size={18} /> {t.proveedores.nuevo}</DialogTitle>
           </DialogHeader>
           {camposForm}
           <DialogFooter>
-            <Button variant="outline" className="h-11" onClick={() => setAltaAbierta(false)}>Cancelar</Button>
+            <Button variant="outline" className="h-11" onClick={() => setAltaAbierta(false)}>{t.actions.cancel}</Button>
             <Button
               className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
               onClick={guardarAlta}
               disabled={guardando}
             >
-              {guardando ? "Guardando…" : "Guardar"}
+              {guardando ? t.finanzas.guardando : t.actions.save}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -481,16 +476,16 @@ export default function Proveedores() {
       {/* Edición */}
       <Dialog open={!!editando} onOpenChange={o => { if (!o) setEditando(null); }}>
         <DialogContent className="max-h-[92vh] max-w-2xl overflow-y-auto">
-          <DialogHeader><DialogTitle>Editar proveedor</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.proveedores.editar}</DialogTitle></DialogHeader>
           {camposForm}
           <DialogFooter>
-            <Button variant="outline" className="h-11" onClick={() => setEditando(null)}>Cancelar</Button>
+            <Button variant="outline" className="h-11" onClick={() => setEditando(null)}>{t.actions.cancel}</Button>
             <Button
               className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
               onClick={guardarEdicion}
               disabled={guardando}
             >
-              {guardando ? "Guardando…" : "Guardar cambios"}
+              {guardando ? t.finanzas.guardando : t.finanzas.guardarCambios}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -499,14 +494,13 @@ export default function Proveedores() {
       {/* Eliminar */}
       <Dialog open={!!borrarTarget} onOpenChange={o => { if (!o) setBorrarTarget(null); }}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>¿Eliminar proveedor?</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.proveedores.eliminarTitulo}</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Se eliminará <strong>{borrarTarget?.nombre_comercial}</strong>. Si ya tiene pagos
-            registrados conviene archivarlo en lugar de borrarlo, para no perder el histórico.
+            {t.proveedores.eliminarDesc1} <strong>{borrarTarget?.nombre_comercial}</strong>{t.proveedores.eliminarDesc2}
           </p>
           <DialogFooter>
-            <Button variant="outline" className="h-11" onClick={() => setBorrarTarget(null)}>Volver</Button>
-            <Button variant="destructive" className="h-11" onClick={borrar}>Eliminar</Button>
+            <Button variant="outline" className="h-11" onClick={() => setBorrarTarget(null)}>{t.finanzas.volver}</Button>
+            <Button variant="destructive" className="h-11" onClick={borrar}>{t.actions.delete}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

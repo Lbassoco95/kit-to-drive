@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { FileText, Upload, ExternalLink, Trash2, Paperclip } from "lucide-react";
 import { fdb } from "@/lib/finanzasDb";
+import { useLang } from "@/contexts/LangContext";
 import {
   BUCKET_FINANZAS, MIME_ADJUNTOS, TIPOS_ADJUNTO, rutaAdjunto,
   type Adjunto, type AdjuntoTipo,
@@ -22,9 +23,6 @@ interface Props {
   onCambio?: () => void;
 }
 
-const etiquetaTipo = (t: AdjuntoTipo) =>
-  TIPOS_ADJUNTO.find(x => x.value === t)?.label ?? t;
-
 const fmtPeso = (bytes: number | null) => {
   if (!bytes) return "";
   if (bytes < 1024) return `${bytes} B`;
@@ -35,6 +33,9 @@ const fmtPeso = (bytes: number | null) => {
 export default function ExpedienteAdjuntos({
   movimientoId, usuarioId, puedeSubir = true, puedeBorrar = true, onCambio,
 }: Props) {
+  const { t, lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
+  const etiquetaTipo = (tipo: AdjuntoTipo) => t.finanzas.tipoAdjunto(tipo);
   const [adjuntos, setAdjuntos] = useState<Adjunto[]>([]);
   const [cargando, setCargando] = useState(true);
   const [subiendo, setSubiendo] = useState(false);
@@ -64,7 +65,7 @@ export default function ExpedienteAdjuntos({
       .upload(path, file, { upsert: false, contentType: file.type });
     if (errUp) {
       setSubiendo(false);
-      toast.error("No se pudo subir el archivo: " + errUp.message);
+      toast.error(t.finanzas.expediente.errorSubir + errUp.message);
       return;
     }
 
@@ -83,11 +84,11 @@ export default function ExpedienteAdjuntos({
     if (errIns) {
       // El archivo ya subió pero el registro falló: se limpia para no dejar basura
       await fdb.storage.from(BUCKET_FINANZAS).remove([path]);
-      toast.error("No se pudo registrar el documento: " + errIns.message);
+      toast.error(t.finanzas.expediente.errorRegistrar + errIns.message);
       return;
     }
 
-    toast.success(`✓ ${etiquetaTipo(tipoDoc)} agregada al expediente`);
+    toast.success(t.finanzas.expediente.agregada(etiquetaTipo(tipoDoc)));
     setNotas("");
     if (fileRef.current) fileRef.current.value = "";
     cargar();
@@ -98,7 +99,7 @@ export default function ExpedienteAdjuntos({
     const { data, error } = await fdb.storage
       .from(BUCKET_FINANZAS)
       .createSignedUrl(a.storage_path, 3600);
-    if (error || !data?.signedUrl) { toast.error("No se pudo abrir el documento"); return; }
+    if (error || !data?.signedUrl) { toast.error(t.finanzas.expediente.errorAbrir); return; }
     window.open(data.signedUrl, "_blank");
   };
 
@@ -106,7 +107,7 @@ export default function ExpedienteAdjuntos({
     const { error } = await fdb.from("movimiento_adjuntos").delete().eq("id", a.id);
     if (error) { toast.error(error.message); return; }
     await fdb.storage.from(BUCKET_FINANZAS).remove([a.storage_path]);
-    toast.success("Documento eliminado del expediente");
+    toast.success(t.finanzas.expediente.eliminado);
     cargar();
     onCambio?.();
   };
@@ -115,9 +116,9 @@ export default function ExpedienteAdjuntos({
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <Paperclip size={16} className="text-[#1F3864]" />
-        <h3 className="font-bold text-[#1F3864]">Expediente</h3>
+        <h3 className="font-bold text-[#1F3864]">{t.finanzas.expediente.title}</h3>
         <Badge variant="outline" className="text-xs">
-          {adjuntos.length} {adjuntos.length === 1 ? "documento" : "documentos"}
+          {adjuntos.length} {adjuntos.length === 1 ? t.finanzas.expediente.documento : t.finanzas.expediente.documentos}
         </Badge>
       </div>
 
@@ -125,23 +126,23 @@ export default function ExpedienteAdjuntos({
         <div className="rounded-lg border bg-slate-50/60 p-3 space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <Label className="text-xs">Tipo de documento</Label>
+              <Label className="text-xs">{t.finanzas.expediente.tipoDocumento}</Label>
               <Select value={tipoDoc} onValueChange={v => setTipoDoc(v as AdjuntoTipo)}>
                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {TIPOS_ADJUNTO.map(t => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  {TIPOS_ADJUNTO.map(tipo => (
+                    <SelectItem key={tipo.value} value={tipo.value}>{etiquetaTipo(tipo.value)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Nota (opcional)</Label>
+              <Label className="text-xs">{t.finanzas.expediente.nota}</Label>
               <Input
                 className="h-10"
                 value={notas}
                 onChange={e => setNotas(e.target.value)}
-                placeholder="ej. factura parcial 1 de 2"
+                placeholder={t.finanzas.expediente.notaPlaceholder}
               />
             </div>
           </div>
@@ -152,10 +153,10 @@ export default function ExpedienteAdjuntos({
           >
             <Upload size={22} className="mx-auto mb-1 opacity-50" />
             <p className="text-sm font-medium">
-              {subiendo ? "Subiendo…" : "Toca para agregar un archivo al expediente"}
+              {subiendo ? t.finanzas.expediente.subiendo : t.finanzas.expediente.tocaParaAgregar}
             </p>
             <p className="text-xs mt-0.5 text-muted-foreground">
-              PDF, XML, JPG, PNG — máx. 20 MB
+              {t.finanzas.expediente.formatos}
             </p>
           </div>
           <input
@@ -170,10 +171,10 @@ export default function ExpedienteAdjuntos({
       )}
 
       {cargando ? (
-        <div className="text-sm text-muted-foreground py-3">Cargando expediente…</div>
+        <div className="text-sm text-muted-foreground py-3">{t.finanzas.expediente.cargando}</div>
       ) : adjuntos.length === 0 ? (
         <div className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
-          Todavía no hay documentos en este expediente.
+          {t.finanzas.expediente.vacio}
         </div>
       ) : (
         <div className="divide-y rounded-lg border">
@@ -188,18 +189,18 @@ export default function ExpedienteAdjuntos({
                   </Badge>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {new Date(a.created_at).toLocaleDateString("es-MX", {
+                  {new Date(a.created_at).toLocaleDateString(locale, {
                     year: "numeric", month: "short", day: "numeric",
                   })}
                   {a.tamano_bytes ? ` · ${fmtPeso(a.tamano_bytes)}` : ""}
                   {a.notas ? ` · ${a.notas}` : ""}
                 </div>
               </div>
-              <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => abrir(a)} title="Abrir">
+              <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => abrir(a)} title={t.finanzas.expediente.abrir}>
                 <ExternalLink size={15} className="text-blue-600" />
               </Button>
               {puedeBorrar && (
-                <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => borrar(a)} title="Quitar del expediente">
+                <Button size="icon" variant="ghost" className="h-9 w-9 shrink-0" onClick={() => borrar(a)} title={t.finanzas.expediente.quitar}>
                   <Trash2 size={15} className="text-red-400" />
                 </Button>
               )}

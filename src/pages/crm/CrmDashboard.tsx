@@ -76,7 +76,7 @@ export default function CrmDashboard() {
 
   const kpiCards = [
     {
-      title: "Total oportunidades",
+      title: t.crm.dashboard.totalOportunidades,
       value: kpis.totalOportunidades,
       icon: TrendingUp,
       color: "bg-blue-100 text-blue-700",
@@ -84,7 +84,7 @@ export default function CrmDashboard() {
       iconColor: "text-blue-600"
     },
     {
-      title: "Oportunidades ganadas",
+      title: t.crm.dashboard.oportunidadesGanadas,
       value: kpis.oportunidadesGanadas,
       icon: CheckCircle,
       color: "bg-green-100 text-green-700",
@@ -92,7 +92,7 @@ export default function CrmDashboard() {
       iconColor: "text-green-600"
     },
     {
-      title: "Monto total ganado",
+      title: t.crm.dashboard.montoTotal,
       value: `$${kpis.montoTotal.toLocaleString()}`,
       icon: DollarSign,
       color: "bg-yellow-100 text-yellow-700",
@@ -100,7 +100,7 @@ export default function CrmDashboard() {
       iconColor: "text-yellow-600"
     },
     {
-      title: "Actividades (30 días)",
+      title: t.crm.dashboard.actividades30,
       value: kpis.actividadesMes,
       icon: BookOpen,
       color: "bg-purple-100 text-purple-700",
@@ -108,7 +108,7 @@ export default function CrmDashboard() {
       iconColor: "text-purple-600"
     },
     {
-      title: "Rutas (30 días)",
+      title: t.crm.dashboard.rutas30,
       value: kpis.rutasMes,
       icon: MapPin,
       color: "bg-orange-100 text-orange-700",
@@ -120,12 +120,12 @@ export default function CrmDashboard() {
   return (
     <div className="space-y-5">
       <div>
-        <h1>Dashboard CRM</h1>
-        <p className="text-base text-muted-foreground mt-1">Resumen de ventas y actividades</p>
+        <h1>{t.crm.dashboard.title}</h1>
+        <p className="text-base text-muted-foreground mt-1">{t.crm.dashboard.subtitle}</p>
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-muted-foreground">Cargando KPIs...</div>
+        <div className="text-center py-12 text-muted-foreground">{t.crm.dashboard.cargando}</div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
@@ -148,7 +148,7 @@ export default function CrmDashboard() {
             <Card className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <Users className="text-[#1F3864]" size={20}/>
-                <h3 className="font-semibold">Top vendedores (por monto ganado)</h3>
+                <h3 className="font-semibold">{t.crm.dashboard.topVendedores}</h3>
               </div>
               {kpis.topVendedores.length > 0 ? (
                 <div className="space-y-3">
@@ -165,18 +165,18 @@ export default function CrmDashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">Sin datos de vendedores</div>
+                <div className="text-center py-8 text-muted-foreground">{t.crm.dashboard.sinDatosVendedores}</div>
               )}
             </Card>
 
             <Card className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <BarChart2 className="text-[#1F3864]" size={20}/>
-                <h3 className="font-semibold">Resumen</h3>
+                <h3 className="font-semibold">{t.crm.dashboard.resumen}</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-muted-foreground">Tasa de conversión</span>
+                  <span className="text-muted-foreground">{t.crm.dashboard.tasaConversion}</span>
                   <span className="font-bold text-[#1F3864]">
                     {kpis.totalOportunidades > 0 
                       ? `${((kpis.oportunidadesGanadas / kpis.totalOportunidades) * 100).toFixed(1)}%` 
@@ -184,7 +184,7 @@ export default function CrmDashboard() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-muted-foreground">Promedio por oportunidad ganada</span>
+                  <span className="text-muted-foreground">{t.crm.dashboard.promedioGanada}</span>
                   <span className="font-bold text-[#1F3864]">
                     {kpis.oportunidadesGanadas > 0 
                       ? `$${(kpis.montoTotal / kpis.oportunidadesGanadas).toLocaleString()}` 
@@ -192,7 +192,7 @@ export default function CrmDashboard() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <span className="text-muted-foreground">Actividades por día (promedio)</span>
+                  <span className="text-muted-foreground">{t.crm.dashboard.actividadesPorDia}</span>
                   <span className="font-bold text-[#1F3864]">
                     {(kpis.actividadesMes / 30).toFixed(1)}
                   </span>

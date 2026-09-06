@@ -187,43 +187,85 @@ export const TIPOS_ADJUNTO: { value: AdjuntoTipo; label: string }[] = [
 export const MIME_ADJUNTOS =
   "application/pdf,application/xml,text/xml,image/jpeg,image/png,image/webp,image/heic,image/heif";
 
+/**
+ * Textos que estas funciones puras necesitan mostrar. La pantalla pasa
+ * `t.finanzas.validacion`; el default en español mantiene el comportamiento de
+ * quien las llame sin idioma (y las pruebas de vitest).
+ */
+export interface MensajesFinanzas {
+  concepto: string;
+  quienPago: string;
+  aQuienPago: string;
+  monto: string;
+  montoMayorCero: string;
+  tipoCambio: (moneda: string) => string;
+  cliente: string;
+  proveedor: string;
+  empleado: string;
+  fecha: string;
+  monedaCuenta: (cuenta: string, monedaCuenta: string, monedaMov: string) => string;
+  viaIngresoDirecto: string;
+  viaIngresoIntermediario: string;
+  viaEgresoDirecto: string;
+  viaEgresoIntermediario: string;
+  intermediarioIngreso: string;
+  intermediarioEgreso: string;
+}
+
+export const MENSAJES_FINANZAS_ES: MensajesFinanzas = {
+  concepto: "El concepto es obligatorio",
+  quienPago: "Falta indicar quién pagó",
+  aQuienPago: "Falta indicar a quién se le pagó",
+  monto: "El monto es obligatorio",
+  montoMayorCero: "El monto debe ser mayor a cero",
+  tipoCambio: (moneda) => `Captura el tipo de cambio de ${moneda} a MXN`,
+  cliente: "Selecciona el cliente de la lista",
+  proveedor: "Selecciona el proveedor de la lista",
+  empleado: "Selecciona la persona de la lista",
+  fecha: "La fecha del movimiento es obligatoria",
+  monedaCuenta: (cuenta, monedaCuenta, monedaMov) =>
+    `«${cuenta}» maneja ${monedaCuenta}; el movimiento está en ${monedaMov}`,
+  viaIngresoDirecto: "El cliente pagó directo en caja",
+  viaIngresoIntermediario: "Alguien trajo el dinero",
+  viaEgresoDirecto: "Le pagamos directo al beneficiario",
+  viaEgresoIntermediario: "Entregamos el efectivo a alguien para que pagara",
+  intermediarioIngreso: "¿Quién trajo el dinero?",
+  intermediarioEgreso: "¿A quién le dimos el efectivo?",
+};
+
 /** Etiqueta de la contraparte según el tipo de movimiento. */
-export function etiquetaContraparte(tipo: MovTipo): string {
-  return tipo === "INGRESO" ? "¿Quién nos pagó?" : "¿A quién le pagamos?";
+export function etiquetaContraparte(tipo: MovTipo, msgs: MensajesFinanzas = MENSAJES_FINANZAS_ES): string {
+  return tipo === "INGRESO" ? msgs.quienPago : msgs.aQuienPago;
 }
 
 /** Etiqueta de la vía según el tipo de movimiento. */
-export function etiquetaVia(tipo: MovTipo, via: MovVia): string {
+export function etiquetaVia(tipo: MovTipo, via: MovVia, msgs: MensajesFinanzas = MENSAJES_FINANZAS_ES): string {
   if (tipo === "INGRESO") {
-    return via === "DIRECTO"
-      ? "El cliente pagó directo en caja"
-      : "Alguien trajo el dinero";
+    return via === "DIRECTO" ? msgs.viaIngresoDirecto : msgs.viaIngresoIntermediario;
   }
-  return via === "DIRECTO"
-    ? "Le pagamos directo al beneficiario"
-    : "Entregamos el efectivo a alguien para que pagara";
+  return via === "DIRECTO" ? msgs.viaEgresoDirecto : msgs.viaEgresoIntermediario;
 }
 
-export function etiquetaIntermediario(tipo: MovTipo): string {
-  return tipo === "INGRESO" ? "¿Quién trajo el dinero?" : "¿A quién le dimos el efectivo?";
+export function etiquetaIntermediario(tipo: MovTipo, msgs: MensajesFinanzas = MENSAJES_FINANZAS_ES): string {
+  return tipo === "INGRESO" ? msgs.intermediarioIngreso : msgs.intermediarioEgreso;
 }
 
 // ── Formato ─────────────────────────────────────────────────
-export function fmtMoneda(monto: number, moneda = "MXN"): string {
-  return new Intl.NumberFormat("es-MX", {
+export function fmtMoneda(monto: number, moneda = "MXN", locale = "es-MX"): string {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: moneda,
     minimumFractionDigits: 2,
   }).format(monto ?? 0);
 }
 
-export function fmtFecha(fecha: string | null): string {
+export function fmtFecha(fecha: string | null, locale = "es-MX"): string {
   if (!fecha) return "—";
   // Las fechas `date` de Postgres llegan como YYYY-MM-DD; partirlas evita que
   // el navegador las corra un día por zona horaria.
   const [y, m, d] = fecha.slice(0, 10).split("-").map(Number);
   if (!y || !m || !d) return "—";
-  return new Date(y, m - 1, d).toLocaleDateString("es-MX", {
+  return new Date(y, m - 1, d).toLocaleDateString(locale, {
     year: "numeric", month: "short", day: "numeric",
   });
 }
@@ -291,39 +333,43 @@ export function formVacio(tipo: MovTipo): MovimientoForm {
  * Espeja en el cliente las restricciones de la base, para dar el error en el
  * formulario en lugar de esperar el rechazo de Postgres.
  */
-export function validarMovimiento(f: MovimientoForm, cuentas: Cuenta[] = []): string[] {
+export function validarMovimiento(
+  f: MovimientoForm,
+  cuentas: Cuenta[] = [],
+  msgs: MensajesFinanzas = MENSAJES_FINANZAS_ES,
+): string[] {
   const errores: string[] = [];
 
-  if (!f.concepto.trim()) errores.push("El concepto es obligatorio");
+  if (!f.concepto.trim()) errores.push(msgs.concepto);
   if (!f.contraparte_nombre.trim()) {
-    errores.push(f.tipo === "INGRESO" ? "Falta indicar quién pagó" : "Falta indicar a quién se le pagó");
+    errores.push(f.tipo === "INGRESO" ? msgs.quienPago : msgs.aQuienPago);
   }
 
   const monto = parseFloat(f.monto);
-  if (!f.monto || isNaN(monto)) errores.push("El monto es obligatorio");
-  else if (monto <= 0) errores.push("El monto debe ser mayor a cero");
+  if (!f.monto || isNaN(monto)) errores.push(msgs.monto);
+  else if (monto <= 0) errores.push(msgs.montoMayorCero);
 
   if (f.moneda !== "MXN") {
     const tc = parseFloat(f.tipo_cambio);
     if (!f.tipo_cambio || isNaN(tc) || tc <= 0) {
-      errores.push(`Captura el tipo de cambio de ${f.moneda} a MXN`);
+      errores.push(msgs.tipoCambio(f.moneda));
     }
   }
 
-  if (f.contraparte_tipo === "CLIENTE"   && !f.cliente_id)   errores.push("Selecciona el cliente de la lista");
-  if (f.contraparte_tipo === "PROVEEDOR" && !f.proveedor_id) errores.push("Selecciona el proveedor de la lista");
-  if (f.contraparte_tipo === "EMPLEADO"  && !f.empleado_id)  errores.push("Selecciona la persona de la lista");
+  if (f.contraparte_tipo === "CLIENTE"   && !f.cliente_id)   errores.push(msgs.cliente);
+  if (f.contraparte_tipo === "PROVEEDOR" && !f.proveedor_id) errores.push(msgs.proveedor);
+  if (f.contraparte_tipo === "EMPLEADO"  && !f.empleado_id)  errores.push(msgs.empleado);
 
   if (f.via === "INTERMEDIARIO" && !f.intermediario_id && !f.intermediario_nombre.trim()) {
-    errores.push(etiquetaIntermediario(f.tipo));
+    errores.push(etiquetaIntermediario(f.tipo, msgs));
   }
 
-  if (!f.fecha_movimiento) errores.push("La fecha del movimiento es obligatoria");
+  if (!f.fecha_movimiento) errores.push(msgs.fecha);
 
   if (f.cuenta_id) {
     const cuenta = cuentas.find(c => c.id === f.cuenta_id);
     if (cuenta && cuenta.moneda !== f.moneda) {
-      errores.push(`«${cuenta.nombre}» maneja ${cuenta.moneda}; el movimiento está en ${f.moneda}`);
+      errores.push(msgs.monedaCuenta(cuenta.nombre, cuenta.moneda, f.moneda));
     }
   }
 

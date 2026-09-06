@@ -89,7 +89,7 @@ export default function CrmRutas() {
     if (editing) {
       const { error } = await supabase.from("crm_rutas").update(payload).eq("id", editing.id);
       if (error) return toast.error(error.message);
-      toast.success("Ruta actualizada"); setEditing(null);
+      toast.success(t.crm.rutas.actualizada); setEditing(null);
     } else {
       const { data: rutaData, error: rutaError } = await supabase.from("crm_rutas").insert(payload).select().single();
       if (rutaError) return toast.error(rutaError.message);
@@ -108,7 +108,7 @@ export default function CrmRutas() {
         if (paradasError) return toast.error(paradasError.message);
       }
       
-      toast.success("Ruta creada"); setCreating(false);
+      toast.success(t.crm.rutas.creada); setCreating(false);
     }
     setForm({
       vendedor_id: "",
@@ -127,16 +127,16 @@ export default function CrmRutas() {
   };
 
   const deleteRuta = async (id: string) => {
-    if (!confirm("¿Eliminar esta ruta y todas sus paradas?")) return;
+    if (!confirm(t.crm.rutas.confirmarEliminar)) return;
     const { error } = await supabase.from("crm_rutas").delete().eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Ruta eliminada");
+    toast.success(t.crm.rutas.eliminada);
     load();
   };
 
   const agregarParada = () => {
     if (!nuevaParada.cliente_id && !nuevaParada.descripcion) {
-      return toast.error("Debes seleccionar un cliente o agregar una descripción");
+      return toast.error(t.crm.rutas.paradaRequerida);
     }
     setParadasLocales([...paradasLocales, { ...nuevaParada, orden: paradasLocales.length + 1 }]);
     setNuevaParada({
@@ -164,13 +164,13 @@ export default function CrmRutas() {
     <div className="space-y-5">
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
-          <h1>Rutas</h1>
-          <p className="text-base text-muted-foreground mt-1">{filtered.length} rutas registradas</p>
+          <h1>{t.crm.rutas.title}</h1>
+          <p className="text-base text-muted-foreground mt-1">{t.crm.rutas.subtitle(filtered.length)}</p>
         </div>
         {canCreate && (
           <Button onClick={() => { setForm({ vendedor_id: "", fecha: "", notas: "" }); setParadasLocales([]); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-            <Plus className="h-5 w-5 mr-2"/> Nueva ruta
+            <Plus className="h-5 w-5 mr-2"/> {t.crm.rutas.nueva}
           </Button>
         )}
       </div>
@@ -178,7 +178,7 @@ export default function CrmRutas() {
       <Card className="p-3">
         <div className="relative">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input className="pl-10 h-12 text-base" placeholder="Buscar por fecha, vendedor..." value={q} onChange={e => setQ(e.target.value)} />
+          <Input className="pl-10 h-12 text-base" placeholder={t.crm.rutas.buscar} value={q} onChange={e => setQ(e.target.value)} />
         </div>
       </Card>
 
@@ -195,7 +195,7 @@ export default function CrmRutas() {
                     <div className="text-2xl font-bold text-[#1F3864]">{new Date(r.fecha).toLocaleDateString()}</div>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                    <User size={16}/> <span>{vendedor?.nombre_completo || "Sin vendedor"}</span>
+                    <User size={16}/> <span>{vendedor?.nombre_completo || t.crm.sinVendedor}</span>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -214,7 +214,7 @@ export default function CrmRutas() {
 
               {rutaParadas.length > 0 ? (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-muted-foreground mb-2">Paradas ({rutaParadas.length})</div>
+                  <div className="text-sm font-medium text-muted-foreground mb-2">{t.crm.rutas.paradasCount(rutaParadas.length)}</div>
                   {rutaParadas.map((p: any) => {
                     const cliente = clientes.find((c: any) => c.id === p.cliente_id);
                     return (
@@ -246,7 +246,7 @@ export default function CrmRutas() {
                   })}
                 </div>
               ) : (
-                <div className="text-sm text-muted-foreground">Sin paradas</div>
+                <div className="text-sm text-muted-foreground">{t.crm.rutas.sinParadas}</div>
               )}
 
               {r.notas && (
@@ -257,17 +257,17 @@ export default function CrmRutas() {
             </Card>
           );
         })}
-        {!filtered.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin rutas</div>}
+        {!filtered.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.crm.rutas.sinRutas}</div>}
       </div>
 
       <Dialog open={creating || !!editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); } }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editing ? "Editar ruta" : "Nueva ruta"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? t.crm.rutas.editar : t.crm.rutas.nueva}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Vendedor</Label>
+              <Label>{t.crm.vendedor}</Label>
               <Select value={form.vendedor_id} onValueChange={(v) => setForm({ ...form, vendedor_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar vendedor" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t.crm.seleccionarVendedor} /></SelectTrigger>
                 <SelectContent>
                   {vendedores.map((v: any) => (
                     <SelectItem key={v.id} value={v.id}>{v.nombre_completo}</SelectItem>
@@ -276,17 +276,17 @@ export default function CrmRutas() {
               </Select>
             </div>
             <div>
-              <Label>Fecha</Label>
+              <Label>{t.crm.fecha}</Label>
               <Input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
             </div>
             <div>
-              <Label>Notas</Label>
+              <Label>{t.crm.notas}</Label>
               <Input value={form.notas || ""} onChange={e => setForm({ ...form, notas: e.target.value })} />
             </div>
 
             {!editing && (
               <div className="border-t pt-4">
-                <div className="font-medium mb-3">Paradas</div>
+                <div className="font-medium mb-3">{t.crm.rutas.paradas}</div>
                 
                 <div className="space-y-2 mb-3">
                   {paradasLocales.map((p, idx) => {
@@ -307,9 +307,9 @@ export default function CrmRutas() {
 
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <div>
-                    <Label className="text-sm">Cliente</Label>
+                    <Label className="text-sm">{t.crm.cliente}</Label>
                     <Select value={nuevaParada.cliente_id} onValueChange={(v) => setNuevaParada({ ...nuevaParada, cliente_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Cliente" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t.crm.cliente} /></SelectTrigger>
                       <SelectContent>
                         {clientes.map((c: any) => (
                           <SelectItem key={c.id} value={c.id}>{c.nombre_comercial || c.codigo_erp}</SelectItem>
@@ -318,20 +318,20 @@ export default function CrmRutas() {
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-sm">Hora estimada</Label>
+                    <Label className="text-sm">{t.crm.rutas.horaEstimada}</Label>
                     <Input type="time" value={nuevaParada.hora_estimada} onChange={e => setNuevaParada({ ...nuevaParada, hora_estimada: e.target.value })} />
                   </div>
                 </div>
                 <div className="mb-2">
-                  <Label className="text-sm">Descripción (si no hay cliente)</Label>
+                  <Label className="text-sm">{t.crm.rutas.descripcionParada}</Label>
                   <Input value={nuevaParada.descripcion} onChange={e => setNuevaParada({ ...nuevaParada, descripcion: e.target.value })} />
                 </div>
                 <div className="mb-2">
-                  <Label className="text-sm">Notas de parada</Label>
+                  <Label className="text-sm">{t.crm.rutas.notasParada}</Label>
                   <Input value={nuevaParada.notas} onChange={e => setNuevaParada({ ...nuevaParada, notas: e.target.value })} />
                 </div>
                 <Button onClick={agregarParada} variant="outline" className="w-full">
-                  <Plus className="h-4 w-4 mr-2" /> Agregar parada
+                  <Plus className="h-4 w-4 mr-2" /> {t.crm.rutas.agregarParada}
                 </Button>
               </div>
             )}

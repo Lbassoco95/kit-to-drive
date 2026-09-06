@@ -13,6 +13,7 @@ import {
   explicarError,
 } from "@/lib/dazon";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { ColorChasis, ChasisColor, AjustarCapacidadColor } from "@/components/ColorChasis";
 
 type Chasis = {
@@ -110,7 +111,6 @@ type IncidenciaChasis = {
   retiene_chasis: boolean;
 };
 
-const LINEA_LABEL: Record<LineaProducto, string> = { motocarro: "Motocarro", mototaxi: "Mototaxi", otro: "Otro" };
 const LINEA_BADGE: Record<LineaProducto, string> = {
   motocarro: "bg-slate-100 text-slate-700",
   mototaxi: "bg-purple-100 text-purple-700",
@@ -118,11 +118,12 @@ const LINEA_BADGE: Record<LineaProducto, string> = {
 };
 
 function LineaBadge({ modelo, catalogo }: { modelo: string; catalogo: CatalogoModelos }) {
+  const { t } = useLang();
   const linea = lineaDe(modelo, catalogo);
   const sinClasificar = catalogo.size > 0 && !catalogo.has(modelo);
   return (
-    <span className={`px-2 py-1 rounded-full text-xs font-medium ${LINEA_BADGE[linea]}`} title={sinClasificar ? `Modelo ${modelo} sin clasificar — pídele a un administrador que lo agregue al catálogo.` : undefined}>
-      {LINEA_LABEL[linea]}{sinClasificar && " ⚠"}
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${LINEA_BADGE[linea]}`} title={sinClasificar ? t.inventario.modeloSinClasificar(modelo) : undefined}>
+      {t.catalogos.linea[linea]}{sinClasificar && " ⚠"}
     </span>
   );
 }
@@ -143,6 +144,7 @@ function agruparModeloColor<T extends { modelo: string; color?: string }>(items:
 
 export default function Inventario() {
   const { role } = useAuth();
+  const { t } = useLang();
   const puedeEditarColor = role === "admin" || role === "fabrica";
   const [colorChasis, setColorChasis] = useState<ChasisColor | null>(null);
   const [capacidadEdit, setCapacidadEdit] = useState<{ modelo: string; color: string; juegos: number } | null>(null);
@@ -227,14 +229,14 @@ export default function Inventario() {
       setCatalogo(new Map((catalogoData.data ?? []).map((c: any) => [c.modelo, { linea: c.linea as LineaProducto, nombre_comercial: c.nombre_comercial }])));
     } catch (error) {
       console.error("Error loading inventory:", error);
-      toast.error(explicarError(error, "Error al cargar inventario"));
+      toast.error(explicarError(error, t.inventario.errorCargar));
     } finally {
       setLoading(false);
     }
   };
 
   const getUnidadOrden = (motocarro_id: string | null) => {
-    if (!motocarro_id) return <span className="text-amber-600 text-xs">sin parear</span>;
+    if (!motocarro_id) return <span className="text-amber-600 text-xs">{t.inventario.sinParear}</span>;
     const u = unidades.find(m => m.id === motocarro_id);
     return <span className="font-medium">#{u?.orden_armado ?? motocarro_id.slice(0, 8)}</span>;
   };
@@ -242,9 +244,9 @@ export default function Inventario() {
   const getParteDiferencia = (esperada: number, recibida: number) => recibida - esperada;
 
   const getColorStatus = (disponible: number, umbral: number) => {
-    if (disponible === 0) return { icon: <AlertTriangle className="h-5 w-5" />, color: "text-red-600 bg-red-50", text: "Sin stock" };
-    if (disponible <= umbral) return { icon: <AlertTriangle className="h-5 w-5" />, color: "text-amber-600 bg-amber-50", text: "Bajo stock" };
-    return { icon: <CheckCircle2 className="h-5 w-5" />, color: "text-green-600 bg-green-50", text: "OK" };
+    if (disponible === 0) return { icon: <AlertTriangle className="h-5 w-5" />, color: "text-red-600 bg-red-50", text: t.inventario.colores.sinStock };
+    if (disponible <= umbral) return { icon: <AlertTriangle className="h-5 w-5" />, color: "text-amber-600 bg-amber-50", text: t.inventario.colores.bajoStock };
+    return { icon: <CheckCircle2 className="h-5 w-5" />, color: "text-green-600 bg-green-50", text: t.inventario.colores.ok };
   };
 
   const pasaFiltro = (modelo: string) => lineaFiltro === "TODAS" || lineaDe(modelo, catalogo) === lineaFiltro;
@@ -296,7 +298,7 @@ export default function Inventario() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">Cargando inventario...</p>
+        <p className="text-muted-foreground">{t.inventario.cargando}</p>
       </div>
     );
   }
@@ -304,24 +306,24 @@ export default function Inventario() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Inventario de Contenedores</h1>
-        <p className="text-muted-foreground mt-1">Gestión de unidades, chasis, motores, partes y colores</p>
+        <h1 className="text-3xl font-bold">{t.inventario.title}</h1>
+        <p className="text-muted-foreground mt-1">{t.inventario.subtitle}</p>
       </div>
 
       <Tabs defaultValue="unidades" className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1 p-1">
-          <TabsTrigger value="unidades" className="text-base"><Bike className="h-4 w-4 mr-2" />Unidades</TabsTrigger>
-          <TabsTrigger value="chasis" className="text-base"><Truck className="h-4 w-4 mr-2" />Chasis</TabsTrigger>
-          <TabsTrigger value="motores" className="text-base"><Wrench className="h-4 w-4 mr-2" />Motores</TabsTrigger>
-          <TabsTrigger value="partes" className="text-base"><Package className="h-4 w-4 mr-2" />Partes</TabsTrigger>
-          <TabsTrigger value="colores" className="text-base"><Palette className="h-4 w-4 mr-2" />Colores</TabsTrigger>
-          <TabsTrigger value="otras" className="text-base"><Layers className="h-4 w-4 mr-2" />Otras líneas</TabsTrigger>
-          <TabsTrigger value="stock" className="text-base"><Boxes className="h-4 w-4 mr-2" />Stock</TabsTrigger>
+          <TabsTrigger value="unidades" className="text-base"><Bike className="h-4 w-4 mr-2" />{t.inventario.tabs.unidades}</TabsTrigger>
+          <TabsTrigger value="chasis" className="text-base"><Truck className="h-4 w-4 mr-2" />{t.inventario.tabs.chasis}</TabsTrigger>
+          <TabsTrigger value="motores" className="text-base"><Wrench className="h-4 w-4 mr-2" />{t.inventario.tabs.motores}</TabsTrigger>
+          <TabsTrigger value="partes" className="text-base"><Package className="h-4 w-4 mr-2" />{t.inventario.tabs.partes}</TabsTrigger>
+          <TabsTrigger value="colores" className="text-base"><Palette className="h-4 w-4 mr-2" />{t.inventario.tabs.colores}</TabsTrigger>
+          <TabsTrigger value="otras" className="text-base"><Layers className="h-4 w-4 mr-2" />{t.inventario.tabs.otras}</TabsTrigger>
+          <TabsTrigger value="stock" className="text-base"><Boxes className="h-4 w-4 mr-2" />{t.inventario.tabs.stock}</TabsTrigger>
         </TabsList>
 
         {/* Filtro de línea — aplica a Unidades, Chasis y Motores */}
         <div className="flex items-center gap-2 mt-3">
-          <span className="text-sm text-muted-foreground">Línea:</span>
+          <span className="text-sm text-muted-foreground">{t.inventario.lineaFiltro}</span>
           <div className="inline-flex rounded-lg border p-1 bg-card">
             {(["TODAS", "motocarro", "mototaxi", "otro"] as const).map(l => (
               <button
@@ -329,7 +331,7 @@ export default function Inventario() {
                 onClick={() => setLineaFiltro(l)}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium ${lineaFiltro === l ? "bg-[#2E75B6] text-white" : "text-muted-foreground"}`}
               >
-                {l === "TODAS" ? "Todas" : LINEA_LABEL[l]}
+                {l === "TODAS" ? t.inventario.todas : t.catalogos.linea[l]}
               </button>
             ))}
           </div>
@@ -338,23 +340,23 @@ export default function Inventario() {
         <TabsContent value="unidades" className="space-y-4 mt-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg">Unidades</h3>
+              <h3 className="font-semibold text-lg">{t.inventario.tabs.unidades}</h3>
               <div className="text-sm text-muted-foreground">
-                Total: {unidadesFiltrado.length} unidades
+                {t.inventario.totalUnidades(unidadesFiltrado.length)}
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Orden</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>Línea</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Chasis</TableHead>
-                    <TableHead>Motor</TableHead>
-                    <TableHead>Estatus</TableHead>
-                    <TableHead>Remisión</TableHead>
+                    <TableHead>{t.inventario.col.orden}</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead>{t.inventario.col.linea}</TableHead>
+                    <TableHead>{t.inventario.col.color}</TableHead>
+                    <TableHead>{t.inventario.col.chasis}</TableHead>
+                    <TableHead>{t.inventario.col.motor}</TableHead>
+                    <TableHead>{t.inventario.col.estatus}</TableHead>
+                    <TableHead>{t.inventario.col.remision}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -372,16 +374,16 @@ export default function Inventario() {
                           u.estatus_armado === 'ARMADO' || u.estatus_armado === 'LISTO' ? 'bg-green-100 text-green-700' :
                           'bg-blue-100 text-blue-700'
                         }`}>
-                          {u.estatus_armado}
+                          {t.estatus[u.estatus_armado as keyof typeof t.estatus] ?? u.estatus_armado}
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{u.remision_id ? u.remision_id.slice(0, 8) + '...' : 'sin asignar'}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">{u.remision_id ? u.remision_id.slice(0, 8) + '...' : t.inventario.sinAsignar}</TableCell>
                     </TableRow>
                   ))}
                   {unidadesFiltrado.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No hay unidades en inventario
+                        {t.inventario.vacio.unidades}
                       </TableCell>
                     </TableRow>
                   )}
@@ -394,12 +396,12 @@ export default function Inventario() {
         <TabsContent value="chasis" className="space-y-4 mt-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg">Inventario de Chasis</h3>
+              <h3 className="font-semibold text-lg">{t.inventario.tabs.chasis}</h3>
               <div className="text-sm text-muted-foreground flex items-center gap-3">
-                <span>Total: {chasisFiltrado.length} piezas | Disponibles: {chasisFiltrado.filter(c => c.estatus === 'disponible').length}</span>
+                <span>{t.inventario.totalPiezas(chasisFiltrado.length, chasisFiltrado.filter(c => c.estatus === 'disponible').length)}</span>
                 {chasisDetenidos.length > 0 && (
                   <Link to="/incidencias" className="inline-flex items-center gap-1 text-[#991B1B] font-medium hover:underline">
-                    <TriangleAlert className="h-4 w-4" /> {chasisDetenidos.length} detenidos por incidencia
+                    <TriangleAlert className="h-4 w-4" /> {t.inventario.detenidosIncidencia(chasisDetenidos.length)}
                   </Link>
                 )}
               </div>
@@ -408,19 +410,20 @@ export default function Inventario() {
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Chasis (FRAME NUMBER)</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>Línea</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Estatus</TableHead>
-                    <TableHead>Incidencia</TableHead>
-                    <TableHead>Unidad</TableHead>
-                    <TableHead>Contenedor ID</TableHead>
+                    <TableHead>{t.inventario.col.chasisFrame}</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead>{t.inventario.col.linea}</TableHead>
+                    <TableHead>{t.inventario.col.color}</TableHead>
+                    <TableHead>{t.inventario.col.estatus}</TableHead>
+                    <TableHead>{t.inventario.col.incidencia}</TableHead>
+                    <TableHead>{t.inventario.col.unidad}</TableHead>
+                    <TableHead>{t.inventario.col.contenedorId}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {chasisFiltrado.map((c) => {
                     const est = ESTATUS_CHASIS[c.estatus] ?? { label: c.estatus, cls: "bg-gray-100 text-gray-700" };
+                    const estLabel = t.catalogos.estatusChasis(c.estatus);
                     const inc = incidencias.get(c.id);
                     const incMeta = inc ? ESTATUS_INCIDENCIA[inc.estatus] : null;
                     return (
@@ -434,7 +437,7 @@ export default function Inventario() {
                           {normColor(c.color_original ?? c.color) !== normColor(c.color) && (
                             <span
                               className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E]"
-                              title={`El VIN declaró ${normColor(c.color_original)}; se armó en ${normColor(c.color)}`}
+                              title={t.inventario.tip.vinDeclaro(normColor(c.color_original), normColor(c.color))}
                             >
                               VIN: {normColor(c.color_original)}
                             </span>
@@ -446,7 +449,7 @@ export default function Inventario() {
                                 color: c.color, color_original: c.color_original, motocarro_id: c.motocarro_id,
                               })}
                               className="text-muted-foreground hover:text-[#1F3864]"
-                              title="Cambiar el color con el que se arma"
+                              title={t.inventario.tip.cambiarColor}
                             >
                               <Pencil className="h-3.5 w-3.5" />
                             </button>
@@ -454,13 +457,13 @@ export default function Inventario() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-xs ${est.cls}`}>{est.label}</span>
+                        <span className={`px-2 py-1 rounded-full text-xs ${est.cls}`}>{estLabel}</span>
                       </TableCell>
                       <TableCell>
                         {inc ? (
                           <Link to="/incidencias" className="inline-flex flex-col gap-0.5 hover:underline" title={inc.parte_afectada ?? undefined}>
                             <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${incMeta?.cls ?? ""}`}>
-                              {inc.folio} · {incMeta?.label ?? inc.estatus}
+                              {inc.folio} · {t.catalogos.estatusIncidencia(inc.estatus)}
                             </span>
                             {inc.parte_afectada && <span className="text-[10px] text-muted-foreground">{inc.parte_afectada}</span>}
                           </Link>
@@ -476,7 +479,7 @@ export default function Inventario() {
                   {chasisFiltrado.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                        No hay chasis en inventario
+                        {t.inventario.vacio.chasis}
                       </TableCell>
                     </TableRow>
                   )}
@@ -489,21 +492,21 @@ export default function Inventario() {
         <TabsContent value="motores" className="space-y-4 mt-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg">Inventario de Motores</h3>
+              <h3 className="font-semibold text-lg">{t.inventario.tabs.motores}</h3>
               <div className="text-sm text-muted-foreground">
-                Total: {motoresFiltrado.length} piezas | Disponibles: {motoresFiltrado.filter(m => m.estatus === 'disponible').length}
+                {t.inventario.totalPiezas(motoresFiltrado.length, motoresFiltrado.filter(m => m.estatus === 'disponible').length)}
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Motor</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>Línea</TableHead>
-                    <TableHead>Estatus</TableHead>
-                    <TableHead>Unidad</TableHead>
-                    <TableHead>Contenedor ID</TableHead>
+                    <TableHead>{t.inventario.col.motor}</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead>{t.inventario.col.linea}</TableHead>
+                    <TableHead>{t.inventario.col.estatus}</TableHead>
+                    <TableHead>{t.inventario.col.unidad}</TableHead>
+                    <TableHead>{t.inventario.col.contenedorId}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -518,7 +521,7 @@ export default function Inventario() {
                           m.estatus === 'configurado' ? 'bg-blue-100 text-blue-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
-                          {m.estatus}
+                          {t.catalogos.estatusChasis(m.estatus)}
                         </span>
                       </TableCell>
                       <TableCell>{getUnidadOrden(m.motocarro_id)}</TableCell>
@@ -528,7 +531,7 @@ export default function Inventario() {
                   {motoresFiltrado.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No hay motores en inventario
+                        {t.inventario.vacio.motores}
                       </TableCell>
                     </TableRow>
                   )}
@@ -541,21 +544,21 @@ export default function Inventario() {
         <TabsContent value="partes" className="space-y-4 mt-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg">Inventario de Partes</h3>
+              <h3 className="font-semibold text-lg">{t.inventario.tabs.partes}</h3>
               <div className="text-sm text-muted-foreground">
-                Total registros: {partes.length}
+                {t.inventario.totalRegistros(partes.length)}
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Parte</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead className="text-right">Esperada</TableHead>
-                    <TableHead className="text-right">Recibida</TableHead>
-                    <TableHead className="text-right">Diferencia</TableHead>
-                    <TableHead>Contenedor ID</TableHead>
+                    <TableHead>{t.inventario.col.parte}</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.esperada}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.recibida}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.diferencia}</TableHead>
+                    <TableHead>{t.inventario.col.contenedorId}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -577,7 +580,7 @@ export default function Inventario() {
                   {partes.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No hay partes en inventario
+                        {t.inventario.vacio.partes}
                       </TableCell>
                     </TableRow>
                   )}
@@ -593,12 +596,9 @@ export default function Inventario() {
           <Card className="p-4">
             <div className="flex items-start justify-between mb-4 flex-wrap gap-2">
               <div>
-                <h3 className="font-semibold text-lg">Disponible y comprometido por color</h3>
+                <h3 className="font-semibold text-lg">{t.inventario.colores.title}</h3>
                 <p className="text-sm text-muted-foreground">
-                  Se calcula de los chasis y las unidades reales — no de un contador. La demanda sale
-                  de las remisiones NUEVA y PARCIAL. <strong>Juegos</strong> es cuántas piezas de ese
-                  color llegaron: aunque haya chasis de sobra, no se pueden armar más unidades de un
-                  color que juegos de ese color.
+                  {t.inventario.colores.desc1} <strong>{t.inventario.colores.juegosBold}</strong> {t.inventario.colores.desc2}
                 </p>
               </div>
             </div>
@@ -606,18 +606,18 @@ export default function Inventario() {
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Modelo (comercial)</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead className="text-right" title="Chasis sanos sin unidad">Piezas disponibles</TableHead>
-                    <TableHead className="text-right" title="Unidades con NS chasis y NS motor, sin remisión">Unidades libres</TableHead>
-                    <TableHead className="text-right" title="Unidades sin NS chasis / NS motor: no se pueden asignar">Sin NS</TableHead>
-                    <TableHead className="text-right" title="Con remisión, aún no entregadas">Comprometidas</TableHead>
-                    <TableHead className="text-right" title="Detenidas por incidencia: en revisión, garantía o no útiles">Detenidas</TableHead>
-                    <TableHead className="text-right" title="Juegos de piezas de ese color que llegaron (VIN + extras registradas)">Juegos</TableHead>
-                    <TableHead className="text-right" title="Juegos libres para armar otro chasis en este color">Juegos libres</TableHead>
-                    <TableHead className="text-right" title="Unidades pendientes de asignar en remisiones activas">Demanda</TableHead>
-                    <TableHead className="text-right" title="Unidades libres menos demanda pendiente">Holgura</TableHead>
-                    <TableHead>Estatus</TableHead>
+                    <TableHead>{t.inventario.col.modeloComercial}</TableHead>
+                    <TableHead>{t.inventario.col.color}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.piezasDisponibles}>{t.inventario.col.piezasDisponibles}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.unidadesLibres}>{t.inventario.col.unidadesLibres}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.sinNS}>{t.inventario.col.sinNS}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.comprometidas}>{t.inventario.col.comprometidas}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.detenidas}>{t.inventario.col.detenidas}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.juegos}>{t.inventario.col.juegos}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.juegosLibres}>{t.inventario.col.juegosLibres}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.demanda}>{t.inventario.col.demanda}</TableHead>
+                    <TableHead className="text-right" title={t.inventario.tip.holgura}>{t.inventario.col.holgura}</TableHead>
+                    <TableHead>{t.inventario.col.estatus}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -643,7 +643,7 @@ export default function Inventario() {
                         <TableCell className="text-right">
                           {r.capacidad_color}
                           {r.piezas_recoloreadas > 0 && (
-                            <span className="text-[10px] text-[#92400E] ml-1" title={`${r.piezas_recoloreadas} chasis se armaron en un color distinto al del VIN`}>
+                            <span className="text-[10px] text-[#92400E] ml-1" title={t.inventario.tip.recoloreadas(r.piezas_recoloreadas)}>
                               ↺{r.piezas_recoloreadas}
                             </span>
                           )}
@@ -658,19 +658,19 @@ export default function Inventario() {
                         <TableCell>
                           {cubierta ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-green-50 text-green-700 inline-flex items-center gap-1">
-                              <CheckCircle2 className="h-4 w-4" /> Sin demanda
+                              <CheckCircle2 className="h-4 w-4" /> {t.inventario.colores.sinDemanda}
                             </span>
                           ) : r.holgura_con_serial >= 0 ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-green-50 text-green-700 inline-flex items-center gap-1">
-                              <CheckCircle2 className="h-4 w-4" /> Cubierta
+                              <CheckCircle2 className="h-4 w-4" /> {t.inventario.colores.cubierta}
                             </span>
                           ) : cubiertaConPiezas ? (
                             <span className="px-2 py-1 rounded-full text-xs bg-amber-50 text-amber-700 inline-flex items-center gap-1">
-                              <Wrench className="h-4 w-4" /> Falta configurar
+                              <Wrench className="h-4 w-4" /> {t.inventario.colores.faltaConfigurar}
                             </span>
                           ) : (
                             <span className="px-2 py-1 rounded-full text-xs bg-red-50 text-red-600 inline-flex items-center gap-1">
-                              <AlertTriangle className="h-4 w-4" /> Faltan piezas
+                              <AlertTriangle className="h-4 w-4" /> {t.inventario.colores.faltanPiezas}
                             </span>
                           )}
                         </TableCell>
@@ -680,7 +680,7 @@ export default function Inventario() {
                   {stock.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
-                        Sin movimientos de color todavía
+                        {t.inventario.vacio.stockColor}
                       </TableCell>
                     </TableRow>
                   )}
@@ -693,22 +693,22 @@ export default function Inventario() {
               mercancía y como la cuenta fábrica, con su umbral de alerta. */}
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <h3 className="font-semibold text-lg">Por código de fábrica</h3>
-              <div className="text-sm text-muted-foreground">Alerta cuando el disponible ≤ umbral</div>
+              <h3 className="font-semibold text-lg">{t.inventario.colores.porCodigoFabrica}</h3>
+              <div className="text-sm text-muted-foreground">{t.inventario.colores.alertaUmbral}</div>
             </div>
             <div className="border rounded-lg overflow-x-auto max-h-[50vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead className="text-right">Piezas totales</TableHead>
-                    <TableHead className="text-right">Disponibles</TableHead>
-                    <TableHead className="text-right">En unidades</TableHead>
-                    <TableHead className="text-right">Entregadas</TableHead>
-                    <TableHead className="text-right">Juegos de color</TableHead>
-                    <TableHead className="text-right">Umbral</TableHead>
-                    <TableHead>Estatus</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead>{t.inventario.col.color}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.piezasTotales}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.disponibles}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.enUnidades}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.entregadas}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.juegosColor}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.umbral}</TableHead>
+                    <TableHead>{t.inventario.col.estatus}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -724,12 +724,12 @@ export default function Inventario() {
                         <TableCell className="text-right">{c.unidades_entregadas ?? "—"}</TableCell>
                         <TableCell className="text-right">
                           <span className="font-semibold">{c.piezas_recibidas ?? "—"}</span>
-                          <span className="text-muted-foreground text-xs"> / {c.juegos_usados ?? 0} usados</span>
+                          <span className="text-muted-foreground text-xs">{t.inventario.colores.usados(c.juegos_usados ?? 0)}</span>
                           {puedeEditarColor && (
                             <button
                               onClick={() => setCapacidadEdit({ modelo: c.modelo, color: c.color, juegos: c.piezas_recibidas ?? 0 })}
                               className="ml-1.5 text-muted-foreground hover:text-[#1F3864]"
-                              title="Registrar juegos de este color que llegaron fuera del VIN"
+                              title={t.inventario.tip.registrarJuegos}
                             >
                               <Pencil className="h-3.5 w-3.5 inline" />
                             </button>
@@ -748,7 +748,7 @@ export default function Inventario() {
                   {colores.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        No hay colores en inventario
+                        {t.inventario.vacio.colores}
                       </TableCell>
                     </TableRow>
                   )}
@@ -761,58 +761,58 @@ export default function Inventario() {
         <TabsContent value="otras" className="space-y-4 mt-4">
           <Card className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-lg">Otras líneas</h3>
+              <h3 className="font-semibold text-lg">{t.inventario.otras.title}</h3>
               <div className="text-sm text-muted-foreground">
-                Mototaxis y modelos fuera del flujo de armado de motocarros
+                {t.inventario.otras.desc}
               </div>
             </div>
             <div className="border rounded-lg overflow-hidden max-h-[70vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Identificador</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>Línea</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Contenedor / Remisión</TableHead>
+                    <TableHead>{t.inventario.col.tipo}</TableHead>
+                    <TableHead>{t.inventario.col.identificador}</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead>{t.inventario.col.linea}</TableHead>
+                    <TableHead>{t.inventario.col.color}</TableHead>
+                    <TableHead>{t.inventario.col.contenedorRemision}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {otrasUnidades.map(u => (
                     <TableRow key={`u-${u.id}`}>
-                      <TableCell><span className="px-2 py-1 rounded-full text-xs bg-slate-100">Unidad #{u.orden_armado}</span></TableCell>
+                      <TableCell><span className="px-2 py-1 rounded-full text-xs bg-slate-100">{t.inventario.otras.unidad(u.orden_armado)}</span></TableCell>
                       <TableCell className="font-mono text-xs">{u.ns_chasis} / {u.ns_motor}</TableCell>
                       <TableCell>{displayFabrica(u.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={u.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>{u.color}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{u.remision_id ? `Remisión ${u.remision_id.slice(0, 8)}...` : "sin remisión"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{u.remision_id ? t.inventario.otras.remisionCorta(u.remision_id.slice(0, 8) + "...") : t.inventario.sinRemision}</TableCell>
                     </TableRow>
                   ))}
                   {otrasChasis.map(c => (
                     <TableRow key={`c-${c.id}`}>
-                      <TableCell><span className="px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">Chasis</span></TableCell>
+                      <TableCell><span className="px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700">{t.inventario.otras.chasis}</span></TableCell>
                       <TableCell className="font-mono text-xs">{c.numero_chasis}</TableCell>
                       <TableCell>{displayFabrica(c.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={c.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>{c.color}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{c.contenedor_id ? c.contenedor_id.slice(0, 8) + "..." : "-"} {c.motocarro_id ? "· configurado" : "· disponible"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{c.contenedor_id ? c.contenedor_id.slice(0, 8) + "..." : "-"} {c.motocarro_id ? t.inventario.configurado : t.inventario.disponible}</TableCell>
                     </TableRow>
                   ))}
                   {otrasMotores.map(m => (
                     <TableRow key={`m-${m.id}`}>
-                      <TableCell><span className="px-2 py-1 rounded-full text-xs bg-purple-50 text-purple-700">Motor</span></TableCell>
+                      <TableCell><span className="px-2 py-1 rounded-full text-xs bg-purple-50 text-purple-700">{t.inventario.otras.motor}</span></TableCell>
                       <TableCell className="font-mono text-xs">{m.numero_motor}</TableCell>
                       <TableCell>{displayFabrica(m.modelo, catalogo)}</TableCell>
                       <TableCell><LineaBadge modelo={m.modelo} catalogo={catalogo} /></TableCell>
                       <TableCell>-</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{m.contenedor_id ? m.contenedor_id.slice(0, 8) + "..." : "-"} {m.motocarro_id ? "· configurado" : "· disponible"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{m.contenedor_id ? m.contenedor_id.slice(0, 8) + "..." : "-"} {m.motocarro_id ? t.inventario.configurado : t.inventario.disponible}</TableCell>
                     </TableRow>
                   ))}
                   {!otrasUnidades.length && !otrasChasis.length && !otrasMotores.length && (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No hay piezas ni unidades fuera de la línea motocarro
+                        {t.inventario.vacio.otras}
                       </TableCell>
                     </TableRow>
                   )}
@@ -825,30 +825,30 @@ export default function Inventario() {
         <TabsContent value="stock" className="space-y-4 mt-4">
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-4">
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Libre (vendible hoy)</div>
+              <div className="text-sm text-muted-foreground">{t.inventario.stock.libre}</div>
               <div className="text-3xl font-bold text-[#065F46]">{stockLibre.length}</div>
-              <div className="text-xs text-muted-foreground mt-1">Armadas/listas sin remisión</div>
+              <div className="text-xs text-muted-foreground mt-1">{t.inventario.stock.libreDesc}</div>
             </Card>
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Comprometido</div>
+              <div className="text-sm text-muted-foreground">{t.inventario.stock.comprometido}</div>
               <div className="text-3xl font-bold text-[#5B21B6]">{stockComprometido.length}</div>
-              <div className="text-xs text-muted-foreground mt-1">Con remisión, aún no entregadas</div>
+              <div className="text-xs text-muted-foreground mt-1">{t.inventario.stock.comprometidoDesc}</div>
             </Card>
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Por configurar</div>
+              <div className="text-sm text-muted-foreground">{t.inventario.stock.porConfigurar}</div>
               <div className="text-3xl font-bold text-[#1F3864]">{chasisPorConfigurar.length}</div>
-              <div className="text-xs text-muted-foreground mt-1">Chasis disponibles sin unidad</div>
+              <div className="text-xs text-muted-foreground mt-1">{t.inventario.stock.porConfigurarDesc}</div>
             </Card>
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground">Más de 60 días en stock</div>
+              <div className="text-sm text-muted-foreground">{t.inventario.stock.masDe60}</div>
               <div className={`text-3xl font-bold ${rangos["60+"] > 0 ? "text-[#991B1B]" : "text-[#065F46]"}`}>{rangos["60+"]}</div>
-              <div className="text-xs text-muted-foreground mt-1">De las unidades libres</div>
+              <div className="text-xs text-muted-foreground mt-1">{t.inventario.stock.masDe60Desc}</div>
             </Card>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Libre por modelo y color</h3>
+              <h3 className="font-semibold mb-3">{t.inventario.stock.libreModeloColor}</h3>
               <div className="space-y-1 text-sm">
                 {agruparModeloColor(stockLibre, catalogo).map((g, i) => (
                   <div key={i} className="flex justify-between border-b py-1 last:border-0">
@@ -856,11 +856,11 @@ export default function Inventario() {
                     <span className="font-bold">{g.n}</span>
                   </div>
                 ))}
-                {!stockLibre.length && <div className="text-muted-foreground text-center py-4">Sin stock libre</div>}
+                {!stockLibre.length && <div className="text-muted-foreground text-center py-4">{t.inventario.vacio.stockLibre}</div>}
               </div>
             </Card>
             <Card className="p-4">
-              <h3 className="font-semibold mb-3">Por configurar por modelo y color</h3>
+              <h3 className="font-semibold mb-3">{t.inventario.stock.porConfigurarModeloColor}</h3>
               <div className="space-y-1 text-sm">
                 {agruparModeloColor(chasisPorConfigurar, catalogo).map((g, i) => (
                   <div key={i} className="flex justify-between border-b py-1 last:border-0">
@@ -868,14 +868,14 @@ export default function Inventario() {
                     <span className="font-bold">{g.n}</span>
                   </div>
                 ))}
-                {!chasisPorConfigurar.length && <div className="text-muted-foreground text-center py-4">No hay chasis sin configurar</div>}
+                {!chasisPorConfigurar.length && <div className="text-muted-foreground text-center py-4">{t.inventario.vacio.porConfigurar}</div>}
               </div>
             </Card>
           </div>
 
           <Card className="p-4">
             <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-              <h3 className="font-semibold">Arrastre — antigüedad del stock libre</h3>
+              <h3 className="font-semibold">{t.inventario.stock.arrastre}</h3>
               <div className="flex gap-2 text-xs">
                 <span className="px-2 py-1 rounded-full bg-slate-100">0-15d: {rangos["0-15"]}</span>
                 <span className="px-2 py-1 rounded-full bg-amber-50 text-amber-700">16-30d: {rangos["16-30"]}</span>
@@ -887,11 +887,11 @@ export default function Inventario() {
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
-                    <TableHead>Orden</TableHead>
-                    <TableHead>Modelo</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Armada desde</TableHead>
-                    <TableHead className="text-right">Días en stock</TableHead>
+                    <TableHead>{t.inventario.col.orden}</TableHead>
+                    <TableHead>{t.inventario.col.modelo}</TableHead>
+                    <TableHead>{t.inventario.col.color}</TableHead>
+                    <TableHead>{t.inventario.col.armadaDesde}</TableHead>
+                    <TableHead className="text-right">{t.inventario.col.diasEnStock}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -906,7 +906,7 @@ export default function Inventario() {
                   ))}
                   {!arrastre.length && (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Sin stock libre con fecha de armado</TableCell>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">{t.inventario.vacio.arrastre}</TableCell>
                     </TableRow>
                   )}
                 </TableBody>

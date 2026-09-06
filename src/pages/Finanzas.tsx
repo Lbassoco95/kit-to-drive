@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ type FiltroTipo = "TODOS" | MovTipo;
 
 export default function Finanzas() {
   const { user, perms } = useAuth();
+  const { t, lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
   const navigate = useNavigate();
 
   const [movs, setMovs] = useState<Movimiento[]>([]);
@@ -106,7 +109,7 @@ export default function Finanzas() {
   };
 
   const guardar = async () => {
-    const errores = validarMovimiento(form, cuentas);
+    const errores = validarMovimiento(form, cuentas, t.finanzas.validacion);
     if (errores.length) { toast.error(errores[0]); return; }
 
     setGuardando(true);
@@ -142,7 +145,7 @@ export default function Finanzas() {
     setGuardando(false);
     if (error) { toast.error(error.message); return; }
 
-    toast.success(`✓ ${data.folio} registrado — agrega su expediente`);
+    toast.success(t.finanzas.registrado(data.folio));
     setAltaAbierta(false);
     await cargar();
     navigate(`/finanzas/${data.id}`);
@@ -158,15 +161,13 @@ export default function Finanzas() {
         <div>
           <h1 className="flex items-center gap-2">
             <Wallet size={28} className="text-[#1F3864]" />
-            Control Financiero
+            {t.finanzas.title}
           </h1>
-          <p className="mt-1 text-base text-muted-foreground">
-            Ingresos de caja y egresos · {filtrados.length} de {movs.length} movimientos
-          </p>
+          <p className="mt-1 text-base text-muted-foreground">{t.finanzas.subtitle(filtrados.length, movs.length)}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" className="h-12 px-4 text-base" onClick={() => navigate("/proveedores")}>
-            <Building2 className="mr-2 h-5 w-5" /> Proveedores
+            <Building2 className="mr-2 h-5 w-5" /> {t.finanzas.proveedores}
           </Button>
           {puedeCapturar && (
             <>
@@ -174,13 +175,13 @@ export default function Finanzas() {
                 onClick={() => abrirAlta("INGRESO")}
                 className="h-12 bg-emerald-600 px-5 text-base hover:bg-emerald-700"
               >
-                <ArrowDownCircle className="mr-2 h-5 w-5" /> Registrar ingreso
+                <ArrowDownCircle className="mr-2 h-5 w-5" /> {t.finanzas.registrarIngreso}
               </Button>
               <Button
                 onClick={() => abrirAlta("EGRESO")}
                 className="h-12 bg-[#1F3864] px-5 text-base hover:bg-[#162a4d]"
               >
-                <ArrowUpCircle className="mr-2 h-5 w-5" /> Registrar egreso
+                <ArrowUpCircle className="mr-2 h-5 w-5" /> {t.finanzas.registrarEgreso}
               </Button>
             </>
           )}
@@ -201,12 +202,12 @@ export default function Finanzas() {
                   <Badge variant="outline" className="ml-auto text-[10px]">{s.moneda}</Badge>
                 </div>
                 <div className={`mt-1.5 text-2xl font-extrabold ${negativo ? "text-red-600" : "text-[#1F3864]"}`}>
-                  {fmtMoneda(Number(s.saldo_actual), s.moneda)}
+                  {fmtMoneda(Number(s.saldo_actual), s.moneda, locale)}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  <span className="text-emerald-600">+{fmtMoneda(Number(s.total_ingresos), s.moneda)}</span>
+                  <span className="text-emerald-600">+{fmtMoneda(Number(s.total_ingresos), s.moneda, locale)}</span>
                   {" · "}
-                  <span className="text-red-500">−{fmtMoneda(Number(s.total_egresos), s.moneda)}</span>
+                  <span className="text-red-500">−{fmtMoneda(Number(s.total_egresos), s.moneda, locale)}</span>
                 </div>
               </Card>
             );
@@ -223,12 +224,9 @@ export default function Finanzas() {
           <div className="flex items-center gap-3">
             <AlertTriangle size={22} className="shrink-0 text-amber-600" />
             <div className="flex-1">
-              <p className="font-bold text-amber-900">
-                {porComprobar.length} entrega{porComprobar.length === 1 ? "" : "s"} de efectivo sin comprobar
-              </p>
+              <p className="font-bold text-amber-900">{t.finanzas.sinComprobar(porComprobar.length)}</p>
               <p className="text-sm text-amber-800">
-                {fmtMoneda(porComprobar.reduce((s, m) => s + Number(m.monto_mxn ?? 0), 0))} entregados que
-                todavía no tienen comprobante ni cambio de vuelta.
+                {t.finanzas.sinComprobarDesc(fmtMoneda(porComprobar.reduce((s, m) => s + Number(m.monto_mxn ?? 0), 0), "MXN", locale))}
               </p>
             </div>
             <ChevronRight size={18} className="text-amber-600" />
@@ -239,17 +237,17 @@ export default function Finanzas() {
       {/* Totales del filtro */}
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Ingresos confirmados</p>
-          <p className="text-2xl font-extrabold text-emerald-600">{fmtMoneda(totales.ingresos)}</p>
+          <p className="text-sm text-muted-foreground">{t.finanzas.ingresosConfirmados}</p>
+          <p className="text-2xl font-extrabold text-emerald-600">{fmtMoneda(totales.ingresos, "MXN", locale)}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Egresos confirmados</p>
-          <p className="text-2xl font-extrabold text-red-600">{fmtMoneda(totales.egresos)}</p>
+          <p className="text-sm text-muted-foreground">{t.finanzas.egresosConfirmados}</p>
+          <p className="text-2xl font-extrabold text-red-600">{fmtMoneda(totales.egresos, "MXN", locale)}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-sm text-muted-foreground">Neto (MXN)</p>
+          <p className="text-sm text-muted-foreground">{t.finanzas.neto}</p>
           <p className={`text-2xl font-extrabold ${totales.neto < 0 ? "text-red-600" : "text-[#1F3864]"}`}>
-            {fmtMoneda(totales.neto)}
+            {fmtMoneda(totales.neto, "MXN", locale)}
           </p>
         </Card>
       </div>
@@ -258,9 +256,9 @@ export default function Finanzas() {
       <Card className="space-y-3 p-3">
         <div className="flex flex-wrap gap-2">
           {([
-            { v: "TODOS" as FiltroTipo, label: "Todos" },
-            { v: "INGRESO" as FiltroTipo, label: "Ingresos" },
-            { v: "EGRESO" as FiltroTipo, label: "Egresos" },
+            { v: "TODOS" as FiltroTipo, label: t.finanzas.tabs.todos },
+            { v: "INGRESO" as FiltroTipo, label: t.finanzas.tabs.ingresos },
+            { v: "EGRESO" as FiltroTipo, label: t.finanzas.tabs.egresos },
           ]).map(t => (
             <button
               key={t.v}
@@ -278,11 +276,11 @@ export default function Finanzas() {
             onClick={() => setFiltrosAbiertos(v => !v)}
           >
             <Filter size={15} className="mr-1.5" />
-            Filtros{filtrosActivos ? " ·" : ""}
+            {t.finanzas.filtros}{filtrosActivos ? " ·" : ""}
           </Button>
           {filtrosActivos && (
             <Button variant="ghost" className="h-10" onClick={limpiarFiltros}>
-              <X size={15} className="mr-1" /> Limpiar
+              <X size={15} className="mr-1" /> {t.finanzas.limpiar}
             </Button>
           )}
         </div>
@@ -291,7 +289,7 @@ export default function Finanzas() {
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
           <Input
             className="h-12 pl-10 text-base"
-            placeholder="Buscar por folio, concepto, cliente, proveedor, referencia…"
+            placeholder={t.finanzas.buscar}
             value={q}
             onChange={e => setQ(e.target.value)}
           />
@@ -300,23 +298,23 @@ export default function Finanzas() {
         {filtrosAbiertos && (
           <div className="grid gap-3 border-t pt-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <Label className="text-xs">Estatus</Label>
+              <Label className="text-xs">{t.finanzas.estatus}</Label>
               <Select value={estatus} onValueChange={v => setEstatus(v as MovEstatus | "TODOS")}>
                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="TODOS">Todos</SelectItem>
+                  <SelectItem value="TODOS">{t.finanzas.todos}</SelectItem>
                   {(Object.keys(ESTATUS_MOV) as MovEstatus[]).map(e => (
-                    <SelectItem key={e} value={e}>{ESTATUS_MOV[e].label}</SelectItem>
+                    <SelectItem key={e} value={e}>{t.finanzas.estatusMov(e)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Caja / banco</Label>
+              <Label className="text-xs">{t.finanzas.cajaBanco}</Label>
               <Select value={cuentaId} onValueChange={setCuentaId}>
                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="TODAS">Todas</SelectItem>
+                  <SelectItem value="TODAS">{t.finanzas.todas}</SelectItem>
                   {cuentas.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.nombre} · {c.moneda}</SelectItem>
                   ))}
@@ -324,23 +322,23 @@ export default function Finanzas() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Forma de pago</Label>
+              <Label className="text-xs">{t.finanzas.formaPago}</Label>
               <Select value={metodo} onValueChange={setMetodo}>
                 <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="TODOS">Todas</SelectItem>
+                  <SelectItem value="TODOS">{t.finanzas.todas}</SelectItem>
                   {METODOS_PAGO.map(m => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    <SelectItem key={m.value} value={m.value}>{t.finanzas.metodoPago(m.value)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Desde</Label>
+              <Label className="text-xs">{t.finanzas.desde}</Label>
               <Input type="date" className="h-10" value={desde} onChange={e => setDesde(e.target.value)} />
             </div>
             <div>
-              <Label className="text-xs">Hasta</Label>
+              <Label className="text-xs">{t.finanzas.hasta}</Label>
               <Input type="date" className="h-10" value={hasta} onChange={e => setHasta(e.target.value)} />
             </div>
             <div className="flex items-end">
@@ -353,7 +351,7 @@ export default function Finanzas() {
                     : "border-slate-200 text-slate-600 hover:border-slate-300"
                 }`}
               >
-                Solo pendientes de comprobar
+                {t.finanzas.soloPorComprobar}
               </button>
             </div>
           </div>
@@ -362,12 +360,10 @@ export default function Finanzas() {
 
       {/* Lista */}
       {cargando ? (
-        <div className="py-16 text-center text-muted-foreground">Cargando…</div>
+        <div className="py-16 text-center text-muted-foreground">{t.finanzas.cargando}</div>
       ) : filtrados.length === 0 ? (
         <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
-          {movs.length === 0
-            ? "Aún no hay movimientos. Registra el primer ingreso o egreso."
-            : "Ningún movimiento coincide con la búsqueda."}
+          {movs.length === 0 ? t.finanzas.sinMovimientos : t.finanzas.sinCoincidencias}
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -394,48 +390,48 @@ export default function Finanzas() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-muted-foreground">{m.folio}</span>
                       <span className="truncate text-base font-bold text-[#1F3864]">{m.concepto}</span>
-                      <Badge variant="outline" className={est.clase}>{est.label}</Badge>
+                      <Badge variant="outline" className={est.clase}>{t.finanzas.estatusMov(m.estatus)}</Badge>
                       {m.tiene_factura && (
                         <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-xs text-emerald-700">
-                          <FileText size={11} className="mr-1" /> Con factura
+                          <FileText size={11} className="mr-1" /> {t.finanzas.conFactura}
                         </Badge>
                       )}
                       {pendienteComprobar && (
                         <Badge variant="outline" className="border-amber-300 bg-amber-50 text-xs text-amber-800">
-                          <AlertTriangle size={11} className="mr-1" /> Por comprobar
+                          <AlertTriangle size={11} className="mr-1" /> {t.finanzas.porComprobar}
                         </Badge>
                       )}
                     </div>
 
                     <div className="text-sm text-muted-foreground">
                       <span className="font-medium text-foreground">
-                        {esIngreso ? "Pagó:" : "Pagamos a:"}
+                        {esIngreso ? t.finanzas.pago : t.finanzas.pagamosA}
                       </span>{" "}
                       {m.contraparte_nombre}
                       {m.via === "INTERMEDIARIO" && m.intermediario_display && (
                         <span className="text-amber-700">
-                          {" "}· {esIngreso ? "lo trajo" : "vía"} {m.intermediario_display}
+                          {" "}· {esIngreso ? t.finanzas.loTrajo : t.finanzas.via} {m.intermediario_display}
                         </span>
                       )}
                     </div>
 
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                      <span>{fmtFecha(m.fecha_movimiento)}</span>
+                      <span>{fmtFecha(m.fecha_movimiento, locale)}</span>
                       {m.cuenta_nombre && <span>· {m.cuenta_nombre}</span>}
-                      <span>· {METODOS_PAGO.find(x => x.value === m.metodo_pago)?.label ?? m.metodo_pago}</span>
+                      <span>· {t.finanzas.metodoPago(m.metodo_pago)}</span>
                       {m.categoria && <span>· {m.categoria}</span>}
-                      {m.folio_remision && <span>· Remisión {m.folio_remision}</span>}
-                      {!!m.adjuntos_count && <span>· {m.adjuntos_count} doc.</span>}
+                      {m.folio_remision && <span>· {t.finanzas.remisionCorta(m.folio_remision)}</span>}
+                      {!!m.adjuntos_count && <span>· {t.finanzas.docs(m.adjuntos_count)}</span>}
                     </div>
                   </div>
 
                   <div className="shrink-0 text-right">
                     <div className={`text-lg font-extrabold ${esIngreso ? "text-emerald-600" : "text-red-600"}`}>
-                      {esIngreso ? "+" : "−"}{fmtMoneda(Number(m.monto), m.moneda)}
+                      {esIngreso ? "+" : "−"}{fmtMoneda(Number(m.monto), m.moneda, locale)}
                     </div>
                     {m.moneda !== "MXN" && (
                       <div className="text-xs text-muted-foreground">
-                        {fmtMoneda(Number(m.monto_mxn), "MXN")}
+                        {fmtMoneda(Number(m.monto_mxn), "MXN", locale)}
                       </div>
                     )}
                   </div>
@@ -452,20 +448,20 @@ export default function Finanzas() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus size={18} />
-              {form.tipo === "INGRESO" ? "Registrar ingreso a caja" : "Registrar egreso / pago"}
+              {form.tipo === "INGRESO" ? t.finanzas.altaIngreso : t.finanzas.altaEgreso}
             </DialogTitle>
           </DialogHeader>
           <MovimientoForm form={form} setForm={setForm} cuentas={cuentas} />
           <DialogFooter>
             <Button variant="outline" className="h-11" onClick={() => setAltaAbierta(false)}>
-              Cancelar
+              {t.actions.cancel}
             </Button>
             <Button
               onClick={guardar}
               disabled={guardando}
               className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
             >
-              {guardando ? "Guardando…" : "Guardar y abrir expediente"}
+              {guardando ? t.finanzas.guardando : t.finanzas.guardarAbrirExpediente}
             </Button>
           </DialogFooter>
         </DialogContent>
