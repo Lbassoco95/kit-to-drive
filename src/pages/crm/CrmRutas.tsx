@@ -96,13 +96,17 @@ export default function CrmRutas() {
       
       // Insertar paradas
       if (paradasLocales.length > 0) {
+        // `crm_ruta_paradas` no tiene descripcion/hora_estimada/notas: los
+        // campos del formulario se guardan en las columnas que sí existen
+        // (nombre_cliente, hora_llegada, objetivo). Antes el INSERT fallaba
+        // completo y la ruta se creaba sin ninguna parada.
         const paradasPayload = paradasLocales.map(p => ({
           ruta_id: rutaData.id,
           orden: p.orden,
           cliente_id: p.cliente_id || null,
-          descripcion: p.descripcion,
-          hora_estimada: p.hora_estimada || null,
-          notas: p.notas
+          nombre_cliente: p.descripcion || null,
+          hora_llegada: p.hora_estimada || null,
+          objetivo: p.notas || null,
         }));
         const { error: paradasError } = await supabase.from("crm_ruta_paradas").insert(paradasPayload);
         if (paradasError) return toast.error(paradasError.message);
@@ -223,14 +227,14 @@ export default function CrmRutas() {
                           {p.orden}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium">{cliente?.nombre_comercial || p.descripcion}</div>
-                          {p.hora_estimada && (
+                          <div className="font-medium">{cliente?.nombre_comercial || p.nombre_cliente}</div>
+                          {p.hora_llegada && (
                             <div className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Clock size={14}/> {p.hora_estimada}
+                              <Clock size={14}/> {p.hora_llegada}
                             </div>
                           )}
-                          {p.notas && (
-                            <div className="text-sm text-muted-foreground mt-1">{p.notas}</div>
+                          {p.objetivo && (
+                            <div className="text-sm text-muted-foreground mt-1">{p.objetivo}</div>
                           )}
                         </div>
                         <Button

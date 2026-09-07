@@ -162,7 +162,9 @@ export default function Produccion() {
   const [view, setView] = useState<"cards" | "tabla">("cards");
   const [editing, setEditing] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<any>({});
-  const [confirm, setConfirm] = useState<{ moto: any; action: "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
+  // «Iniciar ensamble» despacha EN_PROCESO, así que va en la unión: sin él,
+  // TypeScript daba por muerta la rama que sí se ejecuta.
+  const [confirm, setConfirm] = useState<{ moto: any; action: "EN_PROCESO" | "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
   const [comentariosMoto, setComentariosMoto] = useState<{ id: string; orden: number } | null>(null);
   const [contenedorPartes, setContenedorPartes] = useState<{ id: string; folio: string } | null>(null);
   const [liberar, setLiberar] = useState<{ id: string; orden: number } | null>(null);

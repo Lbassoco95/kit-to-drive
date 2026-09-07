@@ -25,9 +25,15 @@ describe("acceso por área", () => {
     expect(comercial.puedeVer("crm")).toBe(true);
     expect(comercial.puedeVer("produccion")).toBe(false);
 
+    // Administración es el área transversal del ERP: desde 40b0800 también ve
+    // la operación, no sólo finanzas. Lo que sigue fuera de su alcance es la
+    // administración del sistema (usuarios y bitácora).
     const admin = permisosDe("administracion", "operador");
     expect(admin.puedeVer("finanzas")).toBe(true);
-    expect(admin.puedeVer("produccion")).toBe(false);
+    expect(admin.puedeVer("produccion")).toBe(true);
+    expect(admin.puedeVer("crm")).toBe(true);
+    expect(admin.puedeVer("usuarios")).toBe(false);
+    expect(admin.puedeVer("bitacora")).toBe(false);
   });
 
   it("Dirección tiene visibilidad transversal pero no escribe fuera de su área", () => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
+import type { Json, TablesUpdate } from "@/integrations/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -722,7 +722,7 @@ export default function Remisiones() {
       vendedor_id,
       fecha_remision: form.fecha_remision,
       notas: form.notas||null,
-      estatus: "NUEVA",
+      estatus: "NUEVA" as const,
     };
 
     const { data: nueva, error } = await supabase.from("remisiones").insert(corePayload).select("id").single();
@@ -730,7 +730,10 @@ export default function Remisiones() {
 
     // UPDATE con columnas extendidas — tolerante a cache stale (falla silenciosamente)
     if (nueva?.id) {
-      const extended: Record<string,any> = {
+      // Tipado con la propia tabla y no `Record<string, any>`: el cliente de
+      // Supabase rechaza los índices abiertos, y así un nombre de columna mal
+      // escrito se ve aquí y no en runtime.
+      const extended: TablesUpdate<"remisiones"> = {
         tipo_pago: form.tipo_pago,
         pagado: form.tipo_pago === "anticipado",
         color_solicitado: motos[0]?.color || "BLANCO",
@@ -825,38 +828,14 @@ export default function Remisiones() {
   const verComprobante = (path:string) => setPreviewPath(path);
 
   const cerrarRemision = async (id: string) => {
-    // Get the remision to know which model/color to decrement
-    const { data: remisionData, error: fetchError } = await supabase
-      .from("remisiones")
-      .select("color_solicitado, remision_items")
-      .eq("id", id)
-      .single();
-
-    if (fetchError) {
-      console.error("Error fetching remision data:", fetchError);
-    }
-
-    // Mark as complete
+    // Aquí se leía `remision_items` como si fuera una columna de `remisiones`
+    // —es otra tabla— así que la consulta siempre fallaba y el descuento de
+    // color nunca corría. No hace falta: desde 20260823000001
+    // `decrementar_inventario_color` sólo llama a `recalcular_inventario_colores`,
+    // y esa recalculación ya la disparan los triggers de `motocarros` e
+    // `inventario_chasis` con cada movimiento.
     const { error } = await supabase.from("remisiones").update({ estatus: "COMPLETA" }).eq("id", id);
     if (error) return toast.error(error.message);
-
-    // Decrement color inventory for each motocarro item
-    if (remisionData) {
-      const items = remisionData.remision_items || [];
-      for (const item of items) {
-        if (item.tipo_servicio === "motocarro" && item.modelo && item.color) {
-          try {
-            await supabase.rpc("decrementar_inventario_color", {
-              _modelo: item.modelo,
-              _color: item.color,
-              _cantidad: item.cantidad || 1,
-            });
-          } catch (error) {
-            console.error("Error decrementing color inventory:", error);
-          }
-        }
-      }
-    }
 
     toast.success(t.remisiones.entregadaOk);
     setCierreConfirm(null); load();
