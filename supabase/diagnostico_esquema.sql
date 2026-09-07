@@ -227,6 +227,11 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260904000001_solicitudes_a_fabrica',        'funcion|responder_solicitud(uuid,boolean,text)'),
   ('20260904000001_solicitudes_a_fabrica',        'politica|avisos.leer avisos de mi area|usuario_destino'),
 
+  -- El cilindraje y el color del motocarro ya armado los declara Fábrica.
+  -- Misma firma que 20260828000001, así que se reconoce por el cuerpo: la
+  -- versión nueva es la que manda el color por `cambiar_color_chasis`.
+  ('20260907000001_ya_armado_cilindraje_color',   'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|cambiar_color_chasis'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
