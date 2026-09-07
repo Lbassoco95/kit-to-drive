@@ -114,7 +114,7 @@ export default function CrmOportunidadDetail() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-[#1F3864]">{t.crm.detalle.title}</h1>
+          <h1 className="text-2xl font-bold text-[#1F3864]">{oportunidad.titulo || t.crm.detalle.title}</h1>
           <p className="text-muted-foreground mt-1">{cliente?.nombre_comercial || t.crm.sinCliente}</p>
         </div>
         {canEdit && (
@@ -166,12 +166,12 @@ export default function CrmOportunidadDetail() {
             </div>
           )}
 
-          {oportunidad.monto_estimado && (
+          {oportunidad.valor_estimado && (
             <div>
               <Label className="text-muted-foreground text-sm">{t.crm.oportunidades.montoEstimado}</Label>
               <div className="flex items-center gap-2 mt-1">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium">${oportunidad.monto_estimado.toLocaleString()}</span>
+                <span className="font-medium">${oportunidad.valor_estimado.toLocaleString()}</span>
               </div>
             </div>
           )}
