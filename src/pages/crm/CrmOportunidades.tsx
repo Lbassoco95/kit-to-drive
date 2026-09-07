@@ -12,6 +12,19 @@ import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Plus, Pencil, Search, TrendingUp, DollarSign, Calendar, User, Building2, AlertTriangle } from "lucide-react";
 
+/** Estaba escrito tres veces, y por eso las tres copias se separaron. */
+const FORM_VACIO = {
+  titulo: "",
+  cliente_id: "",
+  vendedor_id: "",
+  tipo_venta: "motocarro",
+  cantidad_estimada: "",
+  valor_estimado: "",
+  etapa: "prospecto",
+  fecha_cierre_estimada: "",
+  notas: "",
+};
+
 export default function CrmOportunidades() {
   const { perms, user } = useAuth();
   const { t } = useLang();
@@ -24,17 +37,10 @@ export default function CrmOportunidades() {
   const [q, setQ] = useState("");
   const [selectedEtapa, setSelectedEtapa] = useState<string>("all");
 
-  const etapas = ["prospecto", "contacto", "cotizacion", "negociacion", "ganado", "perdido"];
-  const [form, setForm] = useState<any>({
-    cliente_id: "",
-    vendedor_id: "",
-    tipo_venta: "motocarro",
-    cantidad_estimada: "",
-    monto_estimado: "",
-    etapa: "prospecto",
-    fecha_cierre_estimada: "",
-    notas: ""
-  });
+  // Los valores que acepta `crm_oportunidades_etapa_check`. El alta usaba
+  // «cotizacion», «ganado» y «perdido», que la base rechaza.
+  const etapas = ["prospecto", "contacto", "propuesta", "negociacion", "ganada", "perdida"];
+  const [form, setForm] = useState<any>(FORM_VACIO);
 
   const load = async () => {
     const [{ data: ops }, { data: cs }, { data: vs }] = await Promise.all([
@@ -82,10 +88,15 @@ export default function CrmOportunidades() {
   const canDelete = perms.puedeEliminar("crm");
 
   const save = async () => {
+    // `titulo` es NOT NULL en la base: sin esto el alta se rechazaba y el
+    // mensaje que veía el usuario era el error crudo de Postgres.
+    if (!form.titulo?.trim()) return toast.error(t.crm.oportunidades.tituloRequerido);
+
     const payload = {
       ...form,
+      titulo: form.titulo.trim(),
       cantidad_estimada: form.cantidad_estimada ? parseInt(form.cantidad_estimada) : null,
-      monto_estimado: form.monto_estimado ? parseFloat(form.monto_estimado) : null,
+      valor_estimado: form.valor_estimado ? parseFloat(form.valor_estimado) : null,
       fecha_cierre_estimada: form.fecha_cierre_estimada || null,
       vendedor_id: form.vendedor_id || user?.id
     };
@@ -103,16 +114,7 @@ export default function CrmOportunidades() {
         return;
       }
     }
-    setForm({
-      cliente_id: "",
-      vendedor_id: "",
-      tipo_venta: "motocarro",
-      cantidad_estimada: "",
-      monto_estimado: "",
-      etapa: "prospecto",
-      fecha_cierre_estimada: "",
-      notas: ""
-    });
+    setForm(FORM_VACIO);
     load();
   };
 
@@ -127,10 +129,10 @@ export default function CrmOportunidades() {
   const etapaColors: Record<string, string> = {
     prospecto: "bg-gray-100 text-gray-700",
     contacto: "bg-blue-100 text-blue-700",
-    cotizacion: "bg-yellow-100 text-yellow-700",
+    propuesta: "bg-yellow-100 text-yellow-700",
     negociacion: "bg-orange-100 text-orange-700",
-    ganado: "bg-green-100 text-green-700",
-    perdido: "bg-red-100 text-red-700"
+    ganada: "bg-green-100 text-green-700",
+    perdida: "bg-red-100 text-red-700"
   };
 
   return (
@@ -141,7 +143,7 @@ export default function CrmOportunidades() {
           <p className="text-base text-muted-foreground mt-1">{t.crm.oportunidades.subtitle(filtered.length)}</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setForm({ cliente_id: "", vendedor_id: "", tipo_venta: "motocarro", cantidad_estimada: "", monto_estimado: "", etapa: "prospecto", fecha_cierre_estimada: "", notas: "" }); setCreating(true); }}
+          <Button onClick={() => { setForm(FORM_VACIO); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> {t.crm.oportunidades.nueva}
           </Button>
@@ -197,9 +199,15 @@ export default function CrmOportunidades() {
                   <div className="text-xs uppercase text-muted-foreground tracking-wide font-medium">
                     {cliente?.nombre_comercial || t.crm.sinCliente} {cliente?.codigo_erp && `(${cliente.codigo_erp})`}
                   </div>
-                  <div className="text-lg font-bold text-[#1F3864] truncate">{t.crm.tipoVenta(o.tipo_venta)}</div>
-                  <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${etapaColors[o.etapa]}`}>
-                    {t.crm.etapa(o.etapa)}
+                  {/* El título encabeza la tarjeta; antes iba el tipo de venta y
+                      todas decían lo mismo. El respaldo es para las que se
+                      crearon sin título. */}
+                  <div className="text-lg font-bold text-[#1F3864] truncate">{o.titulo || t.crm.tipoVenta(o.tipo_venta)}</div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${etapaColors[o.etapa]}`}>
+                      {t.crm.etapa(o.etapa)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">{t.crm.tipoVenta(o.tipo_venta)}</span>
                   </div>
                 </div>
                 <div className="flex gap-1">
@@ -225,9 +233,9 @@ export default function CrmOportunidades() {
                     <TrendingUp size={16}/> <span>{t.crm.unidades(o.cantidad_estimada)}</span>
                   </div>
                 )}
-                {o.monto_estimado && (
+                {o.valor_estimado && (
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <DollarSign size={16}/> <span>${o.monto_estimado.toLocaleString()}</span>
+                    <DollarSign size={16}/> <span>${o.valor_estimado.toLocaleString()}</span>
                   </div>
                 )}
                 {o.fecha_cierre_estimada && (
@@ -274,6 +282,14 @@ export default function CrmOportunidades() {
           <DialogHeader><DialogTitle>{editing ? t.crm.oportunidades.editar : t.crm.oportunidades.nueva}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
+              <Label>{t.crm.oportunidades.tituloLabel}</Label>
+              <Input
+                value={form.titulo}
+                placeholder={t.crm.oportunidades.tituloPlaceholder}
+                onChange={e => setForm({ ...form, titulo: e.target.value })}
+              />
+            </div>
+            <div>
               <Label>{t.crm.cliente}</Label>
               <Select value={form.cliente_id} onValueChange={(v) => setForm({ ...form, cliente_id: v })}>
                 <SelectTrigger><SelectValue placeholder={t.crm.seleccionarCliente} /></SelectTrigger>
@@ -311,13 +327,13 @@ export default function CrmOportunidades() {
               <Label>{t.crm.oportunidades.etapaLabel}</Label>
               <Select value={form.etapa} onValueChange={(v) => setForm({ ...form, etapa: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
+                {/* Sale de `etapas`, la misma lista que filtra arriba: tener las
+                    opciones escritas aparte fue lo que dejó que se separaran de
+                    lo que acepta la base. */}
                 <SelectContent>
-                  <SelectItem value="prospecto">{t.crm.etapas.prospecto}</SelectItem>
-                  <SelectItem value="contacto">{t.crm.etapas.contacto}</SelectItem>
-                  <SelectItem value="cotizacion">{t.crm.etapas.cotizacion}</SelectItem>
-                  <SelectItem value="negociacion">{t.crm.etapas.negociacion}</SelectItem>
-                  <SelectItem value="ganado">{t.crm.etapas.ganado}</SelectItem>
-                  <SelectItem value="perdido">{t.crm.etapas.perdido}</SelectItem>
+                  {etapas.map(e => (
+                    <SelectItem key={e} value={e}>{t.crm.etapa(e)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -327,7 +343,7 @@ export default function CrmOportunidades() {
             </div>
             <div>
               <Label>{t.crm.oportunidades.montoEstimado}</Label>
-              <Input type="number" step="0.01" value={form.monto_estimado} onChange={e => setForm({ ...form, monto_estimado: e.target.value })} />
+              <Input type="number" step="0.01" value={form.valor_estimado} onChange={e => setForm({ ...form, valor_estimado: e.target.value })} />
             </div>
             <div>
               <Label>{t.crm.oportunidades.fechaCierre}</Label>

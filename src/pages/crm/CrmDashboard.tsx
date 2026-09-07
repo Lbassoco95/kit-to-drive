@@ -27,27 +27,27 @@ export default function CrmDashboard() {
     const [
       { count: totalOps },
       { count: ganadas },
-      { data: montos },
+      { data: opsGanadas },
       { count: actMes },
-      { count: rutasMes },
-      { data: vendedoresData }
+      { count: rutasMes }
     ] = await Promise.all([
       supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }),
-      supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }).eq("etapa", "ganado"),
-      supabase.from("crm_oportunidades").select("monto_estimado").eq("etapa", "ganado"),
+      // La etapa en la base es «ganada», no «ganado»: con el masculino estas dos
+      // consultas no encontraban nada y el monto ganado siempre salía en $0.
+      supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }).eq("etapa", "ganada"),
+      supabase.from("crm_oportunidades").select("vendedor_id, valor_estimado").eq("etapa", "ganada"),
       supabase.from("crm_actividades").select("*", { count: "exact", head: true }).gte("fecha", new Date(new Date().setDate(new Date().getDate() - 30)).toISOString()),
-      supabase.from("crm_rutas").select("*", { count: "exact", head: true }).gte("fecha", new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString()),
-      supabase.from("crm_oportunidades").select("vendedor_id, monto_estimado").eq("etapa", "ganado")
+      supabase.from("crm_rutas").select("*", { count: "exact", head: true }).gte("fecha", new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString())
     ]);
 
     // Calcular monto total
-    const montoTotal = montos?.reduce((sum: number, o: any) => sum + (o.monto_estimado || 0), 0) || 0;
+    const montoTotal = opsGanadas?.reduce((sum: number, o: any) => sum + (o.valor_estimado || 0), 0) || 0;
 
     // Calcular top vendedores por monto ganado
     const vendedorMontos: Record<string, number> = {};
-    vendedoresData?.forEach((o: any) => {
-      if (o.vendedor_id && o.monto_estimado) {
-        vendedorMontos[o.vendedor_id] = (vendedorMontos[o.vendedor_id] || 0) + o.monto_estimado;
+    opsGanadas?.forEach((o: any) => {
+      if (o.vendedor_id && o.valor_estimado) {
+        vendedorMontos[o.vendedor_id] = (vendedorMontos[o.vendedor_id] || 0) + o.valor_estimado;
       }
     });
 

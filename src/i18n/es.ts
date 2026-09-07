@@ -1,12 +1,14 @@
 // Etiquetas CRM que viven como texto libre en la base de datos: se traducen con
 // una función para que un valor nuevo no rompa la pantalla (cae al valor crudo).
+// Las llaves son los valores que acepta `crm_oportunidades_etapa_check`. Si no
+// coinciden, el INSERT se rechaza y los filtros por etapa no encuentran nada.
 const CRM_ETAPAS_ES: Record<string, string> = {
   prospecto: "Prospecto",
   contacto: "Contacto",
-  cotizacion: "Cotización",
+  propuesta: "Propuesta",
   negociacion: "Negociación",
-  ganado: "Ganado",
-  perdido: "Perdido",
+  ganada: "Ganada",
+  perdida: "Perdida",
 };
 const CRM_TIPO_VENTA_ES: Record<string, string> = {
   motocarro: "Motocarro",
@@ -1981,14 +1983,6 @@ export const es = {
       ninguno: "Ninguno",
       vendedores: "Vendedores",
     },
-    etapas: {
-      prospecto: "Prospecto",
-      contacto: "Contacto",
-      cotizacion: "Cotización",
-      negociacion: "Negociación",
-      ganado: "Ganado",
-      perdido: "Perdido",
-    },
     tiposVenta: {
       motocarro: "Motocarro",
       refaccion: "Refacción",
@@ -2045,6 +2039,9 @@ export const es = {
       buscar: "Buscar por cliente, vendedor, etapa…",
       todas: "Todas",
       sinOportunidades: "Sin oportunidades",
+      tituloLabel: "Título",
+      tituloPlaceholder: "Ej. 20 motocarros para Transportes del Norte",
+      tituloRequerido: "Ponle un título a la oportunidad",
       cantidadEstimada: "Cantidad estimada",
       montoEstimado: "Monto estimado",
       fechaCierre: "Fecha estimada de cierre",
