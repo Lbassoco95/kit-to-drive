@@ -7,10 +7,10 @@ import type { Translations } from "./es";
 const CRM_ETAPAS_ZH: Record<string, string> = {
   prospecto: "潜在客户",
   contacto: "已接触",
-  cotizacion: "报价中",
+  propuesta: "报价中",
   negociacion: "谈判中",
-  ganado: "已成交",
-  perdido: "已流失",
+  ganada: "已成交",
+  perdida: "已流失",
 };
 const CRM_TIPO_VENTA_ZH: Record<string, string> = {
   motocarro: "三轮摩托车",
@@ -1976,14 +1976,6 @@ export const zh = {
       ninguno: "无",
       vendedores: "销售员",
     },
-    etapas: {
-      prospecto: "潜在客户",
-      contacto: "已接触",
-      cotizacion: "报价中",
-      negociacion: "谈判中",
-      ganado: "已成交",
-      perdido: "已流失",
-    },
     tiposVenta: {
       motocarro: "三轮摩托车",
       refaccion: "配件",
@@ -2040,6 +2032,9 @@ export const zh = {
       buscar: "按客户、销售员或阶段搜索…",
       todas: "全部",
       sinOportunidades: "暂无商机",
+      tituloLabel: "标题",
+      tituloPlaceholder: "例如：北方运输公司 20 台三轮摩托车",
+      tituloRequerido: "请为该商机填写标题",
       cantidadEstimada: "预计数量",
       montoEstimado: "预计金额",
       fechaCierre: "预计成交日期",

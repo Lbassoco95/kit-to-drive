@@ -23,9 +23,10 @@ type OpportunityData = {
   vendedor_id: string;
   tipo_venta: string;
   cantidad_estimada: number;
-  monto_estimado: number;
+  valor_estimado: number;
   etapa: string;
   fecha_cierre_estimada: string;
+  fecha_cierre_real: string | null;
   limitante_descuento: boolean;
   limitante_flete: boolean;
   limitante_precio: boolean;
@@ -34,9 +35,70 @@ type OpportunityData = {
   cliente_codigo_erp?: string;
 };
 
+/** Las dos etapas que cierran una oportunidad, según el CHECK de la tabla. */
+const CERRADAS = ["ganada", "perdida"];
+
+const esActiva = (o: OpportunityData) => !CERRADAS.includes(o.etapa);
+
+const cerroEsteMes = (o: OpportunityData) => {
+  if (!o.fecha_cierre_real) return false;
+  const [anio, mes] = o.fecha_cierre_real.split("-").map(Number);
+  const hoy = new Date();
+  return anio === hoy.getFullYear() && mes === hoy.getMonth() + 1;
+};
+
+/**
+ * El tablero es por vendedor, pero `v_reporte_pipeline` devuelve una fila por
+ * oportunidad y no trae `vendedor_id`, así que no se puede agrupar con ella.
+ * Los totales se arman aquí, con los mismos cortes que la vista usa para su
+ * `estado_pipeline`: cerrada si la etapa lo dice, vencida si se le pasó la
+ * fecha estimada, y activa en cualquier otro caso.
+ *
+ * `vendedor` queda vacío si la oportunidad no tiene quién la lleve; la etiqueta
+ * la pone el render, para que siga el idioma activo.
+ */
+function agruparPorVendedor(
+  ops: OpportunityData[],
+  nombres: Map<string, string>,
+): SellerData[] {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const porVendedor = new Map<string, SellerData>();
+
+  for (const o of ops) {
+    const id = o.vendedor_id ?? "";
+    let fila = porVendedor.get(id);
+    if (!fila) {
+      fila = {
+        vendedor_id: id,
+        vendedor: nombres.get(id) ?? "",
+        oportunidades_activas: 0,
+        valor_pipeline: 0,
+        ganadas_mes: 0,
+        perdidas_mes: 0,
+        vencidas: 0,
+        con_limitantes: 0,
+      };
+      porVendedor.set(id, fila);
+    }
+
+    if (esActiva(o)) {
+      fila.oportunidades_activas += 1;
+      fila.valor_pipeline += Number(o.valor_estimado) || 0;
+      if (o.fecha_cierre_estimada && o.fecha_cierre_estimada < hoy) fila.vencidas += 1;
+      if (o.limitante_descuento || o.limitante_flete || o.limitante_precio) fila.con_limitantes += 1;
+    } else if (cerroEsteMes(o)) {
+      if (o.etapa === "ganada") fila.ganadas_mes += 1;
+      else fila.perdidas_mes += 1;
+    }
+  }
+
+  return [...porVendedor.values()].sort((a, b) => b.valor_pipeline - a.valor_pipeline);
+}
+
 export default function CrmTracker() {
   const { perms } = useAuth();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
   const [sellers, setSellers] = useState<SellerData[]>([]);
   const [oportunidades, setOportunidades] = useState<OpportunityData[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
@@ -45,14 +107,17 @@ export default function CrmTracker() {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: sellersData }, { data: opsData }, { data: csData }] = await Promise.all([
-      supabase.from("v_reporte_pipeline").select("*"),
+    const [{ data: opsData }, { data: csData }, { data: vsData }] = await Promise.all([
       supabase.from("crm_oportunidades").select("*").order("fecha_cierre_estimada", { ascending: true }),
-      supabase.from("clientes").select("id, nombre_comercial, codigo_erp")
+      supabase.from("clientes").select("id, nombre_comercial, codigo_erp"),
+      supabase.from("profiles").select("id, nombre_completo")
     ]);
-    
-    setSellers(sellersData ?? []);
-    setOportunidades(opsData ?? []);
+
+    const ops = (opsData ?? []) as OpportunityData[];
+    const nombres = new Map((vsData ?? []).map(v => [v.id, v.nombre_completo ?? ""]));
+
+    setOportunidades(ops);
+    setSellers(agruparPorVendedor(ops, nombres));
     setClientes(csData ?? []);
     setLoading(false);
   };
@@ -66,20 +131,15 @@ export default function CrmTracker() {
     precio: oportunidades.filter(o => o.limitante_precio).length,
   };
 
-  const sellersWithDescuento = sellers.filter(s => {
-    const sellerOps = oportunidades.filter(o => o.vendedor_id === s.vendedor_id && o.limitante_descuento);
-    return sellerOps.length > 0;
-  }).map(s => s.vendedor);
+  // Los tres eran el mismo filtro escrito tres veces; sólo cambia la limitante.
+  const vendedoresCon = (limitante: "limitante_descuento" | "limitante_flete" | "limitante_precio") =>
+    sellers
+      .filter(s => oportunidades.some(o => o.vendedor_id === s.vendedor_id && o[limitante]))
+      .map(s => s.vendedor || t.crm.sinVendedor);
 
-  const sellersWithFlete = sellers.filter(s => {
-    const sellerOps = oportunidades.filter(o => o.vendedor_id === s.vendedor_id && o.limitante_flete);
-    return sellerOps.length > 0;
-  }).map(s => s.vendedor);
-
-  const sellersWithPrecio = sellers.filter(s => {
-    const sellerOps = oportunidades.filter(o => o.vendedor_id === s.vendedor_id && o.limitante_precio);
-    return sellerOps.length > 0;
-  }).map(s => s.vendedor);
+  const sellersWithDescuento = vendedoresCon("limitante_descuento");
+  const sellersWithFlete = vendedoresCon("limitante_flete");
+  const sellersWithPrecio = vendedoresCon("limitante_precio");
 
   if (!perms.puedeVer("crmEquipo")) {
     return (
@@ -119,7 +179,7 @@ export default function CrmTracker() {
                 <tbody>
                   {sellers.map((seller) => {
                     const isExpanded = expandedSeller === seller.vendedor_id;
-                    const sellerOps = oportunidades.filter(o => o.vendedor_id === seller.vendedor_id && !["ganado", "perdido"].includes(o.etapa));
+                    const sellerOps = oportunidades.filter(o => o.vendedor_id === seller.vendedor_id && esActiva(o));
                     
                     return (
                       <>
@@ -127,14 +187,14 @@ export default function CrmTracker() {
                           <td className="p-4">
                             <div className="flex items-center gap-2">
                               <Users className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-medium">{seller.vendedor}</span>
+                              <span className="font-medium">{seller.vendedor || t.crm.sinVendedor}</span>
                             </div>
                           </td>
                           <td className="text-right p-4 font-medium">{seller.oportunidades_activas}</td>
                           <td className="text-right p-4">
                             <span className="flex items-center justify-end gap-1">
                               <DollarSign className="h-4 w-4 text-muted-foreground" />
-                              {seller.valor_pipeline.toLocaleString()}
+                              {seller.valor_pipeline.toLocaleString(locale)}
                             </span>
                           </td>
                           <td className="text-right p-4 text-red-600">{seller.vencidas}</td>
@@ -178,10 +238,10 @@ export default function CrmTracker() {
                                                 {t.crm.tipoVenta(op.tipo_venta)} · {t.crm.etapa(op.etapa)}
                                               </div>
                                               <div className="flex items-center gap-3 mt-2 text-xs">
-                                                <span>${op.monto_estimado?.toLocaleString() || "0"}</span>
+                                                <span>${op.valor_estimado?.toLocaleString(locale) || "0"}</span>
                                                 <span>{op.cantidad_estimada || 0} {t.crm.tracker.unid}</span>
                                                 <span className={isVencida ? "text-red-600 font-medium" : ""}>
-                                                  {op.fecha_cierre_estimada ? new Date(op.fecha_cierre_estimada).toLocaleDateString() : t.crm.sinFecha}
+                                                  {op.fecha_cierre_estimada ? new Date(op.fecha_cierre_estimada).toLocaleDateString(locale) : t.crm.sinFecha}
                                                 </span>
                                               </div>
                                             </div>

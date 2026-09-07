@@ -489,8 +489,10 @@ function ResumenEjecutivo() {
         supabase.from("motocarros").select("estatus_entrega"),
         supabase.from("remisiones").select("estatus"),
         supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }),
-        supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }).eq("etapa", "ganado"),
-        supabase.from("crm_oportunidades").select("vendedor_id, monto_estimado").eq("etapa", "ganado"),
+        // «ganada» y `valor_estimado` son los nombres reales en la base; con los
+        // anteriores el resumen ejecutivo daba 0 oportunidades ganadas y $0.
+        supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }).eq("etapa", "ganada"),
+        supabase.from("crm_oportunidades").select("vendedor_id, valor_estimado").eq("etapa", "ganada"),
         supabase.from("crm_actividades").select("*", { count: "exact", head: true }).gte("fecha", hace30),
       ]);
 
@@ -502,12 +504,12 @@ function ResumenEjecutivo() {
       const remisionesCompletas = (rems ?? []).filter((r: any) => r.estatus === "COMPLETA").length;
       const remisionesParciales = (rems ?? []).filter((r: any) => r.estatus === "PARCIAL").length;
 
-      const montoTotal = (opsGanadasData ?? []).reduce((s: number, o: any) => s + (o.monto_estimado || 0), 0);
+      const montoTotal = (opsGanadasData ?? []).reduce((s: number, o: any) => s + (o.valor_estimado || 0), 0);
 
       const vendedorMontos: Record<string, number> = {};
       (opsGanadasData ?? []).forEach((o: any) => {
-        if (o.vendedor_id && o.monto_estimado) {
-          vendedorMontos[o.vendedor_id] = (vendedorMontos[o.vendedor_id] || 0) + o.monto_estimado;
+        if (o.vendedor_id && o.valor_estimado) {
+          vendedorMontos[o.vendedor_id] = (vendedorMontos[o.vendedor_id] || 0) + o.valor_estimado;
         }
       });
 
