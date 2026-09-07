@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { CatalogoModelos, displayFabrica, lineaDe, COLORES, normColor, CapacidadColor, claveCapacidad, explicarError } from "@/lib/dazon";
 import { ReportarIncidencia } from "@/components/ReportarIncidencia";
 import { cargarCapacidadColor } from "@/components/ColorChasis";
+import { useLang } from "@/contexts/LangContext";
 
 type IncidenciaAbierta = { folio: string | null; parte_afectada: string | null };
 type ChasisDisponible = {
@@ -20,6 +21,7 @@ type ChasisDisponible = {
 type MotorDisponible = { id: string; numero_motor: string; modelo: string };
 
 export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -103,7 +105,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
       setMotores((motorData ?? []).map((m: any) => ({ id: m.id, numero_motor: m.numero_motor, modelo: m.modelo })));
       setOrden((ultimoOrden?.[0]?.orden_armado ?? 0) + 1);
     } catch (e: any) {
-      toast.error(explicarError(e, "Error al cargar piezas disponibles"));
+      toast.error(explicarError(e, t.componentes.configurarUnidad.errorCargar));
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
   const colorVin = chasisSel ? normColor(chasisSel.color_original ?? chasisSel.color) : "";
 
   const guardar = async () => {
-    if (!chasisSel || !motorSel) { toast.error("Selecciona un chasis y un motor"); return; }
+    if (!chasisSel || !motorSel) { toast.error(t.componentes.configurarUnidad.faltaSeleccion); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("configurar_unidad", {
       _chasis_id: chasisSel.id, _motor_id: motorSel.id, _orden: orden,
@@ -146,12 +148,12 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
     if (error) { toast.error(error.message); return; }
     const r = data as { ok?: boolean; orden_armado?: number; modelos_coinciden?: boolean; color_cambiado?: boolean; color?: string; color_vin?: string } | null;
     if (r?.color_cambiado) {
-      toast.info(`Unidad #${r?.orden_armado} armada en ${r?.color} — el VIN decía ${r?.color_vin}. Queda registrado.`);
+      toast.info(t.componentes.configurarUnidad.okColorDistinto(r?.orden_armado, r?.color, r?.color_vin));
     }
     if (r?.modelos_coinciden === false) {
-      toast.warning(`Unidad #${r.orden_armado} creada, pero el chasis (${chasisSel.modelo}) y el motor (${motorSel.modelo}) son de modelos distintos.`);
+      toast.warning(t.componentes.configurarUnidad.okModelosDistintos(r.orden_armado, chasisSel.modelo, motorSel.modelo));
     } else {
-      toast.success(`✓ Unidad #${r?.orden_armado ?? orden} configurada`);
+      toast.success(t.componentes.configurarUnidad.ok(r?.orden_armado ?? orden));
     }
     // Quita del pool local las piezas usadas y limpia la selección
     setChasis(prev => prev.filter(c => c.id !== chasisSel.id));
@@ -165,26 +167,26 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
   return (
     <>
       <Button onClick={() => setOpen(true)} className="h-12 bg-[#1F3864] hover:bg-[#162a4d] text-white font-semibold">
-        <Wrench className="h-5 w-5 mr-2" /> Configurar unidad
+        <Wrench className="h-5 w-5 mr-2" /> {t.componentes.configurarUnidad.boton}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-2xl">
-              <Wrench className="h-6 w-6 text-[#1F3864]" /> Configurar unidad
+              <Wrench className="h-6 w-6 text-[#1F3864]" /> {t.componentes.configurarUnidad.boton}
             </DialogTitle>
             <DialogDescription>
-              {loading ? "Cargando piezas disponibles…" : `Quedan ${chasis.length} chasis y ${motores.length} motores sin configurar`}
+              {loading ? t.componentes.configurarUnidad.cargando : t.componentes.configurarUnidad.desc(chasis.length, motores.length)}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Chasis disponible {chasisSel && <span className="text-[#065F46] font-mono">— {chasisSel.numero_chasis}</span>}</Label>
+              <Label>{t.componentes.configurarUnidad.chasisDisponible} {chasisSel && <span className="text-[#065F46] font-mono">— {chasisSel.numero_chasis}</span>}</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-8 h-10" placeholder="Buscar chasis, modelo, color, contenedor…" value={qChasis} onChange={e => setQChasis(e.target.value)} />
+                <Input className="pl-8 h-10" placeholder={t.componentes.configurarUnidad.buscarChasis} value={qChasis} onChange={e => setQChasis(e.target.value)} />
               </div>
               <div className="border rounded-lg max-h-64 overflow-y-auto divide-y">
                 {chasisFiltrados.map(c => (
@@ -201,18 +203,18 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">{displayFabrica(c.modelo, catalogo)} · {c.color} · {c.folio ?? "sin contenedor"}</div>
+                    <div className="text-xs text-muted-foreground">{displayFabrica(c.modelo, catalogo)} · {c.color} · {c.folio ?? t.componentes.configurarUnidad.sinContenedor}</div>
                   </button>
                 ))}
-                {!loading && chasisFiltrados.length === 0 && <div className="p-4 text-sm text-center text-muted-foreground">Sin chasis disponibles</div>}
+                {!loading && chasisFiltrados.length === 0 && <div className="p-4 text-sm text-center text-muted-foreground">{t.componentes.configurarUnidad.sinChasis}</div>}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Motor disponible {motorSel && <span className="text-[#065F46] font-mono">— {motorSel.numero_motor}</span>}</Label>
+              <Label>{t.componentes.configurarUnidad.motorDisponible} {motorSel && <span className="text-[#065F46] font-mono">— {motorSel.numero_motor}</span>}</Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-8 h-10" placeholder="Buscar motor, modelo…" value={qMotor} onChange={e => setQMotor(e.target.value)} />
+                <Input className="pl-8 h-10" placeholder={t.componentes.configurarUnidad.buscarMotor} value={qMotor} onChange={e => setQMotor(e.target.value)} />
               </div>
               <div className="border rounded-lg max-h-64 overflow-y-auto divide-y">
                 {motoresFiltrados.map(m => (
@@ -225,7 +227,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                     <div className="text-xs text-muted-foreground">{displayFabrica(m.modelo, catalogo)}</div>
                   </button>
                 ))}
-                {!loading && motoresFiltrados.length === 0 && <div className="p-4 text-sm text-center text-muted-foreground">Sin motores disponibles</div>}
+                {!loading && motoresFiltrados.length === 0 && <div className="p-4 text-sm text-center text-muted-foreground">{t.componentes.configurarUnidad.sinMotores}</div>}
               </div>
             </div>
           </div>
@@ -234,11 +236,10 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
             <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEE2E2] text-[#991B1B] text-sm">
               <TriangleAlert className="h-5 w-5 shrink-0" />
               <span className="flex-1">
-                {detenidos} chasis están detenidos por una incidencia (retenidos, en garantía o no útiles).
-                Siguen en inventario, pero no entran al armado hasta resolverse.
+                {t.componentes.configurarUnidad.detenidos(detenidos)}
               </span>
               <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={() => { setOpen(false); nav("/incidencias"); }}>
-                Ver incidencias
+                {t.componentes.configurarUnidad.verIncidencias}
               </Button>
             </div>
           )}
@@ -250,32 +251,30 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
               className="self-start text-sm text-slate-600 hover:text-[#C0392B] hover:underline inline-flex items-center gap-1.5"
             >
               <TriangleAlert className="h-4 w-4" />
-              ¿Este chasis llegó con una falla? Levantar reporte
+              {t.componentes.configurarUnidad.levantarReporte}
             </button>
           )}
 
           {chasisSel?.incidencia && (
             <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
               <TriangleAlert className="h-5 w-5 shrink-0" />
-              Este chasis trae el reporte {chasisSel.incidencia.folio} abierto
-              {chasisSel.incidencia.parte_afectada ? ` (${chasisSel.incidencia.parte_afectada})` : ""}.
-              Se puede configurar: el reporte viaja con la unidad para darle seguimiento.
+              {t.componentes.configurarUnidad.reporteAbierto(chasisSel.incidencia.folio ?? "", chasisSel.incidencia.parte_afectada ?? "")}
             </div>
           )}
 
           {!modelosCoinciden && (
             <div className="rounded-lg p-3 flex items-center gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
               <AlertTriangle className="h-5 w-5 shrink-0" />
-              El chasis es {chasisSel?.modelo} y el motor {motorSel?.modelo} — verifica que sean compatibles.
+              {t.componentes.configurarUnidad.modelosDistintos(chasisSel?.modelo ?? "", motorSel?.modelo ?? "")}
             </div>
           )}
 
           {chasisSel && (
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5">
-                <Palette className="h-4 w-4" /> Color con el que se arma
+                <Palette className="h-4 w-4" /> {t.componentes.configurarUnidad.colorArmado}
                 {colorVin !== colorPropio && (
-                  <span className="text-xs font-normal text-muted-foreground">(el VIN decía {colorVin})</span>
+                  <span className="text-xs font-normal text-muted-foreground">{t.componentes.configurarUnidad.vinDecia(colorVin)}</span>
                 )}
               </Label>
               <div className="flex flex-wrap gap-1.5">
@@ -294,37 +293,36 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                         activo ? "bg-[#1F3864] text-white border-[#1F3864]"
                         : agotado ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
                         : "bg-white text-slate-700 hover:border-[#2E75B6]"}`}
-                      title={propio ? "El color que trae el chasis"
-                        : agotado ? `No quedan juegos ${c} libres de este modelo`
-                        : `${libres} juego(s) ${c} libres`}
+                      title={propio ? t.componentes.configurarUnidad.colorDelChasis
+                        : agotado ? t.componentes.configurarUnidad.colorAgotado(c)
+                        : t.componentes.configurarUnidad.colorLibres(libres, c)}
                     >
-                      {c}{propio ? " · del chasis" : ` · ${libres}`}
+                      {c}{propio ? t.componentes.configurarUnidad.sufijoPropio : ` · ${libres}`}
                     </button>
                   );
                 })}
               </div>
               {colorCambia && !colorSinJuegos && (
                 <p className="text-xs text-[#92400E]">
-                  Se va a usar un juego de piezas {colorSel}; queda registrado que el VIN decía {colorVin}.
+                  {t.componentes.configurarUnidad.colorCambia(colorSel, colorVin)}
                 </p>
               )}
               {colorSinJuegos && (
                 <p className="text-xs text-[#991B1B]">
-                  No quedan juegos {colorSel} libres. Intercambia el color con otro chasis desde
-                  Inventario → Chasis, o registra las piezas extra que llegaron.
+                  {t.componentes.configurarUnidad.colorSinJuegos(colorSel)}
                 </p>
               )}
             </div>
           )}
 
           <div className="flex items-center gap-3">
-            <Label className="shrink-0">Orden de armado</Label>
+            <Label className="shrink-0">{t.componentes.configurarUnidad.ordenArmado}</Label>
             <Input type="number" min={1} className="h-10 w-32" value={orden} onChange={e => setOrden(Number(e.target.value))} />
           </div>
 
           <DialogFooter>
             <Button onClick={guardar} disabled={busy || !chasisSel || !motorSel || colorSinJuegos} className="h-12 bg-[#065F46] hover:bg-[#054c38]">
-              <CheckCircle2 className="h-5 w-5 mr-2" /> {busy ? "Guardando…" : "Configurar unidad"}
+              <CheckCircle2 className="h-5 w-5 mr-2" /> {busy ? t.componentes.configurarUnidad.guardando : t.componentes.configurarUnidad.boton}
             </Button>
           </DialogFooter>
         </DialogContent>

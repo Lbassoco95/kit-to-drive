@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { ReportarIncidencia } from "@/components/ReportarIncidencia";
 import {
   CatalogoModelos, displayFabrica, ESTATUS_INCIDENCIA, EstatusIncidencia,
@@ -39,31 +40,18 @@ type Incidencia = {
 
 type FiltroKey = "ABIERTAS" | "RETENIDOS" | "ADAPTADAS" | "GARANTIA" | "NO_UTIL" | "TODAS";
 
+// El texto de cada resultado se resuelve con `t.incidencias.resultados`; aquí
+// sólo vive lo que no se traduce (icono y clases de color).
 const RESULTADOS = [
-  {
-    key: "adaptacion", label: "Sí se pudo adaptar", icon: Wrench,
-    cls: "bg-[#065F46] hover:bg-[#054c38]",
-    ayuda: "El chasis vuelve a servir. El registro se queda pegado a la pieza y a la unidad para darle seguimiento.",
-  },
-  {
-    key: "garantia", label: "Se reclama en garantía", icon: ShieldCheck,
-    cls: "bg-[#5B21B6] hover:bg-[#4c1d95]",
-    ayuda: "El chasis queda identificado y fuera del disponible, con el folio del reclamo.",
-  },
-  {
-    key: "no_util", label: "No se puede usar", icon: Ban,
-    cls: "bg-[#C0392B] hover:bg-[#a03024]",
-    ayuda: "Deja de contar como disponible pero NO se elimina: sigue en inventario, identificado.",
-  },
-  {
-    key: "descartada", label: "Falsa alarma", icon: XCircle,
-    cls: "bg-slate-600 hover:bg-slate-700",
-    ayuda: "La pieza estaba bien; el chasis regresa a disponible.",
-  },
+  { key: "adaptacion", icon: Wrench,      cls: "bg-[#065F46] hover:bg-[#054c38]" },
+  { key: "garantia",   icon: ShieldCheck, cls: "bg-[#5B21B6] hover:bg-[#4c1d95]" },
+  { key: "no_util",    icon: Ban,         cls: "bg-[#C0392B] hover:bg-[#a03024]" },
+  { key: "descartada", icon: XCircle,     cls: "bg-slate-600 hover:bg-slate-700" },
 ] as const;
 
 export default function Incidencias() {
   const { role } = useAuth();
+  const { t, lang } = useLang();
   const puedeResolver = role === "admin" || role === "fabrica";
   const puedeReportar = puedeResolver || role === "coordinador";
 
@@ -130,19 +118,19 @@ export default function Incidencias() {
     setBusy(true);
     const { error } = await supabase.rpc("revisar_incidencia_chasis", {
       _incidencia_id: inc.id,
-      _nota: retiene ? "Se retiene el chasis para revisarlo" : "Entra a revisión sin detener el chasis",
+      _nota: retiene ? t.incidencias.notas.retiene : t.incidencias.notas.noRetiene,
       _retiene: retiene,
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(retiene ? "✓ En revisión — el chasis queda retenido" : "✓ En revisión — el chasis sigue disponible");
+    toast.success(retiene ? t.incidencias.notas.okRetiene : t.incidencias.notas.okNoRetiene);
     load();
   };
 
   const guardarResolucion = async () => {
     if (!resolver) return;
-    if (resolucion.trim().length < 5) { toast.error("Escribe qué se hizo (mínimo 5 caracteres)"); return; }
-    if (resultado === "garantia" && !folioGarantia.trim()) { toast.error("Captura el folio o referencia de la garantía"); return; }
+    if (resolucion.trim().length < 5) { toast.error(t.incidencias.notas.faltaResolucion); return; }
+    if (resultado === "garantia" && !folioGarantia.trim()) { toast.error(t.incidencias.notas.faltaFolioGarantia); return; }
     setBusy(true);
     const { error } = await supabase.rpc("resolver_incidencia_chasis", {
       _incidencia_id: resolver.id,
@@ -152,22 +140,22 @@ export default function Incidencias() {
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    const label = RESULTADOS.find(r => r.key === resultado)?.label ?? resultado;
-    toast.success(`✓ ${resolver.folio} cerrada — ${label}`);
+    const label = t.incidencias.resultados[resultado as keyof typeof t.incidencias.resultados] ?? resultado;
+    toast.success(t.incidencias.notas.cerrada(resolver.folio ?? "", label));
     setResolver(null); setResolucion(""); setFolioGarantia(""); setResultado("adaptacion");
     load();
   };
 
   const guardarReapertura = async () => {
     if (!reabrir) return;
-    if (motivo.trim().length < 5) { toast.error("Se requiere un motivo (mínimo 5 caracteres)"); return; }
+    if (motivo.trim().length < 5) { toast.error(t.incidencias.notas.faltaMotivo); return; }
     setBusy(true);
     const { error } = await supabase.rpc("reabrir_incidencia_chasis", {
       _incidencia_id: reabrir.id, _motivo: motivo.trim(),
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(`✓ ${reabrir.folio} reabierta — vuelve a revisión sin perder su historia`);
+    toast.success(t.incidencias.notas.reabierta(reabrir.folio ?? ""));
     setReabrir(null); setMotivo(""); load();
   };
 
@@ -180,56 +168,47 @@ export default function Incidencias() {
     setHistorial({ inc, eventos: data ?? [] });
   };
 
-  const FILTROS: { key: FiltroKey; label: string }[] = [
-    { key: "ABIERTAS",  label: "Por revisar" },
-    { key: "RETENIDOS", label: "Chasis detenidos" },
-    { key: "ADAPTADAS", label: "Adaptados" },
-    { key: "GARANTIA",  label: "En garantía" },
-    { key: "NO_UTIL",   label: "No útiles" },
-    { key: "TODAS",     label: "Todas" },
-  ];
+  const FILTROS: FiltroKey[] = ["ABIERTAS", "RETENIDOS", "ADAPTADAS", "GARANTIA", "NO_UTIL", "TODAS"];
 
   return (
     <div className="space-y-5">
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Incidencias de chasis</h1>
-          <p className="text-muted-foreground mt-1">
-            Piezas que llegaron mal: se reportan, se revisan y se resuelven — ninguna se elimina.
-          </p>
+          <h1 className="text-3xl font-bold">{t.incidencias.title}</h1>
+          <p className="text-muted-foreground mt-1">{t.incidencias.subtitle}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="h-12" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-5 w-5 mr-2 ${loading ? "animate-spin" : ""}`} /> Actualizar
+            <RefreshCw className={`h-5 w-5 mr-2 ${loading ? "animate-spin" : ""}`} /> {t.incidencias.actualizar}
           </Button>
           {puedeReportar && (
             <Button className="h-12 bg-[#C0392B] hover:bg-[#a03024]" onClick={() => setReportar(true)}>
-              <TriangleAlert className="h-5 w-5 mr-2" /> Levantar reporte
+              <TriangleAlert className="h-5 w-5 mr-2" /> {t.incidencias.levantarReporte}
             </Button>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <Kpi label="Por revisar" value={conteos.ABIERTAS} accent="#92400E" />
-        <Kpi label="Chasis detenidos" value={conteos.RETENIDOS} accent={conteos.RETENIDOS ? "#C0392B" : "#64748B"} />
-        <Kpi label="Adaptados" value={conteos.ADAPTADAS} accent="#065F46" />
-        <Kpi label="En garantía" value={conteos.GARANTIA} accent="#5B21B6" />
-        <Kpi label="No útiles" value={conteos.NO_UTIL} accent={conteos.NO_UTIL ? "#991B1B" : "#64748B"} />
+        <Kpi label={t.incidencias.filtros.ABIERTAS} value={conteos.ABIERTAS} accent="#92400E" />
+        <Kpi label={t.incidencias.filtros.RETENIDOS} value={conteos.RETENIDOS} accent={conteos.RETENIDOS ? "#C0392B" : "#64748B"} />
+        <Kpi label={t.incidencias.filtros.ADAPTADAS} value={conteos.ADAPTADAS} accent="#065F46" />
+        <Kpi label={t.incidencias.filtros.GARANTIA} value={conteos.GARANTIA} accent="#5B21B6" />
+        <Kpi label={t.incidencias.filtros.NO_UTIL} value={conteos.NO_UTIL} accent={conteos.NO_UTIL ? "#991B1B" : "#64748B"} />
       </div>
 
       <div className="flex flex-wrap gap-2">
         {FILTROS.map(f => {
-          const activo = filtro === f.key;
+          const activo = filtro === f;
           return (
             <button
-              key={f.key}
-              onClick={() => setFiltro(f.key)}
+              key={f}
+              onClick={() => setFiltro(f)}
               className={`min-h-[44px] px-4 rounded-full font-semibold text-sm border-2 ${activo ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-[#1F3864] border-[#2E75B6]/30 hover:border-[#2E75B6]"}`}
             >
-              {f.label}
+              {t.incidencias.filtros[f]}
               <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${activo ? "bg-white/20" : "bg-[#2E75B6]/10"}`}>
-                {(conteos as any)[f.key]}
+                {conteos[f]}
               </span>
             </button>
           );
@@ -239,7 +218,7 @@ export default function Incidencias() {
       <Card className="p-3">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-          <Input className="pl-10 h-12" placeholder="Buscar folio, chasis, parte…" value={q} onChange={e => setQ(e.target.value)} />
+          <Input className="pl-10 h-12" placeholder={t.incidencias.buscar} value={q} onChange={e => setQ(e.target.value)} />
         </div>
       </Card>
 
@@ -247,7 +226,7 @@ export default function Incidencias() {
         {filtrados.map(i => {
           const meta = ESTATUS_INCIDENCIA[i.estatus];
           const sev = SEVERIDADES.find(s => s.key === i.severidad);
-          const tipo = TIPOS_FALLA.find(t => t.key === i.tipo_falla);
+          const tipoIcon = TIPOS_FALLA.find(x => x.key === i.tipo_falla)?.icon;
           const unidad = i.motocarro_id ? unidades.get(i.motocarro_id) : undefined;
           return (
             <Card key={i.id} className="p-4 space-y-3">
@@ -257,61 +236,61 @@ export default function Incidencias() {
                   <div className="font-mono text-sm">{i.ns_chasis}</div>
                   <div className="text-xs text-muted-foreground">
                     {displayFabrica(i.modelo ?? "", catalogo)} · {i.color ?? "—"}
-                    {unidad != null && <> · <span className="inline-flex items-center gap-1"><Bike className="h-3 w-3" /> unidad #{unidad}</span></>}
+                    {unidad != null && <> · <span className="inline-flex items-center gap-1"><Bike className="h-3 w-3" /> {t.incidencias.unidad(unidad)}</span></>}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${meta.cls}`}>{meta.label}</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${meta.cls}`}>{t.catalogos.estatusIncidencia(i.estatus)}</span>
                   {i.retiene_chasis && (
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FEE2E2] text-[#991B1B] border border-[#C0392B]/30">
-                      CHASIS DETENIDO
+                      {t.incidencias.chasisDetenido}
                     </span>
                   )}
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-1.5 text-xs">
-                <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-700">{tipo?.icon} {tipo?.label ?? i.tipo_falla}</span>
+                <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-700">{tipoIcon} {t.catalogos.tipoFalla(i.tipo_falla)}</span>
                 {i.parte_afectada && <span className="px-2 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] font-medium">🔧 {i.parte_afectada}</span>}
-                {sev && <span className={`px-2 py-1 rounded-md border font-medium ${sev.cls}`}>{sev.label}</span>}
+                {sev && <span className={`px-2 py-1 rounded-md border font-medium ${sev.cls}`}>{t.catalogos.severidad(i.severidad)}</span>}
                 {i.folio_garantia && <span className="px-2 py-1 rounded-md bg-[#EDE9FE] text-[#5B21B6] font-mono">{i.folio_garantia}</span>}
               </div>
 
               <p className="text-sm">{i.descripcion}</p>
               {i.resolucion && (
                 <p className="text-sm bg-slate-50 border-l-2 border-[#1F3864] pl-2 py-1">
-                  <span className="font-semibold">Resolución:</span> {i.resolucion}
+                  <span className="font-semibold">{t.incidencias.resolucion}</span> {i.resolucion}
                 </p>
               )}
 
               <div className="text-xs text-muted-foreground">
-                Reportada {fmtDate(i.reportado_at.slice(0, 10))}
-                {i.resuelto_at && ` · cerrada ${fmtDate(i.resuelto_at.slice(0, 10))}`}
+                {t.incidencias.reportada(fmtDate(i.reportado_at.slice(0, 10)))}
+                {i.resuelto_at && t.incidencias.cerrada(fmtDate(i.resuelto_at.slice(0, 10)))}
               </div>
 
               <div className="flex gap-2 flex-wrap pt-1 border-t">
                 {puedeResolver && i.estatus === "abierta" && (
                   <>
                     <Button size="sm" variant="outline" className="h-10" disabled={busy} onClick={() => tomarRevision(i, false)}>
-                      <Eye className="h-4 w-4 mr-1.5" /> Revisar
+                      <Eye className="h-4 w-4 mr-1.5" /> {t.incidencias.acciones.revisar}
                     </Button>
                     <Button size="sm" variant="outline" className="h-10 border-amber-300 text-amber-700 hover:bg-amber-50" disabled={busy} onClick={() => tomarRevision(i, true)}>
-                      <Ban className="h-4 w-4 mr-1.5" /> Revisar y retener
+                      <Ban className="h-4 w-4 mr-1.5" /> {t.incidencias.acciones.revisarRetener}
                     </Button>
                   </>
                 )}
                 {puedeResolver && meta.abierta && (
                   <Button size="sm" className="h-10 bg-[#1F3864] hover:bg-[#162a4d]" onClick={() => { setResolver(i); setResultado("adaptacion"); setResolucion(""); setFolioGarantia(i.folio_garantia ?? ""); }}>
-                    <Wrench className="h-4 w-4 mr-1.5" /> Resolver
+                    <Wrench className="h-4 w-4 mr-1.5" /> {t.incidencias.acciones.resolver}
                   </Button>
                 )}
                 {puedeResolver && !meta.abierta && (
                   <Button size="sm" variant="outline" className="h-10" onClick={() => { setReabrir(i); setMotivo(""); }}>
-                    <RefreshCw className="h-4 w-4 mr-1.5" /> Reabrir
+                    <RefreshCw className="h-4 w-4 mr-1.5" /> {t.incidencias.acciones.reabrir}
                   </Button>
                 )}
                 <Button size="sm" variant="outline" className="h-10" onClick={() => verHistorial(i)}>
-                  <History className="h-4 w-4 mr-1.5" /> Historia
+                  <History className="h-4 w-4 mr-1.5" /> {t.incidencias.acciones.historia}
                 </Button>
               </div>
             </Card>
@@ -319,7 +298,7 @@ export default function Incidencias() {
         })}
         {!filtrados.length && (
           <Card className="p-10 text-center text-muted-foreground lg:col-span-2">
-            {loading ? "Cargando…" : "Sin incidencias con este filtro"}
+            {loading ? t.actions.loading : t.incidencias.sinIncidencias}
           </Card>
         )}
       </div>
@@ -330,7 +309,7 @@ export default function Incidencias() {
       <Dialog open={!!resolver} onOpenChange={o => { if (!o) setResolver(null); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Resolver {resolver?.folio} — {resolver?.ns_chasis}</DialogTitle>
+            <DialogTitle>{t.incidencias.dialogos.resolverTitulo(resolver?.folio ?? "", resolver?.ns_chasis ?? "")}</DialogTitle>
             <DialogDescription>
               {resolver?.parte_afectada ? `${resolver.parte_afectada}: ` : ""}{resolver?.descripcion}
             </DialogDescription>
@@ -344,8 +323,8 @@ export default function Incidencias() {
               >
                 <input type="radio" className="mt-1 accent-[#1F3864]" checked={resultado === r.key} onChange={() => setResultado(r.key)} />
                 <span className="text-sm">
-                  <span className="font-semibold flex items-center gap-1.5"><r.icon className="h-4 w-4" /> {r.label}</span>
-                  <span className="block text-xs text-muted-foreground">{r.ayuda}</span>
+                  <span className="font-semibold flex items-center gap-1.5"><r.icon className="h-4 w-4" /> {t.incidencias.resultados[r.key]}</span>
+                  <span className="block text-xs text-muted-foreground">{t.incidencias.resultados[`${r.key}Ayuda`]}</span>
                 </span>
               </label>
             ))}
@@ -353,24 +332,24 @@ export default function Incidencias() {
 
           {resultado === "garantia" && (
             <div>
-              <Label>Folio / referencia de la garantía *</Label>
-              <Input className="h-11" placeholder="Ej. GAR-2026-014" value={folioGarantia} onChange={e => setFolioGarantia(e.target.value)} />
+              <Label>{t.incidencias.dialogos.folioGarantia}</Label>
+              <Input className="h-11" placeholder={t.incidencias.dialogos.folioGarantiaPlaceholder} value={folioGarantia} onChange={e => setFolioGarantia(e.target.value)} />
             </div>
           )}
 
           <div>
-            <Label>¿Qué se hizo? *</Label>
+            <Label>{t.incidencias.dialogos.queSeHizo}</Label>
             <Textarea
-              placeholder="Ej. Se fabricó y soldó un soporte adaptado; se probó en frío y caliente."
+              placeholder={t.incidencias.dialogos.queSeHizoPlaceholder}
               value={resolucion}
               onChange={e => setResolucion(e.target.value)}
             />
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setResolver(null)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setResolver(null)}>{t.actions.cancel}</Button>
             <Button onClick={guardarResolucion} disabled={busy} className={RESULTADOS.find(r => r.key === resultado)?.cls}>
-              {busy ? "Guardando…" : "Cerrar incidencia"}
+              {busy ? t.incidencias.dialogos.guardando : t.incidencias.dialogos.cerrarIncidencia}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -380,19 +359,16 @@ export default function Incidencias() {
       <Dialog open={!!reabrir} onOpenChange={o => { if (!o) setReabrir(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reabrir {reabrir?.folio}</DialogTitle>
-            <DialogDescription>
-              Vuelve a revisión con todo su historial. Sirve cuando un chasis marcado no útil
-              consigue garantía, o cuando sí se logró adaptar después.
-            </DialogDescription>
+            <DialogTitle>{t.incidencias.dialogos.reabrirTitulo(reabrir?.folio ?? "")}</DialogTitle>
+            <DialogDescription>{t.incidencias.dialogos.reabrirDesc}</DialogDescription>
           </DialogHeader>
           <div>
-            <Label>Motivo *</Label>
-            <Textarea value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej. Fábrica aceptó revisar la garantía del bastidor" />
+            <Label>{t.incidencias.dialogos.motivo}</Label>
+            <Textarea value={motivo} onChange={e => setMotivo(e.target.value)} placeholder={t.incidencias.dialogos.motivoPlaceholder} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReabrir(null)}>Cancelar</Button>
-            <Button onClick={guardarReapertura} disabled={busy} className="bg-[#1F3864] hover:bg-[#162a4d]">Reabrir</Button>
+            <Button variant="outline" onClick={() => setReabrir(null)}>{t.actions.cancel}</Button>
+            <Button onClick={guardarReapertura} disabled={busy} className="bg-[#1F3864] hover:bg-[#162a4d]">{t.incidencias.acciones.reabrir}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -409,15 +385,15 @@ export default function Incidencias() {
             {(historial?.eventos ?? []).map((e: any, idx: number) => (
               <div key={idx} className="border rounded-md p-2 text-sm">
                 <div className="font-medium">
-                  {e.estatus_anterior ? `${ESTATUS_INCIDENCIA[e.estatus_anterior as EstatusIncidencia]?.label ?? e.estatus_anterior} → ` : ""}
-                  {ESTATUS_INCIDENCIA[e.estatus_nuevo as EstatusIncidencia]?.label ?? e.estatus_nuevo}
+                  {e.estatus_anterior ? `${t.catalogos.estatusIncidencia(e.estatus_anterior)} → ` : ""}
+                  {t.catalogos.estatusIncidencia(e.estatus_nuevo)}
                 </div>
                 {e.nota && <div className="text-xs mt-0.5">{e.nota}</div>}
-                <div className="text-[11px] text-muted-foreground mt-0.5">{new Date(e.creado_at).toLocaleString("es-MX")}</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5">{new Date(e.creado_at).toLocaleString(lang === "zh" ? "zh-CN" : "es-MX")}</div>
               </div>
             ))}
             {!(historial?.eventos ?? []).length && (
-              <div className="text-sm text-muted-foreground text-center py-4">Sin movimientos registrados</div>
+              <div className="text-sm text-muted-foreground text-center py-4">{t.incidencias.dialogos.sinMovimientos}</div>
             )}
           </div>
         </DialogContent>

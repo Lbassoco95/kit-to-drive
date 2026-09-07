@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { Nivel, NIVELES, NIVEL_LABELS } from "@/lib/permissions";
+import { Nivel, NIVELES } from "@/lib/permissions";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Plus, User as UserIcon, Mail, Key, Shield, Trash2 } from "lucide-react";
@@ -35,7 +35,7 @@ export default function CrmEquipo() {
 
   const save = async () => {
     if (!form.nombre_completo || !form.email || !form.password || !form.nivel) {
-      return toast.error("Todos los campos son obligatorios");
+      return toast.error(t.crm.equipo.camposObligatorios);
     }
 
     try {
@@ -59,20 +59,20 @@ export default function CrmEquipo() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Error al crear usuario");
+        throw new Error(result.error || t.crm.equipo.errorCrear);
       }
 
-      toast.success("Usuario creado exitosamente");
+      toast.success(t.crm.equipo.usuarioCreado);
       setCreating(false);
       setForm({ nombre_completo: "", email: "", password: "", nivel: "operador" });
       load();
     } catch (error: any) {
-      toast.error(error.message || "Error al crear usuario");
+      toast.error(error.message || t.crm.equipo.errorCrear);
     }
   };
 
   const deleteUser = async (userId: string) => {
-    if (!confirm("¿Eliminar este usuario? Esta acción no se puede deshacer.")) return;
+    if (!confirm(t.crm.equipo.confirmarEliminar)) return;
     
     try {
       const { error } = await supabase.from("profiles").delete().eq("id", userId);
@@ -81,10 +81,10 @@ export default function CrmEquipo() {
       // Also delete from user_roles
       await supabase.from("user_roles").delete().eq("user_id", userId);
       
-      toast.success("Usuario eliminado");
+      toast.success(t.crm.equipo.usuarioEliminado);
       load();
     } catch (error: any) {
-      toast.error(error.message || "Error al eliminar usuario");
+      toast.error(error.message || t.crm.equipo.errorEliminar);
     }
   };
 
@@ -92,13 +92,13 @@ export default function CrmEquipo() {
     <div className="space-y-5">
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
-          <h1>Equipo de Ventas</h1>
-          <p className="text-base text-muted-foreground mt-1">{usuarios.length} miembros en el equipo</p>
+          <h1>{t.crm.equipo.title}</h1>
+          <p className="text-base text-muted-foreground mt-1">{t.crm.equipo.subtitle(usuarios.length)}</p>
         </div>
         {perms.gestionaUsuarios && (
           <Button onClick={() => setCreating(true)}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-            <Plus className="h-5 w-5 mr-2"/> Agregar vendedor
+            <Plus className="h-5 w-5 mr-2"/> {t.crm.equipo.agregar}
           </Button>
         )}
       </div>
@@ -108,10 +108,10 @@ export default function CrmEquipo() {
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left py-3 px-4 font-semibold">Nombre</th>
-                <th className="text-left py-3 px-4 font-semibold">Email</th>
-                <th className="text-left py-3 px-4 font-semibold">Tipo de usuario</th>
-                <th className="text-left py-3 px-4 font-semibold">Acciones</th>
+                <th className="text-left py-3 px-4 font-semibold">{t.crm.equipo.nombre}</th>
+                <th className="text-left py-3 px-4 font-semibold">{t.crm.equipo.email}</th>
+                <th className="text-left py-3 px-4 font-semibold">{t.crm.equipo.tipoUsuario}</th>
+                <th className="text-left py-3 px-4 font-semibold">{t.crm.equipo.acciones}</th>
               </tr>
             </thead>
             <tbody>
@@ -129,7 +129,7 @@ export default function CrmEquipo() {
                   <td className="py-3 px-4">
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                       <Shield size={12} />
-                      {u.user_roles?.nivel ? NIVEL_LABELS[u.user_roles.nivel as Nivel] : "—"}
+                      {u.user_roles?.nivel ? t.niveles[u.user_roles.nivel as Nivel] : "—"}
                     </span>
                   </td>
                   <td className="py-3 px-4">
@@ -144,7 +144,7 @@ export default function CrmEquipo() {
               {!usuarios.length && (
                 <tr>
                   <td colSpan={4} className="py-12 text-center text-muted-foreground">
-                    Sin miembros en el equipo
+                    {t.crm.equipo.sinMiembros}
                   </td>
                 </tr>
               )}
@@ -155,32 +155,32 @@ export default function CrmEquipo() {
 
       <Dialog open={creating} onOpenChange={setCreating}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Agregar vendedor</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t.crm.equipo.agregar}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div>
               <Label className="flex items-center gap-2">
-                <UserIcon size={16} /> Nombre completo
+                <UserIcon size={16} /> {t.crm.equipo.nombreCompleto}
               </Label>
               <Input 
                 value={form.nombre_completo} 
                 onChange={e => setForm({ ...form, nombre_completo: e.target.value })}
-                placeholder="Juan Pérez"
+                placeholder={t.crm.equipo.nombrePlaceholder}
               />
             </div>
             <div>
               <Label className="flex items-center gap-2">
-                <Mail size={16} /> Email
+                <Mail size={16} /> {t.crm.equipo.email}
               </Label>
               <Input 
                 type="email"
                 value={form.email} 
                 onChange={e => setForm({ ...form, email: e.target.value })}
-                placeholder="juan@ejemplo.com"
+                placeholder={t.crm.equipo.emailPlaceholder}
               />
             </div>
             <div>
               <Label className="flex items-center gap-2">
-                <Key size={16} /> Contraseña
+                <Key size={16} /> {t.crm.equipo.password}
               </Label>
               <Input 
                 type="password"
@@ -191,7 +191,7 @@ export default function CrmEquipo() {
             </div>
             <div>
               <Label className="flex items-center gap-2">
-                <Shield size={16} /> Tipo de usuario
+                <Shield size={16} /> {t.crm.equipo.tipoUsuario}
               </Label>
               <Select value={form.nivel} onValueChange={(v) => setForm({ ...form, nivel: v as Nivel })}>
                 <SelectTrigger>
@@ -199,15 +199,15 @@ export default function CrmEquipo() {
                 </SelectTrigger>
                 <SelectContent>
                   {NIVELES.map(n => (
-                    <SelectItem key={n} value={n}>{NIVEL_LABELS[n]}</SelectItem>
+                    <SelectItem key={n} value={n}>{t.niveles[n]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreating(false)}>Cancelar</Button>
-            <Button onClick={save} className="bg-[#1F3864] hover:bg-[#162a4d]">Crear usuario</Button>
+            <Button variant="outline" onClick={() => setCreating(false)}>{t.actions.cancel}</Button>
+            <Button onClick={save} className="bg-[#1F3864] hover:bg-[#162a4d]">{t.crm.equipo.crearUsuario}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

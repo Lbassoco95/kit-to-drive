@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, PackageSearch, TrendingDown, Wrench } from "lucide-react";
 import { lineaDe, CatalogoModelos, chasisDetenido } from "@/lib/dazon";
+import { useLang } from "@/contexts/LangContext";
 
 type Stats = {
   disponibles: number;        // motocarros sin remisión asignada (con NS o no)
@@ -18,6 +19,7 @@ type Stats = {
 };
 
 export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
+  const { t } = useLang();
   const [s, setS] = useState<Stats | null>(null);
   const nav = useNavigate();
   const location = useLocation();
@@ -90,40 +92,39 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
         <div className={tone.text}>{tone.icon}</div>
         <div className="flex-1 min-w-[260px]">
           <div className={`font-bold text-lg ${tone.text}`}>
-            {critico && "⚠ Sin motocarros con serial — no se pueden asignar nuevas remisiones"}
-            {porConfigurar && `Hay ${s.chasisPorConfigurar} chasis y ${s.motoresPorConfigurar} motores en inventario — fábrica debe configurar las unidades`}
-            {alerta && `Inventario bajo — faltan ${deficit} unidades configuradas para cubrir la demanda`}
-            {ok && "Inventario saludable"}
-            {!critico && !porConfigurar && !alerta && !ok && "Estado de inventario"}
+            {critico && t.componentes.inventarioStatus.critico}
+            {porConfigurar && t.componentes.inventarioStatus.porConfigurar(s.chasisPorConfigurar, s.motoresPorConfigurar)}
+            {alerta && t.componentes.inventarioStatus.alerta(deficit)}
+            {ok && t.componentes.inventarioStatus.ok}
+            {!critico && !porConfigurar && !alerta && !ok && t.componentes.inventarioStatus.neutro}
           </div>
           <div className={`text-sm mt-1 ${tone.text}`}>
             {critico
-              ? "Recibe un contenedor o captura los NS Chasis y NS Motor del próximo packing list para liberar unidades."
+              ? t.componentes.inventarioStatus.criticoDesc
               : porConfigurar
-              ? "Las piezas ya están en inventario; configura chasis + motor en Producción para que queden disponibles con serial."
+              ? t.componentes.inventarioStatus.porConfigurarDesc
               : alerta
-              ? `Tienes ${s.conSerial} disponibles con serial vs ${s.demandaPendiente} unidades pendientes (${s.remisionesPendientes} remisiones).`
-              : `Tienes ${s.conSerial} motocarros con serial listos para asignar.`}
+              ? t.componentes.inventarioStatus.alertaDesc(s.conSerial, s.demandaPendiente, s.remisionesPendientes)
+              : t.componentes.inventarioStatus.okDesc(s.conSerial)}
           </div>
           {s.chasisDetenidos > 0 && (
             <div className={`text-sm mt-1.5 font-medium ${tone.text}`}>
-              ⚠ {s.chasisDetenidos} chasis detenidos por incidencia (retenidos, en garantía o no útiles):
-              siguen en inventario pero no entran al armado.{" "}
-              <button className="underline" onClick={() => nav("/incidencias")}>Ver incidencias</button>
+              {t.componentes.inventarioStatus.detenidos(s.chasisDetenidos)}{" "}
+              <button className="underline" onClick={() => nav("/incidencias")}>{t.componentes.inventarioStatus.verIncidencias}</button>
             </div>
           )}
           {porConfigurar && !enProduccion && (
             <Button size="sm" className="mt-2 h-9 bg-[#92400E] hover:bg-[#78350F]" onClick={() => nav("/produccion")}>
-              <Wrench className="h-4 w-4 mr-1.5" /> Ir a Producción → Configurar unidad
+              <Wrench className="h-4 w-4 mr-1.5" /> {t.componentes.inventarioStatus.irProduccion}
             </Button>
           )}
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
-          <Metric label="Disponibles c/ NS" value={s.conSerial} accent="#065F46" />
-          <Metric label="Sin NS (capturar)" value={s.sinSerial} accent={s.sinSerial > 0 ? "#D97706" : "#64748B"} />
-          <Metric label="Por configurar" value={s.chasisPorConfigurar} accent={s.chasisPorConfigurar > 0 ? "#92400E" : "#64748B"} />
-          <Metric label="Demanda pendiente" value={s.demandaPendiente} accent="#1F3864" />
-          <Metric label="Déficit (configuradas)" value={Math.max(0, deficit)} accent={deficit > 0 ? "#C0392B" : "#065F46"} />
+          <Metric label={t.componentes.inventarioStatus.metricas.disponiblesNS} value={s.conSerial} accent="#065F46" />
+          <Metric label={t.componentes.inventarioStatus.metricas.sinNS} value={s.sinSerial} accent={s.sinSerial > 0 ? "#D97706" : "#64748B"} />
+          <Metric label={t.componentes.inventarioStatus.metricas.porConfigurar} value={s.chasisPorConfigurar} accent={s.chasisPorConfigurar > 0 ? "#92400E" : "#64748B"} />
+          <Metric label={t.componentes.inventarioStatus.metricas.demanda} value={s.demandaPendiente} accent="#1F3864" />
+          <Metric label={t.componentes.inventarioStatus.metricas.deficit} value={Math.max(0, deficit)} accent={deficit > 0 ? "#C0392B" : "#065F46"} />
         </div>
       </div>
     </Card>

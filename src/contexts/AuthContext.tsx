@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactN
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { dictActual } from "@/contexts/LangContext";
 import {
   Area, Nivel, Permisos, permisosDe, desdeRolLegacy, PERMISOS_VACIOS,
 } from "@/lib/permissions";
@@ -91,8 +92,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Sólo se avisa en las revisiones automáticas, no en el arranque de sesión.
     if (cambio && notificar) {
-      toast.info("Tus permisos cambiaron", {
-        description: "Un administrador actualizó tu área o tu tipo de usuario. El menú ya está al día.",
+      // `dictActual()` y no `useLang()`: este provider envuelve al de idioma.
+      const t = dictActual();
+      toast.info(t.componentes.permisosCambiados.titulo, {
+        description: t.componentes.permisosCambiados.detalle,
         duration: 8000,
       });
     }

@@ -17,25 +17,9 @@ export type Area = "comercial" | "fabrica" | "almacen_logistica" | "administraci
 export const NIVELES: Nivel[] = ["operador", "supervisor", "admin"];
 export const AREAS: Area[] = ["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"];
 
-export const NIVEL_LABELS: Record<Nivel, string> = {
-  operador: "Operador",
-  supervisor: "Supervisor",
-  admin: "Administrador",
-};
-
-export const NIVEL_DESC: Record<Nivel, string> = {
-  operador: "Captura y da seguimiento a su propio trabajo dentro de su área.",
-  supervisor: "Ve y corrige todo lo de su área, aprueba y consulta indicadores del equipo.",
-  admin: "Control total de su área, incluida la gestión de usuarios de su área.",
-};
-
-export const AREA_LABELS: Record<Area, string> = {
-  comercial: "Comercial",
-  fabrica: "Fábrica",
-  almacen_logistica: "Almacén y Logística",
-  administracion: "Administración",
-  direccion: "Dirección",
-};
+// Las etiquetas de nivel y área (y sus descripciones) viven en el diccionario
+// —`t.niveles`, `t.nivelDesc` y `t.areas`— para que salgan en el idioma activo.
+// Aquí sólo se queda lo que no es texto: el orden, el rango y los colores.
 
 export const NIVEL_RANK: Record<Nivel, number> = { operador: 1, supervisor: 2, admin: 3 };
 

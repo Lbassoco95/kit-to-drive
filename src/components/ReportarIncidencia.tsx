@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
+import { useLang } from "@/contexts/LangContext";
 import {
   CatalogoModelos, displayFabrica, ESTATUS_CHASIS, ESTATUS_INCIDENCIA,
   PARTES_FRECUENTES, SEVERIDADES, TIPOS_FALLA,
@@ -45,6 +46,7 @@ const defaultForm = () => ({
  * marca — así el reporte no frena la línea por sí solo.
  */
 export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props) {
+  const { t } = useLang();
   const [form, setForm] = useState(defaultForm());
   const [busy, setBusy] = useState(false);
   const [lista, setLista] = useState<ChasisParaReporte[]>([]);
@@ -90,8 +92,8 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
   }, [lista, q]);
 
   const guardar = async () => {
-    if (!elegido) { toast.error("Selecciona el chasis del reporte"); return; }
-    if (form.descripcion.trim().length < 5) { toast.error("Describe la falla (mínimo 5 caracteres)"); return; }
+    if (!elegido) { toast.error(t.componentes.reportarIncidencia.faltaChasis); return; }
+    if (form.descripcion.trim().length < 5) { toast.error(t.componentes.reportarIncidencia.faltaDescripcion); return; }
 
     setBusy(true);
     const { data, error } = await supabase.rpc("reportar_incidencia_chasis", {
@@ -108,8 +110,8 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
     const r = data as { folio?: string; retiene_chasis?: boolean } | null;
     toast.success(
       r?.retiene_chasis
-        ? `✓ Reporte ${r?.folio} levantado — el chasis queda retenido hasta la revisión`
-        : `✓ Reporte ${r?.folio} levantado — el chasis sigue disponible mientras se revisa`
+        ? t.componentes.reportarIncidencia.okRetiene(r?.folio ?? "")
+        : t.componentes.reportarIncidencia.okNoRetiene(r?.folio ?? "")
     );
     onOpenChange(false);
     onDone?.();
@@ -120,12 +122,9 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <TriangleAlert className="h-6 w-6 text-[#D97706]" /> Levantar reporte de chasis
+            <TriangleAlert className="h-6 w-6 text-[#D97706]" /> {t.componentes.reportarIncidencia.titulo}
           </DialogTitle>
-          <DialogDescription>
-            El chasis no se elimina ni se deshabilita por el reporte: pasa a revisión y ahí se
-            decide si se adapta, se reclama en garantía o se marca como no útil.
-          </DialogDescription>
+          <DialogDescription>{t.componentes.reportarIncidencia.desc}</DialogDescription>
         </DialogHeader>
 
         {/* Selección de chasis */}
@@ -133,15 +132,15 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
           <div className="rounded-lg border bg-slate-50 p-3">
             <div className="font-mono font-bold text-base">{chasis.numero_chasis}</div>
             <div className="text-xs text-muted-foreground">
-              {chasis.modelo} · {chasis.color} · {ESTATUS_CHASIS[chasis.estatus]?.label ?? chasis.estatus}
+              {chasis.modelo} · {chasis.color} · {t.catalogos.estatusChasis(chasis.estatus)}
             </div>
           </div>
         ) : (
           <div className="space-y-2">
-            <Label>Chasis {elegido && <span className="text-[#065F46] font-mono">— {elegido.numero_chasis}</span>}</Label>
+            <Label>{t.componentes.reportarIncidencia.chasis} {elegido && <span className="text-[#065F46] font-mono">— {elegido.numero_chasis}</span>}</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-8 h-10" placeholder="Buscar chasis, modelo o color…" value={q} onChange={e => setQ(e.target.value)} />
+              <Input className="pl-8 h-10" placeholder={t.componentes.reportarIncidencia.buscar} value={q} onChange={e => setQ(e.target.value)} />
             </div>
             <div className="border rounded-lg max-h-52 overflow-y-auto divide-y">
               {filtrados.map(c => {
@@ -155,68 +154,73 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
                   >
                     <div className="font-mono font-semibold flex items-center gap-2">
                       {c.numero_chasis}
-                      {yaTiene && <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E]">ya tiene reporte abierto</span>}
+                      {yaTiene && <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-full bg-[#FEF3C7] text-[#92400E]">{t.componentes.reportarIncidencia.yaTieneReporte}</span>}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {displayFabrica(c.modelo, catalogo)} · {c.color} ·{" "}
-                      {ESTATUS_CHASIS[c.estatus]?.label ?? c.estatus}
-                      {c.motocarro_id ? " · ya en una unidad" : ""}
+                      {t.catalogos.estatusChasis(c.estatus)}
+                      {c.motocarro_id ? t.componentes.reportarIncidencia.yaEnUnidad : ""}
                     </div>
                   </button>
                 );
               })}
-              {!filtrados.length && <div className="p-4 text-sm text-center text-muted-foreground">Sin chasis que coincidan</div>}
+              {!filtrados.length && <div className="p-4 text-sm text-center text-muted-foreground">{t.componentes.reportarIncidencia.sinCoincidencias}</div>}
             </div>
           </div>
         )}
 
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <Label>Tipo de falla</Label>
+            <Label>{t.componentes.reportarIncidencia.tipoFalla}</Label>
             <Select value={form.tipo_falla} onValueChange={v => setForm(f => ({ ...f, tipo_falla: v }))}>
               <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {TIPOS_FALLA.map(t => <SelectItem key={t.key} value={t.key}>{t.icon} {t.label}</SelectItem>)}
+                {TIPOS_FALLA.map(f => <SelectItem key={f.key} value={f.key}>{f.icon} {t.catalogos.tipoFalla(f.key)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Severidad</Label>
+            <Label>{t.componentes.reportarIncidencia.severidad}</Label>
             <Select value={form.severidad} onValueChange={v => setForm(f => ({ ...f, severidad: v }))}>
               <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {SEVERIDADES.map(s => <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>)}
+                {SEVERIDADES.map(s => <SelectItem key={s.key} value={s.key}>{t.catalogos.severidad(s.key)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </div>
 
         <div>
-          <Label>Parte afectada</Label>
+          <Label>{t.componentes.reportarIncidencia.parteAfectada}</Label>
           <Input
             className="h-11"
-            placeholder="Ej. Soporte de radiador"
+            placeholder={t.componentes.reportarIncidencia.partePlaceholder}
             value={form.parte_afectada}
             onChange={e => setForm(f => ({ ...f, parte_afectada: e.target.value }))}
           />
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {PARTES_FRECUENTES.map(p => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setForm(f => ({ ...f, parte_afectada: p }))}
-                className={`text-[11px] px-2 py-1 rounded-full border ${form.parte_afectada === p ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-slate-600 hover:border-[#2E75B6]"}`}
-              >
-                {p}
-              </button>
-            ))}
+            {PARTES_FRECUENTES.map((p, i) => {
+              // El valor que se guarda es el español (así vive en la base); lo
+              // que se ve es la traducción con el mismo índice.
+              const etiqueta = t.catalogos.partesFrecuentes[i] ?? p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, parte_afectada: p }))}
+                  className={`text-[11px] px-2 py-1 rounded-full border ${form.parte_afectada === p ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-slate-600 hover:border-[#2E75B6]"}`}
+                >
+                  {etiqueta}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div>
-          <Label>¿Qué trae mal? *</Label>
+          <Label>{t.componentes.reportarIncidencia.queTraeMal}</Label>
           <Textarea
-            placeholder="Ej. El chasis llegó sin el soporte del radiador — hay que ver si se puede adaptar uno."
+            placeholder={t.componentes.reportarIncidencia.queTraeMalPlaceholder}
             value={form.descripcion}
             onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
           />
@@ -230,25 +234,22 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
             className="w-4 h-4 mt-0.5 accent-[#C0392B]"
           />
           <span className="text-sm">
-            <span className="font-semibold">Retener el chasis hasta la revisión</span>
-            <span className="block text-xs text-muted-foreground">
-              Déjalo sin marcar si la unidad puede seguir armándose mientras se resuelve. Marcado,
-              el chasis sale del disponible y no se puede configurar hasta cerrar el reporte.
-            </span>
+            <span className="font-semibold">{t.componentes.reportarIncidencia.retener}</span>
+            <span className="block text-xs text-muted-foreground">{t.componentes.reportarIncidencia.retenerDesc}</span>
           </span>
         </label>
 
         {form.retiene && (
           <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
             <AlertTriangle className="h-5 w-5 shrink-0" />
-            {ESTATUS_INCIDENCIA.en_revision.ayuda}
+            {t.catalogos.ayudaIncidencia("en_revision")}
           </div>
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t.actions.cancel}</Button>
           <Button onClick={guardar} disabled={busy || !elegido} className="h-11 bg-[#C0392B] hover:bg-[#a03024]">
-            <TriangleAlert className="h-5 w-5 mr-2" /> {busy ? "Guardando…" : "Levantar reporte"}
+            <TriangleAlert className="h-5 w-5 mr-2" /> {busy ? t.componentes.reportarIncidencia.guardando : t.componentes.reportarIncidencia.levantar}
           </Button>
         </DialogFooter>
       </DialogContent>

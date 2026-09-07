@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
+import { useLang } from "@/contexts/LangContext";
 
 type Suggestion = {
   id: string;
@@ -19,6 +20,7 @@ interface SerialAutocompleteProps {
 }
 
 export function SerialAutocomplete({ tipo, value, onChange, placeholder, className }: SerialAutocompleteProps) {
+  const { t } = useLang();
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -110,7 +112,7 @@ export function SerialAutocomplete({ tipo, value, onChange, placeholder, classNa
       )}
       {open && suggestions.length === 0 && value.length >= 2 && !loading && (
         <div className="absolute z-50 mt-1 w-full bg-white border rounded-lg shadow-lg px-3 py-2">
-          <span className="text-xs text-muted-foreground">No se encontró en inventario — se registrará como nuevo</span>
+          <span className="text-xs text-muted-foreground">{t.componentes.serialAutocomplete.sinCoincidencia}</span>
         </div>
       )}
     </div>

@@ -56,16 +56,32 @@ export default function ReportesTurno() {
 
   const load = async () => {
     setLoading(true);
+    // `usuario_id` apunta a auth.users, no a `profiles`: sin FK entre las dos,
+    // PostgREST no puede anidar `profiles(...)` y la consulta entera fallaba,
+    // dejando la pantalla vacía. Los nombres se resuelven aparte, igual que en
+    // Bitácora.
     const { data, error } = await supabase
       .from("reportes_turno")
-      .select("*, profiles(nombre_completo)")
+      .select("*")
       .order("fecha", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) {
       // Tabla no en schema cache aún — silenciar hasta que se corra NOTIFY pgrst
       if (!error.message.includes("schema cache")) toast.error(error.message);
-    } else setRows((data as Reporte[]) ?? []);
+      setLoading(false);
+      return;
+    }
+
+    const reportes = (data ?? []) as Reporte[];
+    const ids = [...new Set(reportes.map(r => r.usuario_id).filter(Boolean))];
+    if (ids.length) {
+      const { data: perfiles } = await supabase
+        .from("profiles").select("id, nombre_completo").in("id", ids);
+      const porId = new Map((perfiles ?? []).map(p => [p.id, p.nombre_completo]));
+      reportes.forEach(r => { r.profiles = { nombre_completo: porId.get(r.usuario_id) ?? null }; });
+    }
+    setRows(reportes);
     setLoading(false);
   };
 
@@ -283,7 +299,7 @@ export default function ReportesTurno() {
             )}
             {!editing && autoArmados.length === 0 && (
               <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-muted-foreground">
-                Sin motocarros marcados como ARMADO hoy — captura el número manualmente o ve a Producción a marcarlos primero.
+                {tr.sinArmadosHoy}
               </div>
             )}
 

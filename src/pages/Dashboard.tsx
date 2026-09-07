@@ -111,14 +111,14 @@ export default function Dashboard() {
           });
         }
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Error inesperado");
+        if (!cancelled) setError(e instanceof Error ? e.message : t.dashboard.errorInesperado);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     fetchData();
     return () => { cancelled = true; };
-  }, [user, retry]);
+  }, [user, retry, t.dashboard.errorInesperado]);
 
   // El tablero general es de Dirección; las demás áreas entran a su módulo.
   useEffect(() => {
@@ -126,7 +126,7 @@ export default function Dashboard() {
     if (perms.inicio !== "/") nav(perms.inicio);
   }, [area, nivel, perms.inicio, nav]);
 
-  const greeting = t.dashboard.greeting(profileName || "usuario", area && nivel ? `${t.areas[area]} · ${t.niveles[nivel]}` : "");
+  const greeting = t.dashboard.greeting(profileName || t.dashboard.usuario, area && nivel ? `${t.areas[area]} · ${t.niveles[nivel]}` : "");
 
   if (loading) {
     return (
@@ -156,14 +156,14 @@ export default function Dashboard() {
         <Card className="p-6 border-[#991B1B]">
           <div className="flex items-center gap-2 mb-2 text-[#991B1B] font-bold">
             <AlertTriangle size={20} />
-            Error al cargar el dashboard
+            {t.dashboard.errorCargar}
           </div>
           <p className="text-muted-foreground mb-4">{error}</p>
           <button
             onClick={() => setRetry(r => r + 1)}
             className="px-4 py-2 rounded-md bg-[#1F3864] text-white font-medium hover:bg-[#152a4a] transition-colors"
           >
-            Reintentar
+            {t.dashboard.reintentar}
           </button>
         </Card>
       </div>
@@ -210,7 +210,7 @@ export default function Dashboard() {
       const count = motos.filter(m => m.fecha_real_armado === iso).length;
       const isFuture = iso > today;
       const status = isFuture ? "future" : count >= CAPACIDAD ? "ok" : count > 0 ? "partial" : "miss";
-      return { iso, label: ["L","M","M","J","V"][i], count, status };
+      return { iso, label: t.dashboard.diasSemana[i], count, status };
     });
   })();
 
@@ -243,7 +243,7 @@ export default function Dashboard() {
 
       {area === "direccion" && (
         <div className="space-y-8">
-          <SeccionDashboard titulo="Operación" subtitulo="Producción y entregas de las unidades del embarque">
+          <SeccionDashboard titulo={t.dashboard.seccionOperacion} subtitulo={t.dashboard.seccionOperacionSub}>
             <InventarioStatus />
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -274,7 +274,7 @@ export default function Dashboard() {
               </div>
               <div className="flex gap-2 mt-5">
                 {weekDays.map(d => (
-                  <div key={d.iso} className="flex-1 text-center" title={`${d.iso}: ${d.count} armados`}>
+                  <div key={d.iso} className="flex-1 text-center" title={t.dashboard.armadosDia(d.iso, d.count)}>
                     <div className="text-xs text-muted-foreground mb-1 font-medium">{d.label}</div>
                     <div
                       className="h-12 rounded-md flex items-center justify-center text-sm font-bold border-2"
@@ -313,15 +313,15 @@ export default function Dashboard() {
             )}
           </SeccionDashboard>
 
-          <SeccionDashboard titulo="Avance">
+          <SeccionDashboard titulo={t.dashboard.seccionAvance}>
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="mb-0">{t.dashboard.planVsReal}</h3>
                 <span
                   className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-[#2E75B6]/10 text-[#2E75B6]"
-                  title="Armadas / unidades configuradas por fábrica. No incluye los chasis y motores que aún no se han configurado en una unidad — ver 'Por configurar' arriba."
+                  title={t.dashboard.avanceTooltip}
                 >
-                  {avance}% avance sobre configuradas
+                  {t.dashboard.avanceSobreConfiguradas(avance)}
                 </span>
               </div>
               <div className="h-72">
@@ -339,7 +339,7 @@ export default function Dashboard() {
             </Card>
           </SeccionDashboard>
 
-          <SeccionDashboard titulo="Comercial">
+          <SeccionDashboard titulo={t.dashboard.seccionComercial}>
             <div className="grid md:grid-cols-2 gap-4">
               <Card className="p-6">
                 <h3 className="mb-4 flex items-center gap-2"><Users size={22}/> {t.dashboard.topVendedores}</h3>
@@ -456,6 +456,8 @@ function ProximasOrdenes({ motos, catalogo, t }: { motos: any[]; catalogo: Catal
 // Resumen ejecutivo para Administración / Finanzas: une dinero, motocarros
 // y actividad del equipo comercial en una vista estratégica.
 function ResumenEjecutivo() {
+  const { t } = useLang();
+  const e = t.dashboard.ejecutivo;
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState({
     motosTotal: 0,
@@ -514,7 +516,7 @@ function ResumenEjecutivo() {
       if (vendedorIds.length) {
         const { data: profiles } = await supabase.from("profiles").select("id, nombre_completo").in("id", vendedorIds);
         topVendedores = (profiles ?? [])
-          .map((p: any) => ({ nombre: p.nombre_completo || "Sin nombre", monto: vendedorMontos[p.id] || 0 }))
+          .map((p: any) => ({ nombre: p.nombre_completo || e.sinNombre, monto: vendedorMontos[p.id] || 0 }))
           .sort((a, b) => b.monto - a.monto)
           .slice(0, 5);
       }
@@ -538,61 +540,61 @@ function ResumenEjecutivo() {
     };
     cargar();
     return () => { mounted = false; };
-  }, []);
+  }, [e.sinNombre]);
 
   if (loading) {
-    return <div className="text-center py-10 text-muted-foreground">Cargando resumen ejecutivo…</div>;
+    return <div className="text-center py-10 text-muted-foreground">{e.cargando}</div>;
   }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-[#1F3864]">Resumen ejecutivo</h2>
+      <h2 className="text-lg font-bold text-[#1F3864]">{e.title}</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-4 bg-[#1F3864]/5 border-[#1F3864]/10">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Bike size={18} className="text-[#1F3864]" /> Motocarros totales
+            <Bike size={18} className="text-[#1F3864]" /> {e.motocarrosTotales}
           </div>
           <div className="text-3xl font-extrabold text-[#1F3864] mt-1">{kpis.motosTotal}</div>
         </Card>
         <Card className="p-4 bg-emerald-50 border-emerald-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle size={18} className="text-emerald-600" /> Entregados
+            <CheckCircle size={18} className="text-emerald-600" /> {e.entregados}
           </div>
           <div className="text-3xl font-extrabold text-emerald-600 mt-1">{kpis.motosEntregados}</div>
         </Card>
         <Card className="p-4 bg-amber-50 border-amber-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Truck size={18} className="text-amber-600" /> Por entregar
+            <Truck size={18} className="text-amber-600" /> {e.porEntregar}
           </div>
           <div className="text-3xl font-extrabold text-amber-600 mt-1">{kpis.motosPorEntregar}</div>
         </Card>
         <Card className="p-4 bg-blue-50 border-blue-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <BarChart3 size={18} className="text-blue-600" /> Remisiones
+            <BarChart3 size={18} className="text-blue-600" /> {e.remisiones}
           </div>
           <div className="text-3xl font-extrabold text-blue-600 mt-1">{kpis.remisionesTotal}</div>
         </Card>
         <Card className="p-4 bg-purple-50 border-purple-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <TrendingUp size={18} className="text-purple-600" /> Oportunidades
+            <TrendingUp size={18} className="text-purple-600" /> {e.oportunidades}
           </div>
           <div className="text-3xl font-extrabold text-purple-600 mt-1">{kpis.oportunidadesTotal}</div>
         </Card>
         <Card className="p-4 bg-green-50 border-green-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle size={18} className="text-green-600" /> Oportunidades ganadas
+            <CheckCircle size={18} className="text-green-600" /> {e.oportunidadesGanadas}
           </div>
           <div className="text-3xl font-extrabold text-green-600 mt-1">{kpis.oportunidadesGanadas}</div>
         </Card>
         <Card className="p-4 bg-yellow-50 border-yellow-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <DollarSign size={18} className="text-yellow-600" /> Monto ganado
+            <DollarSign size={18} className="text-yellow-600" /> {e.montoGanado}
           </div>
           <div className="text-2xl font-extrabold text-yellow-600 mt-1">{fmtMoneda(kpis.oportunidadesMonto)}</div>
         </Card>
         <Card className="p-4 bg-indigo-50 border-indigo-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Users size={18} className="text-indigo-600" /> Actividades (30d)
+            <Users size={18} className="text-indigo-600" /> {e.actividades30}
           </div>
           <div className="text-3xl font-extrabold text-indigo-600 mt-1">{kpis.actividadesMes}</div>
         </Card>
@@ -601,18 +603,18 @@ function ResumenEjecutivo() {
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-4">
           <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
-            <Truck size={20} /> Estado de remisiones
+            <Truck size={20} /> {e.estadoRemisiones}
           </h3>
           <div className="space-y-2">
-            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Completas</span><span className="font-bold text-emerald-600">{kpis.remisionesCompletas}</span></div>
-            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Parciales</span><span className="font-bold text-[#1F3864]">{kpis.remisionesParciales}</span></div>
-            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>Otras</span><span className="font-bold text-slate-600">{kpis.remisionesTotal - kpis.remisionesCompletas - kpis.remisionesParciales}</span></div>
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.completas}</span><span className="font-bold text-emerald-600">{kpis.remisionesCompletas}</span></div>
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.parciales}</span><span className="font-bold text-[#1F3864]">{kpis.remisionesParciales}</span></div>
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.otras}</span><span className="font-bold text-slate-600">{kpis.remisionesTotal - kpis.remisionesCompletas - kpis.remisionesParciales}</span></div>
           </div>
         </Card>
 
         <Card className="p-4">
           <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
-            <Users size={20} /> Top vendedores (monto ganado)
+            <Users size={20} /> {e.topVendedores}
           </h3>
           {kpis.topVendedores.length > 0 ? (
             <div className="space-y-2">
@@ -624,7 +626,7 @@ function ResumenEjecutivo() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-6 text-muted-foreground">Sin ventas registradas</div>
+            <div className="text-center py-6 text-muted-foreground">{e.sinVentas}</div>
           )}
         </Card>
       </div>

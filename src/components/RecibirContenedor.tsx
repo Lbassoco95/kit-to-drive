@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { parseContenedoresExcel, ContainerSheetData, ContenedorFromExcel } from "@/lib/excelParser";
 import { COLORES, normColor, normSerial } from "@/lib/dazon";
+import { useLang } from "@/contexts/LangContext";
+import type { Translations } from "@/i18n/es";
 
 type Unidad = { ns_chasis: string; ns_motor: string; chasis_asignado?: string };
 
@@ -26,9 +28,11 @@ type RecepcionReport = {
 
 type RpcResult = { ok: boolean; error?: string; creados?: number; insertados?: number; actualizados?: number; invalidos?: number };
 
-const cabeceraSchema = z.object({
-  folio_contenedor: z.string().trim().min(1, "Folio requerido").max(50),
-  fecha_arribo: z.string().min(1, "Fecha requerida"),
+// El esquema se arma con el diccionario para que el mensaje de validación
+// salga en el idioma activo.
+const cabeceraSchema = (t: Translations) => z.object({
+  folio_contenedor: z.string().trim().min(1, t.componentes.recibirContenedor.folioRequerido).max(50),
+  fecha_arribo: z.string().min(1, t.componentes.recibirContenedor.fechaRequerida),
   modelo: z.string().trim().min(1).max(50),
   color: z.enum(COLORES),
   cantidad: z.coerce.number().int().min(1).max(500),
@@ -37,6 +41,8 @@ const cabeceraSchema = z.object({
 const NS_REGEX = /^[A-Z0-9-]{4,30}$/;
 
 export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
+  const { t } = useLang();
+  const c = t.componentes.recibirContenedor;
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [tab, setTab] = useState<"manual" | "pegar" | "excel">("manual");
@@ -60,7 +66,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       return;
     }
 
-    const r = cabeceraSchema.safeParse(cab);
+    const r = cabeceraSchema(t).safeParse(cab);
     if (!r.success) { toast.error(r.error.issues[0].message); return; }
     setUnidades(Array.from({ length: r.data.cantidad }, () => ({ ns_chasis: "", ns_motor: "", chasis_asignado: "" })));
     setStep(2);
@@ -74,10 +80,10 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       if (!parts.length) continue;
       out.push({ ns_chasis: (parts[0] || "").toUpperCase(), ns_motor: (parts[1] || "").toUpperCase(), chasis_asignado: (parts[2] || "").toUpperCase() });
     }
-    if (!out.length) { toast.error("No se detectaron filas. Pega NS_chasis [tab/coma] NS_motor por línea."); return; }
+    if (!out.length) { toast.error(c.sinFilas); return; }
     setUnidades(out);
     setCab(c => ({ ...c, cantidad: out.length }));
-    toast.success(`✓ ${out.length} fila(s) cargada(s)`);
+    toast.success(c.filasCargadas(out.length));
   };
 
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,7 +95,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       const containerSheets = await parseContenedoresExcel(file);
 
       if (containerSheets.length === 0) {
-        toast.error("No se encontraron hojas válidas en el archivo Excel");
+        toast.error(c.sinHojas);
         setBusy(false);
         return;
       }
@@ -100,10 +106,10 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       const totalChasis = containerSheets.reduce((sum, sheet) => sum + sheet.chasis.length, 0);
       const totalMotores = containerSheets.reduce((sum, sheet) => sum + sheet.motores.length, 0);
 
-      toast.success(`✓ ${containerSheets.length} contenedor(es) detectado(s): ${totalChasis} chasis y ${totalMotores} motores`);
+      toast.success(c.okDetectados(containerSheets.length, totalChasis, totalMotores));
     } catch (error) {
       console.error("Error parsing containers Excel:", error);
-      toast.error("Error al procesar el archivo Excel. Verifica el formato.");
+      toast.error(c.errorExcel);
     } finally {
       setBusy(false);
     }
@@ -111,7 +117,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
   const importarContenedoresExcel = async () => {
     if (parsedContainerSheets.length === 0) {
-      toast.error("No hay contenedores para importar");
+      toast.error(c.sinContenedores);
       return;
     }
 
@@ -121,7 +127,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
       for (const sheet of parsedContainerSheets) {
         if (sheet.chasis.length !== sheet.motores.length) {
-          toast.info(`${sheet.folio_contenedor}: ${sheet.chasis.length} chasis y ${sheet.motores.length} motores recibidos`);
+          toast.info(c.desbalance(sheet.folio_contenedor, sheet.chasis.length, sheet.motores.length));
         }
 
         // Create container record
@@ -146,7 +152,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
             .eq("folio_contenedor", sheet.folio_contenedor.trim())
             .maybeSingle();
           if (!existente) {
-            toast.error(`Contenedor ${sheet.folio_contenedor || "(sin folio)"}: ${containerError.message}`);
+            toast.error(c.errorContenedor(sheet.folio_contenedor || c.sinFolio, containerError.message));
             continue;
           }
           containerId = existente.id;
@@ -169,10 +175,10 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           });
 
           if (chassisError) {
-            toast.error(`Chasis ${sheet.folio_contenedor}: ${chassisError.message}`);
+            toast.error(c.errorChasis(sheet.folio_contenedor, chassisError.message));
             huboError = true;
           } else if (!(chassisData as RpcResult | null)?.ok) {
-            toast.error(`Chasis ${sheet.folio_contenedor}: ${(chassisData as RpcResult | null)?.error ?? 'no se importó'}`);
+            toast.error(c.errorChasis(sheet.folio_contenedor, (chassisData as RpcResult | null)?.error ?? c.noImporto));
             huboError = true;
           } else {
             const r = chassisData as RpcResult;
@@ -191,10 +197,10 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           });
 
           if (motorsError) {
-            toast.error(`Motores ${sheet.folio_contenedor}: ${motorsError.message}`);
+            toast.error(c.errorMotores(sheet.folio_contenedor, motorsError.message));
             huboError = true;
           } else if (!(motorsData as RpcResult | null)?.ok) {
-            toast.error(`Motores ${sheet.folio_contenedor}: ${(motorsData as RpcResult | null)?.error ?? 'no se importó'}`);
+            toast.error(c.errorMotores(sheet.folio_contenedor, (motorsData as RpcResult | null)?.error ?? c.noImporto));
             huboError = true;
           } else {
             const r = motorsData as RpcResult;
@@ -213,12 +219,12 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       const totalChasisRecibidos = reportesRecepcion.reduce((a, r) => a + r.chasis_insertados + r.chasis_actualizados, 0);
       const totalMotoresRecibidos = reportesRecepcion.reduce((a, r) => a + r.motores_insertados + r.motores_actualizados, 0);
 
-      toast.success(`✓ ${reportesRecepcion.length} contenedor(es) recibido(s) — ${totalChasisRecibidos} chasis y ${totalMotoresRecibidos} motores en inventario`);
+      toast.success(c.okRecibidos(reportesRecepcion.length, totalChasisRecibidos, totalMotoresRecibidos));
 
       setStep(4);
     } catch (error) {
       console.error("Error importing containers:", error);
-      toast.error("Error al importar contenedores");
+      toast.error(c.errorImportar);
     } finally {
       setBusy(false);
     }
@@ -231,21 +237,21 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
     unidades.forEach((u, i) => {
       const ch = u.ns_chasis.trim().toUpperCase();
       const mo = u.ns_motor.trim().toUpperCase();
-      if (!ch) errs.push({ idx: i, campo: "ns_chasis", msg: "Vacío" });
-      else if (!NS_REGEX.test(ch)) errs.push({ idx: i, campo: "ns_chasis", msg: "Formato inválido" });
-      if (!mo) errs.push({ idx: i, campo: "ns_motor", msg: "Vacío" });
-      else if (!NS_REGEX.test(mo)) errs.push({ idx: i, campo: "ns_motor", msg: "Formato inválido" });
+      if (!ch) errs.push({ idx: i, campo: "ns_chasis", msg: c.errVacio });
+      else if (!NS_REGEX.test(ch)) errs.push({ idx: i, campo: "ns_chasis", msg: c.errFormato });
+      if (!mo) errs.push({ idx: i, campo: "ns_motor", msg: c.errVacio });
+      else if (!NS_REGEX.test(mo)) errs.push({ idx: i, campo: "ns_motor", msg: c.errFormato });
       if (ch) chasisCount.set(ch, (chasisCount.get(ch) ?? 0) + 1);
       if (mo) motorCount.set(mo, (motorCount.get(mo) ?? 0) + 1);
     });
     unidades.forEach((u, i) => {
       const ch = u.ns_chasis.trim().toUpperCase();
       const mo = u.ns_motor.trim().toUpperCase();
-      if (ch && (chasisCount.get(ch) ?? 0) > 1) errs.push({ idx: i, campo: "ns_chasis", msg: "Duplicado" });
-      if (mo && (motorCount.get(mo) ?? 0) > 1) errs.push({ idx: i, campo: "ns_motor", msg: "Duplicado" });
+      if (ch && (chasisCount.get(ch) ?? 0) > 1) errs.push({ idx: i, campo: "ns_chasis", msg: c.errDuplicado });
+      if (mo && (motorCount.get(mo) ?? 0) > 1) errs.push({ idx: i, campo: "ns_motor", msg: c.errDuplicado });
     });
     return errs;
-  }, [unidades]);
+  }, [unidades, c]);
 
   const errIdx = (i: number, campo: string) => validacion.find(e => e.idx === i && e.campo === campo);
 
@@ -254,7 +260,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   };
 
   const guardar = async () => {
-    if (validacion.length) { toast.error(`Hay ${validacion.length} error(es) que corregir`); return; }
+    if (validacion.length) { toast.error(c.hayErrores(validacion.length)); return; }
     setBusy(true);
     const payload = unidades.map(u => ({
       ns_chasis: u.ns_chasis.trim().toUpperCase(),
@@ -270,7 +276,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
     });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
-    toast.success(`✓ Contenedor recibido — ${(data as { creados?: number } | null)?.creados ?? unidades.length} motocarros creados`);
+    toast.success(c.okRecibido((data as { creados?: number } | null)?.creados ?? unidades.length));
     setOpen(false); reset(); onDone?.();
   };
 
@@ -280,13 +286,13 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       `  Chasis: ${r.chasis_insertados} insertados, ${r.chasis_actualizados} actualizados, ${r.chasis_invalidos} inválidos\n` +
       `  Motores: ${r.motores_insertados} insertados, ${r.motores_actualizados} actualizados, ${r.motores_invalidos} inválidos\n`
     ).join('\n');
-    navigator.clipboard.writeText(text).then(() => toast.success("Reporte copiado"));
+    navigator.clipboard.writeText(text).then(() => toast.success(c.reporteCopiado));
   };
 
   return (
     <>
       <Button onClick={() => { reset(); setOpen(true); }} className="h-12 bg-[#065F46] hover:bg-[#054c38] text-white font-semibold">
-        <PackagePlus className="h-5 w-5 mr-2" /> Recibir contenedor
+        <PackagePlus className="h-5 w-5 mr-2" /> {c.boton}
       </Button>
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
@@ -294,13 +300,13 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-2xl">
               <PackagePlus className="h-6 w-6 text-[#065F46]" />
-              Recibir contenedor — Paso {step} de 4
+              {c.titulo(step)}
             </DialogTitle>
             <DialogDescription>
-              {step === 1 && "Datos generales del packing list"}
-              {step === 2 && "Captura los números de motor y chasis (manual o pegando desde Excel)"}
-              {step === 3 && "Confirma y crea los motocarros en producción"}
-              {step === 4 && "Reporte de recepción"}
+              {step === 1 && c.paso1}
+              {step === 2 && c.paso2}
+              {step === 3 && c.paso3}
+              {step === 4 && c.paso4}
             </DialogDescription>
           </DialogHeader>
 
@@ -318,34 +324,34 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
             <div className="space-y-4 mt-4">
               <Tabs value={importMode} onValueChange={v => setImportMode(v as "single" | "multiple")} className="w-full">
                 <TabsList className="grid grid-cols-2 h-12">
-                  <TabsTrigger value="single" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />Capturar manual</TabsTrigger>
-                  <TabsTrigger value="multiple" className="text-base"><FileSpreadsheet className="h-4 w-4 mr-2" />Importar contenedores</TabsTrigger>
+                  <TabsTrigger value="single" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />{c.capturarManual}</TabsTrigger>
+                  <TabsTrigger value="multiple" className="text-base"><FileSpreadsheet className="h-4 w-4 mr-2" />{c.importarContenedores}</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="single" className="space-y-4 mt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label>Folio de contenedor *</Label>
+                      <Label>{c.folio}</Label>
                       <Input value={cab.folio_contenedor} onChange={e => setCab({ ...cab, folio_contenedor: e.target.value })} placeholder="CONT-2026-001" maxLength={50} className="h-12" />
                     </div>
                     <div>
-                      <Label>Fecha de arribo *</Label>
+                      <Label>{c.fechaArribo}</Label>
                       <Input type="date" value={cab.fecha_arribo} onChange={e => setCab({ ...cab, fecha_arribo: e.target.value })} className="h-12" />
                     </div>
                     <div>
-                      <Label>Modelo *</Label>
+                      <Label>{c.modelo}</Label>
                       <Input value={cab.modelo} onChange={e => setCab({ ...cab, modelo: e.target.value })} maxLength={50} className="h-12" />
                     </div>
                     <div>
-                      <Label>Color *</Label>
+                      <Label>{c.color}</Label>
                       <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as typeof cab.color })} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
-                        {COLORES.map(c => <option key={c} value={c}>{c}</option>)}
+                        {COLORES.map(col => <option key={col} value={col}>{t.colors[col]}</option>)}
                       </select>
                     </div>
                     <div>
-                      <Label>Cantidad de unidades *</Label>
+                      <Label>{c.cantidad}</Label>
                       <Input type="number" min={1} max={500} value={cab.cantidad} onChange={e => setCab({ ...cab, cantidad: Number(e.target.value) })} className="h-12" />
-                      <p className="text-xs text-muted-foreground mt-1">Si vas a pegar desde Excel, se ajusta automáticamente.</p>
+                      <p className="text-xs text-muted-foreground mt-1">{c.cantidadAyuda}</p>
                     </div>
                   </div>
                 </TabsContent>
@@ -353,11 +359,8 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                 <TabsContent value="multiple" className="space-y-4 mt-4">
                   <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center">
                     <Upload className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                    <p className="text-sm font-medium mb-2">Importar desde Excel (VIN list)</p>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      Sube un archivo Excel con múltiples hojas (una por contenedor). El sistema leerá automáticamente:
-                      número de contenedor, modelo, cantidad y VINs (FRAME NUMBER, COLOR, MODEL).
-                    </p>
+                    <p className="text-sm font-medium mb-2">{c.importarExcel}</p>
+                    <p className="text-xs text-muted-foreground mb-4">{c.importarExcelAyuda}</p>
                     <Input
                       type="file"
                       accept=".xlsx,.xls"
@@ -365,43 +368,43 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                       disabled={busy}
                       className="max-w-xs mx-auto"
                     />
-                    {busy && <p className="text-xs text-muted-foreground mt-2">Procesando archivo...</p>}
+                    {busy && <p className="text-xs text-muted-foreground mt-2">{c.procesando}</p>}
                   </div>
 
                   {parsedContainerSheets.length > 0 && (
                     <div className="bg-slate-50 rounded-lg p-4 space-y-4">
-                      <p className="font-medium">Contenedores detectados:</p>
+                      <p className="font-medium">{c.detectados}</p>
                       {parsedContainerSheets.map((sheet, i) => (
                         <div key={i} className="border rounded-lg p-3 bg-white">
                           <div className="flex justify-between items-center mb-2">
                             <span className="font-bold text-[#1F3864]">{sheet.folio_contenedor}</span>
                             <span className={`px-2 py-1 rounded-full text-xs ${sheet.tipo === 'chasis' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                              {sheet.tipo === 'chasis' ? 'Chasis' : 'Motores'}
+                              {sheet.tipo === 'chasis' ? c.chasis : c.motores}
                             </span>
                           </div>
                           <div className="text-sm space-y-1">
-                            <div>Modelo: {sheet.modelo}</div>
-                            <div>Cantidad: {sheet.tipo === 'chasis' ? sheet.chasis.length : sheet.motores.length}</div>
+                            <div>{c.modeloLbl(sheet.modelo)}</div>
+                            <div>{c.cantidadLbl(sheet.tipo === 'chasis' ? sheet.chasis.length : sheet.motores.length)}</div>
                           </div>
                           {sheet.chasis.length > 0 && (
                             <div className="mt-2 border-t pt-2">
-                              <p className="text-xs font-medium mb-1">Primeros chasis:</p>
+                              <p className="text-xs font-medium mb-1">{c.primerosChasis}</p>
                               <ul className="text-xs space-y-0.5">
                                 {sheet.chasis.slice(0, 5).map((vin, j) => (
                                   <li key={j} className="font-mono">{vin.numero_chasis} ({vin.color})</li>
                                 ))}
-                                {sheet.chasis.length > 5 && <li className="text-muted-foreground">... y {sheet.chasis.length - 5} más</li>}
+                                {sheet.chasis.length > 5 && <li className="text-muted-foreground">{c.yMas(sheet.chasis.length - 5)}</li>}
                               </ul>
                             </div>
                           )}
                           {sheet.motores.length > 0 && (
                             <div className="mt-2 border-t pt-2">
-                              <p className="text-xs font-medium mb-1">Primeros motores:</p>
+                              <p className="text-xs font-medium mb-1">{c.primerosMotores}</p>
                               <ul className="text-xs space-y-0.5">
                                 {sheet.motores.slice(0, 5).map((motor, j) => (
                                   <li key={j} className="font-mono">{motor.numero_motor} ({motor.modelo || 'N/A'})</li>
                                 ))}
-                                {sheet.motores.length > 5 && <li className="text-muted-foreground">... y {sheet.motores.length - 5} más</li>}
+                                {sheet.motores.length > 5 && <li className="text-muted-foreground">{c.yMas(sheet.motores.length - 5)}</li>}
                               </ul>
                             </div>
                           )}
@@ -417,16 +420,16 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           {step === 2 && (
             <Tabs value={tab} onValueChange={v => setTab(v as "manual" | "pegar")} className="mt-2">
               <TabsList className="grid grid-cols-2 h-12">
-                <TabsTrigger value="manual" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />Capturar uno por uno</TabsTrigger>
-                <TabsTrigger value="pegar" className="text-base"><ClipboardPaste className="h-4 w-4 mr-2" />Pegar desde Excel</TabsTrigger>
+                <TabsTrigger value="manual" className="text-base"><KeyboardIcon className="h-4 w-4 mr-2" />{c.capturarUnoAUno}</TabsTrigger>
+                <TabsTrigger value="pegar" className="text-base"><ClipboardPaste className="h-4 w-4 mr-2" />{c.pegarExcel}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="pegar" className="space-y-3 mt-4">
                 <p className="text-sm text-muted-foreground">
-                  Pega 2 columnas: <strong>NS Chasis</strong> y <strong>NS Motor</strong> (opcional 3ra columna: Chasis comercial). Separadores: tab, coma o punto y coma.
+                  {c.pegarAyuda1} <strong>{c.pegarNsChasis}</strong> {c.pegarY} <strong>{c.pegarNsMotor}</strong> {c.pegarAyuda2}
                 </p>
                 <Textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={10} className="font-mono text-sm" placeholder={"LXYJCML50P0000001\tHJ200FMI000001\nLXYJCML50P0000002\tHJ200FMI000002"} />
-                <Button onClick={parsePegado} variant="outline" className="h-11"><ClipboardPaste className="h-4 w-4 mr-2" />Procesar pegado</Button>
+                <Button onClick={parsePegado} variant="outline" className="h-11"><ClipboardPaste className="h-4 w-4 mr-2" />{c.procesarPegado}</Button>
               </TabsContent>
 
               <TabsContent value="manual" className="mt-4" />
@@ -435,17 +438,17 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
               {unidades.length > 0 && (
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-2">
-                    <p className="text-sm font-medium">{unidades.length} unidad(es) — {validacion.length === 0 ? <span className="text-[#065F46]">✓ Sin errores</span> : <span className="text-[#C0392B]">{validacion.length} error(es)</span>}</p>
-                    <Button size="sm" variant="outline" onClick={() => setUnidades(prev => [...prev, { ns_chasis: "", ns_motor: "", chasis_asignado: "" }])}>+ Agregar fila</Button>
+                    <p className="text-sm font-medium">{c.resumenUnidades(unidades.length)} {validacion.length === 0 ? <span className="text-[#065F46]">{c.sinErrores}</span> : <span className="text-[#C0392B]">{c.conErrores(validacion.length)}</span>}</p>
+                    <Button size="sm" variant="outline" onClick={() => setUnidades(prev => [...prev, { ns_chasis: "", ns_motor: "", chasis_asignado: "" }])}>{c.agregarFila}</Button>
                   </div>
                   <div className="border rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50 sticky top-0">
                         <tr>
                           <th className="px-2 py-2 text-left w-12">#</th>
-                          <th className="px-2 py-2 text-left">NS Chasis *</th>
-                          <th className="px-2 py-2 text-left">NS Motor *</th>
-                          <th className="px-2 py-2 text-left">Chasis comercial</th>
+                          <th className="px-2 py-2 text-left">{c.colNsChasis}</th>
+                          <th className="px-2 py-2 text-left">{c.colNsMotor}</th>
+                          <th className="px-2 py-2 text-left">{c.colChasisComercial}</th>
                           <th className="w-12" />
                         </tr>
                       </thead>
@@ -488,16 +491,16 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           {step === 3 && (
             <div className="space-y-3 mt-4">
               <div className="bg-slate-50 rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div><div className="text-muted-foreground">Folio</div><div className="font-bold">{cab.folio_contenedor}</div></div>
-                <div><div className="text-muted-foreground">Arribo</div><div className="font-bold">{cab.fecha_arribo}</div></div>
-                <div><div className="text-muted-foreground">Modelo</div><div className="font-bold">{cab.modelo}</div></div>
-                <div><div className="text-muted-foreground">Color</div><div className="font-bold">{cab.color}</div></div>
+                <div><div className="text-muted-foreground">{c.resumenFolio}</div><div className="font-bold">{cab.folio_contenedor}</div></div>
+                <div><div className="text-muted-foreground">{c.resumenArribo}</div><div className="font-bold">{cab.fecha_arribo}</div></div>
+                <div><div className="text-muted-foreground">{c.resumenModelo}</div><div className="font-bold">{cab.modelo}</div></div>
+                <div><div className="text-muted-foreground">{c.resumenColor}</div><div className="font-bold">{t.colors[cab.color]}</div></div>
               </div>
               <div className={`rounded-lg p-4 flex items-center gap-3 ${validacion.length === 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
                 {validacion.length === 0 ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
                 <div>
-                  <div className="font-bold text-lg">{unidades.length} motocarros se crearán en estatus PENDIENTE</div>
-                  <div className="text-sm">{validacion.length === 0 ? "Listo para confirmar. El sistema asignará orden de armado consecutivo." : `Regresa al paso 2 y corrige ${validacion.length} error(es).`}</div>
+                  <div className="font-bold text-lg">{c.seCrearan(unidades.length)}</div>
+                  <div className="text-sm">{validacion.length === 0 ? c.listoConfirmar : c.corrigeErrores(validacion.length)}</div>
                 </div>
               </div>
             </div>
@@ -506,8 +509,8 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
           {step === 4 && (
             <div className="space-y-4 mt-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-lg">Reporte de recepción</h3>
-                <Button size="sm" variant="outline" onClick={copyReport}><Copy className="h-4 w-4 mr-2" />Copiar reporte</Button>
+                <h3 className="font-semibold text-lg">{c.reporteRecepcion}</h3>
+                <Button size="sm" variant="outline" onClick={copyReport}><Copy className="h-4 w-4 mr-2" />{c.copiarReporte}</Button>
               </div>
               <div className="space-y-3">
                 {reportes.map((r, i) => (
@@ -516,25 +519,25 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                       <span className="font-bold text-[#1F3864]">{r.folio}</span>
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
-                      <div><strong>Chasis:</strong> {r.chasis_insertados} insertados · {r.chasis_actualizados} actualizados{r.chasis_invalidos > 0 && <span className="text-amber-700"> · {r.chasis_invalidos} inválidos</span>}</div>
-                      <div><strong>Motores:</strong> {r.motores_insertados} insertados · {r.motores_actualizados} actualizados{r.motores_invalidos > 0 && <span className="text-amber-700"> · {r.motores_invalidos} inválidos</span>}</div>
+                      <div><strong>{c.chasisLinea}</strong> {r.chasis_insertados} {c.insertados} · {r.chasis_actualizados} {c.actualizados}{r.chasis_invalidos > 0 && <span className="text-amber-700"> · {r.chasis_invalidos} {c.invalidos}</span>}</div>
+                      <div><strong>{c.motoresLinea}</strong> {r.motores_insertados} {c.insertados} · {r.motores_actualizados} {c.actualizados}{r.motores_invalidos > 0 && <span className="text-amber-700"> · {r.motores_invalidos} {c.invalidos}</span>}</div>
                     </div>
                   </div>
                 ))}
                 {reportes.length === 0 && (
-                  <div className="text-center text-muted-foreground">No hay reportes para mostrar</div>
+                  <div className="text-center text-muted-foreground">{c.sinReportes}</div>
                 )}
               </div>
             </div>
           )}
 
           <DialogFooter className="gap-2">
-            {step > 1 && step < 4 && <Button variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />Atrás</Button>}
-            {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">Siguiente<ArrowRight className="h-4 w-4 ml-2" /></Button>}
-            {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? "Procesando…" : `Importar ${parsedContainerSheets.length} contenedor(es) — ${parsedContainerSheets.reduce((a,s)=>a+s.chasis.length,0)} chasis y ${parsedContainerSheets.reduce((a,s)=>a+s.motores.length,0)} motores`}</Button>}
-            {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">Revisar<ArrowRight className="h-4 w-4 ml-2" /></Button>}
-            {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? "Guardando…" : `Crear ${unidades.length} motocarros`}</Button>}
-            {step === 4 && <Button onClick={() => { setOpen(false); reset(); onDone?.(); }} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />Cerrar</Button>}
+            {step > 1 && step < 4 && <Button variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />{c.atras}</Button>}
+            {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">{c.siguiente}<ArrowRight className="h-4 w-4 ml-2" /></Button>}
+            {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? c.procesando : c.importarN(parsedContainerSheets.length, parsedContainerSheets.reduce((a,s)=>a+s.chasis.length,0), parsedContainerSheets.reduce((a,s)=>a+s.motores.length,0))}</Button>}
+            {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">{c.revisar}<ArrowRight className="h-4 w-4 ml-2" /></Button>}
+            {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? c.guardando : c.crearN(unidades.length)}</Button>}
+            {step === 4 && <Button onClick={() => { setOpen(false); reset(); onDone?.(); }} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{t.actions.close}</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>

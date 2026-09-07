@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useLang } from "@/contexts/LangContext";
 import { Navigate, useLocation } from "react-router-dom";
 import { Modulo } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { LogOut, ShieldOff, UserCog } from "lucide-react";
  */
 function SinAcceso({ icono, titulo, detalle }: { icono: JSX.Element; titulo: string; detalle: string }) {
   const { signOut, profileName } = useAuth();
+  const { t } = useLang();
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
       <div className="max-w-md w-full bg-card border rounded-lg p-8 text-center space-y-4">
@@ -18,7 +20,7 @@ function SinAcceso({ icono, titulo, detalle }: { icono: JSX.Element; titulo: str
         {profileName && <p className="text-sm font-medium text-slate-600">{profileName}</p>}
         <p className="text-muted-foreground text-sm leading-relaxed">{detalle}</p>
         <Button onClick={signOut} variant="outline" className="w-full h-11">
-          <LogOut className="h-4 w-4 mr-2" /> Salir
+          <LogOut className="h-4 w-4 mr-2" /> {t.layout.signOut}
         </Button>
       </div>
     </div>
@@ -27,9 +29,10 @@ function SinAcceso({ icono, titulo, detalle }: { icono: JSX.Element; titulo: str
 
 export default function ProtectedRoute({ children, modulo }: { children: JSX.Element; modulo?: Modulo }) {
   const { user, area, nivel, perms, activo, loading } = useAuth();
+  const { t } = useLang();
   const loc = useLocation();
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando…</div>;
+  if (loading) return <div className="p-8 text-center text-muted-foreground">{t.componentes.acceso.cargando}</div>;
   if (!user) return <Navigate to="/auth" state={{ from: loc }} replace />;
 
   // Dado de baja: no entra a ningún lado. El RLS ya lo corta del lado de la
@@ -39,8 +42,8 @@ export default function ProtectedRoute({ children, modulo }: { children: JSX.Ele
     return (
       <SinAcceso
         icono={<ShieldOff className="h-10 w-10" />}
-        titulo="Tu cuenta está desactivada"
-        detalle="Un administrador dio de baja este usuario. Si crees que es un error, pídele que te reactive desde Sistema → Usuarios."
+        titulo={t.componentes.acceso.desactivadaTitulo}
+        detalle={t.componentes.acceso.desactivadaDetalle}
       />
     );
   }
@@ -51,8 +54,8 @@ export default function ProtectedRoute({ children, modulo }: { children: JSX.Ele
     return (
       <SinAcceso
         icono={<UserCog className="h-10 w-10" />}
-        titulo="Tu usuario aún no tiene permisos"
-        detalle="Falta asignarte un área y un tipo de usuario. Pídele a un administrador que lo haga desde Sistema → Usuarios."
+        titulo={t.componentes.acceso.sinPermisosTitulo}
+        detalle={t.componentes.acceso.sinPermisosDetalle}
       />
     );
   }

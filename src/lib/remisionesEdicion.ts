@@ -398,23 +398,43 @@ export function faltantesDeExistencia(
   return faltantes;
 }
 
+/**
+ * Textos del aviso de inventario insuficiente. La pantalla pasa
+ * `t.remisiones.faltantes`; el default en español conserva el contrato para
+ * quien la llame sin idioma (y para las pruebas).
+ */
+export interface MensajesFaltantes {
+  sinExistencia: (color: string, modelo: string, piden: number) => string;
+  pidesDe: (piden: number, color: string, modelo: string, hay: number) => string;
+  noAlcanza: (lista: string) => string;
+}
+
+export const MENSAJES_FALTANTES_ES: MensajesFaltantes = {
+  sinExistencia: (color, modelo, piden) =>
+    `ya no hay existencia de ${color} (${modelo}) y estás pidiendo ${piden}`,
+  pidesDe: (piden, color, modelo, hay) =>
+    `estás pidiendo ${piden} de ${color} (${modelo}) y sólo hay ${hay}`,
+  noAlcanza: (lista) => `No alcanza el inventario: ${lista}.`,
+};
+
 /** Lo que se le dice a quien captura cuando no alcanza el inventario. */
 export function mensajeFaltantes(
   faltantes: Faltante[],
   etiquetaColor: (c: string) => string = c => c,
+  msgs: MensajesFaltantes = MENSAJES_FALTANTES_ES,
 ): string {
   if (!faltantes.length) return "";
 
   const frase = (f: Faltante) =>
     f.hay <= 0
-      ? `ya no hay existencia de ${etiquetaColor(f.color)} (${f.modelo}) y estás pidiendo ${f.piden}`
-      : `estás pidiendo ${f.piden} de ${etiquetaColor(f.color)} (${f.modelo}) y sólo hay ${f.hay}`;
+      ? msgs.sinExistencia(etiquetaColor(f.color), f.modelo, f.piden)
+      : msgs.pidesDe(f.piden, etiquetaColor(f.color), f.modelo, f.hay);
 
   if (faltantes.length === 1) {
     const t = frase(faltantes[0]);
     return t.charAt(0).toUpperCase() + t.slice(1) + ".";
   }
-  return `No alcanza el inventario: ${faltantes.map(frase).join(" · ")}.`;
+  return msgs.noAlcanza(faltantes.map(frase).join(" · "));
 }
 
 /** Resumen legible de lo que cambió, para guardarlo junto al motivo. */

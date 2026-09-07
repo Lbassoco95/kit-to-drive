@@ -52,9 +52,9 @@ export default function Bitacora() {
 
       <Tabs defaultValue="eventos" className="w-full">
         <TabsList>
-          <TabsTrigger value="eventos">Eventos del sistema</TabsTrigger>
+          <TabsTrigger value="eventos">{t.bitacora.tabEventos}</TabsTrigger>
           {perms.esAdminGlobal && (
-            <TabsTrigger value="eliminaciones">Eliminaciones (solo admin)</TabsTrigger>
+            <TabsTrigger value="eliminaciones">{t.bitacora.tabEliminaciones}</TabsTrigger>
           )}
         </TabsList>
 
@@ -95,11 +95,11 @@ export default function Bitacora() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Fecha</th>
-                      <th>Tabla</th>
-                      <th>Usuario</th>
-                      <th>Motivo</th>
-                      <th>Acciones</th>
+                      <th>{t.bitacora.fecha}</th>
+                      <th>{t.bitacora.tabla}</th>
+                      <th>{t.bitacora.usuario}</th>
+                      <th>{t.bitacora.motivo}</th>
+                      <th>{t.bitacora.acciones}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -117,12 +117,12 @@ export default function Bitacora() {
                             className="h-8"
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            Ver datos
+                            {t.bitacora.verDatos}
                           </Button>
                         </td>
                       </tr>
                     ))}
-                    {!eliminaciones.length && <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">No hay eliminaciones registradas</td></tr>}
+                    {!eliminaciones.length && <tr><td colSpan={5} className="text-center py-6 text-muted-foreground">{t.bitacora.sinEliminaciones}</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -135,26 +135,26 @@ export default function Bitacora() {
       <Dialog open={!!selectedDeletion} onOpenChange={() => setSelectedDeletion(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Datos eliminados</DialogTitle>
+            <DialogTitle>{t.bitacora.datosEliminados}</DialogTitle>
           </DialogHeader>
           {selectedDeletion && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium">Tabla:</span> {selectedDeletion.tabla}
+                  <span className="font-medium">{t.bitacora.tablaLbl}</span> {selectedDeletion.tabla}
                 </div>
                 <div>
-                  <span className="font-medium">Usuario:</span> {selectedDeletion.nombre_usuario}
+                  <span className="font-medium">{t.bitacora.usuarioLbl}</span> {selectedDeletion.nombre_usuario}
                 </div>
                 <div>
-                  <span className="font-medium">Fecha:</span> {new Date(selectedDeletion.created_at).toLocaleString(locale)}
+                  <span className="font-medium">{t.bitacora.fechaLbl}</span> {new Date(selectedDeletion.created_at).toLocaleString(locale)}
                 </div>
                 <div>
-                  <span className="font-medium">Motivo:</span> {selectedDeletion.motivo}
+                  <span className="font-medium">{t.bitacora.motivoLbl}</span> {selectedDeletion.motivo}
                 </div>
               </div>
               <div>
-                <span className="font-medium block mb-2">Datos eliminados:</span>
+                <span className="font-medium block mb-2">{t.bitacora.datosEliminadosLbl}</span>
                 <pre className="bg-slate-100 p-4 rounded-lg text-xs overflow-x-auto">
                   {JSON.stringify(selectedDeletion.datos_eliminados, null, 2)}
                 </pre>

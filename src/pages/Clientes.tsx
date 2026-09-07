@@ -224,13 +224,13 @@ export default function Clientes() {
 
   const archiveCliente = async (cliente: any) => {
     if (!archiveMotivoSelect) {
-      toast.error("Debe seleccionar un motivo");
+      toast.error(t.clientes.faltaMotivo);
       return;
     }
     
     const motivoFinal = archiveMotivoSelect === "Otro" ? archiveMotivo : archiveMotivoSelect;
     if (!motivoFinal || motivoFinal.trim().length < 3) {
-      toast.error("El motivo debe tener al menos 3 caracteres");
+      toast.error(t.clientes.motivoCorto);
       return;
     }
 
@@ -264,7 +264,7 @@ export default function Clientes() {
         datos_nuevos: { ...currentData, activo: false },
       });
 
-    toast.success("Cliente archivado exitosamente");
+    toast.success(t.clientes.archivado);
     setArchiveConfirm(null);
     setArchiveMotivo("");
     setArchiveMotivoSelect("");
@@ -273,13 +273,13 @@ export default function Clientes() {
 
   const reactivateCliente = async (cliente: any) => {
     if (!reactivateMotivoSelect) {
-      toast.error("Debe seleccionar un motivo");
+      toast.error(t.clientes.faltaMotivo);
       return;
     }
     
     const motivoFinal = reactivateMotivoSelect === "Otro" ? reactivateMotivo : reactivateMotivoSelect;
     if (!motivoFinal || motivoFinal.trim().length < 3) {
-      toast.error("El motivo debe tener al menos 3 caracteres");
+      toast.error(t.clientes.motivoCorto);
       return;
     }
 
@@ -313,7 +313,7 @@ export default function Clientes() {
         datos_nuevos: { ...currentData, activo: true },
       });
 
-    toast.success("Cliente reactivado exitosamente");
+    toast.success(t.clientes.reactivado);
     setReactivateConfirm(null);
     setReactivateMotivo("");
     setReactivateMotivoSelect("");
@@ -322,7 +322,7 @@ export default function Clientes() {
 
   const addComment = async (clienteId: string) => {
     if (!newComment.trim()) {
-      toast.error("El comentario no puede estar vacío");
+      toast.error(t.clientes.comentarioVacio);
       return;
     }
 
@@ -356,13 +356,13 @@ export default function Clientes() {
 
   const saveWithMotivo = async () => {
     if (!saveMotivoSelect) {
-      toast.error("Debe seleccionar un motivo");
+      toast.error(t.clientes.faltaMotivo);
       return;
     }
     
     const motivoFinal = saveMotivoSelect === "Otro" ? saveMotivoOther : saveMotivoSelect;
     if (!motivoFinal || motivoFinal.trim().length < 3) {
-      toast.error("El motivo debe tener al menos 3 caracteres");
+      toast.error(t.clientes.motivoCorto);
       return;
     }
 
@@ -500,12 +500,12 @@ export default function Clientes() {
                     </Button>
                   )}
                   {perms.puedeEliminar("clientes") && !isArchived && (
-                    <Button size="icon" variant="ghost" onClick={() => setArchiveConfirm(c)} className="h-9 w-9 text-amber-600 hover:text-amber-700" title="Archivar cliente">
+                    <Button size="icon" variant="ghost" onClick={() => setArchiveConfirm(c)} className="h-9 w-9 text-amber-600 hover:text-amber-700" title={t.clientes.archivarCliente}>
                       <Archive className="h-4 w-4" />
                     </Button>
                   )}
                   {isArchived && (
-                    <Button size="icon" variant="ghost" onClick={() => setReactivateConfirm(c)} className="h-9 w-9 text-green-600 hover:text-green-700" title="Reactivar cliente">
+                    <Button size="icon" variant="ghost" onClick={() => setReactivateConfirm(c)} className="h-9 w-9 text-green-600 hover:text-green-700" title={t.clientes.reactivarCliente}>
                       <RotateCcw className="h-4 w-4" />
                     </Button>
                   )}
@@ -552,7 +552,7 @@ export default function Clientes() {
               <TabsTrigger value="direccion">{t.clientes.direccionFiscal}</TabsTrigger>
               <TabsTrigger value="credito">{t.clientes.credito}</TabsTrigger>
               {editing && <TabsTrigger value="comentarios">Comentarios</TabsTrigger>}
-              {editing && <TabsTrigger value="bitacora">Bitácora</TabsTrigger>}
+              {editing && <TabsTrigger value="bitacora">{t.clientes.bitacora}</TabsTrigger>}
             </TabsList>
             <TabsContent value="datos" className="space-y-3 mt-4">
               <div className="grid grid-cols-2 gap-3">
@@ -591,7 +591,7 @@ export default function Clientes() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>{t.clientes.codigoPostal}</Label><Input value={form.codigo_postal || ""} onChange={e => setForm({ ...form, codigo_postal: e.target.value })} /></div>
-                <div><Label>{t.clientes.pais}</Label><Input value={form.pais || "México"} onChange={e => setForm({ ...form, pais: e.target.value })} /></div>
+                <div><Label>{t.clientes.pais}</Label><Input value={form.pais || t.clientes.paisDefault} onChange={e => setForm({ ...form, pais: e.target.value })} /></div>
               </div>
               <div><Label>{t.clientes.direccion}</Label><Input value={form.direccion || ""} onChange={e => setForm({ ...form, direccion: e.target.value })} placeholder="Dirección de entrega (diferente a fiscal)" /></div>
             </TabsContent>
@@ -606,7 +606,7 @@ export default function Clientes() {
             {editing && (
               <TabsContent value="comentarios" className="space-y-3 mt-4">
                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                  {comments.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay comentarios</p>}
+                  {comments.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t.clientes.sinComentarios}</p>}
                   {comments.map((comment: any) => (
                     <div key={comment.id} className="bg-slate-50 p-3 rounded-lg">
                       <div className="flex items-center gap-2 mb-1">
@@ -614,7 +614,7 @@ export default function Clientes() {
                           {comment.profiles?.nombre_completo?.charAt(0) || "U"}
                         </div>
                         <div>
-                          <div className="text-sm font-medium">{comment.profiles?.nombre_completo || "Usuario"}</div>
+                          <div className="text-sm font-medium">{comment.profiles?.nombre_completo || t.clientes.usuario}</div>
                           <div className="text-xs text-muted-foreground">
                             {new Date(comment.created_at).toLocaleDateString()} {new Date(comment.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                           </div>
@@ -626,7 +626,7 @@ export default function Clientes() {
                 </div>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Agregar comentario..."
+                    placeholder={t.clientes.agregarComentario}
                     value={newComment}
                     onChange={e => setNewComment(e.target.value)}
                     onKeyPress={e => { if (e.key === 'Enter') addComment(editing.id); }}
@@ -640,7 +640,7 @@ export default function Clientes() {
             {editing && (
               <TabsContent value="bitacora" className="space-y-3 mt-4">
                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                  {bitacora.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay cambios registrados</p>}
+                  {bitacora.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t.clientes.sinCambios}</p>}
                   {bitacora.map((entry: any) => {
                     const iconMap: Record<string, any> = {
                       edicion: <Pencil className="h-4 w-4" />,
@@ -653,7 +653,7 @@ export default function Clientes() {
                         <div className="flex items-center gap-2 mb-1">
                           <div className="text-[#1F3864]">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
                           <div>
-                            <div className="text-sm font-medium">{entry.profiles?.nombre_completo || "Usuario"}</div>
+                            <div className="text-sm font-medium">{entry.profiles?.nombre_completo || t.clientes.usuario}</div>
                             <div className="text-xs text-muted-foreground">
                               {entry.tipo_cambio} • {new Date(entry.created_at).toLocaleDateString()} {new Date(entry.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </div>
@@ -687,7 +687,7 @@ export default function Clientes() {
                 <TabsTrigger value="credito">{t.clientes.credito}</TabsTrigger>
                 <TabsTrigger value="documentos">{t.clientes.documentos}</TabsTrigger>
                 <TabsTrigger value="comentarios">Comentarios</TabsTrigger>
-                <TabsTrigger value="bitacora">Bitácora</TabsTrigger>
+                <TabsTrigger value="bitacora">{t.clientes.bitacora}</TabsTrigger>
               </TabsList>
               <TabsContent value="datos" className="space-y-3 mt-4">
                 <div className="grid grid-cols-2 gap-3">
@@ -783,7 +783,7 @@ export default function Clientes() {
               </TabsContent>
               <TabsContent value="comentarios" className="space-y-3 mt-4">
                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                  {comments.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay comentarios</p>}
+                  {comments.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t.clientes.sinComentarios}</p>}
                   {comments.map((comment: any) => (
                     <div key={comment.id} className="bg-slate-50 p-3 rounded-lg">
                       <div className="flex items-center gap-2 mb-1">
@@ -791,7 +791,7 @@ export default function Clientes() {
                           {comment.profiles?.nombre_completo?.charAt(0) || "U"}
                         </div>
                         <div>
-                          <div className="text-sm font-medium">{comment.profiles?.nombre_completo || "Usuario"}</div>
+                          <div className="text-sm font-medium">{comment.profiles?.nombre_completo || t.clientes.usuario}</div>
                           <div className="text-xs text-muted-foreground">
                             {new Date(comment.created_at).toLocaleDateString()} {new Date(comment.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                           </div>
@@ -803,7 +803,7 @@ export default function Clientes() {
                 </div>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Agregar comentario..."
+                    placeholder={t.clientes.agregarComentario}
                     value={newComment}
                     onChange={e => setNewComment(e.target.value)}
                     onKeyPress={e => { if (e.key === 'Enter') addComment(selectedCliente.id); }}
@@ -815,7 +815,7 @@ export default function Clientes() {
               </TabsContent>
               <TabsContent value="bitacora" className="space-y-3 mt-4">
                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
-                  {bitacora.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No hay cambios registrados</p>}
+                  {bitacora.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t.clientes.sinCambios}</p>}
                   {bitacora.map((entry: any) => {
                     const iconMap: Record<string, any> = {
                       edicion: <Pencil className="h-4 w-4" />,
@@ -828,7 +828,7 @@ export default function Clientes() {
                         <div className="flex items-center gap-2 mb-1">
                           <div className="text-[#1F3864]">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
                           <div>
-                            <div className="text-sm font-medium">{entry.profiles?.nombre_completo || "Usuario"}</div>
+                            <div className="text-sm font-medium">{entry.profiles?.nombre_completo || t.clientes.usuario}</div>
                             <div className="text-xs text-muted-foreground">
                               {entry.tipo_cambio} • {new Date(entry.created_at).toLocaleDateString()} {new Date(entry.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                             </div>
@@ -898,31 +898,31 @@ export default function Clientes() {
       <Dialog open={!!archiveConfirm} onOpenChange={(o) => { if (!o) { setArchiveConfirm(null); setArchiveMotivo(""); setArchiveMotivoSelect(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Archivar cliente {archiveConfirm?.nombre_comercial}?</DialogTitle>
-            <DialogDescription>Ya no aparecerá en listas activas.</DialogDescription>
+            <DialogTitle>{t.clientes.archivarTitulo(archiveConfirm?.nombre_comercial ?? "")}</DialogTitle>
+            <DialogDescription>{t.clientes.archivarDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Motivo de archivo *</Label>
+              <Label>{t.clientes.motivoArchivo}</Label>
               <Select value={archiveMotivoSelect} onValueChange={setArchiveMotivoSelect}>
                 <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Seleccionar motivo" />
+                  <SelectValue placeholder={t.clientes.seleccionarMotivo} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Cliente inactivo / sin operaciones">Cliente inactivo / sin operaciones</SelectItem>
-                  <SelectItem value="Duplicado">Duplicado</SelectItem>
-                  <SelectItem value="Solicitud del cliente">Solicitud del cliente</SelectItem>
-                  <SelectItem value="Datos incorrectos">Datos incorrectos</SelectItem>
-                  <SelectItem value="Otro">Otro</SelectItem>
+                  <SelectItem value="Cliente inactivo / sin operaciones">{t.clientes.motivo("Cliente inactivo / sin operaciones")}</SelectItem>
+                  <SelectItem value="Duplicado">{t.clientes.motivo("Duplicado")}</SelectItem>
+                  <SelectItem value="Solicitud del cliente">{t.clientes.motivo("Solicitud del cliente")}</SelectItem>
+                  <SelectItem value="Datos incorrectos">{t.clientes.motivo("Datos incorrectos")}</SelectItem>
+                  <SelectItem value="Otro">{t.clientes.motivo("Otro")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {archiveMotivoSelect === "Otro" && (
               <div>
-                <Label>Especificar motivo</Label>
+                <Label>{t.clientes.especificarMotivo}</Label>
                 <Textarea
                   className="mt-2"
-                  placeholder="Especifique el motivo..."
+                  placeholder={t.clientes.especificarPlaceholder}
                   value={archiveMotivo}
                   onChange={e => setArchiveMotivo(e.target.value)}
                 />
@@ -930,8 +930,8 @@ export default function Clientes() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setArchiveConfirm(null); setArchiveMotivo(""); setArchiveMotivoSelect(""); }}>Cancelar</Button>
-            <Button onClick={() => archiveCliente(archiveConfirm)} className="bg-amber-600 hover:bg-amber-700">Archivar</Button>
+            <Button variant="outline" onClick={() => { setArchiveConfirm(null); setArchiveMotivo(""); setArchiveMotivoSelect(""); }}>{t.actions.cancel}</Button>
+            <Button onClick={() => archiveCliente(archiveConfirm)} className="bg-amber-600 hover:bg-amber-700">{t.clientes.archivar}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -940,31 +940,31 @@ export default function Clientes() {
       <Dialog open={!!reactivateConfirm} onOpenChange={(o) => { if (!o) { setReactivateConfirm(null); setReactivateMotivo(""); setReactivateMotivoSelect(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>¿Reactivar cliente {reactivateConfirm?.nombre_comercial}?</DialogTitle>
-            <DialogDescription>Volverá a aparecer en listas activas.</DialogDescription>
+            <DialogTitle>{t.clientes.reactivarTitulo(reactivateConfirm?.nombre_comercial ?? "")}</DialogTitle>
+            <DialogDescription>{t.clientes.reactivarDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Motivo de reactivación *</Label>
+              <Label>{t.clientes.motivoReactivacion}</Label>
               <Select value={reactivateMotivoSelect} onValueChange={setReactivateMotivoSelect}>
                 <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Seleccionar motivo" />
+                  <SelectValue placeholder={t.clientes.seleccionarMotivo} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Cliente reactivado">Cliente reactivado</SelectItem>
-                  <SelectItem value="Nueva operación">Nueva operación</SelectItem>
-                  <SelectItem value="Error en archivo">Error en archivo</SelectItem>
-                  <SelectItem value="Solicitud del cliente">Solicitud del cliente</SelectItem>
-                  <SelectItem value="Otro">Otro</SelectItem>
+                  <SelectItem value="Cliente reactivado">{t.clientes.motivo("Cliente reactivado")}</SelectItem>
+                  <SelectItem value="Nueva operación">{t.clientes.motivo("Nueva operación")}</SelectItem>
+                  <SelectItem value="Error en archivo">{t.clientes.motivo("Error en archivo")}</SelectItem>
+                  <SelectItem value="Solicitud del cliente">{t.clientes.motivo("Solicitud del cliente")}</SelectItem>
+                  <SelectItem value="Otro">{t.clientes.motivo("Otro")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {reactivateMotivoSelect === "Otro" && (
               <div>
-                <Label>Especificar motivo</Label>
+                <Label>{t.clientes.especificarMotivo}</Label>
                 <Textarea
                   className="mt-2"
-                  placeholder="Especifique el motivo..."
+                  placeholder={t.clientes.especificarPlaceholder}
                   value={reactivateMotivo}
                   onChange={e => setReactivateMotivo(e.target.value)}
                 />
@@ -972,8 +972,8 @@ export default function Clientes() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setReactivateConfirm(null); setReactivateMotivo(""); setReactivateMotivoSelect(""); }}>Cancelar</Button>
-            <Button onClick={() => reactivateCliente(reactivateConfirm)} className="bg-green-600 hover:bg-green-700">Reactivar</Button>
+            <Button variant="outline" onClick={() => { setReactivateConfirm(null); setReactivateMotivo(""); setReactivateMotivoSelect(""); }}>{t.actions.cancel}</Button>
+            <Button onClick={() => reactivateCliente(reactivateConfirm)} className="bg-green-600 hover:bg-green-700">{t.clientes.reactivar}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -982,31 +982,31 @@ export default function Clientes() {
       <Dialog open={saveMotivoDialog} onOpenChange={(o) => { if (!o) { setSaveMotivoDialog(false); setSaveMotivoSelect(""); setSaveMotivoOther(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Motivo del cambio</DialogTitle>
-            <DialogDescription>Registre el motivo de los cambios realizados.</DialogDescription>
+            <DialogTitle>{t.clientes.motivoCambio}</DialogTitle>
+            <DialogDescription>{t.clientes.motivoCambioDesc}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>Motivo *</Label>
+              <Label>{t.clientes.motivoReq}</Label>
               <Select value={saveMotivoSelect} onValueChange={setSaveMotivoSelect}>
                 <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Seleccionar motivo" />
+                  <SelectValue placeholder={t.clientes.seleccionarMotivo} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Actualización de datos">Actualización de datos</SelectItem>
-                  <SelectItem value="Corrección de datos">Corrección de datos</SelectItem>
-                  <SelectItem value="Información de contacto">Información de contacto</SelectItem>
-                  <SelectItem value="Cambio de dirección">Cambio de dirección</SelectItem>
-                  <SelectItem value="Otro">Otro</SelectItem>
+                  <SelectItem value="Actualización de datos">{t.clientes.motivo("Actualización de datos")}</SelectItem>
+                  <SelectItem value="Corrección de datos">{t.clientes.motivo("Corrección de datos")}</SelectItem>
+                  <SelectItem value="Información de contacto">{t.clientes.motivo("Información de contacto")}</SelectItem>
+                  <SelectItem value="Cambio de dirección">{t.clientes.motivo("Cambio de dirección")}</SelectItem>
+                  <SelectItem value="Otro">{t.clientes.motivo("Otro")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {saveMotivoSelect === "Otro" && (
               <div>
-                <Label>Especificar motivo</Label>
+                <Label>{t.clientes.especificarMotivo}</Label>
                 <Textarea
                   className="mt-2"
-                  placeholder="Especifique el motivo..."
+                  placeholder={t.clientes.especificarPlaceholder}
                   value={saveMotivoOther}
                   onChange={e => setSaveMotivoOther(e.target.value)}
                 />
@@ -1014,8 +1014,8 @@ export default function Clientes() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setSaveMotivoDialog(false); setSaveMotivoSelect(""); setSaveMotivoOther(""); }}>Cancelar</Button>
-            <Button onClick={saveWithMotivo}>Guardar cambios</Button>
+            <Button variant="outline" onClick={() => { setSaveMotivoDialog(false); setSaveMotivoSelect(""); setSaveMotivoOther(""); }}>{t.actions.cancel}</Button>
+            <Button onClick={saveWithMotivo}>{t.clientes.guardarCambios}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

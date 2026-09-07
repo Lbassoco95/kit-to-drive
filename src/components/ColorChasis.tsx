@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeftRight, Palette, Search, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { CapacidadColor, claveCapacidad, COLORES, normColor } from "@/lib/dazon";
+import { useLang } from "@/contexts/LangContext";
 
 export type ChasisColor = {
   id: string;
@@ -51,6 +52,7 @@ type Props = {
  * hay dos caminos: usar un juego libre, o intercambiar con otro chasis.
  */
 export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
+  const { t } = useLang();
   const [modo, setModo] = useState<"cambiar" | "intercambiar">("cambiar");
   const [colorNuevo, setColorNuevo] = useState("");
   const [motivo, setMotivo] = useState("");
@@ -97,18 +99,18 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
 
   const candidatosFiltrados = useMemo(() => {
     const objetivo = colorNuevo ? normColor(colorNuevo) : null;
-    const t = q.trim().toUpperCase();
+    const term = q.trim().toUpperCase();
     return candidatos
       .filter(c => normColor(c.color) !== normColor(chasis?.color))
       .filter(c => !objetivo || normColor(c.color) === objetivo)
-      .filter(c => !t || c.numero_chasis.includes(t))
+      .filter(c => !term || c.numero_chasis.includes(term))
       .slice(0, 100);
   }, [candidatos, colorNuevo, chasis, q]);
 
   const guardarCambio = async () => {
     if (!chasis) return;
-    if (!colorNuevo) { toast.error("Elige el color nuevo"); return; }
-    if (motivo.trim().length < 5) { toast.error("Escribe el motivo (mínimo 5 caracteres)"); return; }
+    if (!colorNuevo) { toast.error(t.componentes.colorChasis.eligeColorNuevo); return; }
+    if (motivo.trim().length < 5) { toast.error(t.componentes.colorChasis.faltaMotivo); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("cambiar_color_chasis", {
       _chasis_id: chasis.id, _color_nuevo: colorNuevo, _motivo: motivo.trim(),
@@ -116,14 +118,14 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     const r = data as any;
-    toast.success(`✓ ${chasis.numero_chasis}: ${r?.color_anterior} → ${r?.color_nuevo} (VIN: ${r?.color_vin}). Quedan ${r?.capacidad_libre_restante} juego(s) ${r?.color_nuevo} libres.`);
+    toast.success(t.componentes.colorChasis.okCambio(chasis.numero_chasis, r?.color_anterior, r?.color_nuevo, r?.color_vin, r?.capacidad_libre_restante));
     onOpenChange(false);
     onDone?.();
   };
 
   const guardarIntercambio = async () => {
-    if (!chasis || !pareja) { toast.error("Elige el chasis con el que se intercambia"); return; }
-    if (motivo.trim().length < 5) { toast.error("Escribe el motivo (mínimo 5 caracteres)"); return; }
+    if (!chasis || !pareja) { toast.error(t.componentes.colorChasis.eligeChasis); return; }
+    if (motivo.trim().length < 5) { toast.error(t.componentes.colorChasis.faltaMotivo); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("intercambiar_color_chasis", {
       _chasis_a: chasis.id, _chasis_b: pareja.id, _motivo: motivo.trim(),
@@ -131,7 +133,7 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     const r = data as any;
-    toast.success(`✓ ${r?.chasis_a?.ns}: ${r?.chasis_a?.antes} → ${r?.chasis_a?.ahora} · ${r?.chasis_b?.ns}: ${r?.chasis_b?.antes} → ${r?.chasis_b?.ahora}`);
+    toast.success(t.componentes.colorChasis.okIntercambio(r?.chasis_a?.ns, r?.chasis_a?.antes, r?.chasis_a?.ahora, r?.chasis_b?.ns, r?.chasis_b?.antes, r?.chasis_b?.ahora));
     onOpenChange(false);
     onDone?.();
   };
@@ -145,21 +147,18 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Palette className="h-6 w-6 text-[#1F3864]" /> Color del chasis
+            <Palette className="h-6 w-6 text-[#1F3864]" /> {t.componentes.colorChasis.titulo}
           </DialogTitle>
-          <DialogDescription>
-            Sólo pueden existir tantas unidades de un color como juegos de piezas de ese
-            color llegaron. Si el color que quieres ya está agotado, intercámbialo con otro chasis.
-          </DialogDescription>
+          <DialogDescription>{t.componentes.colorChasis.desc}</DialogDescription>
         </DialogHeader>
 
         {chasis && (
           <div className="rounded-lg border bg-slate-50 p-3 text-sm">
             <div className="font-mono font-bold text-base">{chasis.numero_chasis}</div>
             <div className="text-xs text-muted-foreground">
-              {chasis.modelo} · color actual <strong>{normColor(chasis.color)}</strong>
-              {recoloreado && <> · el VIN decía <strong>{vin}</strong></>}
-              {chasis.motocarro_id && " · ya armado en una unidad"}
+              {chasis.modelo} · {t.componentes.colorChasis.colorActual} <strong>{normColor(chasis.color)}</strong>
+              {recoloreado && <> · {t.componentes.colorChasis.vinDecia} <strong>{vin}</strong></>}
+              {chasis.motocarro_id && t.componentes.colorChasis.yaArmado}
             </div>
           </div>
         )}
@@ -169,18 +168,18 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
             onClick={() => setModo("cambiar")}
             className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "cambiar" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}
           >
-            Usar un juego libre
+            {t.componentes.colorChasis.usarJuegoLibre}
           </button>
           <button
             onClick={() => setModo("intercambiar")}
             className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "intercambiar" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}
           >
-            <ArrowLeftRight className="h-4 w-4 inline mr-1.5" /> Intercambiar
+            <ArrowLeftRight className="h-4 w-4 inline mr-1.5" /> {t.componentes.colorChasis.intercambiar}
           </button>
         </div>
 
         <div>
-          <Label>Color nuevo</Label>
+          <Label>{t.componentes.colorChasis.colorNuevo}</Label>
           <div className="flex flex-wrap gap-1.5 mt-1.5">
             {opciones.map(c => {
               const libres = libresDe(c);
@@ -196,8 +195,8 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
                     : agotado ? "bg-slate-50 text-slate-400 border-slate-200"
                     : "bg-white text-slate-700 hover:border-[#2E75B6]"}`}
                   title={agotado
-                    ? `No quedan juegos ${c} libres — sólo por intercambio o registrando piezas extra`
-                    : `${libres} juego(s) ${c} libres`}
+                    ? t.componentes.colorChasis.agotadoTip(c)
+                    : t.componentes.colorChasis.libresTip(libres, c)}
                 >
                   {c} <span className={activo ? "opacity-80" : agotado ? "" : "text-[#065F46]"}>
                     {agotado ? "· 0" : `· ${libres}`}
@@ -211,21 +210,21 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
         {modo === "cambiar" && sinJuegos && (
           <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
             <TriangleAlert className="h-5 w-5 shrink-0" />
-            No quedan juegos {normColor(colorNuevo)} libres de este modelo: todos están montados en otros
-            chasis. Cámbiate a <strong>Intercambiar</strong> para tomarlo de otro chasis, o registra las
-            piezas extra que llegaron desde Inventario → Colores.
+            {t.componentes.colorChasis.sinJuegos1(normColor(colorNuevo))}{" "}
+            <strong>{t.componentes.colorChasis.intercambiarBold}</strong>{" "}
+            {t.componentes.colorChasis.sinJuegos2}
           </div>
         )}
 
         {modo === "intercambiar" && (
           <div className="space-y-2">
             <Label>
-              Chasis con el que se intercambia
+              {t.componentes.colorChasis.chasisIntercambio}
               {pareja && <span className="text-[#065F46] font-mono"> — {pareja.numero_chasis}</span>}
             </Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input className="pl-8 h-10" placeholder="Buscar chasis…" value={q} onChange={e => setQ(e.target.value)} />
+              <Input className="pl-8 h-10" placeholder={t.componentes.colorChasis.buscarChasis} value={q} onChange={e => setQ(e.target.value)} />
             </div>
             <div className="border rounded-lg max-h-48 overflow-y-auto divide-y">
               {candidatosFiltrados.map(c => (
@@ -238,46 +237,47 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
                   <div className="text-xs text-muted-foreground">
                     {normColor(c.color)}
                     {normColor(c.color_original ?? c.color) !== normColor(c.color) && ` (VIN: ${normColor(c.color_original)})`}
-                    {c.motocarro_id ? " · armado en una unidad" : " · pieza libre"}
+                    {c.motocarro_id ? t.componentes.colorChasis.armadoEnUnidad : t.componentes.colorChasis.piezaLibre}
                   </div>
                 </button>
               ))}
               {!candidatosFiltrados.length && (
                 <div className="p-4 text-sm text-center text-muted-foreground">
                   {colorNuevo
-                    ? `No hay chasis ${normColor(colorNuevo)} de este modelo para intercambiar`
-                    : "Elige primero el color que quieres"}
+                    ? t.componentes.colorChasis.sinCandidatos(normColor(colorNuevo))
+                    : t.componentes.colorChasis.eligeColor}
                 </div>
               )}
             </div>
             {pareja && (
               <div className="rounded-lg p-3 bg-[#EFF6FF] text-[#1E40AF] text-sm">
-                {chasis?.numero_chasis} queda <strong>{normColor(pareja.color)}</strong> y{" "}
-                {pareja.numero_chasis} queda <strong>{normColor(chasis?.color)}</strong>. La capacidad de
-                cada color no cambia.
+                {chasis?.numero_chasis} {t.componentes.colorChasis.resumenIntercambio1}{" "}
+                <strong>{normColor(pareja.color)}</strong> {t.componentes.colorChasis.resumenIntercambio2}{" "}
+                {pareja.numero_chasis} {t.componentes.colorChasis.resumenIntercambio3}{" "}
+                <strong>{normColor(chasis?.color)}</strong>{t.componentes.colorChasis.resumenIntercambio4}
               </div>
             )}
           </div>
         )}
 
         <div>
-          <Label>Motivo *</Label>
+          <Label>{t.componentes.colorChasis.motivo}</Label>
           <Textarea
             value={motivo}
             onChange={e => setMotivo(e.target.value)}
-            placeholder="Ej. El cliente de REM-005 lo pidió azul y se monta el juego azul en este chasis"
+            placeholder={t.componentes.colorChasis.motivoPlaceholder}
           />
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t.actions.cancel}</Button>
           {modo === "cambiar" ? (
             <Button onClick={guardarCambio} disabled={busy || !colorNuevo || sinJuegos} className="bg-[#1F3864] hover:bg-[#162a4d]">
-              {busy ? "Guardando…" : "Cambiar color"}
+              {busy ? t.componentes.colorChasis.guardando : t.componentes.colorChasis.cambiarColor}
             </Button>
           ) : (
             <Button onClick={guardarIntercambio} disabled={busy || !pareja} className="bg-[#1F3864] hover:bg-[#162a4d]">
-              <ArrowLeftRight className="h-4 w-4 mr-1.5" /> {busy ? "Guardando…" : "Intercambiar"}
+              <ArrowLeftRight className="h-4 w-4 mr-1.5" /> {busy ? t.componentes.colorChasis.guardando : t.componentes.colorChasis.intercambiar}
             </Button>
           )}
         </DialogFooter>
@@ -293,6 +293,7 @@ export function AjustarCapacidadColor({
   modelo: string; color: string; juegosActuales: number;
   open: boolean; onOpenChange: (o: boolean) => void; onDone?: () => void;
 }) {
+  const { t } = useLang();
   const [juegos, setJuegos] = useState(juegosActuales);
   const [motivo, setMotivo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -300,7 +301,7 @@ export function AjustarCapacidadColor({
   useEffect(() => { if (open) { setJuegos(juegosActuales); setMotivo(""); } }, [open, juegosActuales]);
 
   const guardar = async () => {
-    if (motivo.trim().length < 5) { toast.error("Escribe el motivo (mínimo 5 caracteres)"); return; }
+    if (motivo.trim().length < 5) { toast.error(t.componentes.colorChasis.faltaMotivo); return; }
     setBusy(true);
     const { data, error } = await supabase.rpc("ajustar_capacidad_color", {
       _modelo: modelo, _color: color, _piezas_recibidas: juegos, _motivo: motivo.trim(),
@@ -308,7 +309,7 @@ export function AjustarCapacidadColor({
     setBusy(false);
     if (error) { toast.error(error.message); return; }
     const r = data as any;
-    toast.success(`✓ ${modelo} ${color}: ${r?.antes} → ${r?.ahora} juegos (${r?.capacidad_libre} libres)`);
+    toast.success(t.componentes.capacidadColor.ok(modelo, color, r?.antes, r?.ahora, r?.capacidad_libre));
     onOpenChange(false);
     onDone?.();
   };
@@ -317,35 +318,30 @@ export function AjustarCapacidadColor({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Juegos de piezas — {modelo} {color}</DialogTitle>
-          <DialogDescription>
-            El packing list de partes no trae color, así que los juegos que lleguen fuera del VIN
-            se registran aquí. Esto define cuántas unidades de este color pueden existir.
-          </DialogDescription>
+          <DialogTitle>{t.componentes.capacidadColor.titulo(modelo, color)}</DialogTitle>
+          <DialogDescription>{t.componentes.capacidadColor.desc}</DialogDescription>
         </DialogHeader>
         <div>
-          <Label>Juegos {color} disponibles en total</Label>
+          <Label>{t.componentes.capacidadColor.juegosTotal(color)}</Label>
           <Input
             type="number" min={0} className="h-11 text-base font-bold"
             value={juegos}
             onChange={e => setJuegos(Math.max(0, parseInt(e.target.value) || 0))}
           />
-          <p className="text-xs text-muted-foreground mt-1">
-            Hoy hay {juegosActuales} (lo que declaró el VIN más ajustes previos).
-          </p>
+          <p className="text-xs text-muted-foreground mt-1">{t.componentes.capacidadColor.hoyHay(juegosActuales)}</p>
         </div>
         <div>
-          <Label>Motivo *</Label>
+          <Label>{t.componentes.colorChasis.motivo}</Label>
           <Textarea
             value={motivo}
             onChange={e => setMotivo(e.target.value)}
-            placeholder="Ej. Llegaron 4 juegos azules extra en el contenedor de partes"
+            placeholder={t.componentes.capacidadColor.motivoPlaceholder}
           />
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{t.actions.cancel}</Button>
           <Button onClick={guardar} disabled={busy} className="bg-[#1F3864] hover:bg-[#162a4d]">
-            {busy ? "Guardando…" : "Guardar"}
+            {busy ? t.componentes.colorChasis.guardando : t.actions.save}
           </Button>
         </DialogFooter>
       </DialogContent>

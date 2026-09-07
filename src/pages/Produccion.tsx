@@ -27,9 +27,6 @@ type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS"
 const tipoIcon: Record<string, string> = {
   cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",
 };
-const tipoLabel: Record<string, string> = {
-  cabina: "Cabina", instalacion_cabina: "Instalación", activacion: "Activación", flete: "Flete",
-};
 const tipoBadgeConfig: Record<string, string> = {
   cabina: "bg-violet-50 text-violet-700 border-violet-200",
   instalacion_cabina: "bg-purple-50 text-purple-700 border-purple-200",
@@ -155,7 +152,8 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
 
 export default function Produccion() {
   const { perms, area } = useAuth();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
   const [rows, setRows] = useState<any[]>([]);
   const [contenedores, setContenedores] = useState<Map<string, string>>(new Map()); // contenedor_id -> folio
   const [q, setQ] = useState("");
@@ -164,7 +162,9 @@ export default function Produccion() {
   const [view, setView] = useState<"cards" | "tabla">("cards");
   const [editing, setEditing] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<any>({});
-  const [confirm, setConfirm] = useState<{ moto: any; action: "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
+  // «Iniciar ensamble» despacha EN_PROCESO, así que va en la unión: sin él,
+  // TypeScript daba por muerta la rama que sí se ejecuta.
+  const [confirm, setConfirm] = useState<{ moto: any; action: "EN_PROCESO" | "ARMADO" | "LISTO" | "ENTREGADA" } | null>(null);
   const [comentariosMoto, setComentariosMoto] = useState<{ id: string; orden: number } | null>(null);
   const [contenedorPartes, setContenedorPartes] = useState<{ id: string; folio: string } | null>(null);
   const [liberar, setLiberar] = useState<{ id: string; orden: number } | null>(null);
@@ -317,7 +317,8 @@ export default function Produccion() {
   }), [rows, q, filter, colorFilter]);
 
   const exportCsv = () => {
-    const header = ["Orden","Modelo","Color","Fecha estimada de armado","Estatus","Fecha real de armado","Número de serie del chasis","Número de serie del motor","Chasis","Vendedor","Cliente","Remisión","Fecha estimada de entrega","Estatus entrega"];
+    const c = t.produccion.columna;
+    const header = [c.orden, c.modelo, c.color, c.fechaEstimada, c.estatus, c.fechaReal, c.ns_chasis, c.ns_motor, c.chasis, c.vendedor, c.cliente, c.remision, c.fechaEntrega, c.entrega];
     const rows2 = filtered.map(r => [r.orden_armado, r.modelo, r.color, r.fecha_estimada_armado, r._eff, r.fecha_real_armado || "", r.ns_chasis||"", r.ns_motor||"", r.chasis_asignado||"", r.remisiones?.profiles?.nombre_completo||"", r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "", r.remisiones?.folio_remision||"", r.fecha_estimada_entrega||"", r.estatus_entrega]);
     const csv = [header, ...rows2].map(r => r.map(c => `"${String(c ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -340,8 +341,8 @@ export default function Produccion() {
 
     // El proceso no cierra sin los dos seriales — mismo criterio que la base.
     if (["ARMADO","LISTO","ENTREGADA"].includes(action) && !serialesCompletos(moto)) {
-      const faltan = [!moto.ns_chasis && "NS chasis", !moto.ns_motor && "NS motor"].filter(Boolean).join(" y ");
-      toast.error(`Falta capturar ${faltan} de la unidad #${moto.orden_armado} antes de cerrar el proceso`);
+      const faltan = [!moto.ns_chasis && t.produccion.nsChasisCorto, !moto.ns_motor && t.produccion.nsMotorCorto].filter(Boolean).join(" / ");
+      toast.error(t.produccion.faltaCapturar(faltan, moto.orden_armado));
       setConfirm(null);
       setEditing(moto);
       setEditForm({ ns_chasis: moto.ns_chasis || "", ns_motor: moto.ns_motor || "", observaciones_paro: moto.observaciones_paro || "", fecha_estimada_armado: moto.fecha_estimada_armado || "", orden_armado: moto.orden_armado });
@@ -357,12 +358,12 @@ export default function Produccion() {
 
   const doLiberar = async () => {
     if (!liberar) return;
-    if (motivoLiberar.trim().length < 5) { toast.error("Se requiere un motivo (mínimo 5 caracteres)"); return; }
+    if (motivoLiberar.trim().length < 5) { toast.error(t.produccion.liberarFaltaMotivo); return; }
     const { data, error } = await supabase.rpc("desconfigurar_unidad", {
       _motocarro_id: liberar.id, _motivo: motivoLiberar.trim(),
     });
     if (error) { toast.error(error.message); return; }
-    toast.success(`✓ Unidad #${(data as any)?.liberada ?? liberar.orden} liberada — chasis y motor vuelven a disponibles`);
+    toast.success(t.produccion.liberada((data as any)?.liberada ?? liberar.orden));
     setLiberar(null); setMotivoLiberar(""); load();
   };
 
@@ -373,7 +374,7 @@ export default function Produccion() {
     });
     if (error) { toast.error(error.message); return; }
     const r = data as { intercambio_con?: string } | null;
-    toast.success(r?.intercambio_con ? "✓ Orden actualizado — se intercambió con la otra unidad" : "✓ Orden actualizado");
+    toast.success(r?.intercambio_con ? t.produccion.ordenIntercambiado : t.produccion.ordenActualizado);
     load();
   };
 
@@ -435,8 +436,8 @@ export default function Produccion() {
         <Card className="p-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <h3 className="font-semibold text-lg">Inventario de Partes por Contenedor</h3>
-              <p className="text-sm text-muted-foreground">Gestiona el packing list de partes para cada contenedor</p>
+              <h3 className="font-semibold text-lg">{t.produccion.inventarioPartes}</h3>
+              <p className="text-sm text-muted-foreground">{t.produccion.inventarioPartesDesc}</p>
             </div>
             <div className="flex gap-2 flex-wrap">
               {Array.from(contenedores.entries()).map(([id, folio]) => (
@@ -544,7 +545,7 @@ export default function Produccion() {
                 tipo="chasis"
                 value={editForm.ns_chasis}
                 onChange={v => setEditForm({ ...editForm, ns_chasis: v })}
-                placeholder="Escribe para buscar o registrar nuevo…"
+                placeholder={t.produccion.serialPlaceholder}
                 className="h-11 font-mono"
               />
             </div>
@@ -554,14 +555,14 @@ export default function Produccion() {
                 tipo="motor"
                 value={editForm.ns_motor}
                 onChange={v => setEditForm({ ...editForm, ns_motor: v })}
-                placeholder="Escribe para buscar o registrar nuevo…"
+                placeholder={t.produccion.serialPlaceholder}
                 className="h-11 font-mono"
               />
             </div>
             {(!editForm.ns_chasis || !editForm.ns_motor) && (
               <div className="rounded-md p-2.5 text-sm bg-[#FEF3C7] text-[#92400E] flex items-start gap-2">
                 <TriangleAlert className="h-4 w-4 shrink-0 mt-0.5" />
-                Sin los dos seriales la unidad no puede marcarse armada, entregarse ni asignarse a una remisión.
+                {t.produccion.avisoSeriales}
               </div>
             )}
             <div><Label>{t.produccion.fechaEstimadaArmado}</Label><Input type="date" value={editForm.fecha_estimada_armado} onChange={e => setEditForm({ ...editForm, fecha_estimada_armado: e.target.value })} /></div>
@@ -569,7 +570,7 @@ export default function Produccion() {
             {(editing?._eff === "PENDIENTE" || editing?._eff === "EN_PROCESO") && (
               <div className="flex items-end gap-2 pt-2 border-t">
                 <div className="flex-1">
-                  <Label className="flex items-center gap-1"><ArrowUpDown className="h-3.5 w-3.5" /> Orden de armado</Label>
+                  <Label className="flex items-center gap-1"><ArrowUpDown className="h-3.5 w-3.5" /> {t.produccion.ordenArmado}</Label>
                   <Input type="number" min={1} value={editForm.orden_armado} onChange={e => setEditForm({ ...editForm, orden_armado: Number(e.target.value) })} />
                 </div>
                 <Button
@@ -577,7 +578,7 @@ export default function Produccion() {
                   onClick={async () => { await guardarOrden(editing, Number(editForm.orden_armado)); setEditing(null); }}
                   disabled={Number(editForm.orden_armado) === editing?.orden_armado}
                 >
-                  Guardar orden
+                  {t.produccion.guardarOrden}
                 </Button>
               </div>
             )}
@@ -588,7 +589,7 @@ export default function Produccion() {
               delete patch.orden_armado;
               for (const [campo, etiqueta] of [["ns_chasis", t.produccion.nsChasis], ["ns_motor", t.produccion.nsMot]] as const) {
                 const v = (patch as any)[campo];
-                if (v && !NS_REGEX.test(v)) { toast.error(`${etiqueta} inválido: usa 4 a 30 caracteres (letras, números o guion)`); return; }
+                if (v && !NS_REGEX.test(v)) { toast.error(t.produccion.serialInvalido(etiqueta)); return; }
               }
 
               // Los seriales NO se guardan con un update directo: van por
@@ -604,13 +605,13 @@ export default function Produccion() {
                 });
                 if (error) { toast.error(error.message); return; }
                 const r = data as any;
-                const ligadas = [r?.chasis_vinculado && "chasis", r?.motor_vinculado && "motor"].filter(Boolean).join(" y ");
+                const ligadas = [r?.chasis_vinculado && t.produccion.piezaChasis, r?.motor_vinculado && t.produccion.piezaMotor].filter(Boolean).join(" / ");
                 toast.success(ligadas
-                  ? `✓ Seriales capturados — se ligó el ${ligadas} del inventario`
-                  : "✓ Seriales capturados");
-                if (r?.chasis_detenido) toast.warning("Ojo: ese chasis tiene una incidencia que lo mantiene detenido.");
+                  ? t.produccion.serialesLigados(ligadas)
+                  : t.produccion.serialesCapturados);
+                if (r?.chasis_detenido) toast.warning(t.produccion.chasisDetenidoAviso);
                 if ((r?.piezas_liberadas ?? []).length) {
-                  toast.info(`Volvieron al inventario: ${(r.piezas_liberadas as string[]).join(", ")}`);
+                  toast.info(t.produccion.piezasLiberadas((r.piezas_liberadas as string[]).join(", ")));
                 }
               }
               delete patch.ns_chasis;
@@ -642,7 +643,7 @@ export default function Produccion() {
             <AlertDialogTitle>{t.produccion.confirmarAccion}</AlertDialogTitle>
             <AlertDialogDescription>
               {t.produccion.confirmarDesc(confirm?.moto.orden_armado,
-              confirm?.action === "EN_PROCESO" ? "En proceso" :
+              confirm?.action === "EN_PROCESO" ? t.produccion.enProceso :
               confirm?.action === "ARMADO" ? t.produccion.filtros.armados :
               confirm?.action === "LISTO" ? t.produccion.filtros.todos :
               t.produccion.entregado)}
@@ -669,12 +670,12 @@ export default function Produccion() {
       <Dialog open={!!liberar} onOpenChange={(o) => { if (!o) { setLiberar(null); setMotivoLiberar(""); } }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Unlock className="h-5 w-5 text-amber-700" /> Liberar unidad #{liberar?.orden}</DialogTitle>
-            <DialogDescription>El chasis y el motor vuelven a disponibles. Se requiere un motivo.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><Unlock className="h-5 w-5 text-amber-700" /> {t.produccion.liberarTitulo(liberar?.orden)}</DialogTitle>
+            <DialogDescription>{t.produccion.liberarDesc}</DialogDescription>
           </DialogHeader>
           <div>
-            <Label>Motivo *</Label>
-            <Textarea value={motivoLiberar} onChange={e => setMotivoLiberar(e.target.value)} placeholder="Ej. Se capturó el motor equivocado" />
+            <Label>{t.produccion.liberarMotivo}</Label>
+            <Textarea value={motivoLiberar} onChange={e => setMotivoLiberar(e.target.value)} placeholder={t.produccion.liberarPlaceholder} />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setLiberar(null); setMotivoLiberar(""); }}>{t.actions.cancel}</Button>
@@ -687,16 +688,16 @@ export default function Produccion() {
       <Dialog open={!!verHistorial} onOpenChange={(o) => { if (!o) setVerHistorial(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-[#1F3864]" /> Historial de orden — #{verHistorial?.orden}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-[#1F3864]" /> {t.produccion.historialTitulo(verHistorial?.orden)}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {(verHistorial?.items ?? []).map((h: any, i: number) => (
               <div key={i} className="border rounded-md p-2 text-sm">
                 <div className="font-medium">#{h.orden_anterior ?? "—"} → #{h.orden_nuevo}</div>
-                <div className="text-xs text-muted-foreground">{h.motivo || "sin motivo registrado"} · {new Date(h.cambiado_at).toLocaleString("es-MX")}</div>
+                <div className="text-xs text-muted-foreground">{h.motivo || t.produccion.sinMotivo} · {new Date(h.cambiado_at).toLocaleString(locale)}</div>
               </div>
             ))}
-            {!(verHistorial?.items ?? []).length && <div className="text-sm text-muted-foreground text-center py-4">Sin cambios registrados</div>}
+            {!(verHistorial?.items ?? []).length && <div className="text-sm text-muted-foreground text-center py-4">{t.produccion.sinCambios}</div>}
           </div>
         </DialogContent>
       </Dialog>
@@ -712,7 +713,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
   // El proceso no cierra sin los dos seriales: la tarjeta lo dice y bloquea
   // los botones que cerrarían etapa.
   const conSerial = serialesCompletos(r);
-  const faltaSerial = [!r.ns_chasis && "NS chasis", !r.ns_motor && "NS motor"].filter(Boolean).join(" y ");
+  const faltaSerial = [!r.ns_chasis && t.produccion.nsChasisCorto, !r.ns_motor && t.produccion.nsMotorCorto].filter(Boolean).join(" / ");
 
   const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
   const colorBg   = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";
@@ -790,7 +791,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
               )}
               {servicios.map((it: any) => (
                 <span key={it.id} className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full border font-medium ${tipoBadgeConfig[it.tipo_servicio] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-                  {tipoIcon[it.tipo_servicio]} {tipoLabel[it.tipo_servicio] ?? it.tipo_servicio}
+                  {tipoIcon[it.tipo_servicio]} {t.componentes.bandejaRemisiones.tipoServicio(it.tipo_servicio)}
                 </span>
               ))}
             </div>
@@ -820,8 +821,8 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         <div className={`rounded-md px-2.5 py-2 text-xs ${conSerial ? "bg-slate-50 text-slate-600" : "bg-[#FEF3C7] text-[#92400E]"}`}>
           {conSerial ? (
             <div className="space-y-0.5 font-mono">
-              <div>Chasis: <strong>{r.ns_chasis}</strong></div>
-              <div>Motor: <strong>{r.ns_motor}</strong></div>
+              <div>{t.produccion.chasisCorto} <strong>{r.ns_chasis}</strong></div>
+              <div>{t.produccion.motorCorto} <strong>{r.ns_motor}</strong></div>
             </div>
           ) : (
             <div className="flex items-start gap-2">
@@ -842,10 +843,10 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
               return (
                 <span
                   key={idx}
-                  title={`${i.parte_afectada ?? "Incidencia de chasis"} — ${meta?.ayuda ?? ""}`}
+                  title={`${i.parte_afectada ?? t.produccion.incidenciaChasis} — ${t.catalogos.ayudaIncidencia(i.estatus)}`}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${meta?.cls ?? "bg-slate-100 text-slate-600 border-slate-200"}`}
                 >
-                  <TriangleAlert size={9} /> {i.folio} · {meta?.label ?? i.estatus}
+                  <TriangleAlert size={9} /> {i.folio} · {t.catalogos.estatusIncidencia(i.estatus)}
                   {i.parte_afectada ? ` · ${i.parte_afectada}` : ""}
                 </span>
               );
@@ -857,7 +858,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
       <div className="border-t p-3 flex gap-2 items-stretch flex-wrap">
         {canEditFabrica && (r._eff === "PENDIENTE" || r._eff === "ATRASADO") && (
           <Button onClick={() => onAction("EN_PROCESO")} className="flex-1 h-12 bg-amber-600 hover:bg-amber-700 text-base min-w-[120px]">
-            <Pencil className="h-5 w-5 mr-2" /> Iniciar ensamble
+            <Pencil className="h-5 w-5 mr-2" /> {t.produccion.iniciarEnsamble}
           </Button>
         )}
         {canEditFabrica && r._eff === "EN_PROCESO" && (
@@ -867,7 +868,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
             </Button>
           ) : (
             <Button onClick={onEdit} className="flex-1 h-12 bg-[#D97706] hover:bg-[#b45309] text-base min-w-[120px]">
-              <Pencil className="h-5 w-5 mr-2" /> Capturar {faltaSerial}
+              <Pencil className="h-5 w-5 mr-2" /> {t.produccion.capturar(faltaSerial)}
             </Button>
           )
         )}
@@ -887,15 +888,15 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
           </div>
         )}
         {canEditFabrica && (
-          <Button variant="outline" onClick={onEdit} className="h-12 w-12 p-0" title="Editar"><Pencil className="h-5 w-5" /></Button>
+          <Button variant="outline" onClick={onEdit} className="h-12 w-12 p-0" title={t.produccion.editar}><Pencil className="h-5 w-5" /></Button>
         )}
         {canEditFabrica && r._eff === "PENDIENTE" && !r.remision_id && (
-          <Button variant="outline" onClick={onLiberar} className="h-12 w-12 p-0 border-amber-300 text-amber-700 hover:bg-amber-50" title="Liberar unidad">
+          <Button variant="outline" onClick={onLiberar} className="h-12 w-12 p-0 border-amber-300 text-amber-700 hover:bg-amber-50" title={t.produccion.liberarUnidad}>
             <Unlock className="h-5 w-5" />
           </Button>
         )}
         {historialCount > 0 && (
-          <Button variant="outline" onClick={onVerHistorial} className="h-12 w-12 p-0 relative" title="Historial de orden">
+          <Button variant="outline" onClick={onVerHistorial} className="h-12 w-12 p-0 relative" title={t.produccion.historialOrden}>
             <History className="h-5 w-5 text-[#1F3864]" />
             <span className="absolute -top-1.5 -right-1.5 bg-[#1F3864] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{historialCount}</span>
           </Button>

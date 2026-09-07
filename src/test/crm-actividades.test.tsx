@@ -36,9 +36,12 @@ vi.mock("@/contexts/AuthContext", () => ({
   }),
 }));
 
-vi.mock("@/contexts/LangContext", () => ({
-  useLang: () => ({ t: {}, lang: "es", setLang: () => {} }),
-}));
+// El diccionario real: la pantalla saca de aquí cada etiqueta, así que un mock
+// vacío la tiraría al primer `t.crm…`.
+vi.mock("@/contexts/LangContext", async () => {
+  const { es } = await import("@/i18n/es");
+  return { useLang: () => ({ t: es, lang: "es", toggleLang: () => {} }) };
+});
 
 import CrmActividades from "@/pages/crm/CrmActividades";
 

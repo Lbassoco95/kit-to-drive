@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Json } from "@/integrations/supabase/types";
+import type { Json, TablesUpdate } from "@/integrations/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,9 +59,6 @@ const tipoBadgeClass: Record<string, string> = {
 const tipoIcon: Record<string, string> = {
   motocarro: "🏍️", cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",
 };
-const tipoLabel: Record<string, string> = {
-  motocarro: "Motocarro", cabina: "Cabina", instalacion_cabina: "Instalación de cabina", activacion: "Activación", flete: "Flete",
-};
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 // Una línea del pedido. Al capturar viene en blanco; al editar trae además el
@@ -98,6 +95,7 @@ function CampoCliente({ clientes, value, onChange, onCrearCliente }:{
   onChange: (id: string) => void;
   onCrearCliente: (datos: NuevoCliente) => Promise<string|null>;
 }) {
+  const { t } = useLang();
   const [creando, setCreando]   = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -126,19 +124,19 @@ function CampoCliente({ clientes, value, onChange, onCrearCliente }:{
   return (
     <div>
       <div className="flex items-center justify-between">
-        <Label className="text-base">Cliente</Label>
+        <Label className="text-base">{t.remisiones.cliente}</Label>
         <button type="button" onClick={()=>setCreando(s=>!s)} className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
-          <UserPlus className="h-3.5 w-3.5" /> {creando?"Cancelar":"Nuevo cliente"}
+          <UserPlus className="h-3.5 w-3.5" /> {creando ? t.actions.cancel : t.remisiones.nuevoCliente}
         </button>
       </div>
 
       {creando ? (
         <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
-          <Input placeholder="Nombre comercial *" value={nuevo.nombre_comercial} onChange={e=>setNuevo({...nuevo,nombre_comercial:e.target.value})} className="h-11"/>
-          <Input placeholder="Código ERP (solo si es cliente migrado)" value={nuevo.codigo_erp} onChange={e=>setNuevo({...nuevo,codigo_erp:e.target.value})} className="h-11"/>
-          <Input placeholder="Teléfono" value={nuevo.telefono} onChange={e=>setNuevo({...nuevo,telefono:e.target.value})} className="h-11"/>
+          <Input placeholder={t.remisiones.nombreComercialReq} value={nuevo.nombre_comercial} onChange={e=>setNuevo({...nuevo,nombre_comercial:e.target.value})} className="h-11"/>
+          <Input placeholder={t.remisiones.codigoErpOpcional} value={nuevo.codigo_erp} onChange={e=>setNuevo({...nuevo,codigo_erp:e.target.value})} className="h-11"/>
+          <Input placeholder={t.remisiones.telefono} value={nuevo.telefono} onChange={e=>setNuevo({...nuevo,telefono:e.target.value})} className="h-11"/>
           <Button type="button" onClick={guardar} disabled={guardando} className="w-full h-11 bg-[#2E75B6] hover:bg-[#246094]">
-            {guardando?"Guardando…":"Guardar cliente"}
+            {guardando ? t.remisiones.guardandoCliente : t.remisiones.guardarCliente}
           </Button>
         </div>
       ) : (
@@ -147,12 +145,12 @@ function CampoCliente({ clientes, value, onChange, onCrearCliente }:{
             <Input
               value={busqueda}
               onChange={e=>setBusqueda(e.target.value)}
-              placeholder="Buscar por folio o nombre…"
+              placeholder={t.remisiones.buscarCliente}
               className="h-10 text-sm mb-1.5"
             />
           )}
           <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Selecciona cliente"/></SelectTrigger>
+            <SelectTrigger className="h-12 text-base"><SelectValue placeholder={t.remisiones.seleccionaCliente}/></SelectTrigger>
             <SelectContent>
               {visibles.map(c => <SelectItem key={c.id} value={c.id}>{etiqueta(c)}</SelectItem>)}
             </SelectContent>
@@ -160,9 +158,7 @@ function CampoCliente({ clientes, value, onChange, onCrearCliente }:{
           {/* Un desplegable vacío se ve igual que uno roto: hay que decir por qué. */}
           {!visibles.length && (
             <p className="text-xs text-amber-700 mt-1">
-              {clientes.length
-                ? "Ningún cliente coincide con la búsqueda."
-                : "El catálogo de clientes está vacío. Da de alta el cliente con «Nuevo cliente»."}
+              {clientes.length ? t.remisiones.sinCoincidencias : t.remisiones.catalogoVacio}
             </p>
           )}
         </>
@@ -192,20 +188,21 @@ function LineasMotocarro({
   conFlete: boolean;
   onFlete: (v: boolean) => void;
 }) {
+  const { t } = useLang();
   return (
     <>
       {/* ── MOTOCARROS ──────────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-base font-semibold">Motocarros</Label>
-          <span className="text-sm font-semibold text-[#1F3864]">{totalUnidades} unidades</span>
+          <Label className="text-base font-semibold">{t.remisiones.motocarros}</Label>
+          <span className="text-sm font-semibold text-[#1F3864]">{t.remisiones.unidades(totalUnidades)}</span>
         </div>
 
         {motos.map((moto, idx) => (
           <div key={moto._key} className="border rounded-xl overflow-hidden">
             {/* Header motocarro */}
             <div className="flex items-center justify-between px-3 py-2 bg-[#1F3864]/5 border-b">
-              <span className="text-xs font-bold text-[#1F3864] uppercase tracking-wide">🏍️ Motocarro {idx+1}</span>
+              <span className="text-xs font-bold text-[#1F3864] uppercase tracking-wide">🏍️ {t.remisiones.motocarroN(idx+1)}</span>
               {motos.length>1&&(
                 <button type="button" onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
               )}
@@ -215,14 +212,14 @@ function LineasMotocarro({
             <div className="p-3 space-y-2 bg-slate-50">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Modelo</Label>
+                  <Label className="text-xs text-muted-foreground">{t.remisiones.modelo}</Label>
                   <Select value={moto.modelo} onValueChange={v=>onUpdate(idx,"modelo",v)}>
                     <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
                     <SelectContent>{modelos.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Color</Label>
+                  <Label className="text-xs text-muted-foreground">{t.remisiones.color}</Label>
                   <Select value={moto.color} onValueChange={v=>onUpdate(idx,"color",v)}>
                     <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
                     <SelectContent>
@@ -233,10 +230,10 @@ function LineasMotocarro({
                             <div className="flex items-center justify-between w-full gap-3">
                               <span>{colorLabel(c)}</span>
                               {quedan === null ? null : quedan <= 0 ? (
-                                <span className="text-red-600 text-xs whitespace-nowrap">Sin existencia</span>
+                                <span className="text-red-600 text-xs whitespace-nowrap">{t.remisiones.sinExistencia}</span>
                               ) : (
                                 <span className={`text-xs whitespace-nowrap ${quedan <= 3 ? "text-amber-600" : "text-muted-foreground"}`}>
-                                  {quedan} disponible{quedan === 1 ? "" : "s"}
+                                  {t.remisiones.disponiblesN(quedan)}
                                 </span>
                               )}
                             </div>
@@ -262,8 +259,8 @@ function LineasMotocarro({
                           <XCircle size={12} className="mt-0.5 shrink-0" />
                           <span>
                             {quedan <= 0
-                              ? `Ya no hay existencia de ${colorLabel(moto.color)}. Cambia el color o quita la línea.`
-                              : `Sólo hay ${quedan} de ${colorLabel(moto.color)} y pides ${piden}. Baja la cantidad a ${quedan} o cambia el color.`}
+                              ? t.remisiones.sinExistenciaColor(colorLabel(moto.color))
+                              : t.remisiones.soloHay(quedan, colorLabel(moto.color), piden)}
                           </span>
                         </div>
                       );
@@ -271,13 +268,13 @@ function LineasMotocarro({
                     if (quedan - piden <= 3) {
                       return (
                         <div className="mt-1 text-xs text-amber-600 font-medium flex items-center gap-1">
-                          <AlertTriangle size={12} /> Quedan {quedan} de {colorLabel(moto.color)}; con esta orden se van {piden}.
+                          <AlertTriangle size={12} /> {t.remisiones.quedanPocas(quedan, colorLabel(moto.color), piden)}
                         </div>
                       );
                     }
                     return (
                       <div className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-                        <CheckCircle2 size={12} className="text-emerald-600" /> {quedan} disponibles de {colorLabel(moto.color)}
+                        <CheckCircle2 size={12} className="text-emerald-600" /> {t.remisiones.disponiblesDe(quedan, colorLabel(moto.color))}
                       </div>
                     );
                   })()}
@@ -285,32 +282,32 @@ function LineasMotocarro({
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-28">
-                  <Label className="text-xs text-muted-foreground">Cantidad</Label>
+                  <Label className="text-xs text-muted-foreground">{t.remisiones.cantidad}</Label>
                   <Input type="number" min={1} value={moto.cantidad}
                     onChange={e=>onUpdate(idx,"cantidad",Math.max(1,parseInt(e.target.value)||1))}
                     className="h-10 text-sm"/>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer pt-5 flex-1">
                   <input type="checkbox" checked={moto.con_caja} onChange={e=>onUpdate(idx,"con_caja",e.target.checked)} className="w-4 h-4 accent-[#1F3864]"/>
-                  <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-[#1F3864]"/> Con caja montada</span>
+                  <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-[#1F3864]"/> {t.remisiones.conCajaMontada}</span>
                 </label>
               </div>
             </div>
 
             {/* Servicios adicionales por motocarro */}
             <div className="px-3 py-2.5 bg-white border-t space-y-1.5">
-              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Servicios adicionales</div>
+              <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t.remisiones.serviciosAdicionales}</div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={moto.con_cabina} onChange={e=>onUpdate(idx,"con_cabina",e.target.checked)} className="w-3.5 h-3.5 accent-violet-600"/>
-                <span className="text-sm">🛖 Cabina</span>
+                <span className="text-sm">🛖 {t.remisiones.cabina}</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={moto.con_instalacion} onChange={e=>onUpdate(idx,"con_instalacion",e.target.checked)} className="w-3.5 h-3.5 accent-purple-600"/>
-                <span className="text-sm">🔧 Instalación de cabina</span>
+                <span className="text-sm">🔧 {t.remisiones.instalacionCabina}</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={moto.con_activacion} onChange={e=>onUpdate(idx,"con_activacion",e.target.checked)} className="w-3.5 h-3.5 accent-amber-500"/>
-                <span className="text-sm">⚡ Activación</span>
+                <span className="text-sm">⚡ {t.remisiones.activacion}</span>
               </label>
             </div>
           </div>
@@ -318,7 +315,7 @@ function LineasMotocarro({
 
         <Button type="button" variant="outline" onClick={onAdd}
           className="w-full h-10 border-dashed border-[#2E75B6]/50 text-[#2E75B6] hover:bg-[#DBEAFE]/30">
-          <Plus className="h-4 w-4 mr-2"/> Agregar motocarro
+          <Plus className="h-4 w-4 mr-2"/> {t.remisiones.agregarMotocarro}
         </Button>
       </div>
 
@@ -327,7 +324,7 @@ function LineasMotocarro({
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={conFlete} onChange={e=>onFlete(e.target.checked)} className="w-4 h-4 accent-blue-600"/>
           <span className="text-sm font-medium flex items-center gap-1.5">
-            🚛 Flete <span className="text-xs text-muted-foreground font-normal">(servicio para toda la orden)</span>
+            🚛 {t.remisiones.flete} <span className="text-xs text-muted-foreground font-normal">{t.remisiones.fleteOrden}</span>
           </span>
         </label>
       </div>
@@ -364,7 +361,8 @@ export default function Remisiones() {
   // La confirmación de fechas la hace cada área operativa.
   const confirmaFabrica   = perms.esAdminGlobal || (area === "fabrica" && perms.puedeCrear("produccion"));
   const confirmaLogistica = perms.esAdminGlobal || (area === "almacen_logistica" && perms.puedeCrear("produccion"));
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
   const [rows, setRows]             = useState<any[]>([]);
   const [clientes, setClientes]     = useState<any[]>([]);
   const [vendedores, setVendedores] = useState<any[]>([]);
@@ -670,10 +668,10 @@ export default function Remisiones() {
   const crearCliente = async (datos: NuevoCliente): Promise<string|null> => {
     const nombre = datos.nombre_comercial.trim();
     const erp    = datos.codigo_erp.trim();
-    if (!nombre && !erp) { toast.error("El nombre comercial o el código ERP es obligatorio"); return null; }
+    if (!nombre && !erp) { toast.error(t.remisiones.nombreOCodigo); return null; }
     if (erp) {
       const { count } = await supabase.from("clientes").select("*", { count: "exact", head: true }).eq("codigo_erp", erp);
-      if (count && count > 0) { toast.error(`El código ERP ${erp} ya existe`); return null; }
+      if (count && count > 0) { toast.error(t.remisiones.erpDuplicado(erp)); return null; }
     }
 
     const payload: any = {
@@ -689,11 +687,11 @@ export default function Remisiones() {
       cliente_id: data.id,
       usuario_id: user?.id,
       tipo_cambio: "alta",
-      motivo: "Alta de cliente desde remisión",
+      motivo: t.remisiones.altaDesdeRemision,
       datos_nuevos: data,
     });
 
-    toast.success("✓ Cliente creado");
+    toast.success(t.remisiones.clienteCreado);
     // El catálogo se recarga, pero el cliente recién creado se agrega de una
     // vez: si la recarga tarda (o falla), el selector ya lo tiene y la remisión
     // se puede guardar.
@@ -704,14 +702,14 @@ export default function Remisiones() {
 
   // ── Create remisión ─────────────────────────────────────────────────────────
   const crearRemision = async () => {
-    if (!form.folio_remision||!form.cliente_id) { toast.error("Folio y cliente son obligatorios"); return; }
-    if (activeFolios.includes(form.folio_remision.trim())) { toast.error("Ese folio ya está en uso por una remisión activa"); return; }
-    if (totalUnidades===0) { toast.error("Agrega al menos un motocarro"); return; }
+    if (!form.folio_remision||!form.cliente_id) { toast.error(t.remisiones.folioYCliente); return; }
+    if (activeFolios.includes(form.folio_remision.trim())) { toast.error(t.remisiones.folioEnUso); return; }
+    if (totalUnidades===0) { toast.error(t.remisiones.agregaMotocarro); return; }
 
     // No se compromete lo que no hay. Sin dato de inventario no se bloquea:
     // ver faltantesDeExistencia().
     const faltan = faltantesDeExistencia(motos, disponiblesPara);
-    if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel)); return; }
+    if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes)); return; }
 
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
 
@@ -724,7 +722,7 @@ export default function Remisiones() {
       vendedor_id,
       fecha_remision: form.fecha_remision,
       notas: form.notas||null,
-      estatus: "NUEVA",
+      estatus: "NUEVA" as const,
     };
 
     const { data: nueva, error } = await supabase.from("remisiones").insert(corePayload).select("id").single();
@@ -732,7 +730,10 @@ export default function Remisiones() {
 
     // UPDATE con columnas extendidas — tolerante a cache stale (falla silenciosamente)
     if (nueva?.id) {
-      const extended: Record<string,any> = {
+      // Tipado con la propia tabla y no `Record<string, any>`: el cliente de
+      // Supabase rechaza los índices abiertos, y así un nombre de columna mal
+      // escrito se ve aquí y no en runtime.
+      const extended: TablesUpdate<"remisiones"> = {
         tipo_pago: form.tipo_pago,
         pagado: form.tipo_pago === "anticipado",
         color_solicitado: motos[0]?.color || "BLANCO",
@@ -778,21 +779,21 @@ export default function Remisiones() {
 
     const res = data as { asignadas?:number; detalle?:any[] } | null;
     const asignadas = res?.asignadas ?? 0;
-    if (asignadas>0) toast.success(`✓ ${asignadas} chasis asignados`);
+    if (asignadas>0) toast.success(t.remisiones.chasisAsignados(asignadas));
 
     const faltantes = (res?.detalle ?? []).filter((d:any)=>(d?.faltan??0)>0);
     faltantes.forEach((d:any)=>{
-      const que = [d.modelo,d.color].filter(Boolean).join(" ") || "sin modelo/color";
+      const que = [d.modelo,d.color].filter(Boolean).join(" ") || t.remisiones.sinModeloColor;
       const porque = d.piezas_por_configurar>0
         ? `hay ${d.piezas_por_configurar} chasis por configurar`
         : d.unidades_sin_serial>0
         ? `hay ${d.unidades_sin_serial} unidad(es) sin NS chasis/NS motor`
         : d.unidades_detenidas>0
         ? `hay ${d.unidades_detenidas} unidad(es) detenidas por incidencia de chasis`
-        : "no hay inventario de ese color";
-      toast.warning(`Faltan ${d.faltan} de ${que}: ${porque}`);
+        : t.remisiones.porqueSinInventario;
+      toast.warning(t.remisiones.faltanDe(d.faltan, que, porque));
     });
-    if (!asignadas && !faltantes.length) toast.info("Ya están todos asignados");
+    if (!asignadas && !faltantes.length) toast.info(t.remisiones.todosAsignados);
 
     load();
   };
@@ -802,13 +803,13 @@ export default function Remisiones() {
     const { error } = await supabase.storage.from("remisiones-docs").upload(path,file);
     if (error) return toast.error(error.message);
     await supabase.from("remisiones").update({documento_url:path}).eq("id",r.id);
-    toast.success("✓ PDF subido"); load();
+    toast.success(t.remisiones.pdfSubido); load();
   };
   const verPdf = (path:string) => setPreviewPath(path);
   const descargarPdf = async (path:string) => {
     const nombre=path.split("/").pop()||"remision.pdf";
     const { data,error } = await supabase.storage.from("remisiones-docs").createSignedUrl(path,60,{download:nombre});
-    if (error||!data?.signedUrl) { toast.error("No se pudo descargar el PDF"); return; }
+    if (error||!data?.signedUrl) { toast.error(t.remisiones.errorDescargarPdf); return; }
     const link=document.createElement("a");
     link.href=data.signedUrl;
     link.download=nombre;
@@ -827,40 +828,16 @@ export default function Remisiones() {
   const verComprobante = (path:string) => setPreviewPath(path);
 
   const cerrarRemision = async (id: string) => {
-    // Get the remision to know which model/color to decrement
-    const { data: remisionData, error: fetchError } = await supabase
-      .from("remisiones")
-      .select("color_solicitado, remision_items")
-      .eq("id", id)
-      .single();
-
-    if (fetchError) {
-      console.error("Error fetching remision data:", fetchError);
-    }
-
-    // Mark as complete
+    // Aquí se leía `remision_items` como si fuera una columna de `remisiones`
+    // —es otra tabla— así que la consulta siempre fallaba y el descuento de
+    // color nunca corría. No hace falta: desde 20260823000001
+    // `decrementar_inventario_color` sólo llama a `recalcular_inventario_colores`,
+    // y esa recalculación ya la disparan los triggers de `motocarros` e
+    // `inventario_chasis` con cada movimiento.
     const { error } = await supabase.from("remisiones").update({ estatus: "COMPLETA" }).eq("id", id);
     if (error) return toast.error(error.message);
 
-    // Decrement color inventory for each motocarro item
-    if (remisionData) {
-      const items = remisionData.remision_items || [];
-      for (const item of items) {
-        if (item.tipo_servicio === "motocarro" && item.modelo && item.color) {
-          try {
-            await supabase.rpc("decrementar_inventario_color", {
-              _modelo: item.modelo,
-              _color: item.color,
-              _cantidad: item.cantidad || 1,
-            });
-          } catch (error) {
-            console.error("Error decrementing color inventory:", error);
-          }
-        }
-      }
-    }
-
-    toast.success("✓ Remisión marcada como entregada");
+    toast.success(t.remisiones.entregadaOk);
     setCierreConfirm(null); load();
   };
 
@@ -870,13 +847,13 @@ export default function Remisiones() {
     // Soft delete: marcar CANCELADA (reversible por admin desde la pestaña Canceladas)
     const { error } = await supabase.from("remisiones").update({ estatus: "CANCELADA" }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("✓ Remisión cancelada — visible en pestaña Canceladas");
+    toast.success(t.remisiones.canceladaOk);
     setDeleteConfirm(null); load();
   };
 
   const hardDeleteRemision = async (id: string, motivo: string) => {
     if (!motivo || motivo.trim().length < 10) {
-      toast.error("El motivo debe tener al menos 10 caracteres");
+      toast.error(t.remisiones.motivoCorto10);
       return;
     }
 
@@ -889,7 +866,7 @@ export default function Remisiones() {
 
     if (fetchError) {
       console.error("Error fetching remision data:", fetchError);
-      toast.error("Error al obtener datos de la remisión");
+      toast.error(t.remisiones.errorObtenerDatos);
       return;
     }
 
@@ -907,7 +884,7 @@ export default function Remisiones() {
 
     if (auditError) {
       console.error("Error logging deletion:", auditError);
-      toast.error("Error al registrar la eliminación en bitácora");
+      toast.error(t.remisiones.errorBitacora);
       return;
     }
 
@@ -919,11 +896,11 @@ export default function Remisiones() {
 
     if (deleteError) {
       console.error("Error deleting remision:", deleteError);
-      toast.error("Error al eliminar la remisión");
+      toast.error(t.remisiones.errorEliminar);
       return;
     }
 
-    toast.success("✓ Remisión eliminada definitivamente y registrada en bitácora");
+    toast.success(t.remisiones.eliminadaOk);
     setHardDeleteConfirm(null);
     setDeleteMotivo("");
     load();
@@ -932,12 +909,12 @@ export default function Remisiones() {
   const restaurarRemision = async (id: string) => {
     const r = rows.find((row) => row.id === id);
     if (r?.folio_remision && activeFolios.includes(r.folio_remision)) {
-      toast.error(`No se puede restaurar: el folio ${r.folio_remision} ya está en uso por una remisión activa`);
+      toast.error(t.remisiones.noRestaurable(r.folio_remision));
       return;
     }
     const { error } = await supabase.from("remisiones").update({ estatus: "NUEVA" }).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("✓ Remisión restaurada a activa"); load();
+    toast.success(t.remisiones.restauradaOk); load();
   };
 
   // ── Editar / complementar una remisión ─────────────────────────────────────
@@ -968,7 +945,7 @@ export default function Remisiones() {
       const { data: previo, error: error2 } = await supabase
         .from("remision_items").select(columnas)
         .eq("remision_id", r.id).order("created_at", { nullsFirst: true });
-      if (error2) return toast.error(`No se pudieron leer los renglones: ${error2.message}`);
+      if (error2) return toast.error(t.remisiones.errorRenglones(error2.message));
       items = previo ?? [];
     }
 
@@ -1026,19 +1003,19 @@ export default function Remisiones() {
     if (!editar || !editForm) return;
 
     const motivo = editMotivo.trim();
-    if (!motivoValido(motivo)) return toast.error(`Escribe el motivo de la modificación (mínimo ${MOTIVO_MIN} caracteres)`);
+    if (!motivoValido(motivo)) return toast.error(t.remisiones.motivoRequerido(MOTIVO_MIN));
 
     const folio = (editForm.folio_remision||"").trim();
-    if (!folio || !editForm.cliente_id) return toast.error("Folio y cliente son obligatorios");
+    if (!folio || !editForm.cliente_id) return toast.error(t.remisiones.folioYCliente);
     // El folio es único entre las remisiones activas — sin contarse a sí misma.
     if (rows.some((r:any) => r.id !== editar.id && r.estatus !== "CANCELADA" && r.folio_remision === folio))
-      return toast.error("Ese folio ya está en uso por otra remisión activa");
+      return toast.error(t.remisiones.folioEnUsoOtra);
 
     const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
-    if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel));
+    if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes));
 
     const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
-    if (!plan.totalUnidades) return toast.error("La remisión necesita al menos un motocarro");
+    if (!plan.totalUnidades) return toast.error(t.remisiones.necesitaMotocarro);
 
     // Bajar el total ya no frena a Comercial. Lo que aún no entra a armado se
     // suelta solo; lo que Fábrica ya empezó se le PIDE; y lo que ya salió del
@@ -1046,7 +1023,7 @@ export default function Remisiones() {
     const asignadas = (editar.motocarros ?? []).length;
     const reparto   = repartoDe(editar, plan.totalUnidades);
     if (reparto.imposible > 0)
-      return toast.error(`No se puede bajar a ${plan.totalUnidades}: ${reparto.yaSalieron} unidad(es) de esta remisión ya se entregaron o van en ruta`);
+      return toast.error(t.remisiones.noSePuedeBajar(plan.totalUnidades, reparto.yaSalieron));
 
     setGuardandoEdicion(true);
 
@@ -1082,7 +1059,7 @@ export default function Remisiones() {
     });
     if (errBitacora) {
       setGuardandoEdicion(false);
-      return toast.error(`No se pudo registrar el motivo, la remisión no se modificó: ${errBitacora.message}`);
+      return toast.error(t.remisiones.errorMotivo(errBitacora.message));
     }
 
     // 2. Encabezado — columnas que siempre han existido.
@@ -1099,7 +1076,7 @@ export default function Remisiones() {
     if (errCore) { setGuardandoEdicion(false); return toast.error(errCore.message); }
     if (!actualizada?.length) {
       setGuardandoEdicion(false);
-      return toast.error("No se guardó nada: no tienes permiso para modificar esta remisión, o ya no existe. Pídele el cambio a tu supervisor.");
+      return toast.error(t.remisiones.sinPermisoEditar);
     }
 
     // 3. Columnas extendidas — tolerante a cache stale, igual que al capturar.
@@ -1117,7 +1094,7 @@ export default function Remisiones() {
     const fallo = await aplicarPlanRenglones(plan);
     if (fallo) {
       setGuardandoEdicion(false);
-      return toast.error(`La remisión se actualizó, pero un renglón falló: ${fallo}`);
+      return toast.error(t.remisiones.errorRenglon(fallo));
     }
 
     // 5. Si el pedido se achicó, soltar las unidades de más y avisarle a
@@ -1132,7 +1109,7 @@ export default function Remisiones() {
       });
       if (error) {
         setGuardandoEdicion(false);
-        return toast.error(`La remisión se actualizó, pero las unidades de más no se movieron: ${error.message}`);
+        return toast.error(t.remisiones.errorUnidadesDeMas(error.message));
       }
       const r = data as { liberadas?: number; solicitadas?: number } | null;
       liberadas   = Number(r?.liberadas ?? 0);
@@ -1145,8 +1122,8 @@ export default function Remisiones() {
       solicitadas ? `se le pidió a Fábrica soltar ${solicitadas} que ya está(n) en armado` : "",
     ].filter(Boolean);
     toast.success(partes.length
-      ? `✓ Remisión actualizada — ${partes.join(" y ")}`
-      : "✓ Remisión actualizada — el motivo quedó en la bitácora");
+      ? t.remisiones.actualizadaCon(partes.join(" · "))
+      : t.remisiones.actualizada);
     cerrarEdicion();
     load(); loadModificaciones();
   };
@@ -1193,8 +1170,8 @@ export default function Remisiones() {
           <p className="text-muted-foreground text-base mt-1">
             {t.remisiones.subtitle(activeRows.length + canceledRows.length)}
             {scope === 'todas'
-              ? <> — todo el equipo{misRemisiones>0 ? <> · {misRemisiones} {misRemisiones===1?"tuya":"tuyas"}</> : null}</>
-              : <> — solo las tuyas</>}
+              ? <>{t.remisiones.sufijoTodoEquipo}{misRemisiones>0 ? t.remisiones.sufijoTuyas(misRemisiones) : null}</>
+              : <>{t.remisiones.sufijoSoloTuyas}</>}
           </p>
         </div>
 
@@ -1235,15 +1212,15 @@ export default function Remisiones() {
                 {/* Vendedor selector (admin/coord) */}
                 {canAssignVendedor&&(
                   <div>
-                    <Label className="text-base">Asignar a vendedor</Label>
+                    <Label className="text-base">{t.remisiones.asignarVendedor}</Label>
                     <Select value={form.vendedor_asignado_id || ASIGNAR_A_MI} onValueChange={v=>{
                       const id = v===ASIGNAR_A_MI ? "" : v;
                       const vend=vendedores.find(x=>x.id===id);
                       setForm({...form,vendedor_asignado_id:id,nombre_vendedor:vend?.nombre_completo||form.nombre_vendedor});
                     }}>
-                      <SelectTrigger className="h-12 text-base"><SelectValue placeholder="Vendedor (opcional)"/></SelectTrigger>
+                      <SelectTrigger className="h-12 text-base"><SelectValue placeholder={t.remisiones.vendedorOpcional}/></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={ASIGNAR_A_MI}>— Asignar a mí mismo —</SelectItem>
+                        <SelectItem value={ASIGNAR_A_MI}>{t.remisiones.asignarAMi}</SelectItem>
                         {vendedores.map(v=><SelectItem key={v.id} value={v.id}>{v.nombre_completo}{v.codigo_vendedor?` (${v.codigo_vendedor})`:""}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -1252,8 +1229,8 @@ export default function Remisiones() {
 
                 {/* Nombre vendedor — todos */}
                 <div>
-                  <Label className="text-base">Nombre del vendedor{esVendedor&&<span className="ml-1 text-xs text-muted-foreground font-normal">(tu nombre)</span>}</Label>
-                  <Input value={form.nombre_vendedor} onChange={e=>setForm({...form,nombre_vendedor:e.target.value})} placeholder="Nombre completo del vendedor" className="h-12 text-base"/>
+                  <Label className="text-base">{t.remisiones.nombreVendedor}{esVendedor&&<span className="ml-1 text-xs text-muted-foreground font-normal">{t.remisiones.tuNombre}</span>}</Label>
+                  <Input value={form.nombre_vendedor} onChange={e=>setForm({...form,nombre_vendedor:e.target.value})} placeholder={t.remisiones.nombreVendedorPlaceholder} className="h-12 text-base"/>
                 </div>
 
                 {/* ── MOTOCARROS + FLETE ─────────────────────────── */}
@@ -1270,7 +1247,7 @@ export default function Remisiones() {
                 />
                 {/* Fecha */}
                 <div>
-                  <Label>Fecha</Label>
+                  <Label>{t.remisiones.fecha}</Label>
                   <Input type="date" value={form.fecha_remision} onChange={e=>setForm({...form,fecha_remision:e.target.value})} className="h-12 text-base"/>
                 </div>
 
@@ -1284,19 +1261,19 @@ export default function Remisiones() {
                       <SelectItem value="contra_entrega">{t.remisiones.contraEntrega}</SelectItem>
                     </SelectContent>
                   </Select>
-                  {form.tipo_pago==="contra_entrega"&&<p className="text-xs text-amber-600 mt-1">⚠ Logística no podrá programar hasta confirmar el pago.</p>}
+                  {form.tipo_pago==="contra_entrega"&&<p className="text-xs text-amber-600 mt-1">{t.remisiones.avisoPagoLogistica}</p>}
                 </div>
 
                 {/* Notas */}
                 <div>
-                  <Label>Notas</Label>
+                  <Label>{t.remisiones.notas}</Label>
                   <Input value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})} className="h-12 text-base"/>
                 </div>
 
                 {/* Doc */}
                 <div>
                   <Label>{t.remisiones.subirRemision}</Label>
-                  <FileOrCamera value={formFile} onChange={setFormFile} label="Toma foto o sube el PDF" className="mt-1"/>
+                  <FileOrCamera value={formFile} onChange={setFormFile} label={t.remisiones.tomaFoto} className="mt-1"/>
                 </div>
               </div>
 
@@ -1322,7 +1299,7 @@ export default function Remisiones() {
             <div className="flex items-center gap-2">
               <span className="text-lg">⚠️</span>
               <span className="font-semibold text-amber-800 text-sm">
-                {motocarrosAtrasados.length} motocarro{motocarrosAtrasados.length > 1 ? "s" : ""} con fecha vencida
+                {t.remisiones.atrasados(motocarrosAtrasados.length)}
               </span>
             </div>
             <ChevronDown className={`h-4 w-4 text-amber-700 transition-transform ${notifOpen ? "rotate-180" : ""}`} />
@@ -1333,12 +1310,12 @@ export default function Remisiones() {
                 <div key={m.id} className="flex items-center gap-2 text-xs text-amber-900">
                   <span className="font-mono font-bold text-amber-700">{m.folio}</span>
                   <span className="font-medium">#{m.orden_armado}</span>
-                  <span className="text-muted-foreground">{m.ns_chasis || m.chasis_asignado || "sin NS"}</span>
+                  <span className="text-muted-foreground">{m.ns_chasis || m.chasis_asignado || t.remisiones.sinNS}</span>
                   {m.fecha_estimada_armado && m.fecha_estimada_armado < today && !['ARMADO','LISTO'].includes(m.estatus_armado ?? '') && (
-                    <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">Armado: {m.fecha_estimada_armado}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">{t.remisiones.armadoBadge(m.fecha_estimada_armado)}</span>
                   )}
                   {m.fecha_estimada_entrega && m.fecha_estimada_entrega < today && m.estatus_entrega !== 'ENTREGADA' && (
-                    <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-semibold">Entrega: {m.fecha_estimada_entrega}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 font-semibold">{t.remisiones.entregaBadge(m.fecha_estimada_entrega)}</span>
                   )}
                 </div>
               ))}
@@ -1349,11 +1326,11 @@ export default function Remisiones() {
 
       {/* ── Alcance: todo el equipo comercial / solo las mías ─────────────── */}
       <div className="flex items-center gap-2">
-        <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Ver</span>
+        <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">{t.remisiones.ver}</span>
         <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
           {([
-            { key: 'todas', label: 'Todo el equipo' },
-            { key: 'mias',  label: 'Solo las mías' },
+            { key: 'todas', label: t.remisiones.alcanceTodas },
+            { key: 'mias',  label: t.remisiones.alcanceMias },
           ] as const).map(opt => (
             <button
               key={opt.key}
@@ -1375,7 +1352,7 @@ export default function Remisiones() {
           onClick={() => setActiveTab('activas')}
           className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='activas' ? 'border-[#1F3864] text-[#1F3864]' : 'border-transparent text-muted-foreground hover:text-[#1F3864]'}`}
         >
-          Activas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{activeRows.length}</span>
+          {t.remisiones.tabActivas} <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{activeRows.length}</span>
         </button>
         {/* Quien puede abrir esta página ya lee la bandeja completa (RLS), así que
             la pestaña de canceladas no necesita su propia lista de permisos. */}
@@ -1383,7 +1360,7 @@ export default function Remisiones() {
           onClick={() => setActiveTab('canceladas')}
           className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='canceladas' ? 'border-red-500 text-red-600' : 'border-transparent text-muted-foreground hover:text-red-500'}`}
         >
-          Canceladas <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{canceledRows.length}</span>
+          {t.remisiones.tabCanceladas} <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{canceledRows.length}</span>
         </button>
       </div>
 
@@ -1391,7 +1368,7 @@ export default function Remisiones() {
       <div className="responsive-card-grid gap-4">
         {activeTab === 'canceladas' ? (
           canceledRows.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones canceladas</div>
+            <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.remisiones.sinCanceladas}</div>
           ) : canceledRows.map((r:any) => (
             <Card key={r.id} className="p-5 flex flex-col gap-3 border-red-100 bg-red-50/30 opacity-80">
               <div className="flex items-start justify-between gap-2">
@@ -1400,15 +1377,15 @@ export default function Remisiones() {
                   <div className="text-2xl font-bold text-slate-500 leading-tight line-through">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">CANCELADA</span>
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{t.remisiones.cancelada}</span>
               </div>
               <div className="text-sm text-muted-foreground">
                 <div>👤 {r.clientes?.codigo_erp || r.clientes?.folio_interno || "—"}{r.clientes?.nombre_comercial ? ` — ${r.clientes.nombre_comercial}` : ""}</div>
-                <div>Vendedor: {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}{r.vendedor_id===user?.id ? " (tuya)" : ""}</div>
-                <div>Fecha: {fmtDate(r.fecha_remision)}</div>
+                <div>{t.remisiones.vendedorLbl} {r.nombre_vendedor || r.profiles?.nombre_completo || "—"}{r.vendedor_id===user?.id ? t.remisiones.sufijoTuya : ""}</div>
+                <div>{t.remisiones.fechaLbl} {fmtDate(r.fecha_remision)}</div>
               </div>
               <Button variant="outline" onClick={()=>setDetalleRemision(r)} className="w-full h-10 text-sm">
-                <FileText className="h-4 w-4 mr-2"/> Ver remisión completa
+                <FileText className="h-4 w-4 mr-2"/> {t.remisiones.verCompleta}
               </Button>
               {perms.puedeEliminar('remisiones') && (
                 <Button
@@ -1416,7 +1393,7 @@ export default function Remisiones() {
                   onClick={() => restaurarRemision(r.id)}
                   className="w-full h-10 text-sm border-[#2E75B6] text-[#2E75B6] hover:bg-[#DBEAFE]"
                 >
-                  ↩ Restaurar remisión
+                  {t.remisiones.restaurar}
                 </Button>
               )}
             </Card>
@@ -1450,10 +1427,10 @@ export default function Remisiones() {
                       type="button"
                       onClick={()=>setDetalleRemision(r)}
                       className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 hover:underline"
-                      title="Ver el historial de modificaciones"
+                      title={t.remisiones.verHistorial}
                     >
                       <History className="h-3 w-3"/>
-                      Modificada {modificaciones[r.id]} {modificaciones[r.id]===1?"vez":"veces"}
+                      {t.remisiones.modificada(modificaciones[r.id])}
                     </button>
                   )}
                 </div>
@@ -1467,7 +1444,7 @@ export default function Remisiones() {
                   {vendedorNombre.split(" ")[0]}
                 </span>
                 {isOwner && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#1F3864] text-white text-[10px] font-bold uppercase tracking-wide">Tuya</span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#1F3864] text-white text-[10px] font-bold uppercase tracking-wide">{t.remisiones.tuya}</span>
                 )}
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
                   👤 {r.clientes?.codigo_erp || r.clientes?.folio_interno || "—"}
@@ -1505,7 +1482,7 @@ export default function Remisiones() {
                     );
                   })}
                   {items.find((i:any)=>i.tipo_servicio==="flete")&&(
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${tipoBadgeClass.flete}`}>🚛 Flete</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${tipoBadgeClass.flete}`}>🚛 {t.remisiones.flete}</span>
                   )}
                 </div>
               )}
@@ -1513,20 +1490,20 @@ export default function Remisiones() {
               {/* Progress */}
               <div>
                 <div className="flex justify-between text-sm font-medium mb-1.5">
-                  <span>{listas} de {total} listos</span>
+                  <span>{t.remisiones.listosDe(listas, total)}</span>
                   <span style={{color:pctColor}} className="font-bold">{pct}%</span>
                 </div>
                 <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
                   <div className="h-full transition-all" style={{width:`${Math.min(pct,100)}%`,backgroundColor:pctColor}}/>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">{asignadas} chasis asignados de {total}</div>
+                <div className="text-xs text-muted-foreground mt-1">{t.remisiones.chasisAsignadosDe(asignadas, total)}</div>
               </div>
 
               {/* Moto list */}
               {motos_.length>0&&(
                 <Collapsible open={!!expanded[r.id]} onOpenChange={o=>setExpanded(s=>({...s,[r.id]:o}))}>
                   <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 rounded-md bg-slate-50 hover:bg-slate-100 text-sm font-medium">
-                    Ver chasis y entregas ({motos_.length})
+                    {t.remisiones.verChasisEntregas(motos_.length)}
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id]?"rotate-180":""}`}/>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-2">
@@ -1538,39 +1515,39 @@ export default function Remisiones() {
               {/* Actions */}
               <div className="flex gap-2 mt-auto pt-2 border-t flex-wrap">
                 <Button variant="outline" onClick={()=>setDetalleRemision(r)} className="basis-full h-12 text-base">
-                  <FileText className="h-5 w-5 mr-2"/> Ver remisión completa
+                  <FileText className="h-5 w-5 mr-2"/> {t.remisiones.verCompleta}
                 </Button>
                 {/* Editar / complementar — operador en las suyas, supervisor y
                     administrador en las de todo el área. Cada cambio pide motivo. */}
                 {puedeGestionar&&(
                   <Button variant="outline" onClick={()=>abrirEdicion(r)} className="flex-1 h-12 text-base min-w-[100px] border-[#1F3864]/40 text-[#1F3864] hover:bg-[#DBEAFE]">
-                    <Pencil className="h-5 w-5 mr-2"/> Editar
+                    <Pencil className="h-5 w-5 mr-2"/> {t.remisiones.editar}
                   </Button>
                 )}
                 {canAssign&&asignadas<total&&r.estatus!=="COMPLETA"&&r.estatus!=="CANCELADA"&&(
                   <Button onClick={()=>asignarChasis(r)} className="flex-1 h-12 bg-[#2E75B6] hover:bg-[#246094] text-base min-w-[100px]">
-                    <Wand2 className="h-5 w-5 mr-2"/> Asignar
+                    <Wand2 className="h-5 w-5 mr-2"/> {t.remisiones.asignar}
                   </Button>
                 )}
                 {r.documento_url?(
                   <>
                     <Button variant="outline" onClick={()=>verPdf(r.documento_url)} className="flex-1 h-12 text-base min-w-[100px]">
-                      <Eye className="h-5 w-5 mr-2"/> Ver PDF
+                      <Eye className="h-5 w-5 mr-2"/> {t.remisiones.verPdf}
                     </Button>
                     <Button variant="outline" onClick={()=>descargarPdf(r.documento_url)} className="flex-1 h-12 text-base min-w-[100px]">
-                      <Download className="h-5 w-5 mr-2"/> Descargar
+                      <Download className="h-5 w-5 mr-2"/> {t.remisiones.descargar}
                     </Button>
                   </>
                 ):canUpload?(
                   <label className="flex-1 min-w-[100px]">
                     <input type="file" accept="application/pdf,image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f)subirPdf(r,f);}}/>
                     <span className="flex items-center justify-center cursor-pointer h-12 rounded-md border-2 border-dashed border-[#2E75B6]/40 text-[#1F3864] font-medium hover:bg-[#DBEAFE] text-base">
-                      <Upload className="h-5 w-5 mr-2"/> Subir PDF
+                      <Upload className="h-5 w-5 mr-2"/> {t.remisiones.subirPdf}
                     </span>
                   </label>
                 ):(
                   <div className="flex-1 h-12 flex items-center justify-center text-muted-foreground text-sm min-w-[100px]">
-                    <FileText className="h-5 w-5 mr-2 opacity-40"/> Sin PDF
+                    <FileText className="h-5 w-5 mr-2 opacity-40"/> {t.remisiones.sinPdf}
                   </div>
                 )}
                 {r.tipo_pago==="contra_entrega"&&!r.pagado&&puedeGestionar&&(
@@ -1589,7 +1566,7 @@ export default function Remisiones() {
                     onClick={()=>setCierreConfirm(r)}
                     className="flex-1 h-12 text-base bg-emerald-700 hover:bg-emerald-800 min-w-[120px]"
                   >
-                    <CheckCheck className="h-5 w-5 mr-2"/> Entregar
+                    <CheckCheck className="h-5 w-5 mr-2"/> {t.remisiones.entregar}
                   </Button>
                 )}
                 {/* Cancelar — supervisor/admin del área, u operador en las propias */}
@@ -1598,7 +1575,7 @@ export default function Remisiones() {
                     variant="outline"
                     onClick={()=>setDeleteConfirm(r)}
                     className="h-12 w-12 p-0 shrink-0 border-red-200 text-red-500 hover:bg-red-50"
-                    title="Cancelar remisión"
+                    title={t.remisiones.cancelarRemision}
                   >
                     <Trash2 className="h-5 w-5"/>
                   </Button>
@@ -1609,7 +1586,7 @@ export default function Remisiones() {
                     variant="outline"
                     onClick={()=>setHardDeleteConfirm(r)}
                     className="h-12 w-12 p-0 shrink-0 border-red-300 text-red-600 hover:bg-red-100"
-                    title="Eliminar definitivamente (requiere motivo)"
+                    title={t.remisiones.eliminarDefinitivo}
                   >
                     <XCircle className="h-5 w-5"/>
                   </Button>
@@ -1618,96 +1595,96 @@ export default function Remisiones() {
             </Card>
           );
         })}
-        {activeTab==='activas'&&!activeRows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">Sin remisiones activas</div>}
+        {activeTab==='activas'&&!activeRows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.remisiones.sinActivas}</div>}
       </div>
 
       <Dialog open={!!detalleRemision} onOpenChange={o=>{if(!o)setDetalleRemision(null);}}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex flex-wrap items-center gap-2 text-[#1F3864]">
-              Remisión {detalleRemision?.folio_remision}
+              {t.remisiones.detalleTitulo(detalleRemision?.folio_remision ?? "")}
               {detalleRemision&&<EstatusBadge estatus={detalleRemision.estatus} size="md"/>}
             </DialogTitle>
-            <DialogDescription>Información completa, configuración solicitada y unidades asignadas.</DialogDescription>
+            <DialogDescription>{t.remisiones.detalleDesc}</DialogDescription>
           </DialogHeader>
           {detalleRemision&&(
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">Fecha</div>
+                  <div className="text-xs text-muted-foreground">{t.remisiones.fecha}</div>
                   <div className="font-semibold">{fmtDate(detalleRemision.fecha_remision)}</div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3 sm:col-span-2">
-                  <div className="text-xs text-muted-foreground">Cliente</div>
+                  <div className="text-xs text-muted-foreground">{t.remisiones.cliente}</div>
                   <div className="font-semibold break-words">
                     {detalleRemision.clientes?.codigo_erp||detalleRemision.clientes?.folio_interno||"—"}
                     {detalleRemision.clientes?.nombre_comercial?` · ${detalleRemision.clientes.nombre_comercial}`:""}
                   </div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">Vendedor</div>
+                  <div className="text-xs text-muted-foreground">{t.fields.vendedor}</div>
                   <div className="font-semibold break-words">{detalleRemision.nombre_vendedor||detalleRemision.profiles?.nombre_completo||"—"}</div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">Tipo de pago</div>
-                  <div className="font-semibold">{detalleRemision.tipo_pago==="contra_entrega"?"Contra entrega":"Anticipado"}</div>
+                  <div className="text-xs text-muted-foreground">{t.remisiones.tipoPagoLbl}</div>
+                  <div className="font-semibold">{detalleRemision.tipo_pago==="contra_entrega"?t.pago.contra_entrega:t.pago.anticipado}</div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">Estado del pago</div>
-                  <div className="font-semibold">{detalleRemision.pagado===false?"Pendiente":"Pagado"}</div>
+                  <div className="text-xs text-muted-foreground">{t.remisiones.estadoPago}</div>
+                  <div className="font-semibold">{detalleRemision.pagado===false?t.estatus.PENDIENTE:t.pago.pagado}</div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">Unidades solicitadas</div>
+                  <div className="text-xs text-muted-foreground">{t.remisiones.unidadesSolicitadas}</div>
                   <div className="font-semibold">{detalleRemision.total_unidades_solicitadas||detalleRemision.motocarros?.length||1}</div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">Unidades asignadas</div>
+                  <div className="text-xs text-muted-foreground">{t.remisiones.unidadesAsignadas}</div>
                   <div className="font-semibold">{detalleRemision.motocarros?.length||0}</div>
                 </div>
               </div>
 
               <div>
-                <h3 className="text-base mb-2">Configuración del pedido</h3>
+                <h3 className="text-base mb-2">{t.remisiones.configuracionPedido}</h3>
                 {detalleRemision.remision_items?.length?(
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {detalleRemision.remision_items.map((item:any)=>(
                       <div key={item.id} className="rounded-lg border p-3 flex items-start gap-2">
                         <span>{tipoIcon[item.tipo_servicio]||"•"}</span>
                         <div className="min-w-0">
-                          <div className="font-semibold">{tipoLabel[item.tipo_servicio]||item.tipo_servicio}</div>
+                          <div className="font-semibold">{t.componentes.bandejaRemisiones.tipoServicio(item.tipo_servicio)}</div>
                           <div className="text-sm text-muted-foreground break-words">
-                            {[item.modelo,item.color,item.cantidad?`Cantidad: ${item.cantidad}`:null,item.con_caja?"Con caja":null].filter(Boolean).join(" · ")}
+                            {[item.modelo,item.color,item.cantidad?t.remisiones.cantidadLbl(item.cantidad):null,item.con_caja?t.remisiones.conCaja:null].filter(Boolean).join(" · ")}
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Sin configuración capturada.</div>}
+                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{t.remisiones.sinConfiguracion}</div>}
               </div>
 
               <div>
-                <h3 className="text-base mb-2">Unidades asignadas</h3>
+                <h3 className="text-base mb-2">{t.remisiones.unidadesAsignadas}</h3>
                 {detalleRemision.motocarros?.length?(
                   <div className="space-y-2">
                     {detalleRemision.motocarros.map((m:any)=>(
                       <div key={m.id} className="rounded-lg border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
-                        <div><span className="text-muted-foreground">Orden:</span> <strong>#{m.orden_armado}</strong></div>
-                        <div><span className="text-muted-foreground">Modelo/color:</span> <strong>{m.modelo||"—"} {m.color||""}</strong></div>
-                        <div className="break-all"><span className="text-muted-foreground">NS chasis:</span> <strong>{m.ns_chasis||m.chasis_asignado||"—"}</strong></div>
-                        <div className="break-all"><span className="text-muted-foreground">NS motor:</span> <strong>{m.ns_motor||"—"}</strong></div>
-                        <div><span className="text-muted-foreground">Estado:</span> <strong>{m.estatus_entrega==="ENTREGADA"?"ENTREGADA":effEstatusArmado(m)}</strong></div>
-                        <div><span className="text-muted-foreground">Armado estimado:</span> <strong>{fmtDate(m.fecha_estimada_armado)}</strong></div>
-                        <div><span className="text-muted-foreground">Armado real:</span> <strong>{fmtDate(m.fecha_real_armado)}</strong></div>
-                        <div><span className="text-muted-foreground">Entrega:</span> <strong>{fmtDate(m.fecha_real_entrega||m.fecha_estimada_entrega)}</strong></div>
+                        <div><span className="text-muted-foreground">{t.remisiones.ordenLbl}</span> <strong>#{m.orden_armado}</strong></div>
+                        <div><span className="text-muted-foreground">{t.remisiones.modeloColorLbl}</span> <strong>{m.modelo||"—"} {m.color||""}</strong></div>
+                        <div className="break-all"><span className="text-muted-foreground">{t.remisiones.nsChasisLbl}</span> <strong>{m.ns_chasis||m.chasis_asignado||"—"}</strong></div>
+                        <div className="break-all"><span className="text-muted-foreground">{t.remisiones.nsMotorLbl}</span> <strong>{m.ns_motor||"—"}</strong></div>
+                        <div><span className="text-muted-foreground">{t.remisiones.estadoLbl}</span> <strong>{m.estatus_entrega==="ENTREGADA"?t.estatus.ENTREGADA:(t.estatus[effEstatusArmado(m) as keyof typeof t.estatus] ?? effEstatusArmado(m))}</strong></div>
+                        <div><span className="text-muted-foreground">{t.remisiones.armadoEstimado}</span> <strong>{fmtDate(m.fecha_estimada_armado)}</strong></div>
+                        <div><span className="text-muted-foreground">{t.remisiones.armadoReal}</span> <strong>{fmtDate(m.fecha_real_armado)}</strong></div>
+                        <div><span className="text-muted-foreground">{t.remisiones.entregaLbl}</span> <strong>{fmtDate(m.fecha_real_entrega||m.fecha_estimada_entrega)}</strong></div>
                       </div>
                     ))}
                   </div>
-                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Todavía no hay unidades asignadas.</div>}
+                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{t.remisiones.sinUnidadesAsignadas}</div>}
               </div>
 
               {detalleRemision.notas&&(
                 <div>
-                  <h3 className="text-base mb-2">Notas</h3>
+                  <h3 className="text-base mb-2">{t.remisiones.notas}</h3>
                   <div className="rounded-lg border bg-blue-50/50 p-3 text-sm whitespace-pre-wrap break-words">{detalleRemision.notas}</div>
                 </div>
               )}
@@ -1716,13 +1693,13 @@ export default function Remisiones() {
                   edición a todo el equipo siga siendo rastreable. */}
               {historial.length>0&&(
                 <div>
-                  <h3 className="text-base mb-2 flex items-center gap-2"><History className="h-4 w-4"/> Modificaciones</h3>
+                  <h3 className="text-base mb-2 flex items-center gap-2"><History className="h-4 w-4"/> {t.remisiones.modificaciones}</h3>
                   <div className="space-y-2">
                     {historial.map((h:any)=>(
                       <div key={h.id} className="rounded-lg border bg-amber-50/50 p-3 text-sm">
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                           <strong className="text-[#1F3864]">{h.nombre_usuario||"—"}</strong>
-                          <span>{new Date(h.created_at).toLocaleString("es-MX")}</span>
+                          <span>{new Date(h.created_at).toLocaleString(locale)}</span>
                           <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold uppercase tracking-wide">{h.tipo_cambio}</span>
                         </div>
                         <div className="mt-1 whitespace-pre-wrap break-words">{h.motivo}</div>
@@ -1736,14 +1713,14 @@ export default function Remisiones() {
                 {detalleRemision.documento_url?(
                   <>
                     <Button onClick={()=>verPdf(detalleRemision.documento_url)} className="flex-1 min-w-40 bg-[#1F3864] hover:bg-[#162a4d]">
-                      <Eye className="h-4 w-4 mr-2"/> Visualizar PDF
+                      <Eye className="h-4 w-4 mr-2"/> {t.remisiones.visualizarPdf}
                     </Button>
                     <Button variant="outline" onClick={()=>descargarPdf(detalleRemision.documento_url)} className="flex-1 min-w-40">
-                      <Download className="h-4 w-4 mr-2"/> Descargar PDF
+                      <Download className="h-4 w-4 mr-2"/> {t.remisiones.descargarPdf}
                     </Button>
                   </>
-                ):<div className="flex-1 rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">Esta remisión no tiene PDF adjunto.</div>}
-                <Button variant="outline" onClick={()=>setDetalleRemision(null)}>Cerrar</Button>
+                ):<div className="flex-1 rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">{t.remisiones.sinPdfAdjunto}</div>}
+                <Button variant="outline" onClick={()=>setDetalleRemision(null)}>{t.actions.close}</Button>
               </div>
             </div>
           )}
@@ -1755,12 +1732,9 @@ export default function Remisiones() {
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-[#1F3864]">
-              <Pencil className="h-5 w-5"/> Editar remisión {editar?.folio_remision}
+              <Pencil className="h-5 w-5"/> {t.remisiones.editarTitulo(editar?.folio_remision ?? "")}
             </DialogTitle>
-            <DialogDescription>
-              Corrige lo que se capturó mal o agrega unidades y servicios a esta remisión.
-              Todo cambio queda registrado con tu nombre y el motivo que escribas.
-            </DialogDescription>
+            <DialogDescription>{t.remisiones.editarDesc}</DialogDescription>
           </DialogHeader>
 
           {editForm&&(
@@ -1776,26 +1750,19 @@ export default function Remisiones() {
                   }`}>
                     <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5"/>
                     <span>
-                      Esta remisión tiene <strong>{asignadas}</strong> chasis asignados
-                      {reparto.enArmado > 0 && <> — {reparto.enArmado} ya en armado</>}
-                      {reparto.yaSalieron > 0 && <>, {reparto.yaSalieron} entregada{reparto.yaSalieron===1?"":"s"} o en ruta</>}.
-                      {!mueve && <> Puedes ajustarla libremente.</>}
-                      {reparto.liberables > 0 && (
-                        <> Al bajarla a {totalUnidadesEdit} se <strong>
-                          {reparto.liberables === 1 ? "libera 1" : `liberan ${reparto.liberables}`}</strong>
-                          {reparto.liberables === 1 ? " que aún no entra" : " que aún no entran"} a armado,
-                          y Fábrica queda avisada.</>
-                      )}
+                      {t.remisiones.repartoAsignados(asignadas)}
+                      {reparto.enArmado > 0 && t.remisiones.repartoEnArmado(reparto.enArmado)}
+                      {reparto.yaSalieron > 0 && t.remisiones.repartoYaSalieron(reparto.yaSalieron)}
+                      {!mueve && t.remisiones.repartoLibre}
+                      {reparto.liberables > 0 && t.remisiones.repartoLiberables(totalUnidadesEdit, reparto.liberables)}
                       {reparto.porPedir > 0 && (
                         <strong className="block mt-1 text-[#1F3864]">
-                          {reparto.porPedir} ya {reparto.porPedir===1?"entró":"entraron"} a armado: no se
-                          {reparto.porPedir===1?" quita":" quitan"} desde aquí. Se le manda la solicitud a Fábrica y
-                          ell{reparto.porPedir===1?"a":"os"} contesta{reparto.porPedir===1?"":"n"} si {reparto.porPedir===1?"se puede":"se pueden"} soltar.
+                          {t.remisiones.repartoPorPedir(reparto.porPedir)}
                         </strong>
                       )}
                       {reparto.imposible > 0 && (
                         <strong className="block mt-1 text-red-700">
-                          {reparto.imposible} de las que quieres quitar ya salieron del almacén: eso no se puede deshacer.
+                          {t.remisiones.repartoImposible(reparto.imposible)}
                         </strong>
                       )}
                     </span>
@@ -1819,8 +1786,8 @@ export default function Remisiones() {
 
               {/* Nombre del vendedor */}
               <div>
-                <Label className="text-base">Nombre del vendedor</Label>
-                <Input value={editForm.nombre_vendedor} onChange={e=>setEditForm({...editForm,nombre_vendedor:e.target.value})} placeholder="Nombre completo del vendedor" className="h-12 text-base"/>
+                <Label className="text-base">{t.remisiones.nombreVendedor}</Label>
+                <Input value={editForm.nombre_vendedor} onChange={e=>setEditForm({...editForm,nombre_vendedor:e.target.value})} placeholder={t.remisiones.nombreVendedorPlaceholder} className="h-12 text-base"/>
               </div>
 
               {/* Líneas del pedido — mismas reglas que al capturar */}
@@ -1838,7 +1805,7 @@ export default function Remisiones() {
 
               {/* Fecha */}
               <div>
-                <Label>Fecha</Label>
+                <Label>{t.remisiones.fecha}</Label>
                 <Input type="date" value={editForm.fecha_remision} onChange={e=>setEditForm({...editForm,fecha_remision:e.target.value})} className="h-12 text-base"/>
               </div>
 
@@ -1856,14 +1823,14 @@ export default function Remisiones() {
 
               {/* Notas */}
               <div>
-                <Label>Notas</Label>
+                <Label>{t.remisiones.notas}</Label>
                 <Input value={editForm.notas} onChange={e=>setEditForm({...editForm,notas:e.target.value})} className="h-12 text-base"/>
               </div>
 
               {/* ── Motivo — obligatorio ───────────────────────────────── */}
               <div className="rounded-xl border-2 border-[#2E75B6]/40 bg-[#DBEAFE]/30 p-3 space-y-2">
                 <Label className="text-base font-semibold">
-                  Motivo de la modificación <span className="text-red-500">*</span>
+                  {t.remisiones.motivoModificacion} <span className="text-red-500">*</span>
                 </Label>
                 <Select
                   value={editMotivoSugerido}
@@ -1873,19 +1840,19 @@ export default function Remisiones() {
                     setEditMotivo(m => (m.trim() && m !== editMotivoSugerido ? m : v));
                   }}
                 >
-                  <SelectTrigger className="h-11 text-sm"><SelectValue placeholder="Motivo frecuente (opcional)"/></SelectTrigger>
+                  <SelectTrigger className="h-11 text-sm"><SelectValue placeholder={t.remisiones.motivoFrecuente}/></SelectTrigger>
                   <SelectContent>
-                    {MOTIVOS_EDICION.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    {MOTIVOS_EDICION.map(m=><SelectItem key={m} value={m}>{t.remisiones.motivoEdicion(m)}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Textarea
                   value={editMotivo}
                   onChange={e=>setEditMotivo(e.target.value)}
-                  placeholder="¿Por qué se modifica esta remisión? Ej: el cliente agregó 2 unidades azules el 2 de septiembre."
+                  placeholder={t.remisiones.motivoPlaceholder}
                   className="min-h-[90px]"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Mínimo {MOTIVO_MIN} caracteres. Queda en la bitácora de la remisión, junto con tu nombre y la fecha.
+                  {t.remisiones.motivoMinimo(MOTIVO_MIN)}
                 </p>
               </div>
             </div>
@@ -1898,7 +1865,7 @@ export default function Remisiones() {
               disabled={guardandoEdicion||!motivoValido(editMotivo)}
               className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
             >
-              {guardandoEdicion?"Guardando…":"Guardar cambios"}
+              {guardandoEdicion?t.remisiones.guardandoEdicion:t.remisiones.guardarCambios}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1908,16 +1875,17 @@ export default function Remisiones() {
       <AlertDialog open={!!cierreConfirm} onOpenChange={o=>{ if(!o) setCierreConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Marcar como entregada?</AlertDialogTitle>
+            <AlertDialogTitle>{t.remisiones.marcarEntregadaTitulo}</AlertDialogTitle>
             <AlertDialogDescription>
-              La remisión <strong>{cierreConfirm?.folio_remision}</strong> se marcará como <strong>COMPLETA</strong>.
-              Desaparecerá de la bandeja de fábrica. Esta acción se puede deshacer editando el estatus.
+              {t.remisiones.marcarEntregadaDesc1} <strong>{cierreConfirm?.folio_remision}</strong>{" "}
+              {t.remisiones.marcarEntregadaDesc2} <strong>{t.remisiones.completa}</strong>.{" "}
+              {t.remisiones.marcarEntregadaDesc3}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t.actions.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={()=>cerrarRemision(cierreConfirm?.id)} className="bg-emerald-700 hover:bg-emerald-800">
-              Sí, marcar entregada
+              {t.remisiones.siMarcarEntregada}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1928,17 +1896,17 @@ export default function Remisiones() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-red-700 flex items-center gap-2">
-              <XCircle className="h-5 w-5"/> Cancelar remisión
+              <XCircle className="h-5 w-5"/> {t.remisiones.cancelarRemision}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              La remisión <strong>{deleteConfirm?.folio_remision}</strong> se cancelará y desaparecerá de fábrica.
-              Los motocarros asignados quedarán disponibles. La remisión quedará en la pestaña <strong>Canceladas</strong> y un administrador puede restaurarla.
+              {t.remisiones.cancelarDesc1} <strong>{deleteConfirm?.folio_remision}</strong>{" "}
+              {t.remisiones.cancelarDesc2} <strong>{t.remisiones.tabCanceladas}</strong> {t.remisiones.cancelarDesc3}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t.actions.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={()=>eliminarRemision(deleteConfirm?.id)} className="bg-red-600 hover:bg-red-700">
-              Sí, cancelar remisión
+              {t.remisiones.siCancelar}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1949,41 +1917,40 @@ export default function Remisiones() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-red-700 flex items-center gap-2">
-              <XCircle className="h-5 w-5"/> Eliminar definitivamente remisión
+              <XCircle className="h-5 w-5"/> {t.remisiones.eliminarTitulo}
             </DialogTitle>
             <DialogDescription>
-              Esta acción eliminará permanentemente la remisión <strong>{hardDeleteConfirm?.folio_remision}</strong> del sistema.
-              Esta acción queda registrada en la bitácora de eliminaciones.
+              {t.remisiones.eliminarDesc1} <strong>{hardDeleteConfirm?.folio_remision}</strong>{t.remisiones.eliminarDesc2}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
               <Label htmlFor="motivo" className="text-sm font-medium">
-                Motivo de eliminación <span className="text-red-500">*</span>
+                {t.remisiones.motivoEliminacion} <span className="text-red-500">*</span>
               </Label>
               <Textarea
                 id="motivo"
-                placeholder="Describa el motivo de esta eliminación (mínimo 10 caracteres)..."
+                placeholder={t.remisiones.motivoEliminacionPlaceholder}
                 value={deleteMotivo}
                 onChange={e => setDeleteMotivo(e.target.value)}
                 className="mt-2 min-h-[100px]"
                 required
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Mínimo 10 caracteres. Este motivo quedará registrado en la bitácora.
+                {t.remisiones.motivoEliminacionAyuda}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={()=>{ setHardDeleteConfirm(null); setDeleteMotivo(""); }}>
-              Cancelar
+              {t.actions.cancel}
             </Button>
             <Button 
               onClick={()=>hardDeleteRemision(hardDeleteConfirm?.id, deleteMotivo)}
               disabled={!deleteMotivo || deleteMotivo.trim().length < 10}
               className="bg-red-600 hover:bg-red-700"
             >
-              Eliminar definitivamente
+              {t.remisiones.eliminarBtn}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2018,20 +1985,21 @@ export default function Remisiones() {
 
 // ─── MotoRow ──────────────────────────────────────────────────────────────────
 function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:any;canPropose:boolean;canConfirmFab:boolean;canConfirmLog:boolean;onChange:()=>void}) {
+  const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [fecha, setFecha]     = useState<string>(m.fecha_propuesta_entrega||"");
   const [notas, setNotas]     = useState<string>(m.propuesta_entrega_notas||"");
 
   const proponer = async () => {
-    if (!fecha) return toast.error("Selecciona una fecha");
+    if (!fecha) return toast.error(t.remisiones.seleccionaFecha);
     const { error } = await supabase.rpc("proponer_fecha_entrega",{_motocarro_id:m.id,_fecha:fecha,_notas:notas||null});
     if (error) return toast.error(error.message);
-    toast.success("✓ Fecha propuesta enviada"); setEditing(false); onChange();
+    toast.success(t.remisiones.fechaPropuestaOk); setEditing(false); onChange();
   };
   const confirmar = async (area:"fabrica"|"logistica") => {
     const { error } = await supabase.rpc("confirmar_fecha_entrega",{_motocarro_id:m.id,_area:area});
     if (error) return toast.error(error.message);
-    toast.success(`✓ Confirmado por ${area}`); onChange();
+    toast.success(t.remisiones.confirmadoPor(area === "fabrica" ? t.remisiones.areaFabrica : t.remisiones.areaLogistica)); onChange();
   };
 
   const tieneFab = !!m.confirmada_fabrica_at;
@@ -2047,39 +2015,39 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:an
         <EstatusBadge estatus={m.estatus_entrega==="ENTREGADA"?"ENTREGADA":effEstatusArmado(m)} size="sm"/>
       </div>
       <div className="px-3 pb-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <div className="text-muted-foreground">Estim. armado:</div><div className="text-right font-medium">{fmtDate(m.fecha_estimada_armado)}</div>
-        <div className="text-muted-foreground">Estim. entrega:</div><div className="text-right font-medium">{fmtDate(m.fecha_estimada_entrega||m.fecha_propuesta_entrega)}</div>
+        <div className="text-muted-foreground">{t.remisiones.estimArmado}</div><div className="text-right font-medium">{fmtDate(m.fecha_estimada_armado)}</div>
+        <div className="text-muted-foreground">{t.remisiones.estimEntrega}</div><div className="text-right font-medium">{fmtDate(m.fecha_estimada_entrega||m.fecha_propuesta_entrega)}</div>
       </div>
       {!editing?(
         <div className="px-3 pb-3 flex flex-wrap items-center gap-2">
           {m.fecha_propuesta_entrega?(
             <div className="flex-1 min-w-0 text-xs">
-              <div className="font-medium text-[#1F3864] flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5"/> Propuesta: {fmtDate(m.fecha_propuesta_entrega)}</div>
+              <div className="font-medium text-[#1F3864] flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5"/> {t.remisiones.propuesta(fmtDate(m.fecha_propuesta_entrega))}</div>
               {m.propuesta_entrega_notas&&<div className="text-muted-foreground truncate">{m.propuesta_entrega_notas}</div>}
               <div className="flex gap-1.5 mt-1">
                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${tieneFab?"bg-[#D1FAE5] text-[#065F46]":"bg-slate-100 text-slate-500"}`}>
-                  <Factory className="h-3 w-3"/> {tieneFab?"Fábrica ✓":"Fábrica pendiente"}
+                  <Factory className="h-3 w-3"/> {tieneFab?t.remisiones.fabricaOk:t.remisiones.fabricaPendiente}
                 </span>
                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${tieneLog?"bg-[#D1FAE5] text-[#065F46]":"bg-slate-100 text-slate-500"}`}>
-                  <Truck className="h-3 w-3"/> {tieneLog?"Logística ✓":"Logística pendiente"}
+                  <Truck className="h-3 w-3"/> {tieneLog?t.remisiones.logisticaOk:t.remisiones.logisticaPendiente}
                 </span>
               </div>
             </div>
-          ):<div className="flex-1 text-xs text-muted-foreground italic">Sin fecha propuesta</div>}
+          ):<div className="flex-1 text-xs text-muted-foreground italic">{t.remisiones.sinFechaPropuesta}</div>}
           <div className="flex gap-1.5 ml-auto">
             {canPropose&&m.estatus_entrega!=="ENTREGADA"&&(
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={()=>setEditing(true)}>
-                <CalendarClock className="h-3.5 w-3.5 mr-1"/>{m.fecha_propuesta_entrega?"Cambiar":"Proponer"}
+                <CalendarClock className="h-3.5 w-3.5 mr-1"/>{m.fecha_propuesta_entrega?t.remisiones.cambiar:t.remisiones.proponer}
               </Button>
             )}
             {m.fecha_propuesta_entrega&&canConfirmFab&&!tieneFab&&(
               <Button size="sm" className="h-8 text-xs bg-[#065F46] hover:bg-[#04432f]" onClick={()=>confirmar("fabrica")}>
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1"/>Confirmar fábrica
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1"/>{t.remisiones.confirmarFabrica}
               </Button>
             )}
             {m.fecha_propuesta_entrega&&canConfirmLog&&!tieneLog&&(
               <Button size="sm" className="h-8 text-xs bg-[#065F46] hover:bg-[#04432f]" onClick={()=>confirmar("logistica")}>
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1"/>Confirmar logística
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1"/>{t.remisiones.confirmarLogistica}
               </Button>
             )}
           </div>
@@ -2087,12 +2055,12 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:an
       ):(
         <div className="px-3 pb-3 space-y-2 bg-[#DBEAFE]/30">
           <div className="grid grid-cols-2 gap-2">
-            <div><Label className="text-xs">Fecha pactada</Label><Input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} className="h-9 text-sm"/></div>
-            <div><Label className="text-xs">Hora / contacto</Label><Input value={notas} onChange={e=>setNotas(e.target.value)} placeholder="Ej: 10am" className="h-9 text-sm"/></div>
+            <div><Label className="text-xs">{t.remisiones.fechaPactada}</Label><Input type="date" value={fecha} onChange={e=>setFecha(e.target.value)} className="h-9 text-sm"/></div>
+            <div><Label className="text-xs">{t.remisiones.horaContacto}</Label><Input value={notas} onChange={e=>setNotas(e.target.value)} placeholder={t.remisiones.horaPlaceholder} className="h-9 text-sm"/></div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" className="h-9 bg-[#1F3864] hover:bg-[#162a4d]" onClick={proponer}>Enviar propuesta</Button>
-            <Button size="sm" variant="ghost" className="h-9" onClick={()=>setEditing(false)}>Cancelar</Button>
+            <Button size="sm" className="h-9 bg-[#1F3864] hover:bg-[#162a4d]" onClick={proponer}>{t.remisiones.enviarPropuesta}</Button>
+            <Button size="sm" variant="ghost" className="h-9" onClick={()=>setEditing(false)}>{t.actions.cancel}</Button>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import { useLang } from "@/contexts/LangContext";
 
 /**
  * Red de seguridad de render.
@@ -32,28 +33,36 @@ export class ErrorBoundary extends Component<Props, State> {
     const { error } = this.state;
     if (!error) return this.props.children;
 
-    return (
-      <div className="flex items-center justify-center p-6">
-        <div className="max-w-lg w-full bg-card border rounded-lg p-8 text-center space-y-4">
-          <div className="flex justify-center text-amber-600"><AlertTriangle className="h-10 w-10" /></div>
-          <h2 className="text-xl font-bold text-[#1F3864]">Esta pantalla se quedó atorada</h2>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            No se perdió nada: es un error del sistema al dibujar la pantalla, no de tus datos.
-            Puedes seguir usando el resto del menú.
-          </p>
-          <pre className="text-left text-xs bg-slate-50 border rounded p-3 overflow-x-auto text-slate-600">
-            {error.message}
-          </pre>
-          <div className="flex gap-2 justify-center">
-            <Button onClick={() => this.setState({ error: null })} variant="outline" className="h-11">
-              <RotateCcw className="h-4 w-4 mr-2" /> Reintentar
-            </Button>
-            <Button onClick={() => window.location.assign("/")} className="h-11 bg-[#1F3864] hover:bg-[#162a4d]">
-              Ir al inicio
-            </Button>
-          </div>
+    return <Aviso error={error} onReintentar={() => this.setState({ error: null })} />;
+  }
+}
+
+/**
+ * El texto vive en un componente de función aparte porque `useLang` es un hook
+ * y la red de seguridad tiene que ser una clase (`getDerivedStateFromError`).
+ */
+function Aviso({ error, onReintentar }: { error: Error; onReintentar: () => void }) {
+  const { t } = useLang();
+  return (
+    <div className="flex items-center justify-center p-6">
+      <div className="max-w-lg w-full bg-card border rounded-lg p-8 text-center space-y-4">
+        <div className="flex justify-center text-amber-600"><AlertTriangle className="h-10 w-10" /></div>
+        <h2 className="text-xl font-bold text-[#1F3864]">{t.componentes.errorBoundary.titulo}</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          {t.componentes.errorBoundary.detalle}
+        </p>
+        <pre className="text-left text-xs bg-slate-50 border rounded p-3 overflow-x-auto text-slate-600">
+          {error.message}
+        </pre>
+        <div className="flex gap-2 justify-center">
+          <Button onClick={onReintentar} variant="outline" className="h-11">
+            <RotateCcw className="h-4 w-4 mr-2" /> {t.componentes.errorBoundary.reintentar}
+          </Button>
+          <Button onClick={() => window.location.assign("/")} className="h-11 bg-[#1F3864] hover:bg-[#162a4d]">
+            {t.componentes.errorBoundary.irInicio}
+          </Button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 }

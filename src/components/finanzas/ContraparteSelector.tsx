@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Check, X, Plus, Building2, Users, UserCog, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { fdb } from "@/lib/finanzasDb";
+import { useLang } from "@/contexts/LangContext";
 import {
   type ContraparteTipo, type MovTipo, type Proveedor,
 } from "@/lib/finanzas";
@@ -35,16 +36,18 @@ interface Props {
   }) => void;
 }
 
-const TABS: { value: ContraparteTipo; label: string; icon: typeof Users }[] = [
-  { value: "CLIENTE",   label: "Cliente",   icon: Users },
-  { value: "PROVEEDOR", label: "Proveedor", icon: Building2 },
-  { value: "EMPLEADO",  label: "Personal",  icon: UserCog },
-  { value: "OTRO",      label: "Otro",      icon: PenLine },
+// La etiqueta de cada pestaña sale de `t.finanzas.contraparte`; aquí sólo el icono.
+const TABS: { value: ContraparteTipo; etiqueta: "cliente" | "proveedor" | "personal" | "otro"; icon: typeof Users }[] = [
+  { value: "CLIENTE",   etiqueta: "cliente",   icon: Users },
+  { value: "PROVEEDOR", etiqueta: "proveedor", icon: Building2 },
+  { value: "EMPLEADO",  etiqueta: "personal",  icon: UserCog },
+  { value: "OTRO",      etiqueta: "otro",      icon: PenLine },
 ];
 
 export default function ContraparteSelector({
   tipoMovimiento, contraparteTipo, clienteId, proveedorId, empleadoId, nombre, onChange,
 }: Props) {
+  const { t } = useLang();
   const [q, setQ] = useState("");
   const [clientes, setClientes] = useState<Opcion[]>([]);
   const [proveedores, setProveedores] = useState<Opcion[]>([]);
@@ -134,38 +137,38 @@ export default function ContraparteSelector({
       .select("id, nombre_comercial, rfc, codigo")
       .single();
     setCreando(false);
-    if (error) { toast.error("No se pudo crear el proveedor: " + error.message); return; }
+    if (error) { toast.error(t.finanzas.contraparte.errorCrearProveedor + error.message); return; }
     const nuevo: Proveedor = data;
     setProveedores(prev =>
       [...prev, { id: nuevo.id, nombre: nuevo.nombre_comercial, detalle: nuevo.rfc }]
         .sort((a, b) => a.nombre.localeCompare(b.nombre)));
     elegir({ id: nuevo.id, nombre: nuevo.nombre_comercial });
     setNuevoProveedor("");
-    toast.success(`✓ Proveedor «${nom}» dado de alta`);
+    toast.success(t.finanzas.contraparte.proveedorCreado(nom));
   };
 
   return (
     <div className="space-y-2">
       <Label>
-        {tipoMovimiento === "INGRESO" ? "¿Quién nos pagó?" : "¿A quién le pagamos?"} *
+        {tipoMovimiento === "INGRESO" ? t.finanzas.contraparte.quienPago : t.finanzas.contraparte.aQuienPagamos} *
       </Label>
 
       {/* Tipo de contraparte */}
       <div className="flex flex-wrap gap-1.5">
-        {TABS.map(t => {
-          const activo = contraparteTipo === t.value;
+        {TABS.map(tab => {
+          const activo = contraparteTipo === tab.value;
           return (
             <button
-              key={t.value}
+              key={tab.value}
               type="button"
-              onClick={() => cambiarTab(t.value)}
+              onClick={() => cambiarTab(tab.value)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
                 activo
                   ? "bg-[#1F3864] text-white border-[#1F3864]"
                   : "bg-white text-slate-600 border-slate-200 hover:border-[#1F3864]/40"
               }`}
             >
-              <t.icon size={14} /> {t.label}
+              <tab.icon size={14} /> {t.finanzas.contraparte[tab.etiqueta]}
             </button>
           );
         })}
@@ -192,7 +195,7 @@ export default function ContraparteSelector({
             contraparte_nombre: e.target.value,
           })}
           className="h-11"
-          placeholder="Nombre de la persona o negocio"
+          placeholder={t.finanzas.contraparte.nombreLibre}
         />
       ) : !seleccionadoId && (
         <>
@@ -201,9 +204,9 @@ export default function ContraparteSelector({
             <Input
               className="pl-9 h-11"
               placeholder={
-                contraparteTipo === "CLIENTE"   ? "Buscar cliente por nombre o código…" :
-                contraparteTipo === "PROVEEDOR" ? "Buscar proveedor por nombre o RFC…" :
-                                                  "Buscar persona del equipo…"
+                contraparteTipo === "CLIENTE"   ? t.finanzas.contraparte.buscarCliente :
+                contraparteTipo === "PROVEEDOR" ? t.finanzas.contraparte.buscarProveedor :
+                                                  t.finanzas.contraparte.buscarPersona
               }
               value={q}
               onChange={e => setQ(e.target.value)}
@@ -212,10 +215,10 @@ export default function ContraparteSelector({
 
           <div className="max-h-44 overflow-y-auto rounded-md border divide-y">
             {cargando ? (
-              <div className="p-3 text-sm text-muted-foreground">Cargando catálogo…</div>
+              <div className="p-3 text-sm text-muted-foreground">{t.finanzas.contraparte.cargandoCatalogo}</div>
             ) : opciones.length === 0 ? (
               <div className="p-3 text-sm text-muted-foreground">
-                Sin resultados{q ? ` para «${q}»` : ""}.
+                {t.finanzas.contraparte.sinResultados}{q ? t.finanzas.contraparte.sinResultadosPara(q) : ""}.
               </div>
             ) : (
               opciones.map(o => (
@@ -241,7 +244,7 @@ export default function ContraparteSelector({
                 value={nuevoProveedor}
                 onChange={e => setNuevoProveedor(e.target.value)}
                 className="h-10"
-                placeholder="¿No está en la lista? Nombre del proveedor nuevo"
+                placeholder={t.finanzas.contraparte.nuevoProveedor}
               />
               <Button
                 type="button"
@@ -250,7 +253,7 @@ export default function ContraparteSelector({
                 disabled={!nuevoProveedor.trim() || creando}
                 onClick={crearProveedor}
               >
-                <Plus size={15} className="mr-1" /> {creando ? "Creando…" : "Dar de alta"}
+                <Plus size={15} className="mr-1" /> {creando ? t.finanzas.contraparte.creando : t.finanzas.contraparte.darDeAlta}
               </Button>
             </div>
           )}

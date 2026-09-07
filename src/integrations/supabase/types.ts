@@ -1961,6 +1961,10 @@ export type Database = {
         Args: { _contenedor_id: string; _modelo: string; _motores: Json }
         Returns: Json
       }
+      importar_packing_list: {
+        Args: { _contenedor_id: string; _partes: Json }
+        Returns: Json
+      }
       importar_vins_inventario: {
         Args: {
           _contenedor_id: string
