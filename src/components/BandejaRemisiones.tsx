@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Inbox, RefreshCw, Eye, Download, FileText, Package, Settings2, TriangleAlert, Wrench, UserPlus, X } from "lucide-react";
-import { fmtDate, COLORES, claveStock, explicarError } from "@/lib/dazon";
+import { fmtDate, COLORES, claveStock, explicarError, normColor } from "@/lib/dazon";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -330,6 +330,34 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [manualNuevoMotor, setManualNuevoMotor] = useState("");
   const [manualCapturando, setManualCapturando] = useState<string | null>(null);
   const [manualYaArmado, setManualYaArmado] = useState(false);
+  // Modelo (cilindraje) y color con los que se registra la unidad ya armada.
+  // Arrancan en lo que pide la remisión, pero fábrica los puede corregir: la
+  // unidad que aparece en el piso no siempre es la que capturó ventas, y antes
+  // se guardaba "como está en el sistema" sin manera de decir lo contrario.
+  const [armadoModelo, setArmadoModelo] = useState("");
+  const [armadoColor, setArmadoColor] = useState("");
+
+  // Lo que pide la remisión abierta: el punto de partida de los dos campos.
+  const pedidoMoto = manualDialog?.items?.find(it => it.tipo_servicio === "motocarro");
+  const pedidoModelo = (pedidoMoto?.modelo ?? "").trim();
+  const pedidoColor = pedidoMoto?.color ? normColor(pedidoMoto.color) : "";
+  // El valor del pedido puede no estar en el catálogo (un modelo dado de baja,
+  // un color que no está en la lista). Se agrega a las opciones: un select que
+  // no contiene su propio valor se dibuja vacío.
+  const modelosArmado = pedidoModelo && !modelos.includes(pedidoModelo)
+    ? [pedidoModelo, ...modelos] : modelos;
+  const coloresArmado: string[] = pedidoColor && !(COLORES as readonly string[]).includes(pedidoColor)
+    ? [pedidoColor, ...COLORES] : [...COLORES];
+  const nombreColor = (c: string) => t.colors[c] ?? c;
+  const armadoDifierePedido = !!(pedidoModelo || pedidoColor) &&
+    (armadoModelo !== pedidoModelo || armadoColor !== pedidoColor);
+
+  // Al marcar "ya armado" los campos parten del pedido; si la remisión no
+  // tiene configuración capturada, del catálogo.
+  const prellenarArmado = () => {
+    setArmadoModelo(pedidoModelo || modelos[0] || MODELOS_RESPALDO[0]);
+    setArmadoColor(pedidoColor || "BLANCO");
+  };
 
   const abrirManual = async (rem: RemisionCard) => {
     setManualDialog(rem);
@@ -339,6 +367,8 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     setManualNuevoMotor("");
     setManualCapturando(null);
     setManualYaArmado(false);
+    setArmadoModelo("");
+    setArmadoColor("");
 
     const { data: asig } = await supabase
       .from("motocarros")
@@ -451,23 +481,40 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         toast.error(b.faltanAmbosSeriales);
         return;
       }
-      const motoItem = manualDialog.items.find(it => it.tipo_servicio === "motocarro");
-      if (!motoItem?.modelo || !motoItem?.color) {
+      // Modelo (cilindraje) y color los declara fábrica al ingresar la unidad:
+      // es lo que trae físicamente, no lo que quedó capturado en el pedido.
+      const modelo = (armadoModelo || pedidoModelo).trim();
+      const color = (armadoColor || pedidoColor).trim();
+      if (!modelo || !color) {
         setManualBusy(null);
-        toast.error(b.faltaConfigPedido);
+        toast.error(b.faltaModeloColorArmada);
         return;
       }
       const { data, error } = await supabase.rpc("crear_motocarro_ya_armado", {
         _ns_chasis: chasis,
         _ns_motor: motor,
-        _modelo: motoItem.modelo,
-        _color: motoItem.color,
+        _modelo: modelo,
+        _color: color,
         _remision_id: manualDialog.id,
       });
       setManualBusy(null);
-      if (error) { toast.error(error.message); return; }
-      const r = data as { ok?: boolean; orden_armado?: number } | null;
+      // `explicarError` y no `error.message`: si la base va atrás, esta RPC
+      // contesta «function ... does not exist» y eso no le dice a nadie qué
+      // hacer.
+      if (error) { toast.error(explicarError(error, b.errorCrearArmada)); return; }
+      const r = data as {
+        ok?: boolean; orden_armado?: number;
+        color_cambiado?: boolean; color_vin?: string;
+      } | null;
       toast.success(b.okYaArmada(r?.orden_armado ?? 0));
+      // El chasis ya estaba en inventario con otro color: se armó con este, y
+      // eso consumió un juego de piezas de ese color.
+      if (r?.color_cambiado) {
+        toast.info(b.okColorDistintoChasis(nombreColor(color), nombreColor(r?.color_vin ?? "")));
+      }
+      if (armadoDifierePedido) {
+        toast.info(b.avisoDifierePedido(pedidoModelo || "—", pedidoColor ? nombreColor(pedidoColor) : "—"));
+      }
       setManualNuevoChasis("");
       setManualNuevoMotor("");
       setManualYaArmado(false);
@@ -967,7 +1014,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       </Dialog>
 
       {/* Dialog de asignación manual */}
-      <Dialog open={!!manualDialog} onOpenChange={o => { if (!o) { setManualDialog(null); setManualCapturando(null); setManualYaArmado(false); } }}>
+      <Dialog open={!!manualDialog} onOpenChange={o => { if (!o) { setManualDialog(null); setManualCapturando(null); setManualYaArmado(false); setArmadoModelo(""); setArmadoColor(""); } }}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1014,18 +1061,57 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   <Checkbox
                     id="yaArmado"
                     checked={manualYaArmado}
-                    onCheckedChange={c => setManualYaArmado(c === true)}
+                    onCheckedChange={c => {
+                      const marcado = c === true;
+                      setManualYaArmado(marcado);
+                      if (marcado) prellenarArmado();
+                    }}
                   />
                   <label htmlFor="yaArmado" className="text-xs text-muted-foreground leading-tight cursor-pointer select-none">
                     <span className="font-medium text-[#1F3864] block mb-0.5">{b.yaArmado}</span>
                     {b.yaArmadoAyuda}
                   </label>
                 </div>
+                {/* Cilindraje y color de la unidad que se está ingresando.
+                    Fábrica los corrige aquí: antes se guardaba lo que ventas
+                    hubiera capturado, aunque el motocarro fuera otro. */}
+                {manualYaArmado && (
+                  <div className="rounded-lg border border-[#1F3864]/25 bg-white p-3 space-y-2">
+                    <p className="text-xs text-muted-foreground">{b.armadoDatosAyuda}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-[#1F3864]">{b.cilindraje}</Label>
+                        <Select value={armadoModelo} onValueChange={setArmadoModelo}>
+                          <SelectTrigger className="h-11 text-sm"><SelectValue placeholder={b.elegirCilindraje} /></SelectTrigger>
+                          <SelectContent>
+                            {modelosArmado.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-[#1F3864]">{b.color}</Label>
+                        <Select value={armadoColor} onValueChange={setArmadoColor}>
+                          <SelectTrigger className="h-11 text-sm"><SelectValue placeholder={b.elegirColor} /></SelectTrigger>
+                          <SelectContent>
+                            {coloresArmado.map(c => <SelectItem key={c} value={c}>{nombreColor(c)}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {!pedidoModelo && !pedidoColor ? (
+                      <p className="text-xs text-[#92400E]">{b.pedidoSinConfig}</p>
+                    ) : armadoDifierePedido ? (
+                      <p className="text-xs text-[#92400E]">
+                        {b.difierePedido(pedidoModelo || "—", pedidoColor ? nombreColor(pedidoColor) : "—")}
+                      </p>
+                    ) : null}
+                  </div>
+                )}
                 <Button
                   onClick={buscarYAsignarPorSerial}
                   disabled={
                     (!manualNuevoChasis && !manualNuevoMotor) ||
-                    (manualYaArmado && (!manualNuevoChasis || !manualNuevoMotor)) ||
+                    (manualYaArmado && (!manualNuevoChasis || !manualNuevoMotor || !armadoModelo || !armadoColor)) ||
                     manualBusy === "buscando"
                   }
                   className="w-full h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold"
