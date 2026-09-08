@@ -17,6 +17,7 @@ import React from "react";
  */
 
 const filas: Record<string, Record<string, unknown>[]> = {};
+const unicos: Record<string, Record<string, unknown> | null> = {};
 const rpcs: { fn: string; args: Record<string, unknown> }[] = [];
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -26,7 +27,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       const paso = () => q;
       for (const m of ["select","order","eq","neq","in","is","not","gte","lte","limit","or","ilike"]) q[m] = paso;
       q.single = () => Promise.resolve({ data: null, error: null });
-      q.maybeSingle = () => Promise.resolve({ data: null, error: null });
+      q.maybeSingle = () => Promise.resolve({ data: unicos[tabla] ?? null, error: null });
       q.insert = () => Promise.resolve({ data: null, error: null });
       q.update = () => paso();
       q.delete = () => paso();
@@ -70,11 +71,12 @@ const REMISION = {
 /** Catálogo de fábrica: el cilindraje viaja en el nombre comercial. */
 const CATALOGO = [
   { modelo: "DZ200Q1", linea: "motocarro", nombre_comercial: "200cc 2026", activo: true },
-  { modelo: "DZ300Q1", linea: "motocarro", nombre_comercial: "300cc 2026", activo: true },
+  { modelo: "DZ300Q7", linea: "motocarro", nombre_comercial: "300cc 2026", activo: true },
 ];
 
 const conPedido = (item: Record<string, unknown> | null) => {
   for (const k of Object.keys(filas)) delete filas[k];
+  for (const k of Object.keys(unicos)) delete unicos[k];
   rpcs.length = 0;
   filas.remisiones = [REMISION];
   filas.modelos_producto = CATALOGO;
@@ -101,6 +103,11 @@ const escribirSeriales = async (chasis: string, motor: string) => {
   const inMotor = cuerpo.querySelector<HTMLInputElement>('input[placeholder="Buscar o registrar motor…"]')!;
   await act(async () => { fireEvent.change(inChasis, { target: { value: chasis } }); });
   await act(async () => { fireEvent.change(inMotor, { target: { value: motor } }); });
+};
+
+/** Deja pasar el debounce de la búsqueda del chasis en inventario. */
+const esperarBusquedaChasis = async () => {
+  await act(async () => { await new Promise(r => setTimeout(r, 350)); });
 };
 
 describe("Motocarro ya armado · cilindraje y color los declara fábrica", () => {
@@ -199,5 +206,83 @@ describe("Motocarro ya armado · cilindraje y color los declara fábrica", () =>
     expect(alta!.args._modelo).toBe("200cc 2026");
     expect(alta!.args._color).toBe("BLANCO");
     expect(document.body.textContent).not.toContain("Captura primero la configuración del pedido");
+  });
+});
+
+/**
+ * El caso REM-015, que fue el primero que salió a producción: la remisión pedía
+ * 300cc AZUL y el chasis del patio (3DVHCPZF9T1M00487) es un DZ300Q7 BLANCO.
+ * Precargar el color del PEDIDO mandaba a repintar un chasis que estaba bien, y
+ * el repintado se atoraba contra los juegos de piezas azules —todos ocupados—
+ * con un error que dejaba a Fábrica sin salida.
+ *
+ * Lo que el sistema ya sabe del chasis manda sobre lo que capturó ventas.
+ */
+describe("Motocarro ya armado · el chasis que ya está en inventario manda", () => {
+  const CHASIS_BLANCO = {
+    numero_chasis: "3DVHCPZF9T1M00487",
+    modelo: "DZ300Q7", color: "BLANCO", color_original: "BLANCO",
+  };
+
+  beforeEach(() => {
+    // Pedido: 300cc AZUL. Chasis físico: el mismo modelo, pero BLANCO.
+    conPedido({ tipo_servicio: "motocarro", modelo: "300cc 2026", color: "AZUL", cantidad: 1, con_caja: false });
+    unicos.inventario_chasis = CHASIS_BLANCO;
+    // Los juegos de piezas del embarque: los 31 azules ya están ocupados.
+    filas.inventario_colores = [
+      { modelo: "DZ300Q7", color: "AZUL", piezas_recibidas: 31, juegos_usados: 31 },
+      { modelo: "DZ300Q7", color: "BLANCO", piezas_recibidas: 31, juegos_usados: 30 },
+    ];
+    // Y hay chasis azules libres: si la unidad es azul, es uno de ésos.
+    filas.inventario_chasis = [
+      ...Array.from({ length: 26 }, () => ({ color: "AZUL" })),
+      ...Array.from({ length: 27 }, () => ({ color: "BLANCO" })),
+    ];
+  });
+
+  it("corrige el color al del chasis en cuanto se captura el serial", async () => {
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales(CHASIS_BLANCO.numero_chasis, "DZ170MMT2M00487");
+    await esperarBusquedaChasis();
+
+    // Dice qué es esa pieza, para que nadie declare a ciegas.
+    expect(document.body.textContent).toContain("ya está en inventario como 300cc 2026 · Blanco");
+
+    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+    const alta = rpcs.find(r => r.fn === "crear_motocarro_ya_armado");
+    expect(alta).toBeTruthy();
+    // El color del pedido era AZUL; se registra el del chasis.
+    expect(alta!.args).toMatchObject({ _modelo: "300cc 2026", _color: "BLANCO" });
+  });
+
+  it("avisa que la remisión pedía otra cosa, en vez de repintar en silencio", async () => {
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales(CHASIS_BLANCO.numero_chasis, "DZ170MMT2M00487");
+    await esperarBusquedaChasis();
+    expect(document.body.textContent).toContain("La remisión pide 300cc 2026 · Azul");
+  });
+
+  it("si fábrica insiste en un color sin juegos libres, lo dice y da la salida", async () => {
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales(CHASIS_BLANCO.numero_chasis, "DZ170MMT2M00487");
+    await esperarBusquedaChasis();
+
+    // Fábrica cambia a AZUL a mano: de ese color ya no quedan juegos libres.
+    const triggers = Array.from(document.body.querySelectorAll('[role="combobox"]'));
+    await act(async () => { fireEvent.keyDown(triggers[1], { key: "Enter" }); });
+    const azul = Array.from(document.body.querySelectorAll('[role="option"]'))
+      .find(o => /^Azul$/.test(o.textContent || ""));
+    await act(async () => { fireEvent.keyDown(azul!, { key: "Enter" }); });
+
+    const texto = document.body.textContent || "";
+    expect(texto).toContain("ya no quedan juegos de piezas libres en Azul");
+    // Y la salida real: hay chasis azules libres, probablemente es uno de ésos.
+    expect(texto).toContain("26 chasis libres en Azul");
+
+    // Aun así se puede registrar: la unidad ya está armada, no se bloquea.
+    expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(false);
   });
 });

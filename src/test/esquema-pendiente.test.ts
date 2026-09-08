@@ -44,7 +44,7 @@ describe("explicarError · a qué script apunta cada objeto", () => {
     ["function public.capturar_seriales_unidad(uuid, text, text) does not exist", "20260823000002"],
     // Apunta al script NUEVO, no al que la creó: el viejo la dejaría sin el
     // cilindraje y el color que declara fábrica.
-    ["function public.crear_motocarro_ya_armado(text, text, text, text, uuid) does not exist", "20260907000001"],
+    ["function public.crear_motocarro_ya_armado(text, text, text, text, uuid) does not exist", "20260908000001"],
     ["column inventario_colores.piezas_total does not exist", "20260823000001"],
     ["column inventario_colores.nombre_comercial does not exist", "20260823000001"],
     ["column modelos_producto.nombre_comercial does not exist", "20260822000001"],

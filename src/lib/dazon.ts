@@ -252,7 +252,7 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
   // El script nuevo trae la función completa, así que es el que hay que correr
   // si no está: el viejo la dejaría sin el color declarado por fábrica.
   [/crear_motocarro_ya_armado/,
-    "20260907000001_ya_armado_cilindraje_color.sql"],
+    "20260908000001_ya_armado_no_se_atora_por_capacidad.sql"],
   [/asignar_motocarro_a_remision|desasignar_motocarro_de_remision/,
     "20260826000003_asignacion_manual_remisiones.sql"],
   [/folio_interno|clientes_folio_interno_seq|generar_folio_interno_cliente|trg_clientes_folio_interno/,

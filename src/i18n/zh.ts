@@ -1505,6 +1505,15 @@ export const zh = {
       elegirColor: "选择颜色",
       pedidoSinConfig: "此出货单尚未录入配置：此处选择的排量与颜色即为登记结果。",
       difierePedido: (modelo: string, color: string) => `出货单要求 ${modelo} · ${color}。整车将按此处所选登记。`,
+      chasisEnInventario: (serial: string, modelo: string, color: string) =>
+        `车架 ${serial} 已在库存中登记为 ${modelo} · ${color}，以上两项即取自该记录。`,
+      chasisVinDecia: (color: string) => `VIN 原为${color}。`,
+      colorCambiaChasis: (color: string, colorChasis: string) =>
+        `整车将登记为${color}，车架随之变更（原为${colorChasis}），并占用一套${color}部件。`,
+      sinJuegosDelColor: (color: string, colorChasis: string) =>
+        `本批到货已无空余的${color}部件，且该车架为${colorChasis}：请确认该车确为${color}。`,
+      hayChasisLibresDeEseColor: (n: number, color: string) =>
+        `本型号还有 ${n} 个空闲的${color}车架——如果是其中一辆，请录入它的编号。`,
       buscando: "搜索中…",
       crearAsignarArmada: "创建并分配已组装整车",
       buscarAsignar: "搜索并分配",
@@ -1538,6 +1547,7 @@ export const zh = {
       faltaModeloColorArmada: "请选择正在登记的整车的排量与颜色",
       errorCrearArmada: "无法登记已组装的整车",
       okColorDistintoChasis: (color: string, colorChasis: string) => `车架原登记为${colorChasis}：整车已登记为${color}，并占用了该颜色的一套部件。`,
+      okJuegoExtraRegistrado: (color: string) => `已额外登记一套${color}部件：本批到货已无空余，而该车已组装完成。此记录留存于颜色日志。`,
       avisoDifierePedido: (modelo: string, color: string) => `注意：出货单要求 ${modelo} · ${color}，请通知销售更正订单。`,
       okYaArmada: (orden: number) => `✓ 已组装整车 #${orden} 已创建并分配`,
       sinUnidadParaSerial: "未找到该序列号对应的整车，也没有空白整车可分配。请先在「生产」中创建该整车。",
