@@ -28,3 +28,8 @@ dist-ssr
 
 # Supabase CLI temporary files
 supabase/.temp/
+
+# Credenciales de acceso: contraseñas en claro, no van al repo.
+# Los cinco archivos que ya estaban versionados siguen rastreados; conviene
+# sacarlos del historial aparte. Los nuevos se entregan por fuera.
+credenciales/
