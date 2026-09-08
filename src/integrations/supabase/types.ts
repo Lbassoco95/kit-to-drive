@@ -300,6 +300,7 @@ export type Database = {
           empresa_logo_url: string | null
           empresa_nombre: string
           id: number
+          limite_ya_armados: number
           plazo_max_credito_dias: number
           updated_at: string
         }
@@ -308,6 +309,7 @@ export type Database = {
           empresa_logo_url?: string | null
           empresa_nombre?: string
           id?: number
+          limite_ya_armados?: number
           plazo_max_credito_dias?: number
           updated_at?: string
         }
@@ -316,6 +318,7 @@ export type Database = {
           empresa_logo_url?: string | null
           empresa_nombre?: string
           id?: number
+          limite_ya_armados?: number
           plazo_max_credito_dias?: number
           updated_at?: string
         }
@@ -1115,6 +1118,7 @@ export type Database = {
       }
       motocarros: {
         Row: {
+          carga_ya_armado: boolean
           chasis_asignado: string | null
           color: string
           con_caja: boolean
@@ -1145,6 +1149,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          carga_ya_armado?: boolean
           chasis_asignado?: string | null
           color?: string
           con_caja?: boolean
@@ -1175,6 +1180,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          carga_ya_armado?: boolean
           chasis_asignado?: string | null
           color?: string
           con_caja?: boolean
@@ -1693,6 +1699,14 @@ export type Database = {
       }
     }
     Views: {
+      v_carga_ya_armados: {
+        Row: {
+          cargadas: number | null
+          limite: number | null
+          restantes: number | null
+        }
+        Relationships: []
+      }
       v_stock_modelo_color: {
         Row: {
           asignadas: number | null

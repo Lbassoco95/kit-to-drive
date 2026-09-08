@@ -105,6 +105,15 @@ const escribirSeriales = async (chasis: string, motor: string) => {
   await act(async () => { fireEvent.change(inMotor, { target: { value: motor } }); });
 };
 
+/**
+ * Dar de alta pasa por la confirmación: el botón del formulario abre el
+ * diálogo, y el alta se hace desde ahí.
+ */
+const darDeAlta = async () => {
+  await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+  await act(async () => { fireEvent.click(boton(/Sí, ya estaba armada/i)!); });
+};
+
 /** Deja pasar el debounce de la búsqueda del chasis en inventario. */
 const esperarBusquedaChasis = async () => {
   await act(async () => { await new Promise(r => setTimeout(r, 350)); });
@@ -130,7 +139,7 @@ describe("Motocarro ya armado · cilindraje y color los declara fábrica", () =>
     await abrirManual();
     await marcarYaArmado();
     await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
-    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+    await darDeAlta();
 
     const alta = rpcs.find(r => r.fn === "crear_motocarro_ya_armado");
     expect(alta).toBeTruthy();
@@ -166,7 +175,7 @@ describe("Motocarro ya armado · cilindraje y color los declara fábrica", () =>
     expect(document.body.textContent).toContain("La remisión pide 300cc 2026 · Azul");
 
     await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
-    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+    await darDeAlta();
 
     const alta = rpcs.find(r => r.fn === "crear_motocarro_ya_armado");
     expect(alta).toBeTruthy();
@@ -198,7 +207,7 @@ describe("Motocarro ya armado · cilindraje y color los declara fábrica", () =>
     expect(document.body.textContent).toContain("no tiene configuración capturada");
 
     await escribirSeriales("DZ164FMLT2M00999", "T2M00999");
-    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+    await darDeAlta();
 
     const alta = rpcs.find(r => r.fn === "crear_motocarro_ya_armado");
     expect(alta).toBeTruthy();
@@ -249,7 +258,7 @@ describe("Motocarro ya armado · el chasis que ya está en inventario manda", ()
     // Dice qué es esa pieza, para que nadie declare a ciegas.
     expect(document.body.textContent).toContain("ya está en inventario como 300cc 2026 · Blanco");
 
-    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+    await darDeAlta();
     const alta = rpcs.find(r => r.fn === "crear_motocarro_ya_armado");
     expect(alta).toBeTruthy();
     // El color del pedido era AZUL; se registra el del chasis.
@@ -284,5 +293,110 @@ describe("Motocarro ya armado · el chasis que ya está en inventario manda", ()
 
     // Aun así se puede registrar: la unidad ya está armada, no se bloquea.
     expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(false);
+  });
+});
+
+/**
+ * El ingreso de unidades ya armadas es para un lote cerrado: lo que Fábrica
+ * ensambló ANTES de que existiera el sistema, menos de 50 unidades. Si la
+ * puerta queda abierta sin cuenta, en tres meses nadie distingue una unidad
+ * que se cargó porque ya estaba armada de una que se saltó el armado.
+ */
+describe("Motocarro ya armado · el lote es cerrado y se cuenta", () => {
+  beforeEach(() => {
+    conPedido({ tipo_servicio: "motocarro", modelo: "300cc 2026", color: "AZUL", cantidad: 1, con_caja: false });
+  });
+
+  it("dice cuántas van y cuántas quedan del lote", async () => {
+    unicos.v_carga_ya_armados = { cargadas: 23, limite: 50, restantes: 27 };
+    await abrirManual();
+    await marcarYaArmado();
+    expect(document.body.textContent).toContain("cargadas: 23 de 50 — quedan 27");
+    expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(true); // faltan seriales
+  });
+
+  it("cuando el lote se acabó no deja capturar, y dice quién sube el tope", async () => {
+    unicos.v_carga_ya_armados = { cargadas: 50, limite: 50, restantes: 0 };
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
+
+    const texto = document.body.textContent || "";
+    expect(texto).toContain("Ya se cargaron las 50 unidades");
+    expect(texto).toContain("Dirección sube el tope en Configuración");
+    // Con seriales completos y todo, el botón sigue cerrado.
+    expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(true);
+    expect(rpcs.find(r => r.fn === "crear_motocarro_ya_armado")).toBeUndefined();
+  });
+
+  it("si la base todavía no tiene el tope, la pantalla no inventa una cuenta", async () => {
+    // `unicos.v_carga_ya_armados` sin definir = la vista no está.
+    await abrirManual();
+    await marcarYaArmado();
+    expect(document.body.textContent).not.toContain("cargadas:");
+    await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
+    expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(false);
+  });
+});
+
+/**
+ * Por este camino entra al sistema una unidad que nadie vio armarse. El botón
+ * del formulario no da de alta: abre una confirmación con lo que va a quedar
+ * registrado, y Fábrica dice que sí con todas sus letras.
+ */
+describe("Motocarro ya armado · la confirmación es explícita", () => {
+  beforeEach(() => {
+    conPedido({ tipo_servicio: "motocarro", modelo: "300cc 2026", color: "AZUL", cantidad: 1, con_caja: false });
+    unicos.v_carga_ya_armados = { cargadas: 23, limite: 50, restantes: 27 };
+  });
+
+  it("el botón no da de alta: pregunta si la unidad ya estaba armada", async () => {
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
+    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+
+    const texto = document.body.textContent || "";
+    expect(texto).toContain("¿Esta unidad ya estaba armada?");
+    // Con lo que va a quedar registrado enfrente, no de memoria.
+    expect(texto).toContain("DZ164FMLT2M00654");
+    expect(texto).toContain("T2M00654");
+    expect(texto).toContain("300cc 2026");
+    expect(texto).toContain("REM-044");
+    // Y en qué lugar del lote queda.
+    expect(texto).toContain("van 24 de 50");
+    // Nada se registró todavía.
+    expect(rpcs.find(r => r.fn === "crear_motocarro_ya_armado")).toBeUndefined();
+  });
+
+  it("si se cancela, no se registra nada", async () => {
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
+    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+    await act(async () => { fireEvent.click(boton(/No, cancelar/i)!); });
+
+    expect(rpcs.find(r => r.fn === "crear_motocarro_ya_armado")).toBeUndefined();
+    expect(document.body.textContent).not.toContain("¿Esta unidad ya estaba armada?");
+  });
+
+  it("al confirmar, ahí sí se da de alta", async () => {
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
+    await darDeAlta();
+
+    const alta = rpcs.find(r => r.fn === "crear_motocarro_ya_armado");
+    expect(alta).toBeTruthy();
+    expect(alta!.args).toMatchObject({ _ns_chasis: "DZ164FMLT2M00654", _ns_motor: "T2M00654" });
+  });
+
+  it("avisa cuando el chasis tampoco está en inventario", async () => {
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales("CHASIS-QUE-NO-EXISTE", "MOTOR-QUE-NO-EXISTE");
+    await esperarBusquedaChasis();
+    await act(async () => { fireEvent.click(boton(/Crear y asignar unidad armada/i)!); });
+    expect(document.body.textContent).toContain("Este chasis tampoco está en inventario");
   });
 });
