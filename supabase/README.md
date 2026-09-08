@@ -104,7 +104,7 @@ llegaron a producción**. Tres estaban rompiendo cosas en vivo:
 | `20260824000003_usuario_activo_se_aplica` | Sin `usuario_activo()`, dar de baja a alguien no significaba nada en la base: la app lo cortaba del lado del cliente, el RLS lo seguía dejando leer. |
 | `20260824000002_comercial_lee_toda_la_bandeja` | Faltaba `comercial lee motocarros`: el equipo veía la remisión pero no sus unidades. |
 | `20260717000003_clientes_expediente_digital` | Columnas del expediente (`rfc`, `codigo_postal`, `razon_social`, `email_cobranza`) que la pantalla de Clientes ya captura. |
-| `20260819000001_parts_inventory` | `contenedor_partes`. El frontend no la usa; `importar_partes_excel` sí. |
+| `20260819000001_parts_inventory` | `contenedor_partes`. Nadie la escribe: la RPC que lo hacía (`importar_partes_excel`) nunca se aplicó y se borró del repo el 2026-09-08. La tabla sigue en la base, vacía. |
 
 Los seis van juntos en **`supabase/reparar_pendientes.sql`**: se pega completo
 en el SQL editor y aplica los seis en el orden correcto, en una sola

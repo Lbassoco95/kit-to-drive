@@ -2163,6 +2163,7 @@ export const es = {
     },
     rutas: {
       title: "Rutas",
+      errorCargar: "No se pudieron cargar las rutas",
       subtitle: (n: number) => `${n} rutas registradas`,
       nueva: "Nueva ruta",
       editar: "Editar ruta",

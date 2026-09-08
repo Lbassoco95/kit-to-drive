@@ -493,7 +493,8 @@ function ResumenEjecutivo() {
         // anteriores el resumen ejecutivo daba 0 oportunidades ganadas y $0.
         supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }).eq("etapa", "ganada"),
         supabase.from("crm_oportunidades").select("vendedor_id, valor_estimado").eq("etapa", "ganada"),
-        supabase.from("crm_actividades").select("*", { count: "exact", head: true }).gte("fecha", hace30),
+        // La columna es `fecha_actividad`: con `fecha` el conteo salía en 0.
+        supabase.from("crm_actividades").select("*", { count: "exact", head: true }).gte("fecha_actividad", hace30),
       ]);
 
       const motosTotal = (motos ?? []).length;

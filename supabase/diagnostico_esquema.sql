@@ -92,8 +92,6 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260717000004_crm_fixes',                    'columna|crm_oportunidades.limitante_notas'),
   ('20260717000007_crm_actividades_estatus',      'columna|crm_actividades.objetivo_visita'),
   ('20260819000001_parts_inventory',              'tabla|contenedor_partes'),
-  ('20260819000002_importar_partes_excel',        'funcion|importar_partes_excel(uuid,jsonb)'),
-  ('20260819000003_importar_contenedores_excel',  'funcion|importar_contenedores_excel(jsonb)'),
   ('20260819000004_inventario_chasis',            'tabla|inventario_chasis'),
   ('20260819000005_inventario_motor',             'tabla|inventario_motor'),
   ('20260819000006_inventario_partes',            'tabla|inventario_partes'),
@@ -242,6 +240,9 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260908000002_tope_unidades_ya_armadas',     'columna|config_general.limite_ya_armados'),
   ('20260908000002_tope_unidades_ya_armadas',     'vista|v_carga_ya_armados'),
   ('20260908000002_tope_unidades_ya_armadas',     'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|limite_ya_armados'),
+
+  -- Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
+  ('20260908000003_crm_tipos_actividad',          'restriccion|crm_actividades.crm_actividades_tipo_check|videollamada'),
 
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),

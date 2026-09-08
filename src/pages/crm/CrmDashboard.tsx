@@ -36,8 +36,11 @@ export default function CrmDashboard() {
       // consultas no encontraban nada y el monto ganado siempre salía en $0.
       supabase.from("crm_oportunidades").select("*", { count: "exact", head: true }).eq("etapa", "ganada"),
       supabase.from("crm_oportunidades").select("vendedor_id, valor_estimado").eq("etapa", "ganada"),
-      supabase.from("crm_actividades").select("*", { count: "exact", head: true }).gte("fecha", new Date(new Date().setDate(new Date().getDate() - 30)).toISOString()),
-      supabase.from("crm_rutas").select("*", { count: "exact", head: true }).gte("fecha", new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString())
+      // Las columnas de fecha son `fecha_actividad` y `fecha_ruta`. Con
+      // `fecha` —que en ninguna de las dos existe— PostgREST contestaba 400 y
+      // los dos contadores salían en 0, siempre.
+      supabase.from("crm_actividades").select("*", { count: "exact", head: true }).gte("fecha_actividad", new Date(new Date().setDate(new Date().getDate() - 30)).toISOString()),
+      supabase.from("crm_rutas").select("*", { count: "exact", head: true }).gte("fecha_ruta", new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString())
     ]);
 
     // Calcular monto total

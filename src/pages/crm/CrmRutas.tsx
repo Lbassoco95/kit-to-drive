@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
+import { explicarError, fmtDate } from "@/lib/dazon";
 import { Plus, Pencil, Search, MapPin, Calendar, User, Trash2, CheckCircle, Clock } from "lucide-react";
 
 interface Parada {
@@ -31,7 +32,7 @@ export default function CrmRutas() {
   const [q, setQ] = useState("");
   const [form, setForm] = useState<any>({
     vendedor_id: "",
-    fecha: "",
+    fecha_ruta: "",
     notas: ""
   });
   const [nuevaParada, setNuevaParada] = useState<Parada>({
@@ -44,12 +45,18 @@ export default function CrmRutas() {
   const [paradasLocales, setParadasLocales] = useState<Parada[]>([]);
 
   const load = async () => {
-    const [{ data: rs }, { data: cs }, { data: vs }, { data: ps }] = await Promise.all([
-      supabase.from("crm_rutas").select("*").order("fecha", { ascending: false }),
+    // La columna es `fecha_ruta`. Con `fecha` —que no existe— PostgREST
+    // contestaba 400, `rs` llegaba null y la lista de rutas salía SIEMPRE
+    // vacía, sin decir por qué: el error se tiraba a la basura.
+    const [{ data: rs, error: eRutas }, { data: cs }, { data: vs }, { data: ps }] = await Promise.all([
+      supabase.from("crm_rutas").select("*").order("fecha_ruta", { ascending: false }),
       supabase.from("clientes").select("*").order("nombre_comercial"),
       supabase.from("profiles").select("id, nombre_completo").eq("activo", true),
       supabase.from("crm_ruta_paradas").select("*")
     ]);
+    // «Vacío» y «no se pudo leer» son dos cosas distintas y tienen que verse
+    // distintas: si falla, se dice, en vez de fingir que no hay rutas.
+    if (eRutas) toast.error(explicarError(eRutas, t.crm.rutas.errorCargar));
     setRutas(rs ?? []);
     setClientes(cs ?? []);
     setVendedores(vs ?? []);
@@ -63,7 +70,7 @@ export default function CrmRutas() {
     return rutas.filter((r: any) => {
       const vendedor = vendedores.find((v: any) => v.id === r.vendedor_id);
       const searchable = [
-        r.fecha,
+        r.fecha_ruta,
         vendedor?.nombre_completo,
         r.notas
       ].filter(Boolean).join(" ").toLowerCase();
@@ -82,7 +89,7 @@ export default function CrmRutas() {
   const save = async () => {
     const payload = {
       ...form,
-      fecha: form.fecha,
+      fecha_ruta: form.fecha_ruta,
       vendedor_id: form.vendedor_id || user?.id
     };
 
@@ -116,7 +123,7 @@ export default function CrmRutas() {
     }
     setForm({
       vendedor_id: "",
-      fecha: "",
+      fecha_ruta: "",
       notas: ""
     });
     setParadasLocales([]);
@@ -172,7 +179,7 @@ export default function CrmRutas() {
           <p className="text-base text-muted-foreground mt-1">{t.crm.rutas.subtitle(filtered.length)}</p>
         </div>
         {canCreate && (
-          <Button onClick={() => { setForm({ vendedor_id: "", fecha: "", notas: "" }); setParadasLocales([]); setCreating(true); }}
+          <Button onClick={() => { setForm({ vendedor_id: "", fecha_ruta: "", notas: "" }); setParadasLocales([]); setCreating(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> {t.crm.rutas.nueva}
           </Button>
@@ -196,7 +203,7 @@ export default function CrmRutas() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
                     <Calendar className="text-[#1F3864]" size={20}/>
-                    <div className="text-2xl font-bold text-[#1F3864]">{new Date(r.fecha).toLocaleDateString()}</div>
+                    <div className="text-2xl font-bold text-[#1F3864]">{fmtDate(r.fecha_ruta)}</div>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground mt-1">
                     <User size={16}/> <span>{vendedor?.nombre_completo || t.crm.sinVendedor}</span>
@@ -281,7 +288,7 @@ export default function CrmRutas() {
             </div>
             <div>
               <Label>{t.crm.fecha}</Label>
-              <Input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })} />
+              <Input type="date" value={form.fecha_ruta} onChange={e => setForm({ ...form, fecha_ruta: e.target.value })} />
             </div>
             <div>
               <Label>{t.crm.notas}</Label>
