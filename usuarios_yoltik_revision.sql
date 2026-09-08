@@ -16,7 +16,15 @@
 -- Este script hace lo mismo que la Edge Function `admin-create-user`, pero
 -- por SQL, para poder correrlo sin una sesión de administrador en la app.
 -- Es idempotente: si la cuenta ya existe, sólo renueva contraseña, perfil y
--- rol. Sustituye los dos PLACEHOLDER_* por las contraseñas antes de correrlo.
+-- rol.
+--
+-- OJO: sustituye los dos PLACEHOLDER_* por las contraseñas reales ANTES de
+-- correrlo. Como en una cuenta existente la contraseña se sobrescribe, correr
+-- el archivo tal cual dejaría a JC y Carmen sin poder entrar. El script se
+-- niega a correr si los PLACEHOLDER siguen ahí, y no modifica nada.
+--
+-- Si sólo quieres comprobar cómo están las cuentas, corre nada más el SELECT
+-- del final: es de lectura y no toca la contraseña.
 --
 -- Cómo correrlo: Supabase Dashboard → SQL Editor, proyecto kit-to-drive.
 -- =============================================================================
@@ -34,6 +42,16 @@ BEGIN
     SELECT (c->>'email') AS email, (c->>'nombre') AS nombre, (c->>'password') AS password
     FROM jsonb_array_elements(cuentas) c
   LOOP
+    -- Correr el script tal como está en el repo deja la contraseña en el texto
+    -- literal 'PLACEHOLDER_...' y nadie puede entrar. Peor: en una cuenta que
+    -- ya existe la sobrescribe, así que rompe accesos que funcionaban. Se
+    -- aborta antes de tocar nada; RAISE EXCEPTION revierte todo el bloque.
+    IF cuenta.password LIKE 'PLACEHOLDER%' THEN
+      RAISE EXCEPTION
+        'Sustituye los PLACEHOLDER por las contraseñas reales antes de correr este script (cuenta %). No se modificó nada.',
+        cuenta.email;
+    END IF;
+
     SELECT id INTO uid FROM auth.users WHERE lower(email) = lower(cuenta.email);
 
     IF uid IS NULL THEN
