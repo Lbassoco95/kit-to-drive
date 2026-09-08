@@ -92,8 +92,6 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260717000004_crm_fixes',                    'columna|crm_oportunidades.limitante_notas'),
   ('20260717000007_crm_actividades_estatus',      'columna|crm_actividades.objetivo_visita'),
   ('20260819000001_parts_inventory',              'tabla|contenedor_partes'),
-  ('20260819000002_importar_partes_excel',        'funcion|importar_partes_excel(uuid,jsonb)'),
-  ('20260819000003_importar_contenedores_excel',  'funcion|importar_contenedores_excel(jsonb)'),
   ('20260819000004_inventario_chasis',            'tabla|inventario_chasis'),
   ('20260819000005_inventario_motor',             'tabla|inventario_motor'),
   ('20260819000006_inventario_partes',            'tabla|inventario_partes'),

@@ -538,7 +538,8 @@ CREATE POLICY "borrar clientes admin" ON public.clientes FOR DELETE TO authentic
 -- ==========================================================================
 -- PARTE 6/6 · 20260819000001_parts_inventory.sql
 --
--- `contenedor_partes`. El frontend no la usa; `importar_partes_excel` sí.
+-- `contenedor_partes`. Nadie la escribe: `importar_partes_excel` nunca se
+-- aplicó y se borró del repo el 2026-09-08. La tabla se crea igual, vacía.
 -- ==========================================================================
 
 -- Re-ejecutable: el SQL editor manda el archivo completo en UNA transacción,
