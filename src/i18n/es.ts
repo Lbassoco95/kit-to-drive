@@ -1512,6 +1512,14 @@ export const es = {
       buscarMotor: "Buscar o registrar motor…",
       yaArmado: "Es un motocarro ya armado",
       yaArmadoAyuda: "Marca esta opción si la unidad está físicamente ensamblada y no está registrada en el sistema. Se creará la configuración y se marcará como armada.",
+      confirmarArmadoTitulo: "¿Esta unidad ya estaba armada?",
+      confirmarArmadoDesc: (serial: string) =>
+        `El chasis ${serial} no está registrado como unidad en el sistema. Confirma que el motocarro ya está físicamente ensamblado y que sólo faltaba darlo de alta — si todavía no se arma, la unidad se configura en Producción con su chasis y su motor.`,
+      confirmarArmadoRemision: "Se asigna a",
+      confirmarArmadoChasisNuevo: "Este chasis tampoco está en inventario: se va a dar de alta con el cilindraje y el color de arriba.",
+      confirmarArmadoLote: (van: number, limite: number) => `Con ésta van ${van} de ${limite} unidades ya ensambladas.`,
+      confirmarArmadoNo: "No, cancelar",
+      confirmarArmadoSi: "Sí, ya estaba armada",
       loteYaArmados: (cargadas: number, limite: number, restantes: number) =>
         `Unidades ya ensambladas cargadas: ${cargadas} de ${limite} — quedan ${restantes}. Por aquí sólo entran las que Fábrica armó antes del sistema.`,
       loteYaArmadosAgotado: (limite: number) =>
