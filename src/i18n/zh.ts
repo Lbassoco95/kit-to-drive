@@ -2145,6 +2145,7 @@ export const zh = {
     },
     rutas: {
       title: "路线",
+      errorCargar: "无法加载路线",
       subtitle: (n: number) => `共 ${n} 条路线`,
       nueva: "新建路线",
       editar: "编辑路线",

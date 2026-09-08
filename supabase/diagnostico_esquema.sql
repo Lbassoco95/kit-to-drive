@@ -241,6 +241,9 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260908000002_tope_unidades_ya_armadas',     'vista|v_carga_ya_armados'),
   ('20260908000002_tope_unidades_ya_armadas',     'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|limite_ya_armados'),
 
+  -- Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
+  ('20260908000003_crm_tipos_actividad',          'restriccion|crm_actividades.crm_actividades_tipo_check|videollamada'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

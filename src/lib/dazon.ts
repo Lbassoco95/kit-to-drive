@@ -253,6 +253,8 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
   // si no está: el viejo la dejaría sin el color declarado por fábrica.
   [/carga_ya_armado|limite_ya_armados|v_carga_ya_armados/,
     "20260908000002_tope_unidades_ya_armadas.sql"],
+  [/crm_actividades_tipo_check/,
+    "20260908000003_crm_tipos_actividad.sql"],
   [/crear_motocarro_ya_armado/,
     "20260908000002_tope_unidades_ya_armadas.sql"],
   [/asignar_motocarro_a_remision|desasignar_motocarro_de_remision/,
