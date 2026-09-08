@@ -110,6 +110,10 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   // qué es el chasis que fábrica está capturando y si su color tiene juego libre.
   const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [capacidad, setCapacidad] = useState<Map<string, CapacidadColor>>(new Map());
+  // El lote cerrado de unidades que ya estaban ensambladas: cuántas van, de
+  // cuántas. `null` = la base todavía no tiene el tope, así que no hay nada que
+  // decir (y tampoco hay tope que respetar).
+  const [loteYaArmados, setLoteYaArmados] = useState<{ cargadas: number; limite: number; restantes: number } | null>(null);
 
   // Asignación manual
   const [manualDialog, setManualDialog] = useState<RemisionCard | null>(null);
@@ -139,6 +143,12 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         setCatalogo(new Map(filas));
       });
     cargarCapacidadColor().then(setCapacidad);
+
+    // Cuántas unidades ya armadas se han cargado del lote. Si la vista no está
+    // (falta correr 20260908000002), no hay tope en la base tampoco: se calla
+    // en vez de inventar una cuenta.
+    supabase.from("v_carga_ya_armados").select("cargadas, limite, restantes").maybeSingle()
+      .then(({ data }) => setLoteYaArmados(data ?? null));
 
     // Lo que de verdad hay por modelo comercial y color — para que la bandeja
     // no ofrezca "asignar 5" cuando de ese color sólo hay 1.
@@ -395,6 +405,9 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   // El color declarado no es el que trae el chasis en inventario.
   const colorCambiaChasis = !!chasisInv && !!armadoColor && armadoColor !== chasisInv.color;
   const sinJuegosDelColor = colorCambiaChasis && juegosLibresDe(armadoColor) <= 0;
+  // El lote se acabó: por aquí ya no entra nada más hasta que Dirección suba
+  // el tope. La base lo rechaza igual; la pantalla lo dice antes de capturar.
+  const loteAgotado = !!loteYaArmados && loteYaArmados.restantes <= 0;
 
   // Al marcar "ya armado" los campos parten del pedido; en cuanto el chasis
   // capturado aparece en inventario, se corrigen con lo que dice el chasis.
@@ -607,6 +620,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       const r = data as {
         ok?: boolean; orden_armado?: number;
         color_cambiado?: boolean; color_vin?: string; capacidad_ajustada?: boolean;
+        ya_armados_cargados?: number; ya_armados_limite?: number;
       } | null;
       toast.success(b.okYaArmada(r?.orden_armado ?? 0));
       // El chasis ya estaba en inventario con otro color: se armó con este, y
@@ -621,6 +635,13 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       }
       if (armadoDifierePedido) {
         toast.info(b.avisoDifierePedido(pedidoModelo || "—", pedidoColor ? nombreColor(pedidoColor) : "—"));
+      }
+      if (typeof r?.ya_armados_cargados === "number" && typeof r?.ya_armados_limite === "number") {
+        setLoteYaArmados({
+          cargadas: r.ya_armados_cargados,
+          limite: r.ya_armados_limite,
+          restantes: Math.max(r.ya_armados_limite - r.ya_armados_cargados, 0),
+        });
       }
       setManualNuevoChasis("");
       setManualNuevoMotor("");
@@ -1185,6 +1206,15 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 {manualYaArmado && (
                   <div className="rounded-lg border border-[#1F3864]/25 bg-white p-3 space-y-2">
                     <p className="text-xs text-muted-foreground">{b.armadoDatosAyuda}</p>
+                    {/* El lote es cerrado: por aquí entran las unidades que ya
+                        estaban ensambladas antes del sistema, y son contadas. */}
+                    {loteYaArmados && (
+                      <p className={`text-xs font-medium ${loteAgotado ? "text-[#991B1B]" : "text-[#1F3864]"}`}>
+                        {loteAgotado
+                          ? b.loteYaArmadosAgotado(loteYaArmados.limite)
+                          : b.loteYaArmados(loteYaArmados.cargadas, loteYaArmados.limite, loteYaArmados.restantes)}
+                      </p>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="space-y-1">
                         <Label className="text-xs text-[#1F3864]">{b.cilindraje}</Label>
@@ -1240,7 +1270,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   onClick={buscarYAsignarPorSerial}
                   disabled={
                     (!manualNuevoChasis && !manualNuevoMotor) ||
-                    (manualYaArmado && (!manualNuevoChasis || !manualNuevoMotor || !armadoModelo || !armadoColor)) ||
+                    (manualYaArmado && (!manualNuevoChasis || !manualNuevoMotor || !armadoModelo || !armadoColor || loteAgotado)) ||
                     manualBusy === "buscando"
                   }
                   className="w-full h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold"

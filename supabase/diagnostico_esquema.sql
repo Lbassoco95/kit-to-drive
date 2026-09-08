@@ -236,6 +236,13 @@ WITH esperado(script, objeto) AS (VALUES
   -- juegos de color: si no hay libre, se registra el extra con motivo.
   ('20260908000001_ya_armado_no_se_atora_por_capacidad', 'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|capacidad_ajustada'),
 
+  -- Las unidades que ya estaban ensambladas son un lote cerrado: se marcan,
+  -- se cuentan y no pasan del tope.
+  ('20260908000002_tope_unidades_ya_armadas',     'columna|motocarros.carga_ya_armado'),
+  ('20260908000002_tope_unidades_ya_armadas',     'columna|config_general.limite_ya_armados'),
+  ('20260908000002_tope_unidades_ya_armadas',     'vista|v_carga_ya_armados'),
+  ('20260908000002_tope_unidades_ya_armadas',     'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|limite_ya_armados'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

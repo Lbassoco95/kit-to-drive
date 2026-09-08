@@ -73,6 +73,16 @@ export default function Configuracion() {
           <Label>{t.configuracion.plazoMaxCredito}</Label>
           <Input type="number" value={cfg.plazo_max_credito_dias} onChange={e => setCfg({ ...cfg, plazo_max_credito_dias: Number(e.target.value) })} />
         </div>
+        {/* El lote de unidades que ya estaban ensambladas antes del sistema es
+            cerrado. El tope vive aquí para que se pueda subir sin un
+            despliegue, si de verdad aparecen más — y no en el código. */}
+        {cfg.limite_ya_armados !== undefined && (
+          <div>
+            <Label>{t.configuracion.limiteYaArmados}</Label>
+            <Input type="number" min={0} value={cfg.limite_ya_armados}
+              onChange={e => setCfg({ ...cfg, limite_ya_armados: Number(e.target.value) })} />
+          </div>
+        )}
         <Button onClick={save}>{t.actions.save}</Button>
       </Card>
     </div>

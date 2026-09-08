@@ -251,8 +251,10 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260823000003_color_efectivo_capacidad.sql"],
   // El script nuevo trae la función completa, así que es el que hay que correr
   // si no está: el viejo la dejaría sin el color declarado por fábrica.
+  [/carga_ya_armado|limite_ya_armados|v_carga_ya_armados/,
+    "20260908000002_tope_unidades_ya_armadas.sql"],
   [/crear_motocarro_ya_armado/,
-    "20260908000001_ya_armado_no_se_atora_por_capacidad.sql"],
+    "20260908000002_tope_unidades_ya_armadas.sql"],
   [/asignar_motocarro_a_remision|desasignar_motocarro_de_remision/,
     "20260826000003_asignacion_manual_remisiones.sql"],
   [/folio_interno|clientes_folio_interno_seq|generar_folio_interno_cliente|trg_clientes_folio_interno/,

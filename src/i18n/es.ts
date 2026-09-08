@@ -981,6 +981,7 @@ export const es = {
     nombreEmpresa: "Nombre empresa",
     capacidadDiaria: "Capacidad diaria (motocarros)",
     plazoMaxCredito: "Plazo máx. crédito (días)",
+    limiteYaArmados: "Tope de unidades ya ensambladas que se pueden cargar",
     guardada: "Configuración guardada",
     cargando: "Cargando configuración…",
     errorLeer: "No se pudo leer la configuración",
@@ -1511,6 +1512,10 @@ export const es = {
       buscarMotor: "Buscar o registrar motor…",
       yaArmado: "Es un motocarro ya armado",
       yaArmadoAyuda: "Marca esta opción si la unidad está físicamente ensamblada y no está registrada en el sistema. Se creará la configuración y se marcará como armada.",
+      loteYaArmados: (cargadas: number, limite: number, restantes: number) =>
+        `Unidades ya ensambladas cargadas: ${cargadas} de ${limite} — quedan ${restantes}. Por aquí sólo entran las que Fábrica armó antes del sistema.`,
+      loteYaArmadosAgotado: (limite: number) =>
+        `Ya se cargaron las ${limite} unidades ya ensambladas del lote. Si de verdad aparecieron más, Dirección sube el tope en Configuración; si no, esta unidad se arma en Producción con su chasis y su motor.`,
       armadoDatosAyuda: "Datos de la unidad que estás ingresando. Empiezan en lo que pide la remisión; corrígelos si el motocarro que tienes enfrente es de otro cilindraje o de otro color.",
       cilindraje: "Cilindraje / modelo",
       elegirCilindraje: "Elegir cilindraje",

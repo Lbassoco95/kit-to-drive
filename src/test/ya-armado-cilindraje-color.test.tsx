@@ -286,3 +286,46 @@ describe("Motocarro ya armado · el chasis que ya está en inventario manda", ()
     expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(false);
   });
 });
+
+/**
+ * El ingreso de unidades ya armadas es para un lote cerrado: lo que Fábrica
+ * ensambló ANTES de que existiera el sistema, menos de 50 unidades. Si la
+ * puerta queda abierta sin cuenta, en tres meses nadie distingue una unidad
+ * que se cargó porque ya estaba armada de una que se saltó el armado.
+ */
+describe("Motocarro ya armado · el lote es cerrado y se cuenta", () => {
+  beforeEach(() => {
+    conPedido({ tipo_servicio: "motocarro", modelo: "300cc 2026", color: "AZUL", cantidad: 1, con_caja: false });
+  });
+
+  it("dice cuántas van y cuántas quedan del lote", async () => {
+    unicos.v_carga_ya_armados = { cargadas: 23, limite: 50, restantes: 27 };
+    await abrirManual();
+    await marcarYaArmado();
+    expect(document.body.textContent).toContain("cargadas: 23 de 50 — quedan 27");
+    expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(true); // faltan seriales
+  });
+
+  it("cuando el lote se acabó no deja capturar, y dice quién sube el tope", async () => {
+    unicos.v_carga_ya_armados = { cargadas: 50, limite: 50, restantes: 0 };
+    await abrirManual();
+    await marcarYaArmado();
+    await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
+
+    const texto = document.body.textContent || "";
+    expect(texto).toContain("Ya se cargaron las 50 unidades");
+    expect(texto).toContain("Dirección sube el tope en Configuración");
+    // Con seriales completos y todo, el botón sigue cerrado.
+    expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(true);
+    expect(rpcs.find(r => r.fn === "crear_motocarro_ya_armado")).toBeUndefined();
+  });
+
+  it("si la base todavía no tiene el tope, la pantalla no inventa una cuenta", async () => {
+    // `unicos.v_carga_ya_armados` sin definir = la vista no está.
+    await abrirManual();
+    await marcarYaArmado();
+    expect(document.body.textContent).not.toContain("cargadas:");
+    await escribirSeriales("DZ164FMLT2M00654", "T2M00654");
+    expect(boton(/Crear y asignar unidad armada/i)!.hasAttribute("disabled")).toBe(false);
+  });
+});

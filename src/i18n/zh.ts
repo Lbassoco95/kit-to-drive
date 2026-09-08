@@ -948,6 +948,7 @@ export const zh = {
     nombreEmpresa: "公司名称",
     capacidadDiaria: "日产能（辆）",
     plazoMaxCredito: "最长信用期（天）",
+    limiteYaArmados: "可登记的既有组装车上限",
     guardada: "设置已保存",
     cargando: "正在加载设置…",
     errorLeer: "无法读取设置",
@@ -1499,6 +1500,10 @@ export const zh = {
       buscarMotor: "搜索或登记发动机…",
       yaArmado: "这是一辆已组装的三轮车",
       yaArmadoAyuda: "如果该车已实际组装但尚未在系统中登记，请勾选此项。系统会创建配置并标记为已组装。",
+      loteYaArmados: (cargadas: number, limite: number, restantes: number) =>
+        `已登记的既有组装车：${cargadas} / ${limite}，还剩 ${restantes} 辆。此入口仅用于系统上线前工厂已组装的整车。`,
+      loteYaArmadosAgotado: (limite: number) =>
+        `该批 ${limite} 辆既有组装车已全部登记。如确实还有，请由管理层在“设置”中上调上限；否则请在生产模块用车架和发动机正常组装。`,
       armadoDatosAyuda: "正在登记的整车信息。默认取自出货单要求的配置；如果眼前的三轮车排量或颜色不同，请在此更正。",
       cilindraje: "排量 / 型号",
       elegirCilindraje: "选择排量",
