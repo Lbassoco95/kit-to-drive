@@ -1517,6 +1517,15 @@ export const es = {
       elegirColor: "Elegir color",
       pedidoSinConfig: "Esta remisión no tiene configuración capturada: el cilindraje y el color que elijas aquí son los que quedan registrados.",
       difierePedido: (modelo: string, color: string) => `La remisión pide ${modelo} · ${color}. La unidad se va a registrar con lo que elegiste aquí.`,
+      chasisEnInventario: (serial: string, modelo: string, color: string) =>
+        `El chasis ${serial} ya está en inventario como ${modelo} · ${color}, y de ahí salen los dos campos.`,
+      chasisVinDecia: (color: string) => `El VIN decía ${color}.`,
+      colorCambiaChasis: (color: string, colorChasis: string) =>
+        `La unidad se va a registrar en ${color} y el chasis se mueve con ella (venía en ${colorChasis}); se ocupa un juego de piezas en ${color}.`,
+      sinJuegosDelColor: (color: string, colorChasis: string) =>
+        `De este modelo ya no quedan juegos de piezas libres en ${color}, y el chasis viene en ${colorChasis}: revisa que la unidad de verdad sea ${color}.`,
+      hayChasisLibresDeEseColor: (n: number, color: string) =>
+        `Hay ${n} chasis libres en ${color} de este modelo — si la unidad es uno de ésos, captura su número.`,
       buscando: "Buscando…",
       crearAsignarArmada: "Crear y asignar unidad armada",
       buscarAsignar: "Buscar y asignar",
@@ -1551,6 +1560,7 @@ export const es = {
       faltaModeloColorArmada: "Elige el cilindraje y el color de la unidad que estás ingresando",
       errorCrearArmada: "No se pudo registrar la unidad ya armada",
       okColorDistintoChasis: (color: string, colorChasis: string) => `El chasis estaba registrado en ${colorChasis}: la unidad quedó en ${color} y se ocupó un juego de piezas de ese color.`,
+      okJuegoExtraRegistrado: (color: string) => `Se registró un juego de piezas extra en ${color}: no quedaban libres y la unidad ya estaba armada. Queda en la bitácora de colores.`,
       avisoDifierePedido: (modelo: string, color: string) => `Ojo: la remisión pide ${modelo} · ${color}. Avisa a ventas para que corrija el pedido.`,
       okYaArmada: (orden: number) => `✓ Unidad ya armada #${orden} creada y asignada`,
       sinUnidadParaSerial: "No se encontró una unidad con ese serial y no hay unidades vacías para asignar. Primero crea la unidad en Producción.",

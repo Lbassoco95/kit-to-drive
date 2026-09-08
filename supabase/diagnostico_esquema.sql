@@ -232,6 +232,10 @@ WITH esperado(script, objeto) AS (VALUES
   -- versión nueva es la que manda el color por `cambiar_color_chasis`.
   ('20260907000001_ya_armado_cilindraje_color',   'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|cambiar_color_chasis'),
 
+  -- Registrar una unidad que YA está armada no se atora por la cuenta de
+  -- juegos de color: si no hay libre, se registra el extra con motivo.
+  ('20260908000001_ya_armado_no_se_atora_por_capacidad', 'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|capacidad_ajustada'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

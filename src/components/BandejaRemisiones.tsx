@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Inbox, RefreshCw, Eye, Download, FileText, Package, Settings2, TriangleAlert, Wrench, UserPlus, X } from "lucide-react";
-import { fmtDate, COLORES, claveStock, explicarError, normColor } from "@/lib/dazon";
+import { fmtDate, COLORES, claveStock, explicarError, normColor, normSerial,
+         nombreComercial, claveCapacidad, CatalogoModelos, CapacidadColor,
+         LineaProducto, ModeloInfo } from "@/lib/dazon";
+import { cargarCapacidadColor } from "@/components/ColorChasis";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -65,6 +68,15 @@ const defaultConfigForm = () => ({
   con_flete: false,
 });
 
+/** Lo que el sistema ya sabe de un chasis que fábrica está capturando. */
+type ChasisEnInventario = {
+  numero_chasis: string;
+  modelo: string;    // código de fábrica (DZ300Q7); su nombre comercial se
+                     // traduce al dibujar, con el catálogo ya cargado
+  color: string;     // color efectivo, con el que se arma
+  colorVin: string;  // lo que declaró el VIN
+};
+
 type MotocarroDisponible = {
   id: string;
   orden_armado: number | null;
@@ -94,6 +106,10 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [savingConfig, setSavingConfig] = useState(false);
   const [stock, setStock] = useState<Map<string, StockColor>>(new Map());
   const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
+  // Catálogo de fábrica y juegos de piezas por color: hacen falta para saber
+  // qué es el chasis que fábrica está capturando y si su color tiene juego libre.
+  const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
+  const [capacidad, setCapacidad] = useState<Map<string, CapacidadColor>>(new Map());
 
   // Asignación manual
   const [manualDialog, setManualDialog] = useState<RemisionCard | null>(null);
@@ -110,6 +126,19 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const load = async () => {
     setLoading(true);
     cargarModelosMotocarro().then(setModelos);
+
+    // El código de fábrica del chasis (DZ300Q7) no le dice nada a nadie en el
+    // piso: se traduce a su nombre comercial ("300cc 2026"), que es el
+    // cilindraje con el que se trabaja.
+    supabase.from("modelos_producto").select("modelo, linea, nombre_comercial")
+      .then(({ data }) => {
+        const filas: [string, ModeloInfo][] = (data ?? []).map(c => [
+          c.modelo,
+          { linea: (c.linea ?? "otro") as LineaProducto, nombre_comercial: c.nombre_comercial },
+        ]);
+        setCatalogo(new Map(filas));
+      });
+    cargarCapacidadColor().then(setCapacidad);
 
     // Lo que de verdad hay por modelo comercial y color — para que la bandeja
     // no ofrezca "asignar 5" cuando de ese color sólo hay 1.
@@ -331,33 +360,104 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
   const [manualCapturando, setManualCapturando] = useState<string | null>(null);
   const [manualYaArmado, setManualYaArmado] = useState(false);
   // Modelo (cilindraje) y color con los que se registra la unidad ya armada.
-  // Arrancan en lo que pide la remisión, pero fábrica los puede corregir: la
-  // unidad que aparece en el piso no siempre es la que capturó ventas, y antes
-  // se guardaba "como está en el sistema" sin manera de decir lo contrario.
+  // Fábrica los declara: la unidad que aparece en el piso no siempre es la que
+  // capturó ventas, y antes se guardaba "como está en el sistema" sin manera de
+  // decir lo contrario.
   const [armadoModelo, setArmadoModelo] = useState("");
   const [armadoColor, setArmadoColor] = useState("");
+  // Lo que el sistema ya sabe del chasis capturado, si es que lo conoce.
+  const [chasisInv, setChasisInv] = useState<ChasisEnInventario | null>(null);
+  // Chasis libres de ese modelo por color: es la salida cuando el color que se
+  // eligió no tiene juegos de piezas libres — probablemente la unidad es otra.
+  const [chasisLibres, setChasisLibres] = useState<Map<string, number>>(new Map());
 
-  // Lo que pide la remisión abierta: el punto de partida de los dos campos.
+  // Lo que pide la remisión abierta.
   const pedidoMoto = manualDialog?.items?.find(it => it.tipo_servicio === "motocarro");
   const pedidoModelo = (pedidoMoto?.modelo ?? "").trim();
   const pedidoColor = pedidoMoto?.color ? normColor(pedidoMoto.color) : "";
-  // El valor del pedido puede no estar en el catálogo (un modelo dado de baja,
-  // un color que no está en la lista). Se agrega a las opciones: un select que
-  // no contiene su propio valor se dibuja vacío.
-  const modelosArmado = pedidoModelo && !modelos.includes(pedidoModelo)
-    ? [pedidoModelo, ...modelos] : modelos;
-  const coloresArmado: string[] = pedidoColor && !(COLORES as readonly string[]).includes(pedidoColor)
-    ? [pedidoColor, ...COLORES] : [...COLORES];
   const nombreColor = (c: string) => t.colors[c] ?? c;
+
+  // Un valor que no esté en el catálogo (un modelo dado de baja, un color fuera
+  // de la lista) se agrega a las opciones: un select que no contiene su propio
+  // valor se dibuja vacío.
+  const conValor = (lista: readonly string[], valor: string) =>
+    valor && !lista.includes(valor) ? [valor, ...lista] : [...lista];
+  const modelosArmado = conValor(conValor(modelos, pedidoModelo), armadoModelo);
+  const coloresArmado = conValor(conValor(COLORES, pedidoColor), armadoColor);
+
   const armadoDifierePedido = !!(pedidoModelo || pedidoColor) &&
     (armadoModelo !== pedidoModelo || armadoColor !== pedidoColor);
 
-  // Al marcar "ya armado" los campos parten del pedido; si la remisión no
-  // tiene configuración capturada, del catálogo.
+  // Juegos de piezas libres de un color para el modelo del chasis capturado.
+  // Va por código de fábrica, que es como se cuentan los juegos.
+  const juegosLibresDe = (color: string) =>
+    chasisInv ? (capacidad.get(claveCapacidad(chasisInv.modelo, color))?.libres ?? 0) : 0;
+  // El color declarado no es el que trae el chasis en inventario.
+  const colorCambiaChasis = !!chasisInv && !!armadoColor && armadoColor !== chasisInv.color;
+  const sinJuegosDelColor = colorCambiaChasis && juegosLibresDe(armadoColor) <= 0;
+
+  // Al marcar "ya armado" los campos parten del pedido; en cuanto el chasis
+  // capturado aparece en inventario, se corrigen con lo que dice el chasis.
   const prellenarArmado = () => {
     setArmadoModelo(pedidoModelo || modelos[0] || MODELOS_RESPALDO[0]);
     setArmadoColor(pedidoColor || "BLANCO");
   };
+
+  // El chasis manda sobre el pedido: si ya está en inventario, el cilindraje y
+  // el color de la unidad son los suyos. Precargar el color del PEDIDO mandaba
+  // a repintar chasis que estaban bien —REM-015 pedía azul, el chasis era
+  // blanco— y eso se atoraba contra los juegos de piezas de ese color.
+  useEffect(() => {
+    if (!manualYaArmado) { setChasisInv(null); setChasisLibres(new Map()); return; }
+    const serial = normSerial(manualNuevoChasis);
+    if (serial.length < 4) { setChasisInv(null); setChasisLibres(new Map()); return; }
+
+    let cancelado = false;
+    const temporizador = setTimeout(async () => {
+      const { data } = await supabase
+        .from("inventario_chasis")
+        .select("numero_chasis, modelo, color, color_original")
+        .eq("numero_chasis", serial)
+        .maybeSingle();
+      if (cancelado) return;
+      if (!data) { setChasisInv(null); setChasisLibres(new Map()); return; }
+
+      setChasisInv({
+        numero_chasis: data.numero_chasis,
+        modelo: data.modelo,
+        color: normColor(data.color),
+        colorVin: normColor(data.color_original ?? data.color),
+      });
+
+      const { data: libres } = await supabase
+        .from("inventario_chasis")
+        .select("color")
+        .eq("modelo", data.modelo)
+        .is("motocarro_id", null)
+        .eq("estatus", "disponible");
+      if (cancelado) return;
+      const porColor = new Map<string, number>();
+      for (const c of libres ?? []) {
+        const col = normColor(c.color);
+        porColor.set(col, (porColor.get(col) ?? 0) + 1);
+      }
+      setChasisLibres(porColor);
+    }, 300);
+
+    return () => { cancelado = true; clearTimeout(temporizador); };
+  }, [manualYaArmado, manualNuevoChasis]);
+
+  // Cuando un chasis nuevo queda identificado, los dos campos se van a lo que
+  // dice el chasis — una sola vez por chasis, para no pisar la corrección que
+  // fábrica haya hecho a mano después.
+  const chasisPrellenado = useRef("");
+  useEffect(() => {
+    if (!chasisInv) { chasisPrellenado.current = ""; return; }
+    if (chasisPrellenado.current === chasisInv.numero_chasis) return;
+    chasisPrellenado.current = chasisInv.numero_chasis;
+    setArmadoModelo(nombreComercial(chasisInv.modelo, catalogo));
+    setArmadoColor(chasisInv.color);
+  }, [chasisInv, catalogo]);
 
   const abrirManual = async (rem: RemisionCard) => {
     setManualDialog(rem);
@@ -369,6 +469,8 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     setManualYaArmado(false);
     setArmadoModelo("");
     setArmadoColor("");
+    setChasisInv(null);
+    setChasisLibres(new Map());
 
     const { data: asig } = await supabase
       .from("motocarros")
@@ -504,13 +606,18 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       if (error) { toast.error(explicarError(error, b.errorCrearArmada)); return; }
       const r = data as {
         ok?: boolean; orden_armado?: number;
-        color_cambiado?: boolean; color_vin?: string;
+        color_cambiado?: boolean; color_vin?: string; capacidad_ajustada?: boolean;
       } | null;
       toast.success(b.okYaArmada(r?.orden_armado ?? 0));
       // El chasis ya estaba en inventario con otro color: se armó con este, y
       // eso consumió un juego de piezas de ese color.
       if (r?.color_cambiado) {
         toast.info(b.okColorDistintoChasis(nombreColor(color), nombreColor(r?.color_vin ?? "")));
+      }
+      // Del embarque no venían juegos libres de ese color: la unidad ya estaba
+      // armada, así que se registró el juego extra. Que no pase en silencio.
+      if (r?.capacidad_ajustada) {
+        toast.warning(b.okJuegoExtraRegistrado(nombreColor(color)));
       }
       if (armadoDifierePedido) {
         toast.info(b.avisoDifierePedido(pedidoModelo || "—", pedidoColor ? nombreColor(pedidoColor) : "—"));
@@ -1098,6 +1205,28 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                         </Select>
                       </div>
                     </div>
+                    {/* Qué sabe el sistema del chasis capturado. Es de donde
+                        salen los dos campos cuando ya está en inventario. */}
+                    {chasisInv && (
+                      <p className="text-xs text-muted-foreground">
+                        {b.chasisEnInventario(chasisInv.numero_chasis, nombreComercial(chasisInv.modelo, catalogo), nombreColor(chasisInv.color))}
+                        {chasisInv.colorVin !== chasisInv.color && " " + b.chasisVinDecia(nombreColor(chasisInv.colorVin))}
+                      </p>
+                    )}
+                    {/* El color declarado no es el del chasis y no hay juego
+                        libre de ese color: casi siempre la unidad es otra. */}
+                    {sinJuegosDelColor && (
+                      <p className="text-xs text-[#991B1B]">
+                        {b.sinJuegosDelColor(nombreColor(armadoColor), nombreColor(chasisInv!.color))}
+                        {(chasisLibres.get(armadoColor) ?? 0) > 0 &&
+                          " " + b.hayChasisLibresDeEseColor(chasisLibres.get(armadoColor)!, nombreColor(armadoColor))}
+                      </p>
+                    )}
+                    {colorCambiaChasis && !sinJuegosDelColor && (
+                      <p className="text-xs text-[#92400E]">
+                        {b.colorCambiaChasis(nombreColor(armadoColor), nombreColor(chasisInv!.color))}
+                      </p>
+                    )}
                     {!pedidoModelo && !pedidoColor ? (
                       <p className="text-xs text-[#92400E]">{b.pedidoSinConfig}</p>
                     ) : armadoDifierePedido ? (
