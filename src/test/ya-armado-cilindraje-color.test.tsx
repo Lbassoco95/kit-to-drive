@@ -25,7 +25,7 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (tabla: string) => {
       const q: Record<string, unknown> = {};
       const paso = () => q;
-      for (const m of ["select","order","eq","neq","in","is","not","gte","lte","limit","or","ilike"]) q[m] = paso;
+      for (const m of ["select","order","eq","neq","in","is","not","gte","lte","limit","range","or","ilike"]) q[m] = paso;
       q.single = () => Promise.resolve({ data: null, error: null });
       q.maybeSingle = () => Promise.resolve({ data: unicos[tabla] ?? null, error: null });
       q.insert = () => Promise.resolve({ data: null, error: null });

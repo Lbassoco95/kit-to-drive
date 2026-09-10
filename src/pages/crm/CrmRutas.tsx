@@ -11,6 +11,7 @@ import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { explicarError, fmtDate } from "@/lib/dazon";
 import { Plus, Pencil, Search, MapPin, Calendar, User, Trash2, CheckCircle, Clock } from "lucide-react";
+import { cargarClientes, porNombreComercial } from "@/lib/catalogoClientes";
 
 interface Parada {
   orden: number;
@@ -50,7 +51,9 @@ export default function CrmRutas() {
     // vacía, sin decir por qué: el error se tiraba a la basura.
     const [{ data: rs, error: eRutas }, { data: cs }, { data: vs }, { data: ps }] = await Promise.all([
       supabase.from("crm_rutas").select("*").order("fecha_ruta", { ascending: false }),
-      supabase.from("clientes").select("*").order("nombre_comercial"),
+      // El catálogo pasa de mil clientes y PostgREST corta ahí: se lee
+      // por tramos con cargarClientes(). Ver src/lib/paginar.ts.
+      cargarClientes(),
       supabase.from("profiles").select("id, nombre_completo").eq("activo", true),
       supabase.from("crm_ruta_paradas").select("*")
     ]);
@@ -58,7 +61,7 @@ export default function CrmRutas() {
     // distintas: si falla, se dice, en vez de fingir que no hay rutas.
     if (eRutas) toast.error(explicarError(eRutas, t.crm.rutas.errorCargar));
     setRutas(rs ?? []);
-    setClientes(cs ?? []);
+    setClientes([...(cs ?? [])].sort(porNombreComercial));
     setVendedores(vs ?? []);
     setParadas(ps ?? []);
   };

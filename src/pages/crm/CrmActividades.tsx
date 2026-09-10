@@ -13,6 +13,7 @@ import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Plus, Pencil, Search, BookOpen, Calendar, User, Building2, CheckCircle, XCircle, AlertTriangle, Camera, ChevronRight, ChevronLeft, Expand } from "lucide-react";
 import { FileOrCamera } from "@/components/FileOrCamera";
+import { cargarClientes, porNombreComercial } from "@/lib/catalogoClientes";
 
 export default function CrmActividades() {
   const { perms, user } = useAuth();
@@ -109,12 +110,14 @@ export default function CrmActividades() {
   const load = async () => {
     const [{ data: acts }, { data: cs }, { data: vs }, { data: ops }] = await Promise.all([
       supabase.from("crm_actividades").select("*").order("fecha_actividad", { ascending: false }),
-      supabase.from("clientes").select("*").order("nombre_comercial"),
+      // Más de mil clientes: PostgREST corta en 1000 y el selector se
+      // quedaba sin los del final. cargarClientes() lee por tramos.
+      cargarClientes(),
       supabase.from("profiles").select("id, nombre_completo").eq("activo", true),
       supabase.from("crm_oportunidades").select("*")
     ]);
     setActividades(acts ?? []);
-    setClientes(cs ?? []);
+    setClientes([...(cs ?? [])].sort(porNombreComercial));
     setVendedores(vs ?? []);
     setOportunidades(ops ?? []);
   };

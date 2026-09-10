@@ -13,7 +13,7 @@ la que el sistema pide a la base cosas que no existen.
 Y cuando eso pasa, casi nunca se ve como un error: se ve como si se hubiera
 perdido la información.
 
-## Los dos incidentes de Clientes, para no repetirlos
+## Los tres incidentes de Clientes, para no repetirlos
 
 **«Los clientes no se están viendo».** La pantalla pedía
 `clientes.folio_interno` en una base donde el script `20260827000001` no se
@@ -33,6 +33,38 @@ vacío por `.order("folio_interno, codigo_erp")`. `supabase-js` manda **una**
 columna por llamada: eso viaja como `order=folio_interno, codigo_erp.asc`,
 PostgREST no puede leer el segundo término y contesta 400. Lo correcto es
 encadenar: `.order("a").order("b")`.
+
+**«No aparecen los clientes nuevos».** (2026-09-09) Un cliente recién dado de
+alta —N100, NESTOR ALEJANDRO GALLEGOS— existía en la base, se encontraba
+filtrando por su código, y no salía en ningún selector. Nada estaba roto:
+**PostgREST corta toda respuesta en 1000 filas** (`db-max-rows`, el valor por
+omisión de Supabase). `clientes` había llegado a 1784. El catálogo se pedía
+ordenado por `folio_interno, codigo_erp`, así que de la J en adelante —784
+clientes— nadie existía para la app. En los logs se ve tal cual:
+
+    Content-Range: 0-999/*
+
+Y ahí está lo traicionero: es un **200**, no un error. `data ?? []` recibe mil
+renglones y se queda tan contento con media tabla.
+
+El arreglo es `traerTodo()` (`src/lib/paginar.ts`): pide la consulta por tramos
+de mil hasta que uno vuelve corto. Dos reglas al usarlo:
+
+- **Ordena por algo único al final** (`.order("id")`). Cada tramo es una
+  consulta distinta; si el orden empata, Postgres puede acomodar los empates
+  distinto en cada una y un renglón se pierde entre página y página.
+- **Si un tramo falla, no entregues lo que ya juntaste.** Media lista se ve
+  igual que una lista completa: es el mismo modo de fallar, otra vez.
+
+Para saber qué tablas ya piden paginarse:
+
+```sql
+select relname, n_live_tup from pg_stat_user_tables
+ where schemaname = 'public' order by n_live_tup desc;
+```
+
+Hoy sólo `clientes` pasa de mil. La lista vive en `TABLAS_GRANDES`, dentro de
+`src/test/consultas-supabase.test.ts`.
 
 ## Antes de tocar la base
 
@@ -115,7 +147,8 @@ diagnóstico no cuadran, en las dos direcciones.
 | Prueba | Qué evita |
 |---|---|
 | `inventario-migraciones` | Un script que el diagnóstico no ve. |
-| `consultas-supabase` | `.order("a, b")` en una sola llamada; leer clientes sin el lector compartido; una RPC que ninguna migración crea, o que al fallar no dice qué script correr. |
+| `consultas-supabase` | `.order("a, b")` en una sola llamada; leer clientes sin el lector compartido; leer sin paginar una tabla de más de mil filas; una RPC que ninguna migración crea, o que al fallar no dice qué script correr. |
+| `paginar` | Que `traerTodo()` deje renglones fuera, entregue media lista tras un error, o se cicle. |
 | `catalogo-clientes` | Que el catálogo se quede sin respaldo o se trague el error. |
 | `clientes-visibilidad` | Que la pantalla de Clientes vuelva a decir «Sin resultados» cuando en realidad falló. |
 | `esquema-pendiente` | Que un error de esquema no diga qué script correr. |

@@ -112,6 +112,62 @@ describe("consultas a Supabase", () => {
   });
 
   /**
+   * PostgREST corta toda respuesta en 1000 filas, sin error: contesta 200 con
+   * mil renglones y un `Content-Range: 0-999/*`. La app hace `data ?? []` y
+   * se queda con media tabla creyendo que es la tabla.
+   *
+   * Así se perdieron los clientes nuevos (2026-09-09): `clientes` llegó a
+   * 1784 filas, el catálogo se pedía ordenado por código, y de la J en
+   * adelante nadie aparecía en el selector de la remisión. El cliente estaba
+   * en la base —se encontraba filtrando por su código— pero no en la lista.
+   *
+   * Estas son las tablas que ya pasaron de mil filas en producción. Para
+   * saber cuáles agregar:
+   *
+   *   select relname, n_live_tup from pg_stat_user_tables
+   *    where schemaname = 'public' order by n_live_tup desc;
+   *
+   * Leerlas enteras exige paginar: `traerTodo()` de `@/lib/paginar`, o
+   * `cargarClientes()` que ya lo hace por dentro.
+   */
+  const TABLAS_GRANDES = ["clientes"];
+
+  it("las tablas de más de mil filas se leen por tramos", () => {
+    const sueltas: string[] = [];
+    for (const { ruta, texto } of codigo) {
+      if (ruta.endsWith("src/lib/catalogoClientes.ts")) continue;
+      for (const tabla of TABLAS_GRANDES) {
+        const re = new RegExp(`\\.from\\(\\s*["'\`]${tabla}["'\`]\\s*\\)`, "g");
+        for (const m of texto.matchAll(re)) {
+          // La consulta termina donde empieza la siguiente.
+          let ventana = texto.slice(m.index + m[0].length, m.index + m[0].length + 600);
+          for (const fin of [".from(", ";"]) {
+            const corte = ventana.indexOf(fin);
+            if (corte > 0) ventana = ventana.slice(0, corte);
+          }
+          // Escribir no lee la tabla; y una lectura acotada nunca llega al tope.
+          const acotada =
+            /^\s*\.(insert|update|upsert|delete)\(/.test(ventana) ||
+            /\.range\(/.test(ventana) ||
+            /\.(single|maybeSingle)\(/.test(ventana) ||
+            /\.limit\(/.test(ventana) ||
+            /head:\s*true/.test(ventana) ||
+            /\.eq\(\s*["'`]id["'`]/.test(ventana);
+          if (!acotada) sueltas.push(`${ruta}:${texto.slice(0, m.index).split("\n").length} → ${tabla}`);
+        }
+      }
+    }
+    expect(
+      sueltas,
+      "Estas lecturas se van a quedar en 1000 filas y nadie se va a enterar: " +
+      "PostgREST corta ahí sin error. Envuélvelas en traerTodo() de " +
+      "@/lib/paginar —o usa cargarClientes() si es el catálogo— y ordena por " +
+      "una columna única al final para que los tramos no se traslapen:\n" +
+      sueltas.map(l => `  · ${l}`).join("\n"),
+    ).toEqual([]);
+  });
+
+  /**
    * Cada RPC que la app llama tiene que existir en algún script de
    * `supabase/migrations/`. Si no, la base nunca va a poder tenerla: el botón
    * está roto de origen y no hay nada que correr para arreglarlo.

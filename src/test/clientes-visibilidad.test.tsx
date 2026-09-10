@@ -40,7 +40,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       const columnas: string[] = [];
       const q: Record<string, unknown> = {};
       const paso = () => q;
-      for (const m of ["select","eq","neq","in","is","not","gte","lte","limit","or"]) q[m] = paso;
+      for (const m of ["select","eq","neq","in","is","not","gte","lte","limit","range","or"]) q[m] = paso;
       q.order = (columna: string) => { columnas.push(columna); return q; };
       q.single = () => Promise.resolve({ data: null, error: null });
       q.maybeSingle = () => Promise.resolve({ data: null, error: null });
@@ -113,8 +113,10 @@ describe("Clientes · la lista nunca se queda vacía en silencio", () => {
     expect(cuerpo.textContent).toContain("CLI-2026-004");
     expect(cuerpo.textContent).not.toContain("Sin resultados");
     expect(cuerpo.textContent).not.toContain("Error al cargar clientes");
-    // Un solo viaje: el respaldo no se pide cuando no hace falta.
-    expect(intentos).toEqual([["folio_interno", "codigo_erp"]]);
+    // Un solo viaje: el respaldo no se pide cuando no hace falta. El `id` del
+    // final desempata entre un tramo y el siguiente —el catálogo se lee
+    // paginado— y por eso viaja en el orden.
+    expect(intentos).toEqual([["folio_interno", "codigo_erp", "id"]]);
   });
 
   it("los clientes se ven aunque a la base le falte folio_interno", async () => {
@@ -128,7 +130,7 @@ describe("Clientes · la lista nunca se queda vacía en silencio", () => {
     expect(cuerpo.textContent).not.toContain("Sin resultados");
     expect(cuerpo.textContent).not.toContain("Error al cargar clientes");
     // Primero con folio_interno; al fallar, el catálogo de siempre.
-    expect(intentos).toEqual([["folio_interno", "codigo_erp"], ["codigo_erp"]]);
+    expect(intentos).toEqual([["folio_interno", "codigo_erp", "id"], ["codigo_erp", "id"]]);
   });
 
   it("dice qué pasó —y no «Sin resultados»— cuando el catálogo no se pudo leer", async () => {

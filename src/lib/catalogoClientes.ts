@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { traerTodo } from "@/lib/paginar";
 
 /**
  * Catálogo compartido de clientes.
@@ -8,6 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
  * quedara en silencio y vacía. Este lector centraliza la consulta y, si la
  * columna nueva aún no existe, cae a un conjunto mínimo de columnas para que
  * los clientes anteriores sigan visibles mientras se aplica la migración.
+ *
+ * Se lee **por tramos** (`traerTodo`): PostgREST corta en 1000 filas y la
+ * tabla ya pasa de 1700, así que sin paginar el catálogo llegaba mocho y los
+ * clientes del final del abecedario —los nuevos entre ellos— no aparecían en
+ * ningún selector. Ver `src/lib/paginar.ts`.
  */
 export interface ClienteCatalogo {
   id: string;
@@ -42,11 +48,18 @@ export async function cargarClientes(): Promise<{
    */
   degradado?: boolean;
 }> {
-  const { data, error } = await supabase
-    .from("clientes")
-    .select("*")
-    .order("folio_interno", { nullsFirst: false })
-    .order("codigo_erp", { nullsFirst: false });
+  // El `.order("id")` del final no es decorativo: sin él los cientos de
+  // clientes sin `folio_interno` empatan, y dos tramos consecutivos pueden
+  // acomodar el empate distinto y perderse un renglón entre página y página.
+  const { data, error } = await traerTodo((desde, hasta) =>
+    supabase
+      .from("clientes")
+      .select("*")
+      .order("folio_interno", { nullsFirst: false })
+      .order("codigo_erp", { nullsFirst: false })
+      .order("id")
+      .range(desde, hasta),
+  );
 
   if (!error) {
     return { data: ((data as unknown) as ClienteCatalogo[]) ?? [] };
@@ -59,10 +72,14 @@ export async function cargarClientes(): Promise<{
 
   if (esFolio) {
     console.warn("clientes.folio_interno no disponible:", msg);
-    const { data: fallback, error: error2 } = await supabase
-      .from("clientes")
-      .select(COLUMNAS_RESPALDO)
-      .order("codigo_erp", { nullsFirst: false });
+    const { data: fallback, error: error2 } = await traerTodo((desde, hasta) =>
+      supabase
+        .from("clientes")
+        .select(COLUMNAS_RESPALDO)
+        .order("codigo_erp", { nullsFirst: false })
+        .order("id")
+        .range(desde, hasta),
+    );
     if (error2) return { data: [], error: error2 };
     return {
       data: ((fallback as unknown) as ClienteCatalogo[]) ?? [],
@@ -72,6 +89,18 @@ export async function cargarClientes(): Promise<{
   }
 
   return { data: [], error };
+}
+
+/**
+ * Orden por nombre comercial, como lo pedían las pantallas del CRM cuando
+ * cada una leía la tabla por su cuenta. Ahora que el catálogo se pagina, el
+ * orden se aplica aquí: son dos consultas y el servidor no puede garantizar
+ * un orden global sin desempate. Los que no tienen nombre se van al final,
+ * igual que hacía `.order("nombre_comercial")` en Postgres.
+ */
+export function porNombreComercial(a: ClienteCatalogo, b: ClienteCatalogo): number {
+  const clave = (c: ClienteCatalogo) => c.nombre_comercial?.trim() || "\uffff";
+  return clave(a).localeCompare(clave(b), "es");
 }
 
 export function displayCliente(c: ClienteCatalogo | null | undefined): string {
