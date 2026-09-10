@@ -6,6 +6,7 @@ import Papa from "papaparse";
 import { toast } from "sonner";
 import { Upload, CheckCircle2 } from "lucide-react";
 import { useLang } from "@/contexts/LangContext";
+import { traerTodo } from "@/lib/paginar";
 
 type Result = { motocarros: number; remisiones: number; clientes: number; vendedores: number; errores: string[] };
 
@@ -59,11 +60,20 @@ export default function Importar() {
 
       // 2) Clientes
       const clientesCodigos = Array.from(new Set([...prod, ...rem].map(r => String(r.cliente || "").trim()).filter(Boolean)));
-      const { data: existCli } = await supabase.from("clientes").select("id, codigo_erp").in("codigo_erp", clientesCodigos);
-      const cliMap = new Map<string, string>(existCli?.map(c => [c.codigo_erp, c.id]) ?? []);
+      // Por tramos y revisando el error: si esta lectura llega mocha —PostgREST
+      // corta en 1000 filas— o falla, los clientes que ya existen se ven como
+      // nuevos y el importador los vuelve a dar de alta, duplicados.
+      const { data: existCli, error: errCli } = await traerTodo((desde, hasta) =>
+        supabase.from("clientes").select("id, codigo_erp")
+          .in("codigo_erp", clientesCodigos).order("id").range(desde, hasta));
+      if (errCli) errores.push(`Clientes: ${errCli.message}`);
+      const cliMap = new Map<string, string>(
+        existCli?.flatMap(c => (c.codigo_erp ? [[c.codigo_erp, c.id] as [string, string]] : [])) ?? [],
+      );
       const nuevosCli = clientesCodigos.filter(c => !cliMap.has(c)).map(codigo_erp => ({ codigo_erp }));
       let creadosCli = 0;
-      if (nuevosCli.length) {
+      // Sin saber cuáles ya estaban, dar de alta es duplicar: mejor no tocar nada.
+      if (nuevosCli.length && !errCli) {
         const { data: ins, error } = await supabase.from("clientes").insert(nuevosCli).select("id, codigo_erp");
         if (error) errores.push(`Clientes: ${error.message}`);
         else { ins?.forEach(c => cliMap.set(c.codigo_erp, c.id)); creadosCli = ins?.length ?? 0; }
@@ -71,7 +81,10 @@ export default function Importar() {
 
       // 3) Remisiones (tomamos del archivo de remisiones)
       const folios = Array.from(new Set([...prod, ...rem].map(r => String(r.remision || "").trim()).filter(Boolean)));
-      const { data: existRem } = await supabase.from("remisiones").select("id, folio_remision").in("folio_remision", folios);
+      const { data: existRem, error: errRem } = await traerTodo((desde, hasta) =>
+        supabase.from("remisiones").select("id, folio_remision")
+          .in("folio_remision", folios).order("id").range(desde, hasta));
+      if (errRem) errores.push(`Remisiones: ${errRem.message}`);
       const remMap = new Map<string, string>(existRem?.map(r => [r.folio_remision, r.id]) ?? []);
       const nuevasRem: any[] = [];
       for (const r of rem) {
@@ -90,7 +103,9 @@ export default function Importar() {
         });
       }
       let creadasRem = 0;
-      if (nuevasRem.length) {
+      // Igual que con clientes: sin la lista de las que ya existen, insertar
+      // es duplicar folios.
+      if (nuevasRem.length && !errRem) {
         const { data: insR, error } = await supabase.from("remisiones").insert(nuevasRem).select("id, folio_remision");
         if (error) errores.push(`Remisiones: ${error.message}`);
         else { insR?.forEach(r => remMap.set(r.folio_remision, r.id)); creadasRem = insR?.length ?? 0; }

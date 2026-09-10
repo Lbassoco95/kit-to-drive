@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Check, X, Plus, Building2, Users, UserCog, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { fdb } from "@/lib/finanzasDb";
+import { traerTodo } from "@/lib/paginar";
 import { useLang } from "@/contexts/LangContext";
 import {
   type ContraparteTipo, type MovTipo, type Proveedor,
@@ -61,8 +62,12 @@ export default function ContraparteSelector({
   const cargar = async () => {
     setCargando(true);
     const [cl, pr, pe] = await Promise.all([
-      fdb.from("clientes").select("id, codigo_erp, nombre_comercial, razon_social")
-         .eq("activo", true).order("nombre_comercial"),
+      // Más de mil clientes activos: sin paginar, PostgREST devuelve los
+      // primeros 1000 y el resto no se puede elegir como contraparte.
+      traerTodo((desde, hasta) =>
+        fdb.from("clientes").select("id, codigo_erp, nombre_comercial, razon_social")
+           .eq("activo", true).order("nombre_comercial").order("id")
+           .range(desde, hasta)),
       fdb.from("proveedores").select("id, codigo, nombre_comercial, rfc")
          .eq("activo", true).order("nombre_comercial"),
       fdb.from("profiles").select("id, nombre_completo, email").order("nombre_completo"),

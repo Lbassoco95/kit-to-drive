@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { BarChart2, TrendingUp, AlertTriangle, ChevronDown, ChevronUp, Users, DollarSign } from "lucide-react";
+import { traerTodo } from "@/lib/paginar";
 
 type SellerData = {
   vendedor_id: string;
@@ -109,7 +110,11 @@ export default function CrmTracker() {
     setLoading(true);
     const [{ data: opsData }, { data: csData }, { data: vsData }] = await Promise.all([
       supabase.from("crm_oportunidades").select("*").order("fecha_cierre_estimada", { ascending: true }),
-      supabase.from("clientes").select("id, nombre_comercial, codigo_erp"),
+      // Pasan de mil: PostgREST corta en 1000 y los nombres de los
+      // clientes del final salían vacíos en el tablero.
+      traerTodo((desde, hasta) => supabase
+        .from("clientes").select("id, nombre_comercial, codigo_erp")
+        .order("id").range(desde, hasta)),
       supabase.from("profiles").select("id, nombre_completo")
     ]);
 

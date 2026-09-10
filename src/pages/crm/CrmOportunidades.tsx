@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Plus, Pencil, Search, TrendingUp, DollarSign, Calendar, User, Building2, AlertTriangle } from "lucide-react";
+import { cargarClientes, porNombreComercial } from "@/lib/catalogoClientes";
 
 /** Estaba escrito tres veces, y por eso las tres copias se separaron. */
 const FORM_VACIO = {
@@ -45,11 +46,13 @@ export default function CrmOportunidades() {
   const load = async () => {
     const [{ data: ops }, { data: cs }, { data: vs }] = await Promise.all([
       supabase.from("crm_oportunidades").select("*").order("created_at", { ascending: false }),
-      supabase.from("clientes").select("*").order("nombre_comercial"),
+      // Más de mil clientes: PostgREST corta en 1000 y el selector se
+      // quedaba sin los del final. cargarClientes() lee por tramos.
+      cargarClientes(),
       supabase.from("profiles").select("id, nombre_completo").eq("activo", true)
     ]);
     setOportunidades(ops ?? []);
-    setClientes(cs ?? []);
+    setClientes([...(cs ?? [])].sort(porNombreComercial));
     setVendedores(vs ?? []);
   };
   useEffect(() => { load(); }, []);

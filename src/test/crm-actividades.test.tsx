@@ -20,6 +20,8 @@ vi.mock("@/integrations/supabase/client", () => ({
     from: (tabla: string) => {
       const q = {
         select: () => q, order: () => q, eq: () => q,
+        // El catálogo de clientes se lee por tramos (PostgREST corta en 1000).
+        range: () => q,
         then: (res: (r: { data: Fila[]; error: null }) => void) =>
           res({ data: filas[tabla] ?? [], error: null }),
       };
