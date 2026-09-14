@@ -6,6 +6,7 @@ import { dictActual } from "@/contexts/LangContext";
 import {
   Area, Nivel, Permisos, permisosDe, desdeRolLegacy, PERMISOS_VACIOS,
 } from "@/lib/permissions";
+import ForcePasswordChange from "@/components/ForcePasswordChange";
 
 /** Rol legacy de la base de datos. Se mantiene solo por compatibilidad. */
 export type AppRole = "admin" | "fabrica" | "logistica" | "ventas" | "coordinador" | "director_ventas" | "coordinador_ventas" | "auxiliar_ventas" | "finanzas" | "admin_financiero";
@@ -34,8 +35,11 @@ interface AuthCtx {
   activo: boolean;
   profileName: string;
   loading: boolean;
+  /** Si el usuario debe cambiar su contraseña antes de continuar. */
+  requiresPasswordChange: boolean;
   signOut: () => Promise<void>;
   refreshRole: () => Promise<void>;
+  changePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
 const Ctx = createContext<AuthCtx>({} as AuthCtx);
@@ -51,6 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [activo, setActivo] = useState(true);
   const [profileName, setProfileName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
 
   // Refs para poder comparar sin arrastrar closures viejos dentro de los
   // listeners de foco/visibilidad, que se registran una sola vez.
@@ -103,13 +108,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const clear = () => {
     setRole(null); setNivel(null); setArea(null); setProfileName(""); setActivo(true);
+    setRequiresPasswordChange(false);
     permsRef.current = null;
   };
 
+  const changePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+      data: { must_change_password: false },
+    });
+    if (!error) {
+      setRequiresPasswordChange(false);
+      await supabase.auth.refreshSession();
+    }
+    return { error };
+  };
+
   useEffect(() => {
+    const checkMustChange = (u: User | null) => {
+      setRequiresPasswordChange(!!u?.user_metadata?.must_change_password);
+    };
+
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
       setUser(s?.user ?? null);
+      checkMustChange(s?.user ?? null);
       uidRef.current = s?.user?.id ?? null;
       if (s?.user) setTimeout(() => loadRole(s.user.id), 0);
       else clear();
@@ -117,6 +140,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
+      checkMustChange(s?.user ?? null);
       uidRef.current = s?.user?.id ?? null;
       if (s?.user) loadRole(s.user.id).finally(() => setLoading(false));
       else setLoading(false);
@@ -156,8 +180,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshRole = async () => { if (uidRef.current) await loadRole(uidRef.current); };
 
   return (
-    <Ctx.Provider value={{ user, session, nivel, area, perms, role, activo, profileName, loading, signOut, refreshRole }}>
+    <Ctx.Provider value={{ user, session, nivel, area, perms, role, activo, profileName, loading, requiresPasswordChange, signOut, refreshRole, changePassword }}>
       {children}
+      {user && requiresPasswordChange && (
+        <ForcePasswordChange onChangePassword={changePassword} onSignOut={signOut} />
+      )}
     </Ctx.Provider>
   );
 };

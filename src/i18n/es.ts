@@ -228,6 +228,7 @@ export const es = {
     fabrica: "Fábrica",
     logistica: "Logística",
     ventas: "Ventas",
+    gerente: "Gerente comercial",
     coordinador: "Coordinador comercial",
     director_ventas: "Director de Ventas",
     coordinador_ventas: "Coordinador de Ventas",

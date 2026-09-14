@@ -37,6 +37,7 @@ interface Usuario {
 const EMPTY_NEW = {
   email: "", password: "", nombre_completo: "",
   area: "comercial" as Area, nivel: "operador" as Nivel, codigo_vendedor: "",
+  force_password_change: true,
 };
 
 export default function Usuarios() {
@@ -152,6 +153,7 @@ export default function Usuarios() {
         area: newForm.area,
         nivel: newForm.nivel,
         codigo_vendedor: newForm.codigo_vendedor.trim() || null,
+        force_password_change: newForm.force_password_change,
       },
     });
     setSaving(false);
@@ -362,6 +364,18 @@ export default function Usuarios() {
             <div>
               <Label>{t.usuarios.passwordReq}</Label>
               <Input type="password" value={newForm.password} onChange={e => setNewForm({ ...newForm, password: e.target.value })} className="h-11" placeholder={t.usuarios.passwordPlaceholder} />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="force_password_change"
+                type="checkbox"
+                checked={newForm.force_password_change}
+                onChange={e => setNewForm({ ...newForm, force_password_change: e.target.checked })}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="force_password_change" className="text-sm font-normal cursor-pointer">
+                Pedir cambio de contraseña al primer inicio
+              </Label>
             </div>
             <div>
               <Label>{t.usuarios.nombreCompletoReq}</Label>

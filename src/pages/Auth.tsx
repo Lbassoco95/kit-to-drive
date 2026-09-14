@@ -8,12 +8,13 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
-import { Building2, Wrench, Truck, Briefcase, Wallet } from "lucide-react";
+import { Building2, Wrench, Truck, Briefcase, Wallet, Crown } from "lucide-react";
 
 const DEMO_ROLES = [
   { email: "admin@dazon.demo",     pwd: "Dazon2026!", labelKey: "direccion" as const,  icon: Building2 },
   { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", labelKey: "fabrica" as const,   icon: Wrench },
   { email: "logistica@dazon.demo", pwd: "Dazon2026!", labelKey: "logistica" as const, icon: Truck },
+  { email: "gerente@dazon.demo",   pwd: "Dazon2026!", labelKey: "gerente" as const,   icon: Crown },
   { email: "ventas@dazon.demo",    pwd: "Dazon2026!", labelKey: "ventas" as const,     icon: Briefcase },
   { email: "finanzas@dazon.demo",  pwd: "Dazon123!$", labelKey: "finanzas" as const,  icon: Wallet },
 ];

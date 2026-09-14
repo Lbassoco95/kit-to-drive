@@ -226,6 +226,7 @@ export const zh = {
     fabrica: "工厂",
     logistica: "物流",
     ventas: "销售",
+    gerente: "商务经理",
     coordinador: "商务协调员",
     director_ventas: "销售总监",
     coordinador_ventas: "销售协调员",

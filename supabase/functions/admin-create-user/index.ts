@@ -48,13 +48,15 @@ serve(async (req) => {
 
     // 2. Parsear body
     const body = await req.json();
-    const { email, password, nombre_completo, codigo_vendedor } = body;
+    const { email, password, nombre_completo, codigo_vendedor, force_password_change } = body;
 
     if (!email || !password || !nombre_completo) {
       return new Response(JSON.stringify({ error: "email, password y nombre_completo son obligatorios" }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" }
       });
     }
+
+    const mustChangePassword = force_password_change === true;
 
     const AREAS = ["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"];
     const NIVELES = ["operador", "supervisor", "admin"];
@@ -132,10 +134,16 @@ serve(async (req) => {
     const existente = (list?.users ?? []).find((u) => u.email?.toLowerCase() === email.toLowerCase());
     let uid: string;
 
+    const userMetadata = {
+      must_change_password: mustChangePassword,
+      full_name: nombre_completo.trim(),
+    };
+
     if (existente) {
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(existente.id, {
         password,
         email_confirm: true,
+        user_metadata: { ...(existente.user_metadata || {}), ...userMetadata },
       });
       if (updateErr) {
         return new Response(JSON.stringify({ error: updateErr.message }), {
@@ -148,6 +156,7 @@ serve(async (req) => {
         email,
         password,
         email_confirm: true,
+        user_metadata: userMetadata,
       });
       if (createErr) {
         return new Response(JSON.stringify({ error: createErr.message }), {
