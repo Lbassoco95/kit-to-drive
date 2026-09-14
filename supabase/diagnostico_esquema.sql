@@ -208,6 +208,9 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial edita sus remisiones'),
   ('20260902000001_operador_edita_remisiones',    'politica|remisiones.comercial captura remisiones'),
 
+  -- Fix: usuarios de Finanzas deben poder ver/descargar PDFs de remisiones.
+  ('20260902223156_fix_remisiones_docs_lectura_finanzas', 'politica|storage.objects.leer docs remisiones operativos'),
+
   -- Avisos entre áreas y liberación de unidades
   ('20260903000001_avisos_entre_areas',           'tabla|avisos'),
   ('20260903000001_avisos_entre_areas',           'funcion|recibe_avisos_de(user_area,uuid)'),
