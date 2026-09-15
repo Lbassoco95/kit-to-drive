@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   validarMovimiento, requiereComprobacion, faltanteComprobacion, totalesMXN,
-  coincideBusqueda, formVacio, fmtFecha, etiquetaVia, etiquetaIntermediario,
+  coincideBusqueda, formVacio, fmtFecha, etiquetaVia, etiquetaIntermediario, totalYMes,
   type Cuenta, type Movimiento, type MovimientoForm,
 } from "@/lib/finanzas";
 
@@ -285,5 +285,32 @@ describe("formVacio", () => {
     expect(f.metodo_pago).toBe("EFECTIVO");
     expect(f.via).toBe("DIRECTO");
     expect(f.fecha_movimiento).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("totalYMes", () => {
+  it("lista vacía da ceros", () => {
+    expect(totalYMes([], "2026-09")).toEqual({ total: 0, mes: 0 });
+  });
+
+  it("suma el total histórico y solo el mes en curso", () => {
+    const filas = [
+      { monto: 100, fecha: "2026-09-03" },
+      { monto: 50, fecha: "2026-09-15T10:00:00Z" },
+      { monto: 70, fecha: "2026-08-20" },
+    ];
+    expect(totalYMes(filas, "2026-09")).toEqual({ total: 220, mes: 150 });
+  });
+
+  it("tolera monto y fecha nulos", () => {
+    const filas = [
+      { monto: null, fecha: "2026-09-03" },
+      { monto: 40, fecha: null },
+    ];
+    expect(totalYMes(filas, "2026-09")).toEqual({ total: 40, mes: 0 });
+  });
+
+  it("redondea a centavos", () => {
+    expect(totalYMes([{ monto: 0.1, fecha: null }, { monto: 0.2, fecha: null }], "2026-09").total).toBe(0.3);
   });
 });

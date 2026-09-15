@@ -426,3 +426,17 @@ export function rutaAdjunto(movimientoId: string, nombreArchivo: string): string
   const slug = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   return `movimientos/${movimientoId}/${slug}.${ext}`;
 }
+
+/** Total histórico y del mes en curso (YYYY-MM) de una lista de importes con fecha. */
+export function totalYMes(
+  filas: { monto: number | null | undefined; fecha: string | null | undefined }[],
+  mesActual: string,
+): { total: number; mes: number } {
+  let total = 0, mes = 0;
+  for (const f of filas) {
+    const v = Number(f.monto ?? 0);
+    total += v;
+    if (f.fecha && f.fecha.slice(0, 7) === mesActual) mes += v;
+  }
+  return { total: Math.round(total * 100) / 100, mes: Math.round(mes * 100) / 100 };
+}

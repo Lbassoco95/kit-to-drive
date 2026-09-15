@@ -5,12 +5,13 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, CatalogoModelos, nombreComercial, displayFabrica } from "@/lib/dazon";
-import { fmtMoneda } from "@/lib/finanzas";
+import { fmtMoneda, totalYMes } from "@/lib/finanzas";
+import { fdb } from "@/lib/finanzasDb";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
 import { ResumenAvisos } from "@/components/BandejaAvisos";
-import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, TrendingUp, DollarSign, type LucideIcon } from "lucide-react";
+import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, TrendingUp, DollarSign, Wallet, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const CAPACIDAD = 4;
@@ -241,7 +242,7 @@ export default function Dashboard() {
       {/* Avisos de otra área sin acusar. Sólo se dibuja si hay. */}
       <ResumenAvisos onClick={() => nav("/produccion")} />
 
-      {area === "direccion" && (
+      {(area === "direccion" || area === "administracion") && (
         <div className="space-y-8">
           <SeccionDashboard titulo={t.dashboard.seccionOperacion} subtitulo={t.dashboard.seccionOperacionSub}>
             <InventarioStatus />
@@ -311,6 +312,10 @@ export default function Dashboard() {
                 </div>
               </Card>
             )}
+          </SeccionDashboard>
+
+          <SeccionDashboard titulo={t.dashboard.seccionFinanzas} subtitulo={t.dashboard.seccionFinanzasSub}>
+            <ResumenFinanciero />
           </SeccionDashboard>
 
           <SeccionDashboard titulo={t.dashboard.seccionAvance}>
@@ -453,6 +458,84 @@ function ProximasOrdenes({ motos, catalogo, t }: { motos: any[]; catalogo: Catal
   );
 }
 
+// Tarjetas financieras destacadas: dinero recibido (Control Financiero) y
+// monto vendido (CRM), con total histórico y mes en curso.
+function ResumenFinanciero() {
+  const { t } = useLang();
+  const nav = useNavigate();
+  const e = t.dashboard.ejecutivo;
+  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState({
+    dineroRecibido: { total: 0, mes: 0 },
+    montoVendido: { total: 0, mes: 0 },
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    const cargar = async () => {
+      const mesActual = new Date().toISOString().slice(0, 7);
+      const [{ data: movs }, { data: opsGanadasData }] = await Promise.all([
+        fdb.from("movimientos_financieros").select("monto_mxn, fecha_movimiento").eq("tipo", "INGRESO").eq("estatus", "CONFIRMADO"),
+        supabase.from("crm_oportunidades").select("valor_estimado, fecha_cierre_real").eq("etapa", "ganada"),
+      ]);
+
+      const dineroRecibido = totalYMes(
+        (movs ?? []).map((m: { monto_mxn: number | null; fecha_movimiento: string | null }) => ({ monto: m.monto_mxn, fecha: m.fecha_movimiento })),
+        mesActual,
+      );
+      const montoVendido = totalYMes(
+        (opsGanadasData ?? []).map((o: { valor_estimado: number | null; fecha_cierre_real: string | null }) => ({ monto: o.valor_estimado, fecha: o.fecha_cierre_real })),
+        mesActual,
+      );
+
+      if (mounted) {
+        setKpis({ dineroRecibido, montoVendido });
+        setLoading(false);
+      }
+    };
+    cargar();
+    return () => { mounted = false; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="grid md:grid-cols-2 gap-3">
+        <Skeleton className="h-36" />
+        <Skeleton className="h-36" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid md:grid-cols-2 gap-3">
+      <button onClick={() => nav("/finanzas")} className="text-left">
+        <Card className="p-5 bg-emerald-50 border-emerald-100 h-full hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Wallet size={18} className="text-emerald-600" /> {e.dineroRecibido}
+          </div>
+          <div className="text-3xl font-extrabold text-emerald-600 mt-1">{fmtMoneda(kpis.dineroRecibido.total)}</div>
+          <div className="text-sm text-muted-foreground mt-1">
+            {e.mesEnCurso}: <span className="font-semibold text-emerald-700">{fmtMoneda(kpis.dineroRecibido.mes)}</span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">{e.dineroRecibidoNota}</div>
+        </Card>
+      </button>
+      <button onClick={() => nav("/crm/oportunidades")} className="text-left">
+        <Card className="p-5 bg-yellow-50 border-yellow-100 h-full hover:shadow-md transition-shadow">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <DollarSign size={18} className="text-yellow-600" /> {e.montoVendido}
+          </div>
+          <div className="text-3xl font-extrabold text-yellow-600 mt-1">{fmtMoneda(kpis.montoVendido.total)}</div>
+          <div className="text-sm text-muted-foreground mt-1">
+            {e.mesEnCurso}: <span className="font-semibold text-yellow-700">{fmtMoneda(kpis.montoVendido.mes)}</span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">{e.montoVendidoNota}</div>
+        </Card>
+      </button>
+    </div>
+  );
+}
+
 // Resumen ejecutivo para Administración / Finanzas: une dinero, motocarros
 // y actividad del equipo comercial en una vista estratégica.
 function ResumenEjecutivo() {
@@ -468,7 +551,6 @@ function ResumenEjecutivo() {
     remisionesParciales: 0,
     oportunidadesTotal: 0,
     oportunidadesGanadas: 0,
-    oportunidadesMonto: 0,
     actividadesMes: 0,
     topVendedores: [] as { nombre: string; monto: number }[],
   });
@@ -505,8 +587,6 @@ function ResumenEjecutivo() {
       const remisionesCompletas = (rems ?? []).filter((r: any) => r.estatus === "COMPLETA").length;
       const remisionesParciales = (rems ?? []).filter((r: any) => r.estatus === "PARCIAL").length;
 
-      const montoTotal = (opsGanadasData ?? []).reduce((s: number, o: any) => s + (o.valor_estimado || 0), 0);
-
       const vendedorMontos: Record<string, number> = {};
       (opsGanadasData ?? []).forEach((o: any) => {
         if (o.vendedor_id && o.valor_estimado) {
@@ -534,7 +614,6 @@ function ResumenEjecutivo() {
           remisionesParciales,
           oportunidadesTotal: opsTotal || 0,
           oportunidadesGanadas: opsGanadas || 0,
-          oportunidadesMonto: montoTotal,
           actividadesMes: actividades || 0,
           topVendedores,
         });
@@ -588,12 +667,6 @@ function ResumenEjecutivo() {
             <CheckCircle size={18} className="text-green-600" /> {e.oportunidadesGanadas}
           </div>
           <div className="text-3xl font-extrabold text-green-600 mt-1">{kpis.oportunidadesGanadas}</div>
-        </Card>
-        <Card className="p-4 bg-yellow-50 border-yellow-100">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <DollarSign size={18} className="text-yellow-600" /> {e.montoGanado}
-          </div>
-          <div className="text-2xl font-extrabold text-yellow-600 mt-1">{fmtMoneda(kpis.oportunidadesMonto)}</div>
         </Card>
         <Card className="p-4 bg-indigo-50 border-indigo-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
