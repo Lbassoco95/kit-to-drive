@@ -956,6 +956,14 @@ export const es = {
     creado: (email: string) => `✓ Usuario ${email} creado`,
   },
 
+  // Administración desde Mati
+  matiAdmin: {
+    titulo: "Administración desde Mati",
+    descripcion: "Kit-to-Drive se administra desde el panel de Mati. Altas, bajas y configuración general se hacen ahí.",
+    abrir: "Abrir Mati Admin",
+    editarEnMati: "Esta configuración se edita desde Mati Admin",
+  },
+
   // Bitácora
   bitacora: {
     title: "Bitácora",

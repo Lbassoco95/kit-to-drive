@@ -1,3 +1,6 @@
 project_id = "dmhzhyeivvuliumcgsmm"
 [functions.seed-demo-users]
 verify_jwt = false
+# Auth propia por secreto compartido con mati-api (ver docs/admin-desde-mati.md).
+[functions.mati-admin-bridge]
+verify_jwt = false

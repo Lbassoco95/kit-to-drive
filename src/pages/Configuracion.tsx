@@ -8,12 +8,15 @@ import { toast } from "sonner";
 import { useLang } from "@/contexts/LangContext";
 import { explicarError } from "@/lib/dazon";
 import { AlertTriangle } from "lucide-react";
+import { MatiAdminBanner } from "@/components/MatiAdminBanner";
+import { adminGestionadoDesdeMati } from "@/lib/matiAdmin";
 
 export default function Configuracion() {
   const [cfg, setCfg] = useState<any>(null);
   const [cargando, setCargando] = useState(true);
   const [problema, setProblema] = useState<string | null>(null);
   const { t } = useLang();
+  const soloLectura = adminGestionadoDesdeMati();
 
   useEffect(() => {
     supabase.from("config_general").select("*").eq("id", 1).maybeSingle().then(({ data, error }) => {
@@ -24,6 +27,10 @@ export default function Configuracion() {
   }, [t.configuracion.errorLeer]);
 
   const save = async () => {
+    if (soloLectura) {
+      toast.error(t.matiAdmin.editarEnMati);
+      return;
+    }
     const { error } = await supabase.from("config_general").update(cfg).eq("id", 1);
     if (error) toast.error(explicarError(error, t.configuracion.errorGuardar));
     else toast.success(t.configuracion.guardada);
@@ -39,6 +46,7 @@ export default function Configuracion() {
   if (!cfg) {
     return (
       <div className="space-y-4 max-w-xl">
+        <MatiAdminBanner />
         <h1>{t.configuracion.title}</h1>
         <Card className="p-6 space-y-3">
           <div className="flex items-center gap-2 text-amber-700 font-medium">
@@ -59,19 +67,34 @@ export default function Configuracion() {
 
   return (
     <div className="space-y-4 max-w-xl">
+      <MatiAdminBanner />
       <h1>{t.configuracion.title}</h1>
       <Card className="p-6 space-y-4">
         <div>
           <Label>{t.configuracion.nombreEmpresa}</Label>
-          <Input value={cfg.empresa_nombre} onChange={e => setCfg({ ...cfg, empresa_nombre: e.target.value })} />
+          <Input
+            value={cfg.empresa_nombre}
+            disabled={soloLectura}
+            onChange={e => setCfg({ ...cfg, empresa_nombre: e.target.value })}
+          />
         </div>
         <div>
           <Label>{t.configuracion.capacidadDiaria}</Label>
-          <Input type="number" value={cfg.capacidad_diaria} onChange={e => setCfg({ ...cfg, capacidad_diaria: Number(e.target.value) })} />
+          <Input
+            type="number"
+            value={cfg.capacidad_diaria}
+            disabled={soloLectura}
+            onChange={e => setCfg({ ...cfg, capacidad_diaria: Number(e.target.value) })}
+          />
         </div>
         <div>
           <Label>{t.configuracion.plazoMaxCredito}</Label>
-          <Input type="number" value={cfg.plazo_max_credito_dias} onChange={e => setCfg({ ...cfg, plazo_max_credito_dias: Number(e.target.value) })} />
+          <Input
+            type="number"
+            value={cfg.plazo_max_credito_dias}
+            disabled={soloLectura}
+            onChange={e => setCfg({ ...cfg, plazo_max_credito_dias: Number(e.target.value) })}
+          />
         </div>
         {/* El lote de unidades que ya estaban ensambladas antes del sistema es
             cerrado. El tope vive aquí para que se pueda subir sin un
@@ -79,11 +102,16 @@ export default function Configuracion() {
         {cfg.limite_ya_armados !== undefined && (
           <div>
             <Label>{t.configuracion.limiteYaArmados}</Label>
-            <Input type="number" min={0} value={cfg.limite_ya_armados}
-              onChange={e => setCfg({ ...cfg, limite_ya_armados: Number(e.target.value) })} />
+            <Input
+              type="number"
+              min={0}
+              value={cfg.limite_ya_armados}
+              disabled={soloLectura}
+              onChange={e => setCfg({ ...cfg, limite_ya_armados: Number(e.target.value) })}
+            />
           </div>
         )}
-        <Button onClick={save}>{t.actions.save}</Button>
+        {!soloLectura && <Button onClick={save}>{t.actions.save}</Button>}
       </Card>
     </div>
   );
