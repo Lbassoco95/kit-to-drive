@@ -29,6 +29,7 @@ import CrmRutas from "./pages/crm/CrmRutas";
 import CrmEquipo from "./pages/crm/CrmEquipo";
 import CrmTracker from "./pages/crm/CrmTracker";
 import Inventario from "./pages/Inventario";
+import AlmacenRefacciones from "./pages/AlmacenRefacciones";
 import Incidencias from "./pages/Incidencias";
 import NotFound from "./pages/NotFound";
 
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/produccion" element={<ProtectedRoute modulo="produccion"><Produccion /></ProtectedRoute>} />
               <Route path="/inventario" element={<ProtectedRoute modulo="inventario"><Inventario /></ProtectedRoute>} />
+              <Route path="/almacen-refacciones" element={<ProtectedRoute><AlmacenRefacciones /></ProtectedRoute>} />
               <Route path="/incidencias" element={<ProtectedRoute modulo="inventario"><Incidencias /></ProtectedRoute>} />
               <Route path="/reportes-turno" element={<ProtectedRoute modulo="reportesTurno"><ReportesTurno /></ProtectedRoute>} />
               <Route path="/remisiones" element={<ProtectedRoute modulo="remisiones"><Remisiones /></ProtectedRoute>} />

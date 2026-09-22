@@ -244,8 +244,19 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260908000002_tope_unidades_ya_armadas',     'vista|v_carga_ya_armados'),
   ('20260908000002_tope_unidades_ya_armadas',     'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|limite_ya_armados'),
 
-  -- Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
+  // Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
   ('20260908000003_crm_tipos_actividad',          'restriccion|crm_actividades.crm_actividades_tipo_check|videollamada'),
+
+  -- Almacén de refacciones para venta (lista de precios, códigos duales, compat).
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_productos'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_codigos'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_unidades'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_producto_compat'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_movimientos'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_acceso'),
+  ('20260922000001_almacen_refacciones',          'funcion|puede_ver_almacen_refacciones(uuid)'),
+  ('20260922000001_almacen_refacciones',          'funcion|importar_almacen_refacciones(jsonb)'),
+  ('20260922000001_almacen_refacciones',          'vista|v_almacen_refacciones'),
 
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),

@@ -26,5 +26,10 @@ dist-ssr
 # Environment variables
 .env
 
+# Seed local del almacén de refacciones (se regenera con el script)
+data/almacen_refacciones_seed.json
+data/sql_batches/
+tmp_*.sql
+
 # Supabase CLI temporary files
 supabase/.temp/

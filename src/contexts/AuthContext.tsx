@@ -37,6 +37,8 @@ interface AuthCtx {
   loading: boolean;
   /** Si el usuario debe cambiar su contraseña antes de continuar. */
   requiresPasswordChange: boolean;
+  /** Allowlist del módulo Almacén de refacciones (independiente de área/nivel). */
+  puedeVerRefacciones: boolean;
   signOut: () => Promise<void>;
   refreshRole: () => Promise<void>;
   changePassword: (newPassword: string) => Promise<{ error: Error | null }>;
@@ -56,6 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileName, setProfileName] = useState("");
   const [loading, setLoading] = useState(true);
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
+  const [puedeVerRefacciones, setPuedeVerRefacciones] = useState(false);
 
   // Refs para poder comparar sin arrastrar closures viejos dentro de los
   // listeners de foco/visibilidad, que se registran una sola vez.
@@ -64,12 +67,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const lastCheckRef = useRef(0);
 
   const loadRole = async (uid: string, { notificar = false } = {}) => {
-    const { data: r, error } = await supabase
-      .from("user_roles")
-      .select("role, nivel, area")
-      .eq("user_id", uid)
-      .limit(1)
-      .maybeSingle();
+    const [{ data: r, error }, refacc] = await Promise.all([
+      supabase
+        .from("user_roles")
+        .select("role, nivel, area")
+        .eq("user_id", uid)
+        .limit(1)
+        .maybeSingle(),
+      supabase.rpc("puede_ver_almacen_refacciones" as any, { _user_id: uid }),
+    ]);
 
     // Un error de red no debe borrar los permisos que ya teníamos: dejarlos
     // como están y reintentar en el siguiente ciclo es mejor que degradarlos.
@@ -84,6 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const nuevaArea  = (r?.area  as Area)  ?? (legacy ? fallback.area  : null);
     setNivel(nuevoNivel);
     setArea(nuevaArea);
+    setPuedeVerRefacciones(!refacc.error && !!refacc.data);
 
     const firma  = `${nuevaArea ?? "—"}|${nuevoNivel ?? "—"}`;
     const cambio = permsRef.current !== null && permsRef.current !== firma;
@@ -109,6 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const clear = () => {
     setRole(null); setNivel(null); setArea(null); setProfileName(""); setActivo(true);
     setRequiresPasswordChange(false);
+    setPuedeVerRefacciones(false);
     permsRef.current = null;
   };
 
@@ -180,7 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshRole = async () => { if (uidRef.current) await loadRole(uidRef.current); };
 
   return (
-    <Ctx.Provider value={{ user, session, nivel, area, perms, role, activo, profileName, loading, requiresPasswordChange, signOut, refreshRole, changePassword }}>
+    <Ctx.Provider value={{ user, session, nivel, area, perms, role, activo, profileName, loading, requiresPasswordChange, puedeVerRefacciones, signOut, refreshRole, changePassword }}>
       {children}
       {user && requiresPasswordChange && (
         <ForcePasswordChange onChangePassword={changePassword} onSignOut={signOut} />

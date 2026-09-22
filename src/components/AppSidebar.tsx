@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert, Boxes } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -10,13 +10,23 @@ import { useLang } from "@/contexts/LangContext";
 
 type Group = "Inicio" | "Operación" | "Catálogos" | "CRM" | "Finanzas" | "Sistema";
 
-type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; icon: any; modulo: Modulo; group: Group };
+type Item = {
+  key: keyof ReturnType<typeof useLang>["t"]["nav"];
+  url: string;
+  icon: any;
+  modulo?: Modulo;
+  /** Acceso por allowlist (p.ej. almacén de refacciones), no por área×nivel. */
+  requiereRefacciones?: boolean;
+  group: Group;
+};
 
-// La visibilidad la resuelven los permisos del módulo (área × tipo de usuario).
+// La visibilidad la resuelven los permisos del módulo (área × tipo de usuario),
+// salvo ítems con `requiereRefacciones` (allowlist en base).
 const ITEMS: Item[] = [
   { key: "dashboard",       url: "/",                 icon: LayoutDashboard, modulo: "dashboard",     group: "Inicio"    },
   { key: "produccion",      url: "/produccion",       icon: Factory,         modulo: "produccion",    group: "Operación" },
   { key: "inventario",      url: "/inventario",       icon: Package,         modulo: "inventario",    group: "Operación" },
+  { key: "almacenRefacciones", url: "/almacen-refacciones", icon: Boxes, requiereRefacciones: true, group: "Operación" },
   { key: "incidencias",     url: "/incidencias",      icon: TriangleAlert,   modulo: "inventario",    group: "Operación" },
   { key: "reportesTurno",   url: "/reportes-turno",   icon: ClipboardList,   modulo: "reportesTurno", group: "Operación" },
   { key: "remisiones",      url: "/remisiones",       icon: FileText,        modulo: "remisiones",    group: "Operación" },
@@ -42,9 +52,14 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
-  const { perms, area, nivel } = useAuth();
+  const { perms, area, nivel, puedeVerRefacciones } = useAuth();
   const { t, toggleLang } = useLang();
-  const items = area && nivel ? ITEMS.filter(i => perms.puedeVer(i.modulo)) : [];
+  const items = area && nivel
+    ? ITEMS.filter(i => {
+        if (i.requiereRefacciones) return puedeVerRefacciones;
+        return i.modulo ? perms.puedeVer(i.modulo) : false;
+      })
+    : [];
 
   return (
     <Sidebar collapsible="icon">
