@@ -10,8 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Package, Search, Upload, Bike, RefreshCw, Eye, EyeOff } from "lucide-react";
-import { parseListaPreciosRefacciones } from "@/lib/refaccionesParser";
+import { Package, Search, Upload, Bike, RefreshCw, Eye, EyeOff, Wand2 } from "lucide-react";
+import { extractCompat, parseListaPreciosRefacciones } from "@/lib/refaccionesParser";
 import { explicarError } from "@/lib/dazon";
 
 type Producto = {
@@ -31,7 +31,14 @@ type Producto = {
   num_compatibilidades: number;
 };
 
-type Compat = { id: string; nombre: string; tipo_unidad: string | null };
+type Compat = {
+  id: string;
+  nombre: string;
+  tipo_unidad: string | null;
+  piezas_compartidas?: number;
+};
+
+type UnidadFiltro = { id: string; nombre: string; piezas: number };
 
 const LINEA_LABEL: Record<string, string> = {
   linea_dorada: "Línea dorada",
@@ -48,9 +55,30 @@ export default function AlmacenRefacciones() {
   const [linea, setLinea] = useState<string>("todas");
   const [soloVisibles, setSoloVisibles] = useState(false);
   const [soloConCompat, setSoloConCompat] = useState(false);
+  const [unidadFiltro, setUnidadFiltro] = useState<string>("todas");
+  const [unidades, setUnidades] = useState<UnidadFiltro[]>([]);
+  const [idsPorUnidad, setIdsPorUnidad] = useState<Set<string>>(new Set());
   const [importando, setImportando] = useState(false);
+  const [reprocesando, setReprocesando] = useState(false);
   const [detalle, setDetalle] = useState<Producto | null>(null);
   const [compats, setCompats] = useState<Compat[]>([]);
+
+  const loadUnidades = useCallback(async () => {
+    const { data } = await supabase
+      .from("almacen_refacciones_unidades" as any)
+      .select("id, nombre, almacen_refacciones_producto_compat(count)")
+      .order("nombre")
+      .limit(5000);
+    const list: UnidadFiltro[] = ((data as any[]) ?? [])
+      .map(u => ({
+        id: u.id as string,
+        nombre: u.nombre as string,
+        piezas: Number(u.almacen_refacciones_producto_compat?.[0]?.count ?? 0),
+      }))
+      .filter(u => u.piezas > 0)
+      .sort((a, b) => b.piezas - a.piezas || a.nombre.localeCompare(b.nombre));
+    setUnidades(list);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,11 +94,29 @@ export default function AlmacenRefacciones() {
       setRows(((data as unknown) as Producto[]) ?? []);
     }
     setLoading(false);
-  }, [t]);
+    void loadUnidades();
+  }, [t, loadUnidades]);
 
   useEffect(() => {
     if (puedeVerRefacciones) load();
   }, [puedeVerRefacciones, load]);
+
+  useEffect(() => {
+    if (unidadFiltro === "todas") {
+      setIdsPorUnidad(new Set());
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("almacen_refacciones_producto_compat" as any)
+        .select("producto_id")
+        .eq("unidad_id", unidadFiltro);
+      if (cancelled) return;
+      setIdsPorUnidad(new Set(((data as any[]) ?? []).map(x => x.producto_id as string)));
+    })();
+    return () => { cancelled = true; };
+  }, [unidadFiltro]);
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -78,6 +124,7 @@ export default function AlmacenRefacciones() {
       if (linea !== "todas" && r.linea_catalogo !== linea) return false;
       if (soloVisibles && !r.visible_venta) return false;
       if (soloConCompat && !(r.num_compatibilidades > 0)) return false;
+      if (unidadFiltro !== "todas" && !idsPorUnidad.has(r.id)) return false;
       if (!term) return true;
       const blob = [
         r.codigo_nuevo, r.codigo_antiguo, r.clave_completa,
@@ -85,27 +132,35 @@ export default function AlmacenRefacciones() {
       ].filter(Boolean).join(" ").toLowerCase();
       return blob.includes(term);
     });
-  }, [rows, q, linea, soloVisibles, soloConCompat]);
+  }, [rows, q, linea, soloVisibles, soloConCompat, unidadFiltro, idsPorUnidad]);
 
   const stats = useMemo(() => {
     const dual = rows.filter(r => r.codigo_antiguo).length;
     const conCompat = rows.filter(r => r.num_compatibilidades > 0).length;
     const stock = rows.reduce((s, r) => s + (r.stock || 0), 0);
-    return { total: rows.length, dual, conCompat, stock };
-  }, [rows]);
+    return { total: rows.length, dual, conCompat, stock, unidades: unidades.length };
+  }, [rows, unidades]);
 
   const abrirDetalle = async (p: Producto) => {
     setDetalle(p);
+    setCompats([]);
     const { data } = await supabase
       .from("almacen_refacciones_producto_compat" as any)
       .select("unidad_id, almacen_refacciones_unidades(id, nombre, tipo_unidad)")
       .eq("producto_id", p.id);
-    const list: Compat[] = ((data as any[]) ?? []).map(x => ({
+    const base: Compat[] = ((data as any[]) ?? []).map(x => ({
       id: x.almacen_refacciones_unidades?.id ?? x.unidad_id,
       nombre: x.almacen_refacciones_unidades?.nombre ?? "—",
       tipo_unidad: x.almacen_refacciones_unidades?.tipo_unidad ?? null,
+      piezas_compartidas: unidades.find(u => u.id === (x.almacen_refacciones_unidades?.id ?? x.unidad_id))?.piezas ?? 0,
     }));
-    setCompats(list);
+    setCompats(base.sort((a, b) => a.nombre.localeCompare(b.nombre)));
+  };
+
+  const filtrarPorUnidad = (unidadId: string) => {
+    setUnidadFiltro(unidadId);
+    setDetalle(null);
+    setSoloConCompat(true);
   };
 
   const onImport = async (file: File) => {
@@ -138,6 +193,39 @@ export default function AlmacenRefacciones() {
     }
   };
 
+  /** Vuelve a extraer descripción vs compatibilidades de lo ya cargado. */
+  const reprocesarCompat = async () => {
+    setReprocesando(true);
+    try {
+      const payload = rows.map(r => {
+        const { corta, comps } = extractCompat(r.descripcion);
+        return {
+          codigo_nuevo: r.codigo_nuevo,
+          descripcion_corta: corta,
+          compatibilidades: comps,
+        };
+      });
+      let procesados = 0;
+      const CHUNK = 100;
+      for (let i = 0; i < payload.length; i += CHUNK) {
+        const chunk = payload.slice(i, i + CHUNK);
+        const { data, error } = await supabase.rpc("sincronizar_compat_refacciones" as any, {
+          _items: chunk,
+        });
+        if (error) throw error;
+        procesados += (data as any)?.procesados ?? chunk.length;
+      }
+      toast.success(
+        (t.almacenRefacciones?.okReprocesados ?? ((n: number) => `Compatibilidades actualizadas en ${n} productos`))(procesados),
+      );
+      await load();
+    } catch (e: any) {
+      toast.error(explicarError(e, t.almacenRefacciones?.errorReprocesar ?? "Error al reprocesar"));
+    } finally {
+      setReprocesando(false);
+    }
+  };
+
   if (!puedeVerRefacciones) {
     return (
       <div className="p-8 text-center text-muted-foreground">
@@ -149,17 +237,19 @@ export default function AlmacenRefacciones() {
   const money = (n: number | null) =>
     n == null ? "—" : n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
+  const unidadFiltroNombre = unidades.find(u => u.id === unidadFiltro)?.nombre;
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[#1F3864] flex items-center gap-2">
             <Package className="h-7 w-7" />
-            {t.almacenRefacciones?.titulo ?? "Almacén de refacciones"}
+            {t.almacenRefacciones?.titulo ?? "Inventario de refacciones"}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
             {t.almacenRefacciones?.subtitulo ??
-              "Catálogo de venta con código nuevo/antiguo y compatibilidades por unidad"}
+              "Catálogo de venta independiente. Descripción del producto y motos/unidades compatibles reutilizables."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -167,29 +257,35 @@ export default function AlmacenRefacciones() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             {t.almacenRefacciones?.actualizar ?? "Actualizar"}
           </Button>
-            <Button asChild disabled={importando}>
-              <label className="cursor-pointer inline-flex items-center justify-center gap-2">
-                <input
-                  type="file"
-                  accept=".xlsx,.xls"
-                  className="hidden"
-                  disabled={importando}
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) onImport(f);
-                    e.target.value = "";
-                  }}
-                />
-                <Upload className="h-4 w-4" />
-                {importando
-                  ? (t.almacenRefacciones?.importando ?? "Importando…")
-                  : (t.almacenRefacciones?.importar ?? "Importar lista")}
-              </label>
-            </Button>
+          <Button variant="outline" onClick={reprocesarCompat} disabled={reprocesando || !rows.length}>
+            <Wand2 className={`h-4 w-4 mr-2 ${reprocesando ? "animate-spin" : ""}`} />
+            {reprocesando
+              ? (t.almacenRefacciones?.reprocesando ?? "Reprocesando…")
+              : (t.almacenRefacciones?.reprocesar ?? "Actualizar compatibilidades")}
+          </Button>
+          <Button asChild disabled={importando}>
+            <label className="cursor-pointer inline-flex items-center justify-center gap-2">
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                disabled={importando}
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) onImport(f);
+                  e.target.value = "";
+                }}
+              />
+              <Upload className="h-4 w-4" />
+              {importando
+                ? (t.almacenRefacciones?.importando ?? "Importando…")
+                : (t.almacenRefacciones?.importar ?? "Importar lista")}
+            </label>
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statProductos ?? "Productos"}</div>
           <div className="text-2xl font-bold text-[#1F3864]">{stats.total}</div>
@@ -203,24 +299,28 @@ export default function AlmacenRefacciones() {
           <div className="text-2xl font-bold text-[#1F3864]">{stats.conCompat}</div>
         </Card>
         <Card className="p-4">
+          <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statUnidades ?? "Motos/unidades"}</div>
+          <div className="text-2xl font-bold text-[#1F3864]">{stats.unidades}</div>
+        </Card>
+        <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statStock ?? "Piezas en stock"}</div>
           <div className="text-2xl font-bold text-[#1F3864]">{stats.stock.toLocaleString("es-MX")}</div>
         </Card>
       </div>
 
       <Card className="p-4 space-y-3">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="relative flex-1">
+        <div className="flex flex-col md:flex-row gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-9"
-              placeholder={t.almacenRefacciones?.buscar ?? "Buscar por código nuevo, antiguo, descripción o moto…"}
+              placeholder={t.almacenRefacciones?.buscar ?? "Buscar por código, descripción o moto…"}
               value={q}
               onChange={e => setQ(e.target.value)}
             />
           </div>
           <Select value={linea} onValueChange={setLinea}>
-            <SelectTrigger className="w-full md:w-52">
+            <SelectTrigger className="w-full md:w-48">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -228,6 +328,21 @@ export default function AlmacenRefacciones() {
               <SelectItem value="linea_dorada">{LINEA_LABEL.linea_dorada}</SelectItem>
               <SelectItem value="ref_motocarro">{LINEA_LABEL.ref_motocarro}</SelectItem>
               <SelectItem value="linea_azul">{LINEA_LABEL.linea_azul}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={unidadFiltro} onValueChange={setUnidadFiltro}>
+            <SelectTrigger className="w-full md:w-64">
+              <SelectValue placeholder="Compatible con…" />
+            </SelectTrigger>
+            <SelectContent className="max-h-72">
+              <SelectItem value="todas">
+                {t.almacenRefacciones?.todasUnidades ?? "Todas las motos/unidades"}
+              </SelectItem>
+              {unidades.slice(0, 400).map(u => (
+                <SelectItem key={u.id} value={u.id}>
+                  {u.nombre} ({u.piezas})
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Button
@@ -247,6 +362,19 @@ export default function AlmacenRefacciones() {
             {t.almacenRefacciones?.soloCompat ?? "Con compat."}
           </Button>
         </div>
+
+        {unidadFiltro !== "todas" && unidadFiltroNombre && (
+          <div className="flex items-center gap-2 text-sm bg-slate-50 border rounded-md px-3 py-2">
+            <Bike className="h-4 w-4 text-[#1F3864]" />
+            <span>
+              {t.almacenRefacciones?.filtrandoUnidad ?? "Piezas compatibles con"}{" "}
+              <strong>{unidadFiltroNombre}</strong>
+            </span>
+            <Button variant="ghost" size="sm" className="ml-auto h-7" onClick={() => setUnidadFiltro("todas")}>
+              Quitar filtro
+            </Button>
+          </div>
+        )}
 
         <div className="rounded-md border overflow-auto max-h-[65vh]">
           <Table>
@@ -311,53 +439,85 @@ export default function AlmacenRefacciones() {
       </Card>
 
       <Dialog open={!!detalle} onOpenChange={open => { if (!open) setDetalle(null); }}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           {detalle && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-mono">{detalle.codigo_nuevo}</DialogTitle>
-                <DialogDescription>{detalle.descripcion_corta || detalle.descripcion}</DialogDescription>
+                <DialogTitle className="font-mono text-[#1F3864]">{detalle.codigo_nuevo}</DialogTitle>
+                <DialogDescription className="font-mono text-xs">
+                  {detalle.codigo_antiguo
+                    ? `Antiguo: ${detalle.codigo_antiguo} · ${detalle.clave_completa}`
+                    : detalle.clave_completa}
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Código antiguo</div>
-                    <div className="font-mono">{detalle.codigo_antiguo ?? "—"}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Clave completa</div>
-                    <div className="font-mono text-xs">{detalle.clave_completa}</div>
-                  </div>
-                  <div>
+
+              <div className="space-y-4 text-sm">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-md border p-3">
                     <div className="text-xs text-muted-foreground">Precio</div>
-                    <div>{money(detalle.precio)}</div>
+                    <div className="text-lg font-semibold">{money(detalle.precio)}</div>
                   </div>
-                  <div>
+                  <div className="rounded-md border p-3">
                     <div className="text-xs text-muted-foreground">Stock</div>
-                    <div>{detalle.stock}</div>
+                    <div className="text-lg font-semibold">{detalle.stock}</div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Descripción completa</div>
-                  <p className="text-sm leading-relaxed">{detalle.descripcion}</p>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+
+                <section className="rounded-md border p-3 space-y-1.5 bg-slate-50/80">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {t.almacenRefacciones?.seccionDesc ?? "Descripción del producto"}
+                  </h3>
+                  <p className="text-base font-medium leading-snug text-[#1F3864]">
+                    {detalle.descripcion_corta || detalle.descripcion}
+                  </p>
+                  {detalle.categoria && (
+                    <p className="text-xs text-muted-foreground">{detalle.categoria}{detalle.marca ? ` · ${detalle.marca}` : ""}</p>
+                  )}
+                </section>
+
+                <section className="rounded-md border p-3 space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                     <Bike className="h-3.5 w-3.5" />
-                    Compatibilidades ({compats.length})
-                  </div>
+                    {t.almacenRefacciones?.seccionCompat ?? "Compatible con"} ({compats.length})
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {t.almacenRefacciones?.compatHint ??
+                      "Cada moto/unidad se reutiliza en el catálogo. Pulsa una para ver todas las refacciones compatibles con ella."}
+                  </p>
                   {compats.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">Sin unidades parseadas aún</p>
+                    <p className="text-muted-foreground text-sm py-2">
+                      {t.almacenRefacciones?.sinCompat ?? "Sin unidades parseadas — usa «Actualizar compatibilidades»."}
+                    </p>
                   ) : (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {compats.map(c => (
-                        <Badge key={c.id} variant="outline" className="font-normal">
-                          {c.nombre}
-                        </Badge>
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => filtrarPorUnidad(c.id)}
+                          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-left text-sm hover:border-[#1F3864] hover:bg-[#EFF6FF] transition-colors"
+                          title="Ver otras piezas compatibles con esta unidad"
+                        >
+                          <span className="font-medium">{c.nombre}</span>
+                          {c.piezas_compartidas != null && c.piezas_compartidas > 0 && (
+                            <span className="text-[11px] text-muted-foreground tabular-nums">
+                              {c.piezas_compartidas} pzas
+                            </span>
+                          )}
+                        </button>
                       ))}
                     </div>
                   )}
-                </div>
+                </section>
+
+                {detalle.descripcion !== detalle.descripcion_corta && (
+                  <details className="text-xs text-muted-foreground">
+                    <summary className="cursor-pointer hover:text-foreground">
+                      {t.almacenRefacciones?.verOriginal ?? "Ver texto original del Excel"}
+                    </summary>
+                    <p className="mt-2 leading-relaxed whitespace-pre-wrap">{detalle.descripcion}</p>
+                  </details>
+                )}
               </div>
             </>
           )}

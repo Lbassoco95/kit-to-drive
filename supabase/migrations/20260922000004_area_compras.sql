@@ -2,7 +2,7 @@
 -- Área Compras — paso 2/2: rol_legacy, helpers y RLS de proveedores
 -- Fecha: 2026-09-22
 --
--- Requiere que `20260922000002_area_compras_enum.sql` ya haya corrido
+-- Requiere que `20260922000003_area_compras_enum.sql` ya haya corrido
 -- (y hecho COMMIT). Si falta el label `compras` en user_area/app_role,
 -- el preflight se niega a tocar nada.
 --
@@ -20,7 +20,7 @@ BEGIN
       JOIN pg_namespace n ON n.oid = ty.typnamespace
      WHERE n.nspname = 'public' AND ty.typname = 'user_area' AND e.enumlabel = 'compras'
   ) THEN
-    RAISE EXCEPTION 'No se modificó nada. Corre antes 20260922000002_area_compras_enum.sql (y confirma el COMMIT).';
+    RAISE EXCEPTION 'No se modificó nada. Corre antes 20260922000003_area_compras_enum.sql (y confirma el COMMIT).';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_enum e
@@ -28,7 +28,7 @@ BEGIN
       JOIN pg_namespace n ON n.oid = ty.typnamespace
      WHERE n.nspname = 'public' AND ty.typname = 'app_role' AND e.enumlabel = 'compras'
   ) THEN
-    RAISE EXCEPTION 'No se modificó nada. Corre antes 20260922000002_area_compras_enum.sql (falta app_role.compras).';
+    RAISE EXCEPTION 'No se modificó nada. Corre antes 20260922000003_area_compras_enum.sql (falta app_role.compras).';
   END IF;
   IF to_regclass('public.proveedores') IS NULL THEN
     RAISE EXCEPTION 'No se modificó nada. Falta la tabla proveedores (corre antes 20260823000004_finanzas_ingresos_egresos.sql).';

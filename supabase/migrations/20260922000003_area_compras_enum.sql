@@ -4,7 +4,7 @@
 --
 -- Postgres exige COMMIT del ADD VALUE antes de usar el valor nuevo en
 -- funciones o políticas. Por eso este archivo SOLO agrega los labels;
--- el siguiente (`20260922000003_area_compras.sql`) cablea rol_legacy,
+-- el siguiente (`20260922000004_area_compras.sql`) cablea rol_legacy,
 -- helpers y RLS de proveedores.
 --
 -- Corre ESTE primero en el SQL editor, confirma que terminó OK, y luego

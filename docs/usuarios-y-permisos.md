@@ -128,8 +128,8 @@ sólo un filtro de vista del lado del cliente.
   `user_roles.nivel` y `user_roles.area`, helpers de RLS (`es_area`,
   `nivel_al_menos`, `es_admin_area`, `es_admin_global`, `supervisa_area`) y
   políticas por área.
-- `supabase/migrations/20260922000002_area_compras_enum.sql` y
-  `20260922000003_area_compras.sql` — valor `compras` en `user_area` y
+- `supabase/migrations/20260922000003_area_compras_enum.sql` y
+  `20260922000004_area_compras.sql` — valor `compras` en `user_area` y
   `app_role` (paso 1), luego helpers `es_compras` / `es_compras_admin` y
   políticas de escritura en `proveedores` (paso 2; hay que correrlos en
   commits separados porque Postgres no deja usar un enum recién agregado

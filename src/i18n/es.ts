@@ -1091,6 +1091,18 @@ export const es = {
     colCompat: "Compat.",
     vacio: "No hay productos con esos filtros",
     mostrando: (a: number, b: number) => `Mostrando ${a} de ${b}`,
+    statUnidades: "Motos/unidades",
+    reprocesar: "Actualizar compatibilidades",
+    reprocesando: "Reprocesando…",
+    okReprocesados: (n: number) => `Compatibilidades actualizadas en ${n} productos`,
+    errorReprocesar: "Error al actualizar compatibilidades",
+    todasUnidades: "Todas las motos/unidades",
+    filtrandoUnidad: "Piezas compatibles con",
+    seccionDesc: "Descripción del producto",
+    seccionCompat: "Compatible con",
+    compatHint: "Cada moto/unidad se reutiliza en el catálogo. Pulsa una para ver todas las refacciones compatibles con ella.",
+    sinCompat: "Sin unidades parseadas — usa «Actualizar compatibilidades».",
+    verOriginal: "Ver texto original del Excel",
   },
 
   // Inventario

@@ -1082,6 +1082,18 @@ export const zh = {
     colCompat: "兼容",
     vacio: "没有符合筛选的产品",
     mostrando: (a: number, b: number) => `显示 ${a} / ${b}`,
+    statUnidades: "车型/单位",
+    reprocesar: "更新兼容性",
+    reprocesando: "处理中…",
+    okReprocesados: (n: number) => `已更新 ${n} 个产品的兼容性`,
+    errorReprocesar: "更新兼容性失败",
+    todasUnidades: "全部车型",
+    filtrandoUnidad: "兼容于",
+    seccionDesc: "产品描述",
+    seccionCompat: "兼容车型",
+    compatHint: "车型在目录中复用。点击可查看所有兼容该车型的配件。",
+    sinCompat: "尚未解析车型 — 请使用「更新兼容性」。",
+    verOriginal: "查看 Excel 原文",
   },
 
   // Inventario
