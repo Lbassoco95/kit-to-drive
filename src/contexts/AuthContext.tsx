@@ -9,7 +9,7 @@ import {
 import ForcePasswordChange from "@/components/ForcePasswordChange";
 
 /** Rol legacy de la base de datos. Se mantiene solo por compatibilidad. */
-export type AppRole = "admin" | "fabrica" | "logistica" | "ventas" | "coordinador" | "director_ventas" | "coordinador_ventas" | "auxiliar_ventas" | "finanzas" | "admin_financiero";
+export type AppRole = "admin" | "fabrica" | "logistica" | "ventas" | "coordinador" | "director_ventas" | "coordinador_ventas" | "auxiliar_ventas" | "finanzas" | "admin_financiero" | "compras";
 
 // Cada cuánto se vuelve a preguntar el nivel/área mientras la pestaña está
 // visible. Los permisos no viajan en el token: las políticas los consultan en

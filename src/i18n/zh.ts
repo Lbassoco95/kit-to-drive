@@ -218,6 +218,7 @@ export const zh = {
     fabrica: "工厂",
     almacen_logistica: "仓储与物流",
     administracion: "行政财务",
+    compras: "采购",
     direccion: "管理层",
   },
 
@@ -234,6 +235,7 @@ export const zh = {
     auxiliar_ventas: "销售助理",
     finanzas: "财务",
     admin_financiero: "财务管理员",
+    compras: "采购",
   },
 
   // Status labels

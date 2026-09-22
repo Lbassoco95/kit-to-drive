@@ -58,7 +58,7 @@ serve(async (req) => {
 
     const mustChangePassword = force_password_change === true;
 
-    const AREAS = ["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"];
+    const AREAS = ["comercial", "fabrica", "almacen_logistica", "administracion", "compras", "direccion"];
     const NIVELES = ["operador", "supervisor", "admin"];
 
     // Traduce un rol del enum legacy al par (área, nivel), para clientes que
@@ -75,6 +75,7 @@ serve(async (req) => {
         case "logistica":          return { area: "almacen_logistica", nivel: "operador"   };
         case "admin_financiero":   return { area: "administracion",    nivel: "admin"      };
         case "finanzas":           return { area: "administracion",    nivel: "operador"   };
+        case "compras":            return { area: "compras",           nivel: "operador"   };
         default:                   return null;
       }
     };
@@ -117,6 +118,7 @@ serve(async (req) => {
       if (a === "fabrica") return "fabrica";
       if (a === "almacen_logistica") return "logistica";
       if (a === "administracion") return n === "operador" ? "finanzas" : "admin_financiero";
+      if (a === "compras") return "compras";
       return n === "admin" ? "admin" : "coordinador"; // direccion
     };
     const rolDerivado = rolLegacy(area, nivel);

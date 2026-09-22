@@ -45,7 +45,7 @@ const FORM_VACIO: FormProveedor = {
 };
 
 export default function Proveedores() {
-  const { user, role } = useAuth();
+  const { user, perms } = useAuth();
   const { t, lang } = useLang();
   const locale = lang === "zh" ? "zh-CN" : "es-MX";
   const navigate = useNavigate();
@@ -62,9 +62,9 @@ export default function Proveedores() {
   const [borrarTarget, setBorrarTarget] = useState<Proveedor | null>(null);
   const [form, setForm] = useState<FormProveedor>({ ...FORM_VACIO });
 
-  const puedeEditar = role === "admin" || role === "admin_financiero" || role === "finanzas";
-  const puedeBorrar = role === "admin" || role === "admin_financiero";
-  const esFinanzas = puedeEditar;
+  const puedeEditar = perms.puedeCrear("proveedores");
+  const puedeBorrar = perms.puedeEliminar("proveedores");
+  const veGastos = perms.puedeVer("finanzas");
 
   const cargar = async () => {
     setCargando(true);
@@ -73,7 +73,7 @@ export default function Proveedores() {
     else setRows(data ?? []);
 
     // Cuánto se le ha pagado a cada proveedor (solo si el rol ve finanzas)
-    if (esFinanzas) {
+    if (veGastos) {
       const { data: movs } = await fdb
         .from("movimientos_financieros")
         .select("proveedor_id, monto_mxn")
@@ -419,7 +419,7 @@ export default function Proveedores() {
                   </div>
                 </div>
 
-                {esFinanzas && gastoPorProveedor[p.id] != null && (
+                {veGastos && gastoPorProveedor[p.id] != null && (
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">{t.proveedores.pagado}</p>
                     <p className="font-bold text-[#1F3864]">{fmtMoneda(gastoPorProveedor[p.id], "MXN", locale)}</p>

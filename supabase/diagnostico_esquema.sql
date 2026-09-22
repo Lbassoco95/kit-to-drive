@@ -261,6 +261,14 @@ WITH esperado(script, objeto) AS (VALUES
   -- Reproceso de descripción vs compatibilidades reutilizables.
   ('20260922000002_sincronizar_compat_refacciones', 'funcion|sincronizar_compat_refacciones(jsonb)'),
 
+  -- Área Compras (dos pasos: enum primero, luego helpers/RLS).
+  ('20260922000003_area_compras_enum',            'tipo|user_area.compras'),
+  ('20260922000003_area_compras_enum',            'tipo|app_role.compras'),
+  ('20260922000004_area_compras',                 'funcion|es_compras(uuid)'),
+  ('20260922000004_area_compras',                 'funcion|es_compras_admin(uuid)'),
+  ('20260922000004_area_compras',                 'funcion|rol_legacy(user_area,user_nivel)|compras'),
+  ('20260922000004_area_compras',                 'politica|proveedores.proveedores_insert|es_compras'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

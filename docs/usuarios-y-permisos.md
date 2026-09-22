@@ -17,30 +17,37 @@ las áreas y es el único con acceso a *Configuración*.
 
 ## Áreas
 
-`Comercial` · `Fábrica` · `Almacén y Logística` · `Administración` · `Dirección`
+`Comercial` · `Fábrica` · `Almacén y Logística` · `Administración` · `Compras` · `Dirección`
 
 Dirección tiene visibilidad transversal (ve todo), pero solo su administrador
 escribe fuera de su área.
 
+Para **agregar un área nueva** hay que ampliar el enum `user_area` (y, si
+hace falta, `app_role`) con un script en `supabase/migrations/`, cablearlo en
+`src/lib/permissions.ts` y en la edge function `admin-create-user`, y pegar el
+script en el SQL editor de Supabase. Las áreas no se crean desde la pantalla:
+el RLS y los permisos dependen de esos enums.
+
 ## Módulos por área
 
-| Módulo | Comercial | Fábrica | Almacén y Log. | Administración | Dirección |
-|---|:-:|:-:|:-:|:-:|:-:|
-| Tablero | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Producción | | ✓ | ✓ | | 👁 |
-| Inventario | | ✓ | ✓ | | 👁 |
-| Reportes de turno | | ✓ | ✓ | | 👁 |
-| Remisiones | ✓ | ✓ | ✓ | ✓ | 👁 |
-| Entregas | | | ✓ | | 👁 |
-| Mis motocarros | ✓ | | | | 👁 |
-| Clientes | ✓ | ✓ | | ✓ | 👁 |
-| CRM (oportunidades, actividades, rutas) | ✓ | | | | 👁 |
-| CRM equipo y tracker | ✓ (supervisor+) | | | | 👁 |
-| Finanzas | | | | ✓ | 👁 |
-| Importar datos | | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) |
-| Usuarios | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) |
-| Bitácora | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) |
-| Configuración | | | | | ✓ (admin) |
+| Módulo | Comercial | Fábrica | Almacén y Log. | Administración | Compras | Dirección |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Tablero | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Producción | | ✓ | ✓ | | | 👁 |
+| Inventario | | ✓ | ✓ | | ✓ | 👁 |
+| Reportes de turno | | ✓ | ✓ | | | 👁 |
+| Remisiones | ✓ | ✓ | ✓ | ✓ | | 👁 |
+| Entregas | | | ✓ | | | 👁 |
+| Mis motocarros | ✓ | | | | | 👁 |
+| Clientes | ✓ | ✓ | | ✓ | | 👁 |
+| CRM (oportunidades, actividades, rutas) | ✓ | | | | | 👁 |
+| CRM equipo y tracker | ✓ (supervisor+) | | | | | 👁 |
+| Finanzas | | | | ✓ | | 👁 |
+| Proveedores | | | | ✓ | ✓ | 👁 |
+| Importar datos | | ✓ (admin) | ✓ (admin) | ✓ (admin) | | ✓ (admin) |
+| Usuarios | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) |
+| Bitácora | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) | ✓ (admin) |
+| Configuración | | | | | | ✓ (admin) |
 
 `✓` opera · `👁` solo lectura (Dirección, salvo su administrador)
 
@@ -121,6 +128,12 @@ sólo un filtro de vista del lado del cliente.
   `user_roles.nivel` y `user_roles.area`, helpers de RLS (`es_area`,
   `nivel_al_menos`, `es_admin_area`, `es_admin_global`, `supervisa_area`) y
   políticas por área.
+- `supabase/migrations/20260922000003_area_compras_enum.sql` y
+  `20260922000004_area_compras.sql` — valor `compras` en `user_area` y
+  `app_role` (paso 1), luego helpers `es_compras` / `es_compras_admin` y
+  políticas de escritura en `proveedores` (paso 2; hay que correrlos en
+  commits separados porque Postgres no deja usar un enum recién agregado
+  en la misma transacción).
 - `supabase/migrations/20260824000002_comercial_lee_toda_la_bandeja.sql` —
   corrige la lectura de remisiones y motocarros para que sea por área y no por
   nivel (ver la sección anterior).

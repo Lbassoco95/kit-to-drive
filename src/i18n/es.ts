@@ -220,6 +220,7 @@ export const es = {
     fabrica: "Fábrica",
     almacen_logistica: "Almacén y Logística",
     administracion: "Administración",
+    compras: "Compras",
     direccion: "Dirección",
   },
 
@@ -236,6 +237,7 @@ export const es = {
     auxiliar_ventas: "Auxiliar de Ventas",
     finanzas: "Finanzas",
     admin_financiero: "Administrador Financiero",
+    compras: "Compras",
   },
 
   // Status labels
