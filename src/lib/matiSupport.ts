@@ -49,7 +49,16 @@ async function authHeaders(): Promise<HeadersInit> {
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = { ...(await authHeaders()), ...(init.headers || {}) };
-  const res = await fetch(`${functionsBase()}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${functionsBase()}${path}`, { ...init, headers });
+  } catch {
+    const err = new Error(
+      "No se pudo contactar el puente de soporte (mati-support). ¿Está desplegada la edge function?",
+    ) as Error & { code?: string; status?: number };
+    err.code = "BRIDGE_UNREACHABLE";
+    throw err;
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(body?.error || `Error ${res.status}`) as Error & { code?: string; status?: number };

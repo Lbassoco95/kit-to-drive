@@ -1005,6 +1005,7 @@ export const zh = {
     mensajeEnviado: "消息已发送",
     ticketCerrado: "此工单已关闭。如问题仍在，请新建一个。",
     bridgeNoConfig: "尚未配置与 Mati 的连接。请管理员在边缘函数 mati-support 的密钥中添加 MATI_SUPPORT_TOKEN（或邮箱/密码）。详见 docs/soporte-mati.md。",
+    bridgeUnreachable: "无法连接边缘函数 mati-support。请先按 docs/soporte-mati.md 部署后再发送报修。",
     equipoMati: "Mati 团队",
     tu: "你",
   },

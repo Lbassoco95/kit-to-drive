@@ -1038,6 +1038,7 @@ export const es = {
     mensajeEnviado: "Mensaje enviado",
     ticketCerrado: "Este ticket ya está cerrado. Abre uno nuevo si el problema sigue.",
     bridgeNoConfig: "El puente con Mati aún no está configurado. Pídele a un administrador que agregue MATI_SUPPORT_TOKEN (o email/contraseña) en los secretos de la edge function mati-support. Ver docs/soporte-mati.md.",
+    bridgeUnreachable: "No se pudo contactar la edge function mati-support. Hay que desplegarla en Supabase (ver docs/soporte-mati.md) antes de poder enviar reportes.",
     equipoMati: "Equipo Mati",
     tu: "Tú",
   },

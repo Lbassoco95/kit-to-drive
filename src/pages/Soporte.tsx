@@ -53,6 +53,8 @@ export default function Soporte() {
       const err = e as Error & { code?: string };
       if (err.code === "BRIDGE_NOT_CONFIGURED" || /no configurado/i.test(err.message)) {
         setBridgeDown(s.bridgeNoConfig);
+      } else if (err.code === "BRIDGE_UNREACHABLE") {
+        setBridgeDown(s.bridgeUnreachable);
       } else {
         toast.error(err.message || s.errorListar);
       }
