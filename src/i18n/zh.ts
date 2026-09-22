@@ -1087,11 +1087,10 @@ export const zh = {
     errorReprocesar: "更新兼容性失败",
     todasUnidades: "全部车型",
     filtrandoUnidad: "兼容于",
-    seccionDesc: "产品描述",
+    seccionDesc: "描述",
     seccionCompat: "兼容车型",
     compatHint: "车型在目录中复用。点击可查看所有兼容该车型的配件。",
     sinCompat: "尚未解析车型 — 请使用「更新兼容性」。",
-    verOriginal: "查看 Excel 原文",
   },
 
   // Inventario
