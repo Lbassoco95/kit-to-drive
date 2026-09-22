@@ -1,3 +1,6 @@
 project_id = "dmhzhyeivvuliumcgsmm"
 [functions.seed-demo-users]
 verify_jwt = false
+# Valida el JWT a mano (como admin-create-user) para devolver JSON claro.
+[functions.mati-support]
+verify_jwt = false

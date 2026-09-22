@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert, Headphones } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -34,6 +34,7 @@ const ITEMS: Item[] = [
   { key: "usuarios",        url: "/usuarios",         icon: Database,        modulo: "usuarios",      group: "Sistema"   },
   { key: "bitacora",        url: "/bitacora",         icon: ScrollText,      modulo: "bitacora",      group: "Sistema"   },
   { key: "configuracion",   url: "/configuracion",    icon: Settings,        modulo: "configuracion", group: "Sistema"   },
+  { key: "soporte",         url: "/soporte",          icon: Headphones,      modulo: "soporte",       group: "Sistema"   },
 ];
 
 const GROUPS: Group[] = ["Inicio", "Operación", "Catálogos", "CRM", "Finanzas", "Sistema"];

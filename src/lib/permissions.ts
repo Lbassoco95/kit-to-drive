@@ -53,7 +53,8 @@ export type Modulo =
   | "importar"
   | "usuarios"
   | "bitacora"
-  | "configuracion";
+  | "configuracion"
+  | "soporte";
 
 /**
  * Áreas dueñas de cada módulo y nivel mínimo para entrar.
@@ -76,6 +77,8 @@ export const MODULOS: Record<Modulo, { areas: Area[]; minNivel: Nivel }> = {
   usuarios:      { areas: AREAS.filter(a => a !== "administracion"),                    minNivel: "admin"      },
   bitacora:      { areas: AREAS.filter(a => a !== "administracion"),                    minNivel: "admin"      },
   configuracion: { areas: [],                                                           minNivel: "admin"      },
+  // Soporte: cualquiera con sesión puede reportar fallas a Mati.
+  soporte:       { areas: AREAS,                                                        minNivel: "operador"   },
 };
 
 /* ──────────────────────────────────────────────────────────────────────────

@@ -44,6 +44,12 @@ describe("acceso por área", () => {
     expect(dir.puedeCrear("produccion")).toBe(false);
     expect(dir.puedeEliminar("finanzas")).toBe(false);
   });
+
+  it("cualquier área puede abrir Soporte para reportar fallas a Mati", () => {
+    for (const area of AREAS) {
+      expect(permisosDe(area, "operador").puedeVer("soporte")).toBe(true);
+    }
+  });
 });
 
 describe("qué puede hacer cada tipo de usuario", () => {

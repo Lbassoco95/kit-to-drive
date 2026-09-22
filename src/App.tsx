@@ -30,6 +30,7 @@ import CrmEquipo from "./pages/crm/CrmEquipo";
 import CrmTracker from "./pages/crm/CrmTracker";
 import Inventario from "./pages/Inventario";
 import Incidencias from "./pages/Incidencias";
+import Soporte from "./pages/Soporte";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="/usuarios" element={<ProtectedRoute modulo="usuarios"><Usuarios /></ProtectedRoute>} />
               <Route path="/bitacora" element={<ProtectedRoute modulo="bitacora"><Bitacora /></ProtectedRoute>} />
               <Route path="/configuracion" element={<ProtectedRoute modulo="configuracion"><Configuracion /></ProtectedRoute>} />
+              <Route path="/soporte" element={<ProtectedRoute modulo="soporte"><Soporte /></ProtectedRoute>} />
               <Route path="/finanzas" element={<ProtectedRoute modulo="finanzas"><Finanzas /></ProtectedRoute>} />
               <Route path="/finanzas/:id" element={<ProtectedRoute modulo="finanzas"><FinanzasMovimiento /></ProtectedRoute>} />
               <Route path="/proveedores" element={<ProtectedRoute modulo="finanzas"><Proveedores /></ProtectedRoute>} />
