@@ -258,6 +258,9 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260922000001_almacen_refacciones',          'funcion|importar_almacen_refacciones(jsonb)'),
   ('20260922000001_almacen_refacciones',          'vista|v_almacen_refacciones'),
 
+  -- Reproceso de descripción vs compatibilidades reutilizables.
+  ('20260922000002_sincronizar_compat_refacciones', 'funcion|sincronizar_compat_refacciones(jsonb)'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

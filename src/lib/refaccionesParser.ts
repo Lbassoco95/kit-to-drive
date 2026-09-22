@@ -34,7 +34,13 @@ const LINEAS: Record<string, LineaCatalogo> = {
   "DAZON 2026 LÍNEA AZUL SEP.": "linea_azul",
 };
 
-const NOTAS_FISICAS = /\b(LARGO|HORQUILLA|BUJE|mm|CM\.?|DIAMETRO|DIÁMETRO|MEDIDA)\b/i;
+/** Prefijos / nombres de modelo de moto o unidad. */
+/** Prefijos cortos (DT-125) y marcas con nombre (KURAZAI CLASSIC 125). */
+const MODELO_INICIO =
+  /\b(?:IT\s+)?(?:(?:DT|FT|GS|GSC|GTS|DS|WS|DM|CG|RC|AT|XS|XFT|RT|NS|CS|VS|YZ|YFZ|D|W|GN)[\s\-]?\d{2,4}|(?:FORZA|DIABOLO|KURAZAI|PHANTOM|FIERA|RISKY|CARGO|DINAMO|VENTO|BAJAJ|PULSAR|HONDA|YAMAHA|SPARTHA|TERRA|XROAD|ITALIKA)(?:\s+[A-ZÁÉÍÓÚÑ]+)*[\s\-]?\d{2,4})/i;
+
+const PALABRA_MEDIDA =
+  /^(largo|ancho|alto|diametro|diámetro|medida|horquilla|buje|mm|cm|pza|par|jgo|juego|negro|negra|roja|azul|completo|completa|trasero|delantero)$/i;
 
 const clean = (s: unknown) =>
   String(s ?? "")
@@ -78,40 +84,97 @@ export function tipoDesdeMarca(marca: string | null): string | null {
   return "otro";
 }
 
+/**
+ * Canoniza el nombre de una unidad/moto para reutilizar el mismo registro
+ * entre muchas refacciones (FT125-DELIVERY → FT-125 DELIVERY).
+ */
+export function normalizarNombreUnidad(raw: string): string {
+  let s = clean(raw).toUpperCase();
+  if (!s) return "";
+  s = s.replace(/^IT\s+/, "");
+  // FT125 → FT-125 ; GS150 → GS-150 (si no traía guion)
+  s = s.replace(/\b([A-Z]{1,6})(\d{2,4}[A-Z]?)\b/g, "$1-$2");
+  // FT-125-DELIVERY → FT-125 DELIVERY
+  s = s.replace(/\b([A-Z]{1,6}-\d{2,4}[A-Z]?)-([A-ZÁÉÍÓÚÑ])/g, "$1 $2");
+  s = s.replace(/--+/g, "-");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
+function esTokenModelo(token: string): boolean {
+  const t = clean(token);
+  if (!t || t.length < 2) return false;
+  if (PALABRA_MEDIDA.test(t)) return false;
+  if (/^[\d.,\s]+(mm|cm)?$/i.test(t)) return false;
+  // Talla de llanta 90/90-18
+  if (/^\d{2,3}\s*\/\s*\d{2,3}/.test(t)) return false;
+  // Debe parecer modelo: letras + número, o nombre conocido
+  if (MODELO_INICIO.test(t)) return true;
+  // Variantes sueltas tipo "CLASICA" no son modelo por sí solas
+  return false;
+}
+
+function limpiarPartesModelo(parts: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of parts) {
+    let p = clean(raw).replace(/^IT\s+/i, "");
+    // Si el primer token arrastró medidas ("largo 200 mm diametro 27 mm DT-125 CLASICA")
+    const idx = p.search(MODELO_INICIO);
+    if (idx > 0) p = clean(p.slice(idx));
+    if (!esTokenModelo(p)) continue;
+    // Quitar sobras físicas al final del token
+    p = clean(p.replace(/\b(LARGO|DIAMETRO|DIÁMETRO|HORQUILLA|BUJE|mm|CM)\b.*$/i, ""));
+    if (!p || !esTokenModelo(p)) continue;
+    const canon = normalizarNombreUnidad(p);
+    if (!canon || seen.has(canon)) continue;
+    seen.add(canon);
+    out.push(canon);
+  }
+  return out;
+}
+
+/**
+ * Separa la descripción del producto de la lista de motos/unidades compatibles.
+ * Ej: "CUBRE POLVO … 27 mm DT-125 CLASICA / FT-125 / FORZA 125"
+ *  → corta: "CUBRE POLVO … 27 mm"
+ *  → comps: ["DT-125 CLASICA", "FT-125", "FORZA-125"] (normalizados)
+ */
 export function extractCompat(descRaw: string): { corta: string; comps: string[] } {
   const d = clean(descRaw);
   if (!d) return { corta: "", comps: [] };
 
-  const m = d.match(/COMPAT\w*\s*C\s*\/\s*(.+)$/i);
-  if (m) {
-    const corta = clean(d.slice(0, m.index));
-    const cut = m[1].split(NOTAS_FISICAS)[0] ?? m[1];
-    const parts = cut
-      .split("/")
-      .map(clean)
-      .filter(p => p && !/^[\d.\s]+$/.test(p));
-    return { corta: corta || d, comps: parts };
+  // 1) Marcador explícito COMPATIBLE C/ …
+  const mCompat = d.match(/COMPAT\w*\s*C\s*\/\s*(.+)$/i);
+  if (mCompat && mCompat.index !== undefined) {
+    const corta = clean(d.slice(0, mCompat.index));
+    // Cortar notas físicas al final del bloque de modelos
+    let rest = mCompat[1];
+    const nota = rest.search(/\b(LARGO|HORQUILLA|BUJE)\b\s*[\d.]/i);
+    if (nota > 0) rest = rest.slice(0, nota);
+    const comps = limpiarPartesModelo(rest.split("/"));
+    return { corta: corta || d, comps };
   }
 
-  // Listas modelo/año sin la palabra COMPATIBLE
-  const m2 = d.match(
-    /(?:^|\s)((?:IT\s+)?[A-Z]{1,6}[-\s]?\d{2,4}[A-Z0-9\- ]*(?:\/\s*[A-Z0-9][A-Z0-9\-./ ]+)+)\s*$/i,
-  );
-  if (m2 && (d.match(/\//g) || []).length >= 1) {
-    const blob = clean(m2[1]);
-    if (/\b\d{2,3}\s*\/\s*\d{2,3}-?\d{0,2}\b/.test(blob)) {
-      return { corta: d, comps: [] };
-    }
-    const corta = clean(d.slice(0, m2.index! + (m2[0].startsWith(" ") ? 1 : 0)));
-    const parts = blob
-      .split("/")
-      .map(clean)
-      .map(p => p.replace(/^IT\s+/i, ""))
-      .filter(Boolean);
-    return { corta: corta || d, comps: parts };
+  // 2) Lista tras la descripción: primer modelo real + diagonales
+  if (!d.includes("/")) return { corta: d, comps: [] };
+
+  // Evitar tallas de llanta como única diagonal
+  if (/^\S+\s+\d{2,3}\s*\/\s*\d{2,3}/.test(d) && (d.match(/\//g) || []).length === 1) {
+    return { corta: d, comps: [] };
   }
 
-  return { corta: d, comps: [] };
+  const start = d.search(MODELO_INICIO);
+  if (start < 0) return { corta: d, comps: [] };
+
+  // Debe haber al menos una diagonal en la zona de modelos
+  const zona = d.slice(start);
+  if (!zona.includes("/")) return { corta: d, comps: [] };
+
+  const corta = clean(d.slice(0, start));
+  const comps = limpiarPartesModelo(zona.split("/"));
+  if (!comps.length) return { corta: d, comps: [] };
+  return { corta: corta || d, comps };
 }
 
 function headerMap(header: unknown[]): Record<string, number> {
@@ -187,7 +250,6 @@ export function parseListaPreciosRefacciones(data: ArrayBuffer): RefaccionImport
     const linea = LINEAS[name];
     if (!linea) continue;
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true }) as unknown[][];
-    // Encabezado en fila 5 (índice 4)
     const header = rows[4] ?? [];
     const hm = headerMap(header);
     for (const row of rows.slice(5)) {

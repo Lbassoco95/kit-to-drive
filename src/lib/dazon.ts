@@ -255,6 +255,8 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260908000002_tope_unidades_ya_armadas.sql"],
   [/crm_actividades_tipo_check/,
     "20260908000003_crm_tipos_actividad.sql"],
+  [/sincronizar_compat_refacciones/,
+    "20260922000002_sincronizar_compat_refacciones.sql"],
   [/almacen_refacciones|importar_almacen_refacciones|puede_ver_almacen_refacciones|v_almacen_refacciones/,
     "20260922000001_almacen_refacciones.sql"],
   [/crear_motocarro_ya_armado/,
