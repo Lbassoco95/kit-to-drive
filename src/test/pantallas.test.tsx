@@ -39,9 +39,26 @@ vi.mock("@/integrations/supabase/client", () => ({
       createSignedUrl: () => Promise.resolve({ data: null, error: null }),
       remove: () => Promise.resolve({ data: null, error: null }),
     }) },
-    auth: { getUser: () => Promise.resolve({ data: { user: null } }) },
+    auth: {
+      getUser: () => Promise.resolve({ data: { user: null } }),
+      getSession: () => Promise.resolve({ data: { session: { access_token: "test" } } }),
+    },
   },
 }));
+
+vi.mock("@/lib/matiSupport", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/matiSupport")>();
+  return {
+    ...actual,
+    listarTicketsSoporte: async () => [],
+    crearTicketSoporte: async () => ({ id: "t1", asunto: "x", prioridad: "normal", status: "abierto" }),
+    detalleTicketSoporte: async () => ({
+      ticket: { id: "t1", asunto: "x", prioridad: "normal", status: "abierto" },
+      messages: [],
+    }),
+    enviarMensajeSoporte: async () => ({ id: "m1", mensaje: "hola" }),
+  };
+});
 
 const permisosTotales = {
   puedeVer: () => true, puedeCrear: () => true, puedeEditar: () => true,
@@ -72,6 +89,7 @@ const paginas: Record<string, () => Promise<{ default: React.ComponentType }>> =
   "Usuarios":         () => import("@/pages/Usuarios"),
   "Bitácora":         () => import("@/pages/Bitacora"),
   "Configuración":    () => import("@/pages/Configuracion"),
+  "Soporte":          () => import("@/pages/Soporte"),
   "Finanzas":         () => import("@/pages/Finanzas"),
   "Proveedores":      () => import("@/pages/Proveedores"),
   "CRM · Oportunidades": () => import("@/pages/crm/CrmOportunidades"),
