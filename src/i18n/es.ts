@@ -158,8 +158,8 @@ export const es = {
   nav: {
     dashboard: "Dashboard",
     produccion: "Producción",
-    inventario: "Inventario",
-    almacenRefacciones: "Almacén refacciones",
+    inventario: "Inventario unidades",
+    almacenRefacciones: "Inventario refacciones",
     incidencias: "Incidencias de chasis",
     reportesTurno: "Reportes de turno",
     remisiones: "Remisiones",
@@ -1061,8 +1061,8 @@ export const es = {
 
   // Almacén de refacciones (allowlist)
   almacenRefacciones: {
-    titulo: "Almacén de refacciones",
-    subtitulo: "Catálogo de venta con código nuevo/antiguo y compatibilidades por unidad",
+    titulo: "Inventario de refacciones",
+    subtitulo: "Catálogo de venta independiente del inventario de motocarros/unidades. Códigos nuevo/antiguo y compatibilidades por moto.",
     errorCargar: "Error al cargar el almacén de refacciones",
     errorImportar: "Error al importar la lista de precios",
     sinProductos: "No se encontraron productos en el Excel",
@@ -1093,8 +1093,8 @@ export const es = {
 
   // Inventario
   inventario: {
-    title: "Inventario de Contenedores",
-    subtitle: "Gestión de unidades, chasis, motores, partes y colores",
+    title: "Inventario de unidades",
+    subtitle: "Chasis, motores, partes de contenedor y colores — independiente del inventario de refacciones",
     cargando: "Cargando inventario…",
     errorCargar: "Error al cargar inventario",
     modeloSinClasificar: (modelo: string) =>

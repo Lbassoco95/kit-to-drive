@@ -156,8 +156,8 @@ export const zh = {
   nav: {
     dashboard: "仪表盘",
     produccion: "生产",
-    inventario: "库存",
-    almacenRefacciones: "配件仓库",
+    inventario: "整车库存",
+    almacenRefacciones: "配件库存",
     incidencias: "车架异常",
     reportesTurno: "班次报告",
     remisiones: "提货单",
@@ -1052,8 +1052,8 @@ export const zh = {
 
   // Almacén de refacciones (allowlist)
   almacenRefacciones: {
-    titulo: "配件仓库",
-    subtitulo: "销售目录：新旧编码与车型兼容性",
+    titulo: "配件库存",
+    subtitulo: "独立于整车库存的销售目录：新旧编码与车型兼容性。",
     errorCargar: "加载配件仓库失败",
     errorImportar: "导入价格表失败",
     sinProductos: "Excel 中未找到产品",
@@ -1084,8 +1084,8 @@ export const zh = {
 
   // Inventario
   inventario: {
-    title: "集装箱库存",
-    subtitle: "整车、车架、发动机、零件与颜色管理",
+    title: "整车库存",
+    subtitle: "车架、发动机、集装箱零件与颜色 — 独立于配件库存",
     cargando: "正在加载库存…",
     errorCargar: "加载库存时出错",
     modeloSinClasificar: (modelo: string) =>
