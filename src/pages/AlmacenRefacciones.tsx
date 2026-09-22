@@ -24,6 +24,7 @@ type Producto = {
   categoria: string | null;
   descripcion: string;
   descripcion_corta: string | null;
+  descripcion_original?: string | null;
   unidad_medida: string | null;
   precio: number | null;
   stock: number;
@@ -198,7 +199,9 @@ export default function AlmacenRefacciones() {
     setReprocesando(true);
     try {
       const payload = rows.map(r => {
-        const { corta, comps } = extractCompat(r.descripcion);
+        // Preferir el texto original del Excel si existe; si no, la descripción actual
+        const fuente = r.descripcion_original || r.descripcion;
+        const { corta, comps } = extractCompat(fuente);
         return {
           codigo_nuevo: r.codigo_nuevo,
           descripcion_corta: corta,
@@ -465,7 +468,7 @@ export default function AlmacenRefacciones() {
 
                 <section className="rounded-md border p-3 space-y-1.5 bg-slate-50/80">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {t.almacenRefacciones?.seccionDesc ?? "Descripción del producto"}
+                    {t.almacenRefacciones?.seccionDesc ?? "Descripción"}
                   </h3>
                   <p className="text-base font-medium leading-snug text-[#1F3864]">
                     {detalle.descripcion_corta || detalle.descripcion}
@@ -509,15 +512,6 @@ export default function AlmacenRefacciones() {
                     </div>
                   )}
                 </section>
-
-                {detalle.descripcion !== detalle.descripcion_corta && (
-                  <details className="text-xs text-muted-foreground">
-                    <summary className="cursor-pointer hover:text-foreground">
-                      {t.almacenRefacciones?.verOriginal ?? "Ver texto original del Excel"}
-                    </summary>
-                    <p className="mt-2 leading-relaxed whitespace-pre-wrap">{detalle.descripcion}</p>
-                  </details>
-                )}
               </div>
             </>
           )}

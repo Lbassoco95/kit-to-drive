@@ -1096,11 +1096,10 @@ export const es = {
     errorReprocesar: "Error al actualizar compatibilidades",
     todasUnidades: "Todas las motos/unidades",
     filtrandoUnidad: "Piezas compatibles con",
-    seccionDesc: "Descripción del producto",
+    seccionDesc: "Descripción",
     seccionCompat: "Compatible con",
     compatHint: "Cada moto/unidad se reutiliza en el catálogo. Pulsa una para ver todas las refacciones compatibles con ella.",
     sinCompat: "Sin unidades parseadas — usa «Actualizar compatibilidades».",
-    verOriginal: "Ver texto original del Excel",
   },
 
   // Inventario
