@@ -39,7 +39,7 @@ const ITEMS: Item[] = [
   { key: "crmRutas",        url: "/crm/rutas",        icon: MapPin,          modulo: "crm",           group: "CRM"       },
   { key: "crmTracker",      url: "/crm/tracker",      icon: BarChart2,       modulo: "crmEquipo",     group: "CRM"       },
   { key: "finanzas",        url: "/finanzas",         icon: Wallet,          modulo: "finanzas",      group: "Finanzas"  },
-  { key: "proveedores",     url: "/proveedores",      icon: Building2,       modulo: "finanzas",      group: "Finanzas"  },
+  { key: "proveedores",     url: "/proveedores",      icon: Building2,       modulo: "proveedores",   group: "Finanzas"  },
   { key: "importar",        url: "/importar",         icon: Upload,          modulo: "importar",      group: "Sistema"   },
   { key: "usuarios",        url: "/usuarios",         icon: Database,        modulo: "usuarios",      group: "Sistema"   },
   { key: "bitacora",        url: "/bitacora",         icon: ScrollText,      modulo: "bitacora",      group: "Sistema"   },

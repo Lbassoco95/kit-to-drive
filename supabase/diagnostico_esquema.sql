@@ -258,6 +258,14 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260922000001_almacen_refacciones',          'funcion|importar_almacen_refacciones(jsonb)'),
   ('20260922000001_almacen_refacciones',          'vista|v_almacen_refacciones'),
 
+  -- Área Compras (dos pasos: enum primero, luego helpers/RLS).
+  ('20260922000002_area_compras_enum',            'tipo|user_area.compras'),
+  ('20260922000002_area_compras_enum',            'tipo|app_role.compras'),
+  ('20260922000003_area_compras',                 'funcion|es_compras(uuid)'),
+  ('20260922000003_area_compras',                 'funcion|es_compras_admin(uuid)'),
+  ('20260922000003_area_compras',                 'funcion|rol_legacy(user_area,user_nivel)|compras'),
+  ('20260922000003_area_compras',                 'politica|proveedores.proveedores_insert|es_compras'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
