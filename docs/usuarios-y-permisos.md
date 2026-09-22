@@ -116,6 +116,13 @@ En la UI eso es `editaTodas = perms.puedeEditar("remisiones")` en
 filas llegan lo decide el RLS; el selector *Todo el equipo / Solo las mías* es
 sólo un filtro de vista del lado del cliente.
 
+## Dónde se administra
+
+La administración canónica (usuarios, roles y configuración) vive en
+**mati-admin**. Ver `docs/admin-desde-mati.md` y el puente
+`mati-admin-bridge`. La UI local de Sistema queda en modo consulta cuando
+`VITE_MATI_ADMIN_MANAGED` no está en `false`.
+
 ## Dónde vive esto en el código
 
 - `src/lib/permissions.ts` — única fuente de verdad: niveles, áreas, módulos y

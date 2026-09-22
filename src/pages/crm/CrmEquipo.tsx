@@ -11,6 +11,8 @@ import { Nivel, NIVELES } from "@/lib/permissions";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { Plus, User as UserIcon, Mail, Key, Shield, Trash2 } from "lucide-react";
+import { MatiAdminBanner } from "@/components/MatiAdminBanner";
+import { adminGestionadoDesdeMati } from "@/lib/matiAdmin";
 
 export default function CrmEquipo() {
   const { perms } = useAuth();
@@ -23,6 +25,7 @@ export default function CrmEquipo() {
     password: "",
     nivel: "operador" as Nivel,
   });
+  const gestionaLocal = perms.gestionaUsuarios && !adminGestionadoDesdeMati();
 
   const load = async () => {
     const { data } = await supabase
@@ -90,12 +93,13 @@ export default function CrmEquipo() {
 
   return (
     <div className="space-y-5">
+      <MatiAdminBanner />
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
           <h1>{t.crm.equipo.title}</h1>
           <p className="text-base text-muted-foreground mt-1">{t.crm.equipo.subtitle(usuarios.length)}</p>
         </div>
-        {perms.gestionaUsuarios && (
+        {gestionaLocal && (
           <Button onClick={() => setCreating(true)}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
             <Plus className="h-5 w-5 mr-2"/> {t.crm.equipo.agregar}
@@ -133,7 +137,7 @@ export default function CrmEquipo() {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    {perms.gestionaUsuarios && (
+                    {gestionaLocal && (
                       <Button size="icon" variant="ghost" onClick={() => deleteUser(u.id)} className="h-8 w-8 text-red-600 hover:text-red-700">
                         <Trash2 className="h-4 w-4" />
                       </Button>

@@ -14,6 +14,8 @@ import {
   rolLegacy, desdeRolLegacy,
 } from "@/lib/permissions";
 import { Plus, Pencil, Search, UserCheck, UserX, ShieldCheck, Info } from "lucide-react";
+import { MatiAdminBanner } from "@/components/MatiAdminBanner";
+import { adminGestionadoDesdeMati } from "@/lib/matiAdmin";
 
 interface FormUsuario {
   nombre_completo: string;
@@ -58,6 +60,8 @@ export default function Usuarios() {
 
   // Un admin de área solo administra su propia área; el admin global, todas.
   const areasDisponibles: Area[] = perms.esAdminGlobal ? AREAS : (miArea ? [miArea] : []);
+  // Altas y ediciones viven en mati-admin cuando el sistema está cableado a Mati.
+  const gestionaLocal = perms.gestionaUsuarios && !adminGestionadoDesdeMati();
 
   const load = async () => {
     const [{ data: profiles }, { data: roles }] = await Promise.all([
@@ -171,6 +175,7 @@ export default function Usuarios() {
 
   return (
     <div className="space-y-5">
+      <MatiAdminBanner />
       {/* Header */}
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
@@ -180,7 +185,7 @@ export default function Usuarios() {
           </h1>
           <p className="text-base text-muted-foreground mt-1">{t.usuarios.subtitle(filtered.length, rows.length)}</p>
         </div>
-        {perms.gestionaUsuarios && (
+        {gestionaLocal && (
           <Button
             onClick={() => { setNewForm({ ...EMPTY_NEW, area: areasDisponibles[0] ?? "comercial" }); setNewOpen(true); }}
             className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
@@ -237,7 +242,7 @@ export default function Usuarios() {
       {/* Usuarios */}
       <div className="responsive-card-grid gap-4">
         {filtered.map(u => {
-          const editable = perms.gestionaUsuarios && (perms.esAdminGlobal || (!!u.area && u.area === miArea));
+          const editable = gestionaLocal && (perms.esAdminGlobal || (!!u.area && u.area === miArea));
           return (
             <Card key={u.id} className={`p-5 flex flex-col gap-3 transition-shadow hover:shadow-md ${!u.activo ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-2">

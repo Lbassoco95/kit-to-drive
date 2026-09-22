@@ -926,6 +926,14 @@ export const zh = {
     creado: (email: string) => `✓ 用户 ${email} 已创建`,
   },
 
+  // Administración desde Mati
+  matiAdmin: {
+    titulo: "由 Mati 管理",
+    descripcion: "Kit-to-Drive 的用户与系统配置在 Mati 管理后台维护。",
+    abrir: "打开 Mati Admin",
+    editarEnMati: "请在 Mati Admin 中编辑此配置",
+  },
+
   // Bitácora
   bitacora: {
     title: "系统日志",
