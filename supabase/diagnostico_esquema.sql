@@ -244,7 +244,7 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260908000002_tope_unidades_ya_armadas',     'vista|v_carga_ya_armados'),
   ('20260908000002_tope_unidades_ya_armadas',     'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|limite_ya_armados'),
 
-  // Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
+  -- Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
   ('20260908000003_crm_tipos_actividad',          'restriccion|crm_actividades.crm_actividades_tipo_check|videollamada'),
 
   -- Almacén de refacciones para venta (lista de precios, códigos duales, compat).
