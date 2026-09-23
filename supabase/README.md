@@ -11,6 +11,12 @@ esquema real, no migraciones ejecutables en secuencia. Si necesitas reproducir
 el esquema en otro proyecto, copia el contenido del script al SQL editor y
 ejecútalo de arriba a abajo revisando que no falle por objetos previos.
 
+Un script que ya está en `main` no se vuelve a escribir: la mejora siguiente
+es un archivo nuevo (`npm run migracion:nueva`), sellado
+(`npm run migraciones:sellar`). Así un merge no se lleva lo que otra sesión
+ya había guardado. El detalle está en
+[`docs/no-romper-produccion.md`](../docs/no-romper-produccion.md).
+
 ### El riesgo de este modelo, y cómo se revisa
 
 El SQL editor manda el archivo completo en **una sola transacción**. Si algo
