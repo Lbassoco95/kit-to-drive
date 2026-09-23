@@ -269,6 +269,7 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260923000001_compat_no_borrar_si_vacio', 'funcion|sincronizar_compat_refacciones(jsonb)'),
   ('20260923000002_refacciones_foto_caracteristicas', 'columna|almacen_refacciones_productos.foto_url'),
   ('20260923000002_refacciones_foto_caracteristicas', 'columna|almacen_refacciones_productos.caracteristicas'),
+  ('20260923000003_compat_universal_refacciones', 'columna|almacen_refacciones_productos.compat_universal'),
 
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),

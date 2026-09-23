@@ -19,6 +19,7 @@ import { parseListaPreciosRefacciones, siguienteCodigoEnSerie, seriesDesdeCodigo
 import { explicarError } from "@/lib/dazon";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Producto = {
   id: string;
@@ -39,6 +40,8 @@ type Producto = {
   stock: number;
   visible_venta: boolean;
   num_compatibilidades: number;
+  compat_universal?: boolean;
+  tiene_compatibilidad?: boolean;
 };
 
 type Compat = {
@@ -79,6 +82,11 @@ function grupoDeProducto(p: Producto, modo: AgruparMode): string {
   return "";
 }
 
+function tieneCompat(p: Producto): boolean {
+  if (p.tiene_compatibilidad != null) return Boolean(p.tiene_compatibilidad);
+  return Boolean(p.compat_universal) || (p.num_compatibilidades > 0);
+}
+
 export default function AlmacenRefacciones() {
   const { t } = useLang();
   const { puedeVerRefacciones } = useAuth();
@@ -102,6 +110,7 @@ export default function AlmacenRefacciones() {
   // Edición de compatibilidad en el detalle
   const [editandoCompat, setEditandoCompat] = useState(false);
   const [compatDraft, setCompatDraft] = useState<string[]>([]);
+  const [compatUniversalDraft, setCompatUniversalDraft] = useState(false);
   const [nuevaUnidad, setNuevaUnidad] = useState("");
   const [guardandoCompat, setGuardandoCompat] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
@@ -122,6 +131,7 @@ export default function AlmacenRefacciones() {
   const [altaPrecio, setAltaPrecio] = useState("");
   const [altaStock, setAltaStock] = useState("0");
   const [altaCompatDraft, setAltaCompatDraft] = useState<string[]>([]);
+  const [altaCompatUniversal, setAltaCompatUniversal] = useState(false);
   const [altaNuevaUnidad, setAltaNuevaUnidad] = useState("");
 
   const ar = t.almacenRefacciones;
@@ -185,7 +195,7 @@ export default function AlmacenRefacciones() {
     let list = rows.filter(r => {
       if (linea !== "todas" && r.linea_catalogo !== linea) return false;
       if (soloVisibles && !r.visible_venta) return false;
-      if (soloConCompat && !(r.num_compatibilidades > 0)) return false;
+      if (soloConCompat && !tieneCompat(r)) return false;
       if (stockFiltro === "con_stock" && !(r.stock > 0)) return false;
       if (stockFiltro === "sin_stock" && r.stock > 0) return false;
       if (unidadFiltro !== "todas" && !idsPorUnidad.has(r.id)) return false;
@@ -228,12 +238,13 @@ export default function AlmacenRefacciones() {
 
   const stats = useMemo(() => {
     const dual = rows.filter(r => r.codigo_antiguo).length;
-    const conCompat = rows.filter(r => r.num_compatibilidades > 0).length;
+    const conCompat = rows.filter(tieneCompat).length;
     const sinCompat = rows.length - conCompat;
+    const universales = rows.filter(r => r.compat_universal).length;
     const conStock = rows.filter(r => r.stock > 0).length;
     const sinStock = rows.length - conStock;
     const stock = rows.reduce((s, r) => s + (r.stock || 0), 0);
-    return { total: rows.length, dual, conCompat, sinCompat, conStock, sinStock, stock, unidades: unidades.filter(u => u.piezas > 0).length };
+    return { total: rows.length, dual, conCompat, sinCompat, universales, conStock, sinStock, stock, unidades: unidades.filter(u => u.piezas > 0).length };
   }, [rows, unidades]);
 
   const abrirDetalle = async (p: Producto, opts?: { editarSiVacio?: boolean }) => {
@@ -254,10 +265,11 @@ export default function AlmacenRefacciones() {
     const sorted = base.sort((a, b) => a.nombre.localeCompare(b.nombre));
     setCompats(sorted);
     setCompatDraft(sorted.map(c => c.nombre));
+    setCompatUniversalDraft(Boolean(p.compat_universal));
     setCaractDraft(p.caracteristicas || "");
     setEditandoCaract(false);
-    // Si no tiene compat, abrir en edición (salvo al refrescar tras guardar)
-    if ((opts?.editarSiVacio ?? true) && sorted.length === 0) setEditandoCompat(true);
+    // Si no tiene compat (ni genérica), abrir en edición
+    if ((opts?.editarSiVacio ?? true) && sorted.length === 0 && !p.compat_universal) setEditandoCompat(true);
   };
 
   const filtrarPorUnidad = (unidadId: string) => {
@@ -268,12 +280,14 @@ export default function AlmacenRefacciones() {
 
   const empezarEditarCompat = () => {
     setCompatDraft(compats.map(c => c.nombre));
+    setCompatUniversalDraft(Boolean(detalle?.compat_universal));
     setEditandoCompat(true);
     setNuevaUnidad("");
   };
 
   const cancelarEditarCompat = () => {
     setCompatDraft(compats.map(c => c.nombre));
+    setCompatUniversalDraft(Boolean(detalle?.compat_universal));
     setEditandoCompat(false);
     setNuevaUnidad("");
   };
@@ -296,22 +310,36 @@ export default function AlmacenRefacciones() {
 
   const guardarCompat = async () => {
     if (!detalle) return;
+    if (!compatUniversalDraft && compatDraft.length === 0) {
+      toast.error(ar?.compatRequiereAlgo ?? "Marca «compatible con todas» o agrega al menos una moto");
+      return;
+    }
     setGuardandoCompat(true);
     try {
+      const { error: uniErr } = await supabase
+        .from("almacen_refacciones_productos" as any)
+        .update({ compat_universal: compatUniversalDraft })
+        .eq("id", detalle.id);
+      if (uniErr) throw uniErr;
+
       const { data, error } = await supabase.rpc("sincronizar_compat_refacciones" as any, {
         _items: [{
           codigo_nuevo: detalle.codigo_nuevo,
           descripcion_corta: detalle.descripcion_corta || detalle.descripcion,
           compatibilidades: compatDraft,
-          // Solo vacía a propósito desde la ficha (nunca por reproceso masivo)
+          // Vaciar lista de motos a propósito (p. ej. sólo genérico)
           forzar_vaciar_compat: compatDraft.length === 0,
         }],
       });
       if (error) throw error;
-      const n = (data as any)?.compatibilidades ?? compatDraft.length;
-      toast.success(
-        (ar?.okCompatGuardada ?? ((c: number) => `Compatibilidad actualizada (${c} unidades)`))(n),
-      );
+      if (compatUniversalDraft) {
+        toast.success(ar?.compatUniversalGuardada ?? "Marcado como compatible con todas");
+      } else {
+        const n = (data as any)?.compatibilidades ?? compatDraft.length;
+        toast.success(
+          (ar?.okCompatGuardada ?? ((c: number) => `Compatibilidad actualizada (${c} unidades)`))(n),
+        );
+      }
       await load();
       const actualizado = (await supabase
         .from("v_almacen_refacciones" as any)
@@ -449,6 +477,7 @@ export default function AlmacenRefacciones() {
     setAltaPrecio("");
     setAltaStock("0");
     setAltaCompatDraft([]);
+    setAltaCompatUniversal(false);
     setAltaNuevaUnidad("");
     setAltaOpen(true);
   };
@@ -502,18 +531,27 @@ export default function AlmacenRefacciones() {
         _items: [item],
       });
       if (error) throw error;
+      if (altaCompatUniversal) {
+        await supabase
+          .from("almacen_refacciones_productos" as any)
+          .update({ compat_universal: true })
+          .eq("codigo_nuevo", codigo);
+      }
       toast.success(
         (ar?.okAlta ?? ((c: string) => `Producto ${c} registrado`))(codigo),
       );
       setAltaOpen(false);
       await load();
-      // Abrir ficha del nuevo para terminar compat si quedó pendiente
       const { data: creado } = await supabase
         .from("v_almacen_refacciones" as any)
         .select("*")
         .eq("codigo_nuevo", codigo)
         .maybeSingle();
-      if (creado) await abrirDetalle(creado as Producto, { editarSiVacio: altaCompatDraft.length === 0 });
+      if (creado) {
+        await abrirDetalle(creado as Producto, {
+          editarSiVacio: altaCompatDraft.length === 0 && !altaCompatUniversal,
+        });
+      }
       void data;
     } catch (e: any) {
       toast.error(explicarError(e, ar?.errorAlta ?? "No se pudo registrar el producto"));
@@ -557,6 +595,29 @@ export default function AlmacenRefacciones() {
       <span className="inline-flex items-center gap-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 text-xs font-semibold">
         <PackageX className="h-3 w-3" />
         {ar?.sinStock ?? "Sin stock"}
+      </span>
+    );
+  };
+
+  const CompatBadge = ({ p }: { p: Producto }) => {
+    if (p.compat_universal) {
+      return (
+        <span className="text-[11px] text-sky-800 bg-sky-50 border border-sky-200 rounded px-1.5 py-0.5 font-medium">
+          {ar?.compatUniversalCorto ?? "Todas"}
+        </span>
+      );
+    }
+    if (p.num_compatibilidades > 0) {
+      return (
+        <span className="inline-flex items-center gap-1 text-xs text-[#1F3864]">
+          <Bike className="h-3 w-3" />
+          {p.num_compatibilidades}
+        </span>
+      );
+    }
+    return (
+      <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+        {ar?.compatPendiente ?? "Configurar compat."}
       </span>
     );
   };
@@ -629,6 +690,9 @@ export default function AlmacenRefacciones() {
           <div className="text-2xl font-bold text-[#1F3864]">{stats.conCompat}</div>
           <div className="text-[11px] text-muted-foreground mt-0.5">
             {(ar?.statSinCompat ?? ((n: number) => `${n} sin configurar`))(stats.sinCompat)}
+            {stats.universales > 0 && (
+              <> · {(ar?.statUniversales ?? ((n: number) => `${n} genéricas`))(stats.universales)}</>
+            )}
           </div>
         </Card>
         <Card className="p-4">
@@ -815,16 +879,7 @@ export default function AlmacenRefacciones() {
                           </div>
                           <div className="mt-3 flex items-center justify-between gap-2">
                             <span className="text-sm font-semibold tabular-nums">{money(p.precio)}</span>
-                            {p.num_compatibilidades > 0 ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-[#1F3864]">
-                                <Bike className="h-3 w-3" />
-                                {p.num_compatibilidades}
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
-                                {ar?.compatPendiente ?? "Configurar compat."}
-                              </span>
-                            )}
+                            <CompatBadge p={p} />
                           </div>
                         </div>
                       </button>
@@ -910,7 +965,11 @@ export default function AlmacenRefacciones() {
                         <StockBadge stock={p.stock} />
                       </TableCell>
                       <TableCell className="text-center">
-                        {p.num_compatibilidades > 0 ? (
+                        {p.compat_universal ? (
+                          <Badge variant="outline" className="text-sky-800 border-sky-300 bg-sky-50">
+                            {ar?.compatUniversalCorto ?? "Todas"}
+                          </Badge>
+                        ) : p.num_compatibilidades > 0 ? (
                           <Badge variant="default">{p.num_compatibilidades}</Badge>
                         ) : (
                           <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">
@@ -1078,12 +1137,18 @@ export default function AlmacenRefacciones() {
                     <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                       <Bike className="h-3.5 w-3.5" />
                       {ar?.seccionCompat ?? "Compatible con"}{" "}
-                      ({editandoCompat ? compatDraft.length : compats.length})
+                      {editandoCompat
+                        ? (compatUniversalDraft
+                            ? (ar?.compatUniversalCorto ?? "Todas")
+                            : `(${compatDraft.length})`)
+                        : (detalle.compat_universal
+                            ? (ar?.compatUniversalCorto ?? "Todas")
+                            : `(${compats.length})`)}
                     </h3>
                     {!editandoCompat && (
                       <Button type="button" size="sm" variant="outline" className="h-7" onClick={empezarEditarCompat}>
                         <Pencil className="h-3 w-3 mr-1.5" />
-                        {compats.length === 0
+                        {!tieneCompat(detalle)
                           ? (ar?.configurarCompat ?? "Configurar")
                           : (ar?.editarCompat ?? "Editar")}
                       </Button>
@@ -1092,22 +1157,34 @@ export default function AlmacenRefacciones() {
 
                   {!editandoCompat && (
                     <>
-                      <p className="text-xs text-muted-foreground">
-                        {ar?.compatHint ??
-                          "Cada moto/unidad se reutiliza en el catálogo. Pulsa una para ver todas las refacciones compatibles con ella."}
-                      </p>
-                      {compats.length === 0 ? (
+                      {detalle.compat_universal ? (
+                        <div className="rounded-md border border-sky-200 bg-sky-50/80 p-3 space-y-1">
+                          <p className="text-sm font-medium text-sky-900">
+                            {ar?.compatUniversalTitulo ?? "Compatible con todas las motos"}
+                          </p>
+                          <p className="text-xs text-sky-800/80">
+                            {ar?.compatUniversalHint ??
+                              "Pieza genérica (fluidos, aceites, etc.). Aplica a cualquier unidad del catálogo."}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          {ar?.compatHint ??
+                            "Cada moto/unidad se reutiliza en el catálogo. Pulsa una para ver todas las refacciones compatibles con ella."}
+                        </p>
+                      )}
+                      {!detalle.compat_universal && compats.length === 0 ? (
                         <div className="rounded-md border border-dashed border-amber-300 bg-amber-50/60 p-3 space-y-2">
                           <p className="text-sm text-amber-900">
                             {ar?.sinCompatConfig ??
-                              "Esta pieza aún no tiene motos compatibles. Configúralas para poder filtrar el inventario por unidad."}
+                              "Esta pieza aún no tiene motos compatibles. Márcala como genérica o agrega modelos."}
                           </p>
                           <Button type="button" size="sm" onClick={empezarEditarCompat}>
                             <Plus className="h-4 w-4 mr-1.5" />
                             {ar?.configurarCompat ?? "Configurar compatibilidad"}
                           </Button>
                         </div>
-                      ) : (
+                      ) : !detalle.compat_universal ? (
                         <div className="flex flex-wrap gap-2">
                           {compats.map(c => (
                             <button
@@ -1126,15 +1203,44 @@ export default function AlmacenRefacciones() {
                             </button>
                           ))}
                         </div>
+                      ) : null}
+                      {detalle.compat_universal && compats.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {compats.map(c => (
+                            <span key={c.id} className="inline-flex items-center rounded-md border bg-white px-2.5 py-1 text-xs text-muted-foreground">
+                              {c.nombre}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </>
                   )}
 
                   {editandoCompat && (
                     <div className="space-y-3">
+                      <label className="flex items-start gap-3 rounded-md border border-sky-200 bg-sky-50/70 p-3 cursor-pointer">
+                        <Checkbox
+                          checked={compatUniversalDraft}
+                          onCheckedChange={v => setCompatUniversalDraft(v === true)}
+                          className="mt-0.5"
+                        />
+                        <span className="space-y-0.5">
+                          <span className="block text-sm font-medium text-sky-950">
+                            {ar?.compatUniversalTitulo ?? "Compatible con todas las motos"}
+                          </span>
+                          <span className="block text-xs text-sky-900/80">
+                            {ar?.compatUniversalEditHint ??
+                              "Úsalo para fluidos, aceites u otras piezas genéricas. Queda configurada sin listar cada modelo."}
+                          </span>
+                        </span>
+                      </label>
+
                       <p className="text-xs text-muted-foreground">
-                        {ar?.compatEditHint ??
-                          "Agrega motos/unidades existentes o escribe un nombre nuevo. Al guardar se actualiza el catálogo."}
+                        {compatUniversalDraft
+                          ? (ar?.compatUniversalOpcionalModelos ??
+                              "Opcional: también puedes anotar modelos frecuentes. No es obligatorio.")
+                          : (ar?.compatEditHint ??
+                              "Agrega motos/unidades del catálogo o escribe un nombre nuevo.")}
                       </p>
                       {compatDraft.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
@@ -1157,7 +1263,9 @@ export default function AlmacenRefacciones() {
                         </div>
                       ) : (
                         <p className="text-sm text-muted-foreground italic">
-                          {ar?.compatVaciaEdit ?? "Sin unidades todavía — agrega al menos una."}
+                          {compatUniversalDraft
+                            ? (ar?.compatUniversalSinModelos ?? "Sin modelos específicos (válido si es genérica).")
+                            : (ar?.compatVaciaEdit ?? "Sin unidades todavía — agrega al menos una.")}
                         </p>
                       )}
 
@@ -1342,10 +1450,26 @@ export default function AlmacenRefacciones() {
             <div className="rounded-md border p-3 space-y-2">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                 <Bike className="h-3.5 w-3.5" />
-                {ar?.seccionCompat ?? "Compatible con"} ({altaCompatDraft.length})
+                {ar?.seccionCompat ?? "Compatible con"} ({altaCompatUniversal ? (ar?.compatUniversalCorto ?? "Todas") : altaCompatDraft.length})
               </div>
+              <label className="flex items-start gap-3 rounded-md border border-sky-200 bg-sky-50/70 p-3 cursor-pointer">
+                <Checkbox
+                  checked={altaCompatUniversal}
+                  onCheckedChange={v => setAltaCompatUniversal(v === true)}
+                  className="mt-0.5"
+                />
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-medium text-sky-950">
+                    {ar?.compatUniversalTitulo ?? "Compatible con todas las motos"}
+                  </span>
+                  <span className="block text-xs text-sky-900/80">
+                    {ar?.compatUniversalEditHint ??
+                      "Úsalo para fluidos, aceites u otras piezas genéricas."}
+                  </span>
+                </span>
+              </label>
               <p className="text-xs text-muted-foreground">
-                {ar?.altaCompatOpcional ?? "Opcional al registrar; también se puede editar después en la ficha."}
+                {ar?.altaCompatOpcional ?? "Opcional al registrar; también se edita después en la ficha."}
               </p>
               {altaCompatDraft.length > 0 && (
                 <div className="flex flex-wrap gap-2">

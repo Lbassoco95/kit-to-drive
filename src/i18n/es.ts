@@ -1170,6 +1170,15 @@ export const es = {
     errorCaract: "No se pudieron guardar las características",
     sinCaract: "Sin características cargadas — pulsa Editar para agregarlas.",
     piezasEnAlmacen: (n: number) => `${n.toLocaleString("es-MX")} en almacén`,
+    compatUniversalTitulo: "Compatible con todas las motos",
+    compatUniversalHint: "Pieza genérica (fluidos, aceites, etc.). Aplica a cualquier unidad del catálogo.",
+    compatUniversalEditHint: "Úsalo para fluidos, aceites u otras piezas genéricas. Queda configurada sin listar cada modelo.",
+    compatUniversalOpcionalModelos: "Opcional: también puedes anotar modelos frecuentes. No es obligatorio.",
+    compatUniversalSinModelos: "Sin modelos específicos (válido si es genérica).",
+    compatUniversalCorto: "Todas",
+    compatUniversalGuardada: "Marcado como compatible con todas",
+    compatRequiereAlgo: "Marca «compatible con todas» o agrega al menos una moto",
+    statUniversales: (n: number) => `${n} genéricas`,
   },
 
   // Inventario

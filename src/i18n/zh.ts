@@ -1160,6 +1160,15 @@ export const zh = {
     errorCaract: "无法保存规格",
     sinCaract: "尚未填写规格 — 点击编辑添加。",
     piezasEnAlmacen: (n: number) => `库存 ${n.toLocaleString("es-MX")}`,
+    compatUniversalTitulo: "兼容全部车型",
+    compatUniversalHint: "通用件（液体、机油等）。适用于目录中的任意车型。",
+    compatUniversalEditHint: "用于液体、机油等通用件。无需列出每个车型即可完成配置。",
+    compatUniversalOpcionalModelos: "可选：也可标注常用车型，非必须。",
+    compatUniversalSinModelos: "无具体车型（通用件有效）。",
+    compatUniversalCorto: "全部",
+    compatUniversalGuardada: "已标记为兼容全部车型",
+    compatRequiereAlgo: "请勾选「兼容全部」或至少添加一个车型",
+    statUniversales: (n: number) => `${n} 通用`,
   },
 
   // Inventario
