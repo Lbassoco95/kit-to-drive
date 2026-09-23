@@ -267,6 +267,8 @@ WITH esperado(script, objeto) AS (VALUES
 
   -- Compat: no borrar asignaciones si llega lista vacía (salvo forzar desde ficha).
   ('20260923000001_compat_no_borrar_si_vacio', 'funcion|sincronizar_compat_refacciones(jsonb)'),
+  ('20260923000002_refacciones_foto_caracteristicas', 'columna|almacen_refacciones_productos.foto_url'),
+  ('20260923000002_refacciones_foto_caracteristicas', 'columna|almacen_refacciones_productos.caracteristicas'),
 
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),

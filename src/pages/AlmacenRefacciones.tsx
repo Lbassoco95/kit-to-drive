@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import {
   Package, Search, Upload, Bike, RefreshCw, Eye, EyeOff,
   LayoutGrid, List, Plus, X, Save, Pencil, PackageX, PackageCheck,
+  ImagePlus, Camera, Trash2,
 } from "lucide-react";
 import { parseListaPreciosRefacciones, siguienteCodigoEnSerie, seriesDesdeCodigos } from "@/lib/refaccionesParser";
 import { explicarError } from "@/lib/dazon";
@@ -30,7 +31,10 @@ type Producto = {
   descripcion: string;
   descripcion_corta: string | null;
   descripcion_original?: string | null;
+  caracteristicas?: string | null;
+  foto_url?: string | null;
   unidad_medida: string | null;
+  piezas_por_caja?: string | null;
   precio: number | null;
   stock: number;
   visible_venta: boolean;
@@ -49,6 +53,7 @@ type UnidadFiltro = { id: string; nombre: string; piezas: number };
 type VistaMode = "tabla" | "tarjetas";
 type OrdenMode = "codigo" | "descripcion" | "stock_desc" | "stock_asc";
 type StockFiltro = "todos" | "con_stock" | "sin_stock";
+type AgruparMode = "ninguno" | "categoria" | "linea" | "serie";
 
 const LINEA_LABEL: Record<string, string> = {
   linea_dorada: "Línea dorada",
@@ -56,8 +61,22 @@ const LINEA_LABEL: Record<string, string> = {
   linea_azul: "Línea azul",
 };
 
+const BUCKET_FOTOS = "refacciones-fotos";
+
 function nombreProducto(p: Producto) {
-  return (p.descripcion_corta || p.descripcion || p.codigo_nuevo).trim();
+  return (p.descripcion_corta || p.descripcion || p.codigo_nuevo).trim().replace(/\/\s*$/, "");
+}
+
+function serieDeProducto(p: Producto) {
+  const m = p.codigo_nuevo.match(/^([A-ZÁÉÍÓÚÑ0-9]+)-\d+$/i);
+  return m ? m[1].toUpperCase() : "OTROS";
+}
+
+function grupoDeProducto(p: Producto, modo: AgruparMode): string {
+  if (modo === "categoria") return p.categoria?.trim() || "Sin categoría";
+  if (modo === "linea") return LINEA_LABEL[p.linea_catalogo] ?? p.linea_catalogo;
+  if (modo === "serie") return serieDeProducto(p);
+  return "";
 }
 
 export default function AlmacenRefacciones() {
@@ -78,12 +97,17 @@ export default function AlmacenRefacciones() {
   const [vista, setVista] = useState<VistaMode>("tarjetas");
   const [orden, setOrden] = useState<OrdenMode>("codigo");
   const [stockFiltro, setStockFiltro] = useState<StockFiltro>("todos");
+  const [agrupar, setAgrupar] = useState<AgruparMode>("categoria");
 
   // Edición de compatibilidad en el detalle
   const [editandoCompat, setEditandoCompat] = useState(false);
   const [compatDraft, setCompatDraft] = useState<string[]>([]);
   const [nuevaUnidad, setNuevaUnidad] = useState("");
   const [guardandoCompat, setGuardandoCompat] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [caractDraft, setCaractDraft] = useState("");
+  const [guardandoCaract, setGuardandoCaract] = useState(false);
+  const [editandoCaract, setEditandoCaract] = useState(false);
 
   // Alta de producto nuevo
   const [altaOpen, setAltaOpen] = useState(false);
@@ -184,6 +208,24 @@ export default function AlmacenRefacciones() {
     return list;
   }, [rows, q, linea, soloVisibles, soloConCompat, stockFiltro, unidadFiltro, idsPorUnidad, orden]);
 
+  const grupos = useMemo(() => {
+    if (agrupar === "ninguno") return [{ clave: "", items: filtered, stockTotal: filtered.reduce((s, p) => s + (p.stock || 0), 0) }];
+    const map = new Map<string, Producto[]>();
+    for (const p of filtered) {
+      const g = grupoDeProducto(p, agrupar);
+      const list = map.get(g) ?? [];
+      list.push(p);
+      map.set(g, list);
+    }
+    return [...map.entries()]
+      .map(([clave, items]) => ({
+        clave,
+        items,
+        stockTotal: items.reduce((s, p) => s + (p.stock || 0), 0),
+      }))
+      .sort((a, b) => a.clave.localeCompare(b.clave, "es"));
+  }, [filtered, agrupar]);
+
   const stats = useMemo(() => {
     const dual = rows.filter(r => r.codigo_antiguo).length;
     const conCompat = rows.filter(r => r.num_compatibilidades > 0).length;
@@ -212,6 +254,8 @@ export default function AlmacenRefacciones() {
     const sorted = base.sort((a, b) => a.nombre.localeCompare(b.nombre));
     setCompats(sorted);
     setCompatDraft(sorted.map(c => c.nombre));
+    setCaractDraft(p.caracteristicas || "");
+    setEditandoCaract(false);
     // Si no tiene compat, abrir en edición (salvo al refrescar tras guardar)
     if ((opts?.editarSiVacio ?? true) && sorted.length === 0) setEditandoCompat(true);
   };
@@ -283,6 +327,82 @@ export default function AlmacenRefacciones() {
       toast.error(explicarError(e, ar?.errorCompatGuardar ?? "No se pudo guardar la compatibilidad"));
     } finally {
       setGuardandoCompat(false);
+    }
+  };
+
+  const subirFoto = async (file: File) => {
+    if (!detalle) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error(ar?.fotoTipoInvalido ?? "Sólo se permiten imágenes (JPG, PNG, WEBP)");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(ar?.fotoMuyGrande ?? "La foto no puede pesar más de 5 MB");
+      return;
+    }
+    setSubiendoFoto(true);
+    try {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+      const path = `${detalle.codigo_nuevo}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from(BUCKET_FOTOS).upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from(BUCKET_FOTOS).getPublicUrl(path);
+      const url = pub.publicUrl;
+      const { error } = await supabase
+        .from("almacen_refacciones_productos" as any)
+        .update({ foto_url: url })
+        .eq("id", detalle.id);
+      if (error) throw error;
+      toast.success(ar?.okFoto ?? "Foto actualizada");
+      setDetalle({ ...detalle, foto_url: url });
+      setRows(prev => prev.map(r => r.id === detalle.id ? { ...r, foto_url: url } : r));
+    } catch (e: any) {
+      toast.error(explicarError(e, ar?.errorFoto ?? "No se pudo subir la foto"));
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
+  const quitarFoto = async () => {
+    if (!detalle?.foto_url) return;
+    setSubiendoFoto(true);
+    try {
+      const { error } = await supabase
+        .from("almacen_refacciones_productos" as any)
+        .update({ foto_url: null })
+        .eq("id", detalle.id);
+      if (error) throw error;
+      toast.success(ar?.okFotoQuitada ?? "Foto eliminada");
+      setDetalle({ ...detalle, foto_url: null });
+      setRows(prev => prev.map(r => r.id === detalle.id ? { ...r, foto_url: null } : r));
+    } catch (e: any) {
+      toast.error(explicarError(e, ar?.errorFoto ?? "No se pudo quitar la foto"));
+    } finally {
+      setSubiendoFoto(false);
+    }
+  };
+
+  const guardarCaracteristicas = async () => {
+    if (!detalle) return;
+    setGuardandoCaract(true);
+    try {
+      const texto = caractDraft.trim() || null;
+      const { error } = await supabase
+        .from("almacen_refacciones_productos" as any)
+        .update({ caracteristicas: texto })
+        .eq("id", detalle.id);
+      if (error) throw error;
+      toast.success(ar?.okCaract ?? "Características guardadas");
+      setDetalle({ ...detalle, caracteristicas: texto });
+      setRows(prev => prev.map(r => r.id === detalle.id ? { ...r, caracteristicas: texto } : r));
+      setEditandoCaract(false);
+    } catch (e: any) {
+      toast.error(explicarError(e, ar?.errorCaract ?? "No se pudieron guardar las características"));
+    } finally {
+      setGuardandoCaract(false);
     }
   };
 
@@ -543,6 +663,17 @@ export default function AlmacenRefacciones() {
               <SelectItem value="stock_asc">{ar?.ordenStockAsc ?? "Sin stock primero"}</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={agrupar} onValueChange={v => setAgrupar(v as AgruparMode)}>
+            <SelectTrigger className="w-full md:w-48">
+              <SelectValue placeholder={ar?.agruparPor ?? "Agrupar"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ninguno">{ar?.agruparNinguno ?? "Sin agrupar"}</SelectItem>
+              <SelectItem value="categoria">{ar?.agruparCategoria ?? "Por categoría"}</SelectItem>
+              <SelectItem value="linea">{ar?.agruparLinea ?? "Por línea"}</SelectItem>
+              <SelectItem value="serie">{ar?.agruparSerie ?? "Por serie (código)"}</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={stockFiltro} onValueChange={v => setStockFiltro(v as StockFiltro)}>
             <SelectTrigger className="w-full md:w-44">
               <SelectValue />
@@ -633,55 +764,77 @@ export default function AlmacenRefacciones() {
         )}
 
         {vista === "tarjetas" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[65vh] overflow-auto pr-1">
-            {filtered.map(p => {
-              const conStock = p.stock > 0;
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => abrirDetalle(p)}
-                  className={cn(
-                    "text-left rounded-lg border bg-white p-3 transition-all hover:border-[#1F3864] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F3864]",
-                    !conStock && "opacity-90 bg-slate-50/80",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="font-mono text-sm font-bold text-[#1F3864]">{p.codigo_nuevo}</span>
-                    <StockBadge stock={p.stock} />
+          <div className="space-y-4 max-h-[65vh] overflow-auto pr-1">
+            {grupos.map(g => (
+              <div key={g.clave || "all"} className="space-y-2">
+                {agrupar !== "ninguno" && (
+                  <div className="sticky top-0 z-10 flex items-center justify-between gap-2 rounded-md bg-slate-100/95 border px-3 py-1.5 backdrop-blur-sm">
+                    <span className="text-sm font-semibold text-[#1F3864]">{g.clave}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {g.items.length} {(ar?.piezasLbl ?? "piezas")} · {ar?.colStock ?? "Stock"}{" "}
+                      <strong className="text-foreground">{g.stockTotal.toLocaleString("es-MX")}</strong>
+                    </span>
                   </div>
-                  <div className="text-sm font-medium leading-snug line-clamp-2 min-h-[2.5rem]">
-                    {nombreProducto(p)}
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                    <Badge variant="outline" className="font-normal">
-                      {LINEA_LABEL[p.linea_catalogo] ?? p.linea_catalogo}
-                    </Badge>
-                    {p.marca && <span className="truncate max-w-[8rem]">{p.marca}</span>}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold tabular-nums">{money(p.precio)}</span>
-                    {p.num_compatibilidades > 0 ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-[#1F3864]">
-                        <Bike className="h-3 w-3" />
-                        {p.num_compatibilidades}
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
-                        {ar?.compatPendiente ?? "Configurar compat."}
-                      </span>
-                    )}
-                  </div>
-                  {p.codigo_antiguo && (
-                    <div className="mt-1 font-mono text-[11px] text-muted-foreground truncate">
-                      {p.codigo_antiguo}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {g.items.map(p => {
+                    const conStock = p.stock > 0;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => abrirDetalle(p)}
+                        className={cn(
+                          "text-left rounded-lg border bg-white overflow-hidden transition-all hover:border-[#1F3864] hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1F3864]",
+                          !conStock && "opacity-90 bg-slate-50/80",
+                        )}
+                      >
+                        <div className="relative aspect-[4/3] bg-slate-100 border-b">
+                          {p.foto_url ? (
+                            <img src={p.foto_url} alt={nombreProducto(p)} className="h-full w-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground gap-1">
+                              <Camera className="h-7 w-7 opacity-40" />
+                              <span className="text-[11px]">{ar?.sinFoto ?? "Sin foto"}</span>
+                            </div>
+                          )}
+                          <div className="absolute top-2 right-2">
+                            <StockBadge stock={p.stock} />
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <div className="font-mono text-sm font-bold text-[#1F3864]">{p.codigo_nuevo}</div>
+                          <div className="text-sm font-medium leading-snug line-clamp-2 mt-0.5 min-h-[2.5rem]">
+                            {nombreProducto(p)}
+                          </div>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                            <Badge variant="outline" className="font-normal">
+                              {LINEA_LABEL[p.linea_catalogo] ?? p.linea_catalogo}
+                            </Badge>
+                            {p.categoria && <span className="truncate max-w-[9rem]">{p.categoria}</span>}
+                          </div>
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold tabular-nums">{money(p.precio)}</span>
+                            {p.num_compatibilidades > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-[#1F3864]">
+                                <Bike className="h-3 w-3" />
+                                {p.num_compatibilidades}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                                {ar?.compatPendiente ?? "Configurar compat."}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
             {!loading && filtered.length === 0 && (
-              <div className="col-span-full text-center text-muted-foreground py-12">
+              <div className="text-center text-muted-foreground py-12">
                 {ar?.vacio ?? "No hay productos con esos filtros"}
               </div>
             )}
@@ -691,6 +844,7 @@ export default function AlmacenRefacciones() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-14"></TableHead>
                   <TableHead>{ar?.colNuevo ?? "Código nuevo"}</TableHead>
                   <TableHead>{ar?.colAntiguo ?? "Código antiguo"}</TableHead>
                   <TableHead>{ar?.colDesc ?? "Descripción"}</TableHead>
@@ -702,47 +856,74 @@ export default function AlmacenRefacciones() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(p => (
-                  <TableRow
-                    key={p.id}
-                    className={cn(
-                      "cursor-pointer hover:bg-slate-50",
-                      !(p.stock > 0) && "bg-rose-50/40",
-                    )}
-                    onClick={() => abrirDetalle(p)}
-                  >
-                    <TableCell className="font-mono text-sm font-semibold">{p.codigo_nuevo}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {p.codigo_antiguo ?? "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[320px]">
-                      <div className="truncate font-medium">{nombreProducto(p)}</div>
-                      {p.categoria && (
-                        <div className="text-xs text-muted-foreground truncate">{p.categoria}</div>
+                {grupos.flatMap(g => [
+                  ...(agrupar !== "ninguno"
+                    ? [(
+                      <TableRow key={`g-${g.clave}`} className="bg-slate-100 hover:bg-slate-100">
+                        <TableCell colSpan={9} className="py-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-[#1F3864]">{g.clave}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {g.items.length} · stock {g.stockTotal.toLocaleString("es-MX")}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )]
+                    : []),
+                  ...g.items.map(p => (
+                    <TableRow
+                      key={p.id}
+                      className={cn(
+                        "cursor-pointer hover:bg-slate-50",
+                        !(p.stock > 0) && "bg-rose-50/40",
                       )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{LINEA_LABEL[p.linea_catalogo] ?? p.linea_catalogo}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{p.marca ?? "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums">{money(p.precio)}</TableCell>
-                    <TableCell className="text-right">
-                      <StockBadge stock={p.stock} />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {p.num_compatibilidades > 0 ? (
-                        <Badge variant="default">{p.num_compatibilidades}</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">
-                          {ar?.compatPendienteCorto ?? "Configurar"}
-                        </Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      onClick={() => abrirDetalle(p)}
+                    >
+                      <TableCell className="p-1.5">
+                        <div className="h-10 w-10 rounded border bg-slate-50 overflow-hidden">
+                          {p.foto_url ? (
+                            <img src={p.foto_url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center">
+                              <Camera className="h-4 w-4 text-muted-foreground/50" />
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm font-semibold">{p.codigo_nuevo}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {p.codigo_antiguo ?? "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[320px]">
+                        <div className="truncate font-medium">{nombreProducto(p)}</div>
+                        {p.categoria && (
+                          <div className="text-xs text-muted-foreground truncate">{p.categoria}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{LINEA_LABEL[p.linea_catalogo] ?? p.linea_catalogo}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{p.marca ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{money(p.precio)}</TableCell>
+                      <TableCell className="text-right">
+                        <StockBadge stock={p.stock} />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {p.num_compatibilidades > 0 ? (
+                          <Badge variant="default">{p.num_compatibilidades}</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">
+                            {ar?.compatPendienteCorto ?? "Configurar"}
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )),
+                ])}
                 {!loading && filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                       {ar?.vacio ?? "No hay productos con esos filtros"}
                     </TableCell>
                   </TableRow>
@@ -759,8 +940,8 @@ export default function AlmacenRefacciones() {
         </p>
       </Card>
 
-      <Dialog open={!!detalle} onOpenChange={open => { if (!open) { setDetalle(null); setEditandoCompat(false); } }}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!detalle} onOpenChange={open => { if (!open) { setDetalle(null); setEditandoCompat(false); setEditandoCaract(false); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {detalle && (
             <>
               <DialogHeader>
@@ -773,26 +954,122 @@ export default function AlmacenRefacciones() {
               </DialogHeader>
 
               <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">Precio</div>
-                    <div className="text-lg font-semibold">{money(detalle.precio)}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-3">
+                  <div className="rounded-md border overflow-hidden bg-slate-50">
+                    <div className="aspect-[4/3] relative bg-slate-100">
+                      {detalle.foto_url ? (
+                        <img src={detalle.foto_url} alt={nombreProducto(detalle)} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                          <Camera className="h-10 w-10 opacity-40" />
+                          <span className="text-xs">{ar?.sinFoto ?? "Sin foto"}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2 p-2 border-t bg-white">
+                      <Button type="button" size="sm" variant="outline" className="h-8" disabled={subiendoFoto} asChild>
+                        <label className="cursor-pointer inline-flex items-center gap-1.5">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            disabled={subiendoFoto}
+                            onChange={e => {
+                              const f = e.target.files?.[0];
+                              if (f) void subirFoto(f);
+                              e.target.value = "";
+                            }}
+                          />
+                          <ImagePlus className="h-3.5 w-3.5" />
+                          {subiendoFoto
+                            ? (ar?.subiendoFoto ?? "Subiendo…")
+                            : (ar?.cargarFoto ?? "Cargar foto")}
+                        </label>
+                      </Button>
+                      {detalle.foto_url && (
+                        <Button type="button" size="sm" variant="ghost" className="h-8 text-rose-600" disabled={subiendoFoto} onClick={() => void quitarFoto()}>
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          {ar?.quitarFoto ?? "Quitar"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                  <div className="rounded-md border p-3">
-                    <div className="text-xs text-muted-foreground">Stock</div>
-                    <div className="mt-1"><StockBadge stock={detalle.stock} /></div>
+
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-md border p-3">
+                        <div className="text-xs text-muted-foreground">{ar?.colPrecio ?? "Precio"}</div>
+                        <div className="text-lg font-semibold">{money(detalle.precio)}</div>
+                      </div>
+                      <div className="rounded-md border p-3">
+                        <div className="text-xs text-muted-foreground">{ar?.colStock ?? "Stock"}</div>
+                        <div className="mt-1"><StockBadge stock={detalle.stock} /></div>
+                        <div className="text-[11px] text-muted-foreground mt-1 tabular-nums">
+                          {(ar?.piezasEnAlmacen ?? ((n: number) => `${n.toLocaleString("es-MX")} en almacén`))(detalle.stock || 0)}
+                        </div>
+                      </div>
+                    </div>
+                    <section className="rounded-md border p-3 space-y-1.5 bg-slate-50/80">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {ar?.seccionDesc ?? "Descripción"}
+                      </h3>
+                      <p className="text-base font-medium leading-snug text-[#1F3864]">
+                        {nombreProducto(detalle)}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground pt-1">
+                        <Badge variant="outline">{LINEA_LABEL[detalle.linea_catalogo] ?? detalle.linea_catalogo}</Badge>
+                        {detalle.categoria && <span>{detalle.categoria}</span>}
+                        {detalle.marca && <span>· {detalle.marca}</span>}
+                      </div>
+                    </section>
                   </div>
                 </div>
 
-                <section className="rounded-md border p-3 space-y-1.5 bg-slate-50/80">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {ar?.seccionDesc ?? "Descripción"}
-                  </h3>
-                  <p className="text-base font-medium leading-snug text-[#1F3864]">
-                    {nombreProducto(detalle)}
-                  </p>
-                  {detalle.categoria && (
-                    <p className="text-xs text-muted-foreground">{detalle.categoria}{detalle.marca ? ` · ${detalle.marca}` : ""}</p>
+                <section className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {ar?.seccionCaract ?? "Características"}
+                    </h3>
+                    {!editandoCaract && (
+                      <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => { setCaractDraft(detalle.caracteristicas || ""); setEditandoCaract(true); }}>
+                        <Pencil className="h-3 w-3 mr-1.5" />
+                        {ar?.editarCompat ?? "Editar"}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded border bg-white px-2 py-1.5">
+                      <div className="text-muted-foreground">{ar?.colUnidad ?? "Unidad"}</div>
+                      <div className="font-medium">{detalle.unidad_medida || "—"}</div>
+                    </div>
+                    <div className="rounded border bg-white px-2 py-1.5">
+                      <div className="text-muted-foreground">{ar?.colCaja ?? "Piezas por caja"}</div>
+                      <div className="font-medium">{detalle.piezas_por_caja || "—"}</div>
+                    </div>
+                  </div>
+                  {editandoCaract ? (
+                    <div className="space-y-2">
+                      <textarea
+                        className="w-full min-h-[88px] rounded-md border bg-white px-3 py-2 text-sm"
+                        value={caractDraft}
+                        onChange={e => setCaractDraft(e.target.value)}
+                        placeholder={ar?.caractPlaceholder ?? "Medidas, material, color, notas…"}
+                      />
+                      <div className="flex gap-2">
+                        <Button type="button" size="sm" onClick={() => void guardarCaracteristicas()} disabled={guardandoCaract}>
+                          <Save className="h-3.5 w-3.5 mr-1.5" />
+                          {guardandoCaract ? (ar?.guardandoCaract ?? "Guardando…") : (ar?.guardarCaract ?? "Guardar")}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setEditandoCaract(false)} disabled={guardandoCaract}>
+                          {ar?.cancelarCompat ?? "Cancelar"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap text-foreground/90">
+                      {detalle.caracteristicas?.trim()
+                        || (ar?.sinCaract ?? "Sin características cargadas — pulsa Editar para agregarlas.")}
+                    </p>
                   )}
                 </section>
 
