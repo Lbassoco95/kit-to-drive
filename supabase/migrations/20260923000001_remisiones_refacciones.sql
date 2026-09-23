@@ -141,59 +141,39 @@ REVOKE ALL ON FUNCTION public.stock_bloqueado_producto(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.stock_bloqueado_producto(UUID) TO authenticated;
 
 -- La vista de inventario ahora dice qué está apartado y qué sigue disponible.
--- CREATE OR REPLACE no sirve: en producción la vista ya tiene
--- `descripcion_original` entre descripcion_corta y unidad_medida, y Postgres
--- se niega a cambiar el nombre de una columna de vista (42P16). Se tira y se
--- vuelve a crear, conservando esa columna si la tabla la tiene.
+-- No se usa CREATE OR REPLACE con una lista fija: en producción la vista ya
+-- trae columnas que este repo no tenía (descripcion_original, caracteristicas,
+-- foto_url) y Postgres rechaza cambiar nombres u orden (42P16). Se copian las
+-- columnas que ya expone, en el mismo orden, y se agregan las dos nuevas al final.
 DO $vista$
 DECLARE
-  _tiene_original boolean;
   _cols text;
 BEGIN
-  SELECT EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'almacen_refacciones_productos'
-      AND column_name = 'descripcion_original'
-  ) INTO _tiene_original;
+  SELECT string_agg(
+    CASE column_name
+      WHEN 'num_compatibilidades' THEN 'coalesce(c.num_compat, 0)::integer AS num_compatibilidades'
+      ELSE 'p.' || quote_ident(column_name)
+    END,
+    ', ' ORDER BY ordinal_position
+  )
+  INTO _cols
+  FROM information_schema.columns
+  WHERE table_schema = 'public'
+    AND table_name = 'v_almacen_refacciones'
+    AND column_name NOT IN ('stock_bloqueado', 'stock_disponible');
 
-  EXECUTE 'DROP VIEW IF EXISTS public.v_almacen_refacciones';
-
-  _cols := '
-    p.id,
-    p.codigo_nuevo,
-    p.codigo_antiguo,
-    p.clave_completa,
-    p.clave_simplificada,
-    p.linea_catalogo,
-    p.marca,
-    p.categoria,
-    p.descripcion,
-    p.descripcion_corta,';
-
-  IF _tiene_original THEN
-    _cols := _cols || ' p.descripcion_original,';
+  IF _cols IS NULL THEN
+    RAISE EXCEPTION 'No está la vista v_almacen_refacciones. Corre antes 20260922000001_almacen_refacciones.sql';
   END IF;
 
-  _cols := _cols || '
-    p.unidad_medida,
-    p.piezas_por_caja,
-    p.precio,
-    p.stock,
-    p.visible_venta,
-    p.no_lista,
-    p.fuente_archivo,
-    p.created_at,
-    p.updated_at,
-    coalesce(c.num_compat, 0)::INTEGER AS num_compatibilidades,
-    b.stock_bloqueado,
-    GREATEST(p.stock - b.stock_bloqueado, 0) AS stock_disponible';
+  EXECUTE 'DROP VIEW IF EXISTS public.v_almacen_refacciones';
 
   EXECUTE format($sql$
     CREATE VIEW public.v_almacen_refacciones
     WITH (security_invoker = true) AS
-    SELECT %s
+    SELECT %s,
+      b.stock_bloqueado,
+      GREATEST(p.stock - b.stock_bloqueado, 0) AS stock_disponible
     FROM public.almacen_refacciones_productos p
     CROSS JOIN LATERAL (
       SELECT public.stock_bloqueado_producto(p.id) AS stock_bloqueado
