@@ -43,13 +43,16 @@ CREATE TABLE IF NOT EXISTS public.bitacora_eliminaciones (
 );
 ALTER TABLE bitacora_eliminaciones ENABLE ROW LEVEL SECURITY;
 
--- RLS policies
+-- RLS policies. No dejarlas en USING (true): el detalle de lo borrado no es
+-- público. 20260923000001_endurecer_accesos.sql es la versión vigente.
 DROP POLICY IF EXISTS "solo admin lee bitacora" ON public.bitacora_eliminaciones;
 CREATE POLICY "solo admin lee bitacora" ON public.bitacora_eliminaciones 
-  FOR SELECT TO authenticated USING (true);
+  FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'admin'));
 DROP POLICY IF EXISTS "sistema escribe bitacora" ON public.bitacora_eliminaciones;
 CREATE POLICY "sistema escribe bitacora" ON public.bitacora_eliminaciones 
-  FOR INSERT TO authenticated WITH CHECK (true);
+  FOR INSERT TO authenticated WITH CHECK (
+    eliminado_por = auth.uid() AND public.has_role(auth.uid(), 'admin')
+  );
 
 -- Index for performance
 CREATE INDEX IF NOT EXISTS idx_bitacora_eliminaciones_tabla ON public.bitacora_eliminaciones(tabla);

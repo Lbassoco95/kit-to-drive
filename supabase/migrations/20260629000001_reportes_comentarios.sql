@@ -143,13 +143,34 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('comentarios-fotos', 'comentarios-fotos', false)
 ON CONFLICT (id) DO NOTHING;
 
+-- Solo los roles que ya pueden comentar. Volver a dejarlo en «cualquier
+-- autenticado» abre el bucket; 20260923000001_endurecer_accesos.sql repite
+-- este corte por si este archivo ya se había corrido abierto.
+DROP POLICY IF EXISTS "subir foto comentario" ON storage.objects;
 CREATE POLICY "subir foto comentario"
 ON storage.objects FOR INSERT TO authenticated
-WITH CHECK (bucket_id = 'comentarios-fotos');
+WITH CHECK (
+  bucket_id = 'comentarios-fotos' AND (
+    public.has_role(auth.uid(), 'admin') OR
+    public.has_role(auth.uid(), 'fabrica') OR
+    public.has_role(auth.uid(), 'logistica') OR
+    public.has_role(auth.uid(), 'ventas') OR
+    public.has_role(auth.uid(), 'coordinador')
+  )
+);
 
+DROP POLICY IF EXISTS "leer foto comentario" ON storage.objects;
 CREATE POLICY "leer foto comentario"
 ON storage.objects FOR SELECT TO authenticated
-USING (bucket_id = 'comentarios-fotos');
+USING (
+  bucket_id = 'comentarios-fotos' AND (
+    public.has_role(auth.uid(), 'admin') OR
+    public.has_role(auth.uid(), 'fabrica') OR
+    public.has_role(auth.uid(), 'logistica') OR
+    public.has_role(auth.uid(), 'ventas') OR
+    public.has_role(auth.uid(), 'coordinador')
+  )
+);
 
 CREATE POLICY "borrar foto comentario admin"
 ON storage.objects FOR DELETE TO authenticated
