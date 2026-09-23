@@ -141,40 +141,70 @@ REVOKE ALL ON FUNCTION public.stock_bloqueado_producto(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.stock_bloqueado_producto(UUID) TO authenticated;
 
 -- La vista de inventario ahora dice qué está apartado y qué sigue disponible.
-CREATE OR REPLACE VIEW public.v_almacen_refacciones
-WITH (security_invoker = true) AS
-SELECT
-  p.id,
-  p.codigo_nuevo,
-  p.codigo_antiguo,
-  p.clave_completa,
-  p.clave_simplificada,
-  p.linea_catalogo,
-  p.marca,
-  p.categoria,
-  p.descripcion,
-  p.descripcion_corta,
-  p.unidad_medida,
-  p.piezas_por_caja,
-  p.precio,
-  p.stock,
-  p.visible_venta,
-  p.no_lista,
-  p.fuente_archivo,
-  p.created_at,
-  p.updated_at,
-  coalesce(c.num_compat, 0)::INTEGER AS num_compatibilidades,
-  b.stock_bloqueado,
-  GREATEST(p.stock - b.stock_bloqueado, 0) AS stock_disponible
-FROM public.almacen_refacciones_productos p
-CROSS JOIN LATERAL (
-  SELECT public.stock_bloqueado_producto(p.id) AS stock_bloqueado
-) b
-LEFT JOIN (
-  SELECT producto_id, count(*)::INTEGER AS num_compat
-  FROM public.almacen_refacciones_producto_compat
-  GROUP BY producto_id
-) c ON c.producto_id = p.id;
+-- CREATE OR REPLACE no sirve: en producción la vista ya tiene
+-- `descripcion_original` entre descripcion_corta y unidad_medida, y Postgres
+-- se niega a cambiar el nombre de una columna de vista (42P16). Se tira y se
+-- vuelve a crear, conservando esa columna si la tabla la tiene.
+DO $vista$
+DECLARE
+  _tiene_original boolean;
+  _cols text;
+BEGIN
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'almacen_refacciones_productos'
+      AND column_name = 'descripcion_original'
+  ) INTO _tiene_original;
+
+  EXECUTE 'DROP VIEW IF EXISTS public.v_almacen_refacciones';
+
+  _cols := '
+    p.id,
+    p.codigo_nuevo,
+    p.codigo_antiguo,
+    p.clave_completa,
+    p.clave_simplificada,
+    p.linea_catalogo,
+    p.marca,
+    p.categoria,
+    p.descripcion,
+    p.descripcion_corta,';
+
+  IF _tiene_original THEN
+    _cols := _cols || ' p.descripcion_original,';
+  END IF;
+
+  _cols := _cols || '
+    p.unidad_medida,
+    p.piezas_por_caja,
+    p.precio,
+    p.stock,
+    p.visible_venta,
+    p.no_lista,
+    p.fuente_archivo,
+    p.created_at,
+    p.updated_at,
+    coalesce(c.num_compat, 0)::INTEGER AS num_compatibilidades,
+    b.stock_bloqueado,
+    GREATEST(p.stock - b.stock_bloqueado, 0) AS stock_disponible';
+
+  EXECUTE format($sql$
+    CREATE VIEW public.v_almacen_refacciones
+    WITH (security_invoker = true) AS
+    SELECT %s
+    FROM public.almacen_refacciones_productos p
+    CROSS JOIN LATERAL (
+      SELECT public.stock_bloqueado_producto(p.id) AS stock_bloqueado
+    ) b
+    LEFT JOIN (
+      SELECT producto_id, count(*)::INTEGER AS num_compat
+      FROM public.almacen_refacciones_producto_compat
+      GROUP BY producto_id
+    ) c ON c.producto_id = p.id
+  $sql$, _cols);
+END $vista$;
 
 GRANT SELECT ON public.v_almacen_refacciones TO authenticated;
 
