@@ -125,6 +125,12 @@ UPDATE public.user_roles SET role = public.rol_legacy(area, nivel)
 WHERE role <> public.rol_legacy(area, nivel);
 
 -- 7. Helpers de permisos (nivel × área) -------------------------------------
+-- Si `usuario_activo` ya existe (20260824000003) y se vuelve a pegar este
+-- archivo, no hay que quitarle el corte de baja: 20260923000001 lo pone y
+-- un CREATE OR REPLACE de aquí lo borraría. El cuerpo de abajo es el original
+-- porque, en una base nueva, este archivo corre ANTES de que exista
+-- usuario_activo. Después de pegarlo en una base que ya tenía el corte,
+-- vuelve a correr 20260923000001_endurecer_accesos.sql.
 CREATE OR REPLACE FUNCTION public.mi_area()
 RETURNS public.user_area LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT area FROM public.user_roles WHERE user_id = auth.uid() LIMIT 1

@@ -114,15 +114,27 @@ export default function Usuarios() {
 
     if (profErr) { toast.error(profErr.message); setSaving(false); return; }
 
-    // Un usuario = un tipo de usuario en un área: se reemplaza la fila.
-    await supabase.from("user_roles").delete().eq("user_id", editTarget.id);
-    const { error: rolErr } = await supabase.from("user_roles").insert({
-      user_id: editTarget.id,
+    // Un usuario = un tipo de usuario en un área. Se actualiza la fila que ya
+    // tiene: borrar e insertar dejaba un instante sin rol y, si el trigger
+    // impide autoasignarse, el admin se quedaba fuera al editarse a sí mismo.
+    const rol = {
       area: editForm.area,
       nivel: editForm.nivel,
       role: rolLegacy(editForm.area, editForm.nivel),
-    });
-    if (rolErr) { toast.error(rolErr.message); setSaving(false); return; }
+    };
+    const { data: updated, error: updErr } = await supabase
+      .from("user_roles")
+      .update(rol)
+      .eq("user_id", editTarget.id)
+      .select("user_id");
+    if (updErr) { toast.error(updErr.message); setSaving(false); return; }
+    if (!updated?.length) {
+      const { error: rolErr } = await supabase.from("user_roles").insert({
+        user_id: editTarget.id,
+        ...rol,
+      });
+      if (rolErr) { toast.error(rolErr.message); setSaving(false); return; }
+    }
 
     toast.success(t.usuarios.actualizado);
     setSaving(false);

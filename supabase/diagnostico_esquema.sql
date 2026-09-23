@@ -244,7 +244,7 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260908000002_tope_unidades_ya_armadas',     'vista|v_carga_ya_armados'),
   ('20260908000002_tope_unidades_ya_armadas',     'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|limite_ya_armados'),
 
-  // Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
+  -- Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
   ('20260908000003_crm_tipos_actividad',          'restriccion|crm_actividades.crm_actividades_tipo_check|videollamada'),
 
   -- Almacén de refacciones para venta (lista de precios, códigos duales, compat).
@@ -268,6 +268,16 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260922000004_area_compras',                 'funcion|es_compras_admin(uuid)'),
   ('20260922000004_area_compras',                 'funcion|rol_legacy(user_area,user_nivel)|compras'),
   ('20260922000004_area_compras',                 'politica|proveedores.proveedores_insert|es_compras'),
+
+  -- Cierre de lecturas abiertas, auto-reactivación y escalada de rol.
+  ('20260923000001_endurecer_accesos',            'funcion|usuario_operativo(uuid)|usuario_activo'),
+  ('20260923000001_endurecer_accesos',            'funcion|mi_nivel()|usuario_activo'),
+  ('20260923000001_endurecer_accesos',            'funcion|proteger_profile_activo()|usuario inactivo'),
+  ('20260923000001_endurecer_accesos',            'funcion|impedir_escalada_rol()|No puedes cambiar tu propio rol'),
+  ('20260923000001_endurecer_accesos',            'trigger|profiles.trg_proteger_profile_activo'),
+  ('20260923000001_endurecer_accesos',            'trigger|user_roles.trg_impedir_escalada_rol'),
+  ('20260923000001_endurecer_accesos',            'politica|bitacora_eliminaciones.solo admin lee bitacora|mi_nivel'),
+  ('20260923000001_endurecer_accesos',            'politica|almacen_refacciones_acceso.ref_acceso_escribir|es_admin_global'),
 
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),

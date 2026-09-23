@@ -60,6 +60,11 @@ describe("inventario de migraciones", () => {
     ).toEqual([]);
   });
 
+  it("el diagnóstico no usa comentarios //: Postgres los rechaza", () => {
+    const js = diagnostico.split("\n").filter(l => l.trim().startsWith("//"));
+    expect(js, "Un // en diagnostico_esquema.sql tira el SQL editor entero (42601). Usa --.").toEqual([]);
+  });
+
   it("el diagnóstico no revisa scripts que ya no existen", () => {
     const enElAire = [...registrados].filter(r => !archivos.includes(r));
     expect(

@@ -241,6 +241,8 @@ export const claveCapacidad = (modelo: string, color: string) =>
 // arriba. Ojo con `nombre_comercial`: existe en `modelos_producto` (KIT-3) y
 // también en `inventario_colores` (KIT-4), y son scripts distintos.
 const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
+  [/usuario_operativo|proteger_profile_activo|impedir_escalada_rol/,
+    "20260923000001_endurecer_accesos.sql"],
   [/remisiones_bitacora|puede_editar_remision|puede_capturar_remision|rol_comercial|orden_linea/,
     "20260902000001_operador_edita_remisiones.sql"],
   // Los clientes se vieron «sin resultados» en producción por esto: la lista
