@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import {
-  Package, Search, Upload, Bike, RefreshCw, Eye, EyeOff, Wand2,
+  Package, Search, Upload, Bike, RefreshCw, Eye, EyeOff,
   LayoutGrid, List, Plus, X, Save, Pencil, PackageX, PackageCheck,
 } from "lucide-react";
-import { extractCompat, parseListaPreciosRefacciones } from "@/lib/refaccionesParser";
+import { parseListaPreciosRefacciones, siguienteCodigoEnSerie, seriesDesdeCodigos } from "@/lib/refaccionesParser";
 import { explicarError } from "@/lib/dazon";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 
 type Producto = {
   id: string;
@@ -72,7 +73,6 @@ export default function AlmacenRefacciones() {
   const [unidades, setUnidades] = useState<UnidadFiltro[]>([]);
   const [idsPorUnidad, setIdsPorUnidad] = useState<Set<string>>(new Set());
   const [importando, setImportando] = useState(false);
-  const [reprocesando, setReprocesando] = useState(false);
   const [detalle, setDetalle] = useState<Producto | null>(null);
   const [compats, setCompats] = useState<Compat[]>([]);
   const [vista, setVista] = useState<VistaMode>("tarjetas");
@@ -84,6 +84,21 @@ export default function AlmacenRefacciones() {
   const [compatDraft, setCompatDraft] = useState<string[]>([]);
   const [nuevaUnidad, setNuevaUnidad] = useState("");
   const [guardandoCompat, setGuardandoCompat] = useState(false);
+
+  // Alta de producto nuevo
+  const [altaOpen, setAltaOpen] = useState(false);
+  const [guardandoAlta, setGuardandoAlta] = useState(false);
+  const [altaSerie, setAltaSerie] = useState("AMO");
+  const [altaCodigo, setAltaCodigo] = useState("");
+  const [altaAntiguo, setAltaAntiguo] = useState("");
+  const [altaDesc, setAltaDesc] = useState("");
+  const [altaLinea, setAltaLinea] = useState("linea_dorada");
+  const [altaMarca, setAltaMarca] = useState("");
+  const [altaCategoria, setAltaCategoria] = useState("");
+  const [altaPrecio, setAltaPrecio] = useState("");
+  const [altaStock, setAltaStock] = useState("0");
+  const [altaCompatDraft, setAltaCompatDraft] = useState<string[]>([]);
+  const [altaNuevaUnidad, setAltaNuevaUnidad] = useState("");
 
   const ar = t.almacenRefacciones;
 
@@ -244,6 +259,8 @@ export default function AlmacenRefacciones() {
           codigo_nuevo: detalle.codigo_nuevo,
           descripcion_corta: detalle.descripcion_corta || detalle.descripcion,
           compatibilidades: compatDraft,
+          // Solo vacía a propósito desde la ficha (nunca por reproceso masivo)
+          forzar_vaciar_compat: compatDraft.length === 0,
         }],
       });
       if (error) throw error;
@@ -297,36 +314,91 @@ export default function AlmacenRefacciones() {
     }
   };
 
-  const reprocesarCompat = async () => {
-    setReprocesando(true);
+  const series = useMemo(() => seriesDesdeCodigos(rows.map(r => r.codigo_nuevo)), [rows]);
+
+  const abrirAlta = (seriePreferida?: string) => {
+    const serie = seriePreferida || series[0]?.serie || altaSerie || "AMO";
+    const siguiente = siguienteCodigoEnSerie(rows.map(r => r.codigo_nuevo), serie);
+    setAltaSerie(serie);
+    setAltaCodigo(siguiente);
+    setAltaAntiguo("");
+    setAltaDesc("");
+    setAltaLinea("linea_dorada");
+    setAltaMarca("");
+    setAltaCategoria("");
+    setAltaPrecio("");
+    setAltaStock("0");
+    setAltaCompatDraft([]);
+    setAltaNuevaUnidad("");
+    setAltaOpen(true);
+  };
+
+  const onCambiarSerieAlta = (serie: string) => {
+    setAltaSerie(serie);
+    setAltaCodigo(siguienteCodigoEnSerie(rows.map(r => r.codigo_nuevo), serie));
+  };
+
+  const guardarAlta = async () => {
+    const codigo = altaCodigo.trim().toUpperCase();
+    const desc = altaDesc.trim();
+    if (!codigo) {
+      toast.error(ar?.altaFaltaCodigo ?? "Falta el código nuevo");
+      return;
+    }
+    if (!desc) {
+      toast.error(ar?.altaFaltaDesc ?? "Falta la descripción");
+      return;
+    }
+    if (rows.some(r => r.codigo_nuevo.toUpperCase() === codigo)) {
+      toast.error(ar?.altaCodigoExiste ?? "Ese código ya existe en el inventario");
+      return;
+    }
+    setGuardandoAlta(true);
     try {
-      const payload = rows.map(r => {
-        const fuente = r.descripcion_original || r.descripcion;
-        const { corta, comps } = extractCompat(fuente);
-        return {
-          codigo_nuevo: r.codigo_nuevo,
-          descripcion_corta: corta,
-          compatibilidades: comps,
-        };
+      const antiguo = altaAntiguo.trim() || null;
+      const precio = altaPrecio.trim() === "" ? null : Number(altaPrecio.replace(/,/g, ""));
+      const stock = Number.parseInt(altaStock || "0", 10) || 0;
+      const item = {
+        codigo_nuevo: codigo,
+        codigo_antiguo: antiguo,
+        clave_completa: antiguo ? `${codigo}/${antiguo}` : codigo,
+        clave_simplificada: codigo,
+        linea_catalogo: altaLinea,
+        marca: altaMarca.trim() || null,
+        categoria: altaCategoria.trim() || null,
+        descripcion: desc,
+        descripcion_corta: desc,
+        unidad_medida: null,
+        piezas_por_caja: null,
+        precio: Number.isFinite(precio as number) ? precio : null,
+        stock,
+        visible_venta: true,
+        no_lista: null,
+        fuente_archivo: "alta_manual",
+        tipo_unidad_sugerido: null,
+        compatibilidades: altaCompatDraft,
+      };
+      const { data, error } = await supabase.rpc("importar_almacen_refacciones" as any, {
+        _items: [item],
       });
-      let procesados = 0;
-      const CHUNK = 100;
-      for (let i = 0; i < payload.length; i += CHUNK) {
-        const chunk = payload.slice(i, i + CHUNK);
-        const { data, error } = await supabase.rpc("sincronizar_compat_refacciones" as any, {
-          _items: chunk,
-        });
-        if (error) throw error;
-        procesados += (data as any)?.procesados ?? chunk.length;
-      }
+      if (error) throw error;
       toast.success(
-        (ar?.okReprocesados ?? ((n: number) => `Compatibilidades actualizadas en ${n} productos`))(procesados),
+        (ar?.okAlta ?? ((c: string) => `Producto ${c} registrado`))(codigo),
       );
+      setAltaOpen(false);
       await load();
+      // Abrir ficha del nuevo para terminar compat si quedó pendiente
+      const { data: creado } = await supabase
+        .from("v_almacen_refacciones" as any)
+        .select("*")
+        .eq("codigo_nuevo", codigo)
+        .maybeSingle();
+      if (creado) await abrirDetalle(creado as Producto, { editarSiVacio: altaCompatDraft.length === 0 });
+      void data;
     } catch (e: any) {
-      toast.error(explicarError(e, ar?.errorReprocesar ?? "Error al reprocesar"));
+      toast.error(explicarError(e, ar?.errorAlta ?? "No se pudo registrar el producto"));
     } finally {
-      setReprocesando(false);
+      setGuardandoAlta(false);
     }
   };
 
@@ -387,11 +459,9 @@ export default function AlmacenRefacciones() {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             {ar?.actualizar ?? "Actualizar"}
           </Button>
-          <Button variant="outline" onClick={reprocesarCompat} disabled={reprocesando || !rows.length}>
-            <Wand2 className={`h-4 w-4 mr-2 ${reprocesando ? "animate-spin" : ""}`} />
-            {reprocesando
-              ? (ar?.reprocesando ?? "Reprocesando…")
-              : (ar?.reprocesar ?? "Actualizar compatibilidades")}
+          <Button variant="default" onClick={() => abrirAlta()}>
+            <Plus className="h-4 w-4 mr-2" />
+            {ar?.nuevoProducto ?? "Nuevo producto"}
           </Button>
           <Button asChild disabled={importando}>
             <label className="cursor-pointer inline-flex items-center justify-center gap-2">
@@ -882,6 +952,191 @@ export default function AlmacenRefacciones() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={altaOpen} onOpenChange={setAltaOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{ar?.altaTitulo ?? "Registrar producto"}</DialogTitle>
+            <DialogDescription>
+              {ar?.altaDescHint ??
+                "El código se propone según el siguiente de la serie en el inventario. La compatibilidad se puede configurar aquí o después en la ficha."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{ar?.altaSerie ?? "Serie"}</Label>
+                <Select value={altaSerie} onValueChange={onCambiarSerieAlta}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {series.map(s => (
+                      <SelectItem key={s.serie} value={s.serie}>
+                        {s.serie} → {s.siguiente} ({s.cantidad})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  {(ar?.altaSiguienteHint ?? ((u: string, s: string) => `Último ${u} · siguiente ${s}`))(
+                    series.find(x => x.serie === altaSerie)?.ultimo ?? "—",
+                    altaCodigo || "—",
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{ar?.colNuevo ?? "Código nuevo"}</Label>
+                <Input
+                  className="font-mono"
+                  value={altaCodigo}
+                  onChange={e => setAltaCodigo(e.target.value.toUpperCase())}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>{ar?.colAntiguo ?? "Código antiguo"}</Label>
+              <Input
+                className="font-mono"
+                value={altaAntiguo}
+                onChange={e => setAltaAntiguo(e.target.value)}
+                placeholder="Opcional"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>{ar?.seccionDesc ?? "Descripción"}</Label>
+              <Input
+                value={altaDesc}
+                onChange={e => setAltaDesc(e.target.value)}
+                placeholder={ar?.altaDescPlaceholder ?? "Nombre sencillo del producto"}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{ar?.colLinea ?? "Línea"}</Label>
+                <Select value={altaLinea} onValueChange={setAltaLinea}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linea_dorada">{LINEA_LABEL.linea_dorada}</SelectItem>
+                    <SelectItem value="ref_motocarro">{LINEA_LABEL.ref_motocarro}</SelectItem>
+                    <SelectItem value="linea_azul">{LINEA_LABEL.linea_azul}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>{ar?.colMarca ?? "Marca"}</Label>
+                <Input value={altaMarca} onChange={e => setAltaMarca(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>{ar?.colCategoria ?? "Categoría"}</Label>
+              <Input value={altaCategoria} onChange={e => setAltaCategoria(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{ar?.colPrecio ?? "Precio"}</Label>
+                <Input
+                  inputMode="decimal"
+                  value={altaPrecio}
+                  onChange={e => setAltaPrecio(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{ar?.colStock ?? "Stock"}</Label>
+                <Input
+                  inputMode="numeric"
+                  value={altaStock}
+                  onChange={e => setAltaStock(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3 space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                <Bike className="h-3.5 w-3.5" />
+                {ar?.seccionCompat ?? "Compatible con"} ({altaCompatDraft.length})
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {ar?.altaCompatOpcional ?? "Opcional al registrar; también se puede editar después en la ficha."}
+              </p>
+              {altaCompatDraft.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {altaCompatDraft.map(nombre => (
+                    <span key={nombre} className="inline-flex items-center gap-1 rounded-md border bg-white pl-2.5 pr-1 py-1 text-sm">
+                      {nombre}
+                      <button
+                        type="button"
+                        className="rounded p-0.5 hover:bg-rose-50 text-muted-foreground hover:text-rose-600"
+                        onClick={() => setAltaCompatDraft(prev => prev.filter(n => n !== nombre))}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  list="unidades-alta-sugeridas"
+                  placeholder={ar?.compatPlaceholder ?? "Ej. GS150, FT-125…"}
+                  value={altaNuevaUnidad}
+                  onChange={e => setAltaNuevaUnidad(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      const n = altaNuevaUnidad.trim().replace(/\s+/g, " ");
+                      if (!n) return;
+                      if (altaCompatDraft.some(x => x.toLowerCase() === n.toLowerCase())) return;
+                      setAltaCompatDraft(prev => [...prev, n].sort((a, b) => a.localeCompare(b, "es")));
+                      setAltaNuevaUnidad("");
+                    }
+                  }}
+                />
+                <datalist id="unidades-alta-sugeridas">
+                  {unidades.slice(0, 800).map(u => (
+                    <option key={u.id} value={u.nombre} />
+                  ))}
+                </datalist>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    const n = altaNuevaUnidad.trim().replace(/\s+/g, " ");
+                    if (!n) return;
+                    if (altaCompatDraft.some(x => x.toLowerCase() === n.toLowerCase())) return;
+                    setAltaCompatDraft(prev => [...prev, n].sort((a, b) => a.localeCompare(b, "es")));
+                    setAltaNuevaUnidad("");
+                  }}
+                  disabled={!altaNuevaUnidad.trim()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button type="button" onClick={guardarAlta} disabled={guardandoAlta}>
+                <Save className="h-4 w-4 mr-1.5" />
+                {guardandoAlta
+                  ? (ar?.guardandoAlta ?? "Registrando…")
+                  : (ar?.guardarAlta ?? "Registrar producto")}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setAltaOpen(false)} disabled={guardandoAlta}>
+                {ar?.cancelarCompat ?? "Cancelar"}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

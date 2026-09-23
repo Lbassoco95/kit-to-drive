@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   extractCompat, splitClave, tipoDesdeMarca, normalizarNombreUnidad,
+  siguienteCodigoEnSerie, seriesDesdeCodigos, serieDeCodigo,
 } from "@/lib/refaccionesParser";
 
 describe("splitClave", () => {
@@ -76,5 +77,23 @@ describe("tipoDesdeMarca", () => {
     expect(tipoDesdeMarca("ITALIKA-MOTONETA")).toBe("motoneta");
     expect(tipoDesdeMarca("ITALIKA-TRABAJO")).toBe("trabajo");
     expect(tipoDesdeMarca("MOTOCARRO")).toBe("motocarro");
+  });
+});
+
+describe("siguienteCodigoEnSerie", () => {
+  it("continúa la numeración de la lista", () => {
+    expect(siguienteCodigoEnSerie(["AMO-001", "AMO-057", "AMO-012"], "AMO")).toBe("AMO-058");
+    expect(siguienteCodigoEnSerie(["FRE-117"], "FRE")).toBe("FRE-118");
+  });
+
+  it("serieDeCodigo lee el prefijo", () => {
+    expect(serieDeCodigo("AMO-057")).toBe("AMO");
+    expect(serieDeCodigo("104RPF-MAN")).toBeNull();
+  });
+
+  it("seriesDesdeCodigos lista el siguiente por serie", () => {
+    const s = seriesDesdeCodigos(["AMO-001", "AMO-057", "FRE-010", "FRE-117"]);
+    expect(s.find(x => x.serie === "AMO")?.siguiente).toBe("AMO-058");
+    expect(s.find(x => x.serie === "FRE")?.siguiente).toBe("FRE-118");
   });
 });

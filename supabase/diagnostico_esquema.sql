@@ -265,6 +265,9 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260922000003_descripcion_limpia_refacciones', 'columna|almacen_refacciones_productos.descripcion_original'),
   ('20260922000003_descripcion_limpia_refacciones', 'vista|v_almacen_refacciones'),
 
+  -- Compat: no borrar asignaciones si llega lista vacía (salvo forzar desde ficha).
+  ('20260923000001_compat_no_borrar_si_vacio', 'funcion|sincronizar_compat_refacciones(jsonb)'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

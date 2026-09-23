@@ -266,3 +266,66 @@ export function parseListaPreciosRefacciones(data: ArrayBuffer): RefaccionImport
 
   return products;
 }
+
+/** Prefijo de serie tipo AMO-001 → AMO (letras/números antes del último -dígitos). */
+export function serieDeCodigo(codigo: string): string | null {
+  const m = clean(codigo).match(/^([A-ZÁÉÍÓÚÑ0-9]+)-(\d+)$/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/**
+ * Siguiente código de una serie según los ya existentes (AMO-057 → AMO-058).
+ * Respeta el ancho de ceros del mayor número visto.
+ */
+export function siguienteCodigoEnSerie(codigos: string[], serie: string): string {
+  const s = clean(serie).toUpperCase();
+  if (!s) return "NUE-001";
+  const escaped = s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped}-(\\d+)$`, "i");
+  let max = 0;
+  let width = 3;
+  for (const c of codigos) {
+    const m = clean(c).match(re);
+    if (!m) continue;
+    const n = Number.parseInt(m[1], 10);
+    if (!Number.isFinite(n)) continue;
+    if (n > max) max = n;
+    if (m[1].length > width) width = m[1].length;
+  }
+  return `${s}-${String(max + 1).padStart(width, "0")}`;
+}
+
+export type SerieCatalogo = { serie: string; ultimo: string; siguiente: string; cantidad: number };
+
+/** Series detectadas en el catálogo, con el código que seguiría en cada una. */
+export function seriesDesdeCodigos(codigos: string[]): SerieCatalogo[] {
+  const map = new Map<string, { max: number; width: number; ultimo: string; cantidad: number }>();
+  for (const raw of codigos) {
+    const c = clean(raw);
+    const m = c.match(/^([A-ZÁÉÍÓÚÑ0-9]+)-(\d+)$/i);
+    if (!m) continue;
+    const serie = m[1].toUpperCase();
+    const n = Number.parseInt(m[2], 10);
+    if (!Number.isFinite(n)) continue;
+    const width = m[2].length;
+    const prev = map.get(serie);
+    if (!prev) {
+      map.set(serie, { max: n, width, ultimo: c.toUpperCase(), cantidad: 1 });
+      continue;
+    }
+    prev.cantidad += 1;
+    if (n > prev.max) {
+      prev.max = n;
+      prev.ultimo = c.toUpperCase();
+    }
+    if (width > prev.width) prev.width = width;
+  }
+  return [...map.entries()]
+    .map(([serie, v]) => ({
+      serie,
+      ultimo: v.ultimo,
+      siguiente: `${serie}-${String(v.max + 1).padStart(v.width, "0")}`,
+      cantidad: v.cantidad,
+    }))
+    .sort((a, b) => a.serie.localeCompare(b.serie, "es"));
+}
