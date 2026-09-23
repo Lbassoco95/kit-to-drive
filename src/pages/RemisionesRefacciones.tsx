@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
@@ -21,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Boxes, FileText, Plus, Search, TriangleAlert, Warehouse } from "lucide-react";
+import { Boxes, Plus, Search, TriangleAlert, Warehouse } from "lucide-react";
 
 type Etapa = EtapaRefaccion;
 type EstatusLinea = EstatusLineaRefaccion;
@@ -189,12 +188,6 @@ export default function RemisionesRefacciones() {
           <p className="text-sm text-muted-foreground mt-1 max-w-3xl">{tx.subtitulo}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild>
-            <Link to="/remisiones">
-              <FileText className="h-4 w-4 mr-2" />
-              {tx.irMotocarros}
-            </Link>
-          </Button>
           {puedeCapturar && (
             <Button className="bg-[#1F3864] hover:bg-[#162a4d]" onClick={() => setOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />

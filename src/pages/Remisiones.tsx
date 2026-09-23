@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { Json, TablesUpdate } from "@/integrations/supabase/types";
 import { Card } from "@/components/ui/card";
@@ -23,7 +22,7 @@ import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import {
-  Plus, Upload, Wand2, Eye, Download, FileDown, FileText, ChevronDown, Boxes,
+  Plus, Upload, Wand2, Eye, Download, FileDown, FileText, ChevronDown,
   UserPlus, CalendarClock, CheckCircle2, Factory, Truck, Pencil, History,
   DollarSign, Trash2, Package, CheckCheck, XCircle, AlertTriangle
 } from "lucide-react";
@@ -1168,9 +1167,6 @@ export default function Remisiones() {
       <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
           <h1>{t.remisiones.title}</h1>
-          <Link to="/remisiones-refacciones" className="inline-flex items-center gap-1 text-sm text-[#2E75B6] hover:underline mt-1">
-            <Boxes className="h-4 w-4" /> {t.remisiones.irRefacciones}
-          </Link>
           <p className="text-muted-foreground text-base mt-1">
             {t.remisiones.subtitle(activeRows.length + canceledRows.length)}
             {scope === 'todas'
