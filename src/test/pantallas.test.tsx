@@ -65,6 +65,7 @@ const paginas: Record<string, () => Promise<{ default: React.ComponentType }>> =
   "Incidencias":      () => import("@/pages/Incidencias"),
   "Reportes de turno":() => import("@/pages/ReportesTurno"),
   "Remisiones":       () => import("@/pages/Remisiones"),
+  "Remisiones refacciones": () => import("@/pages/RemisionesRefacciones"),
   "Entregas":         () => import("@/pages/Entregas"),
   "Mis motocarros":   () => import("@/pages/MisMotocarros"),
   "Clientes":         () => import("@/pages/Clientes"),

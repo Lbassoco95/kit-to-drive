@@ -269,6 +269,19 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260922000004_area_compras',                 'funcion|rol_legacy(user_area,user_nivel)|compras'),
   ('20260922000004_area_compras',                 'politica|proveedores.proveedores_insert|es_compras'),
 
+  -- Remisión de venta de refacciones: apartado, liberación en almacén y contingencia.
+  ('20260923000001_remisiones_refacciones',       'tabla|remisiones_refacciones'),
+  ('20260923000001_remisiones_refacciones',       'tabla|remision_refaccion_items'),
+  ('20260923000001_remisiones_refacciones',       'tabla|remision_refaccion_eventos'),
+  ('20260923000001_remisiones_refacciones',       'funcion|stock_bloqueado_producto(uuid)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|crear_remision_refacciones(uuid,text,text,jsonb)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|liberar_refaccion_remision(uuid,integer)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|reportar_faltante_refaccion(uuid,integer,text)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|confirmar_sin_existencia_refaccion(uuid,text)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|cancelar_remision_refacciones(uuid,text)'),
+  ('20260923000001_remisiones_refacciones',       'columna|v_almacen_refacciones.stock_disponible'),
+  ('20260923000001_remisiones_refacciones',       'politica|remisiones_refacciones.leer remisiones refacciones|puede_leer_remision_refaccion'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

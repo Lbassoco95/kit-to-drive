@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Produccion from "./pages/Produccion";
 import Remisiones from "./pages/Remisiones";
+import RemisionesRefacciones from "./pages/RemisionesRefacciones";
 import Entregas from "./pages/Entregas";
 import MisMotocarros from "./pages/MisMotocarros";
 import Clientes from "./pages/Clientes";
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="/incidencias" element={<ProtectedRoute modulo="inventario"><Incidencias /></ProtectedRoute>} />
               <Route path="/reportes-turno" element={<ProtectedRoute modulo="reportesTurno"><ReportesTurno /></ProtectedRoute>} />
               <Route path="/remisiones" element={<ProtectedRoute modulo="remisiones"><Remisiones /></ProtectedRoute>} />
+              <Route path="/remisiones-refacciones" element={<ProtectedRoute><RemisionesRefacciones /></ProtectedRoute>} />
               <Route path="/entregas" element={<ProtectedRoute modulo="entregas"><Entregas /></ProtectedRoute>} />
               <Route path="/mis-motocarros" element={<ProtectedRoute modulo="misMotocarros"><MisMotocarros /></ProtectedRoute>} />
               <Route path="/clientes" element={<ProtectedRoute modulo="clientes"><Clientes /></ProtectedRoute>} />

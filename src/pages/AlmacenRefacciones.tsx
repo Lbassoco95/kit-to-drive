@@ -27,6 +27,8 @@ type Producto = {
   unidad_medida: string | null;
   precio: number | null;
   stock: number;
+  stock_bloqueado?: number | null;
+  stock_disponible?: number | null;
   visible_venta: boolean;
   num_compatibilidades: number;
 };
@@ -138,7 +140,8 @@ export default function AlmacenRefacciones() {
     const dual = rows.filter(r => r.codigo_antiguo).length;
     const conCompat = rows.filter(r => r.num_compatibilidades > 0).length;
     const stock = rows.reduce((s, r) => s + (r.stock || 0), 0);
-    return { total: rows.length, dual, conCompat, stock, unidades: unidades.length };
+    const apartado = rows.reduce((s, r) => s + (r.stock_bloqueado || 0), 0);
+    return { total: rows.length, dual, conCompat, stock, apartado, unidades: unidades.length };
   }, [rows, unidades]);
 
   const abrirDetalle = async (p: Producto) => {
@@ -285,7 +288,7 @@ export default function AlmacenRefacciones() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statProductos ?? "Productos"}</div>
           <div className="text-2xl font-bold text-[#1F3864]">{stats.total}</div>
@@ -305,6 +308,10 @@ export default function AlmacenRefacciones() {
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statStock ?? "Piezas en stock"}</div>
           <div className="text-2xl font-bold text-[#1F3864]">{stats.stock.toLocaleString("es-MX")}</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statApartado ?? "Apartadas en remisión"}</div>
+          <div className="text-2xl font-bold text-amber-700">{stats.apartado.toLocaleString("es-MX")}</div>
         </Card>
       </div>
 
@@ -387,6 +394,7 @@ export default function AlmacenRefacciones() {
                 <TableHead>{t.almacenRefacciones?.colMarca ?? "Marca"}</TableHead>
                 <TableHead className="text-right">{t.almacenRefacciones?.colPrecio ?? "Precio"}</TableHead>
                 <TableHead className="text-right">{t.almacenRefacciones?.colStock ?? "Stock"}</TableHead>
+                <TableHead className="text-right">{t.almacenRefacciones?.colDisponible ?? "Disponible"}</TableHead>
                 <TableHead className="text-center">{t.almacenRefacciones?.colCompat ?? "Compat."}</TableHead>
               </TableRow>
             </TableHeader>
@@ -412,7 +420,15 @@ export default function AlmacenRefacciones() {
                   </TableCell>
                   <TableCell className="text-sm">{p.marca ?? "—"}</TableCell>
                   <TableCell className="text-right tabular-nums">{money(p.precio)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{p.stock}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <div>{p.stock}</div>
+                    {(p.stock_bloqueado ?? 0) > 0 && (
+                      <div className="text-[11px] text-amber-700">{p.stock_bloqueado} apart.</div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {p.stock_disponible ?? p.stock}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={p.num_compatibilidades > 0 ? "default" : "secondary"}>
                       {p.num_compatibilidades}
@@ -422,7 +438,7 @@ export default function AlmacenRefacciones() {
               ))}
               {!loading && filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-10">
                     {t.almacenRefacciones?.vacio ?? "No hay productos con esos filtros"}
                   </TableCell>
                 </TableRow>
@@ -460,6 +476,10 @@ export default function AlmacenRefacciones() {
                   <div className="rounded-md border p-3">
                     <div className="text-xs text-muted-foreground">Stock</div>
                     <div className="text-lg font-semibold">{detalle.stock}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {t.almacenRefacciones?.colDisponible ?? "Disponible"}: {detalle.stock_disponible ?? detalle.stock}
+                      {(detalle.stock_bloqueado ?? 0) > 0 ? ` · ${detalle.stock_bloqueado} apart.` : ""}
+                    </div>
                   </div>
                 </div>
 

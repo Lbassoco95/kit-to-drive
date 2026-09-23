@@ -17,6 +17,8 @@ type Item = {
   modulo?: Modulo;
   /** Acceso por allowlist (p.ej. almacén de refacciones), no por área×nivel. */
   requiereRefacciones?: boolean;
+  /** También visible para quien tiene el almacén de refacciones, aunque su área no vea el módulo. */
+  oRefacciones?: boolean;
   group: Group;
 };
 
@@ -30,6 +32,7 @@ const ITEMS: Item[] = [
   { key: "incidencias",     url: "/incidencias",      icon: TriangleAlert,   modulo: "inventario",    group: "Operación" },
   { key: "reportesTurno",   url: "/reportes-turno",   icon: ClipboardList,   modulo: "reportesTurno", group: "Operación" },
   { key: "remisiones",      url: "/remisiones",       icon: FileText,        modulo: "remisiones",    group: "Operación" },
+  { key: "remisionesRefacciones", url: "/remisiones-refacciones", icon: Boxes, modulo: "remisiones", oRefacciones: true, group: "Operación" },
   { key: "entregas",        url: "/entregas",         icon: Truck,           modulo: "entregas",      group: "Operación" },
   { key: "misMotocarros",   url: "/mis-motocarros",   icon: Bike,            modulo: "misMotocarros", group: "Catálogos" },
   { key: "clientes",        url: "/clientes",         icon: Users,           modulo: "clientes",      group: "Catálogos" },
@@ -57,6 +60,7 @@ export function AppSidebar() {
   const items = area && nivel
     ? ITEMS.filter(i => {
         if (i.requiereRefacciones) return puedeVerRefacciones;
+        if (i.oRefacciones && puedeVerRefacciones) return true;
         return i.modulo ? perms.puedeVer(i.modulo) : false;
       })
     : [];
