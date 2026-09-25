@@ -3,7 +3,7 @@
  * Extrae código nuevo/antiguo (CLAVE con diagonal) y compatibilidades
  * embebidas en la descripción.
  */
-import * as XLSX from "xlsx";
+import { readWorkbookSheets } from "@/lib/excelRead";
 
 export type LineaCatalogo = "linea_dorada" | "ref_motocarro" | "linea_azul";
 
@@ -233,8 +233,9 @@ function rowToProduct(
 }
 
 /** Parsea un ArrayBuffer/File de la lista de precios DAZON. */
-export function parseListaPreciosRefacciones(data: ArrayBuffer): RefaccionImportItem[] {
-  const wb = XLSX.read(data, { type: "array", cellDates: false });
+export async function parseListaPreciosRefacciones(data: ArrayBuffer): Promise<RefaccionImportItem[]> {
+  const sheets = await readWorkbookSheets(data);
+  const byName = new Map(sheets.map((s) => [s.name, s.rows]));
   const order = [
     "DAZON 2026 LÍNEA DORADA SEP.",
     "DAZON 2026 REF. MOTOCARRO SEP.",
@@ -245,11 +246,10 @@ export function parseListaPreciosRefacciones(data: ArrayBuffer): RefaccionImport
   const seen = new Set<string>();
 
   for (const name of order) {
-    const sheet = wb.Sheets[name];
-    if (!sheet) continue;
+    const rows = byName.get(name);
+    if (!rows) continue;
     const linea = LINEAS[name];
     if (!linea) continue;
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true }) as unknown[][];
     const header = rows[4] ?? [];
     const hm = headerMap(header);
     for (const row of rows.slice(5)) {

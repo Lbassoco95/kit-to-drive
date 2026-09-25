@@ -422,9 +422,11 @@ export function coincideBusqueda(m: Movimiento, q: string): boolean {
 
 /** Ruta del archivo dentro del bucket de expedientes. */
 export function rutaAdjunto(movimientoId: string, nombreArchivo: string): string {
-  const ext = nombreArchivo.includes(".") ? nombreArchivo.split(".").pop() : "bin";
+  const safeId = String(movimientoId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "mov";
+  const rawExt = nombreArchivo.includes(".") ? nombreArchivo.split(".").pop()!.toLowerCase() : "bin";
+  const ext = /^[a-z0-9]{1,8}$/.test(rawExt) ? rawExt : "bin";
   const slug = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return `movimientos/${movimientoId}/${slug}.${ext}`;
+  return `movimientos/${safeId}/${slug}.${ext}`;
 }
 
 /** Total histórico y del mes en curso (YYYY-MM) de una lista de importes con fecha. */
