@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { act, fireEvent, render } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import React from "react";
 import { readFileSync, readdirSync } from "node:fs";
@@ -119,6 +119,28 @@ describe("pantallas · se dibujan sin tronar", () => {
       expect(container.textContent?.trim()).not.toBe("");
     });
   }
+});
+
+describe("inventario · recepciones", () => {
+  it("abre el documento vacío y el alta de una compra", async () => {
+    const { default: Pagina } = await paginas.Inventario();
+    const { container } = render(<MemoryRouter><Pagina /></MemoryRouter>);
+    await waitFor(() => {
+      const tab = Array.from(container.querySelectorAll("button")).find(b => b.textContent?.includes("Recepciones"));
+      expect(tab).toBeTruthy();
+    });
+    const tab = Array.from(container.querySelectorAll("button")).find(b => b.textContent?.includes("Recepciones"));
+    await act(async () => { fireEvent.mouseDown(tab!, { button: 0, ctrlKey: false }); });
+    await waitFor(() => {
+      expect(container.textContent).toContain("Documentos de inventario");
+      expect(container.textContent).toContain("Todavía no hay documentos");
+    });
+    const alta = Array.from(container.querySelectorAll("button")).find(b => b.textContent?.includes("Nueva compra"));
+    expect(alta).toBeTruthy();
+    await act(async () => { fireEvent.click(alta!); });
+    expect(document.body.textContent).toContain("Folio de compra");
+    expect(document.body.textContent).toContain("Lo pedido");
+  });
 });
 
 describe("pantallas · los botones no dejan la pantalla en blanco", () => {
