@@ -282,6 +282,9 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260923000001_remisiones_refacciones',       'columna|v_almacen_refacciones.stock_disponible'),
   ('20260923000001_remisiones_refacciones',       'politica|remisiones_refacciones.leer remisiones refacciones|puede_leer_remision_refaccion'),
 
+  ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.forma_pago'),
+  ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.descuento_pct'),
+  ('20260925000003_remision_refacciones_pago_descuento', 'columna|remision_refaccion_items.descuento_pct'),
   ('20260925000002_vista_refacciones_stock',        'columna|v_almacen_refacciones.stock_bloqueado'),
   ('20260925000002_vista_refacciones_stock',        'columna|v_almacen_refacciones.stock_disponible'),
   ('20260925000001_remision_refacciones_seguimiento', 'columna|remisiones_refacciones.tipo_envio'),

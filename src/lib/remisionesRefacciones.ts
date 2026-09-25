@@ -16,8 +16,9 @@ export type EtapaRefaccion =
   | "entregada"
   | "cancelada";
 export type AreaRemisionRefaccion = "ventas" | "almacen" | "logistica" | "finanzas";
-export type TipoEnvioRefaccion = "paqueteria" | "directo";
+export type TipoEnvioRefaccion = "paqueteria" | "directo" | "recoge";
 export type TipoPagoRefaccion = "anticipado" | "contra_entrega";
+export type FormaPagoRefaccion = "efectivo" | "transferencia";
 export type EstatusLineaRefaccion =
   | "bloqueada"
   | "surtida"
@@ -136,11 +137,37 @@ export function envioListo(envio: {
   tipo: string;
   direccion: string;
   tipoPago: string;
+  formaPago?: string;
 }): boolean {
   const dir = envio.direccion.trim();
-  return (envio.tipo === "paqueteria" || envio.tipo === "directo")
-    && dir.length >= 8
-    && (envio.tipoPago === "anticipado" || envio.tipoPago === "contra_entrega");
+  const tipoOk = envio.tipo === "paqueteria" || envio.tipo === "directo" || envio.tipo === "recoge";
+  const dirOk = envio.tipo === "recoge" || dir.length >= 8;
+  const cuandoOk = envio.tipoPago === "anticipado" || envio.tipoPago === "contra_entrega";
+  const forma = envio.formaPago ?? "efectivo";
+  const formaOk = forma === "efectivo" || forma === "transferencia";
+  return tipoOk && dirOk && cuandoOk && formaOk;
+}
+
+/** Porcentaje de descuento entre 0 y 100. */
+export function descuentoValido(pct: number): boolean {
+  return Number.isFinite(pct) && pct >= 0 && pct <= 100;
+}
+
+/**
+ * Precio de lista menos el descuento de la pieza y, después, el de toda la remisión.
+ * El resultado no baja de cero.
+ */
+export function importeConDescuento(
+  precio: number,
+  cantidad: number,
+  descuentoPieza: number,
+  descuentoGeneral: number,
+): number {
+  const base = Math.max(0, precio) * Math.max(0, cantidad);
+  const pieza = Math.min(100, Math.max(0, descuentoPieza));
+  const general = Math.min(100, Math.max(0, descuentoGeneral));
+  const neto = base * (1 - pieza / 100) * (1 - general / 100);
+  return Math.round(neto * 100) / 100;
 }
 
 /** Paquetería no se cierra como entregada sin número de guía. */

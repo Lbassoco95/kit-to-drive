@@ -4,7 +4,9 @@ import {
   cancelarApartado,
   confirmarSinExistencia,
   disponibleRefaccion,
+  descuentoValido,
   envioListo,
+  importeConDescuento,
   etapaDeLineas,
   faltantesDePedido,
   indicePaso,
@@ -129,6 +131,12 @@ describe("almacén libera y la etapa dice en qué área está", () => {
   it("logística recibe dirección y la paquetería no se cierra sin guía", () => {
     expect(envioListo({ tipo: "paqueteria", direccion: "Calle 1", tipoPago: "anticipado" })).toBe(false);
     expect(envioListo({ tipo: "directo", direccion: "Av. Reforma 120, Centro", tipoPago: "contra_entrega" })).toBe(true);
+    expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "anticipado", formaPago: "efectivo" })).toBe(true);
+    expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "anticipado", formaPago: "otro" })).toBe(false);
+    expect(descuentoValido(10)).toBe(true);
+    expect(descuentoValido(101)).toBe(false);
+    expect(importeConDescuento(100, 2, 10, 0)).toBe(180);
+    expect(importeConDescuento(100, 2, 10, 50)).toBe(90);
     expect(puedeMarcarEntregada("logistica", "paqueteria", "")).toBe(false);
     expect(puedeMarcarEntregada("logistica", "paqueteria", "GUIDA-1")).toBe(true);
     expect(puedeMarcarEntregada("logistica", "directo", "")).toBe(true);

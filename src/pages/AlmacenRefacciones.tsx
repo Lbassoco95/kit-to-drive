@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
@@ -122,6 +122,7 @@ export default function AlmacenRefacciones() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
+    const orden = ["linea_dorada", "ref_motocarro", "linea_azul"];
     return rows.filter(r => {
       if (linea !== "todas" && r.linea_catalogo !== linea) return false;
       if (soloVisibles && !r.visible_venta) return false;
@@ -133,7 +134,7 @@ export default function AlmacenRefacciones() {
         r.descripcion, r.descripcion_corta, r.categoria, r.marca,
       ].filter(Boolean).join(" ").toLowerCase();
       return blob.includes(term);
-    });
+    }).sort((a, b) => orden.indexOf(a.linea_catalogo) - orden.indexOf(b.linea_catalogo) || a.codigo_nuevo.localeCompare(b.codigo_nuevo));
   }, [rows, q, linea, soloVisibles, soloConCompat, unidadFiltro, idsPorUnidad]);
 
   const stats = useMemo(() => {
@@ -399,9 +400,17 @@ export default function AlmacenRefacciones() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(p => (
+              {filtered.map((p, i) => {
+                const previa = i > 0 ? filtered[i - 1].linea_catalogo : "";
+                const titulo = LINEA_LABEL[p.linea_catalogo] ?? p.linea_catalogo;
+                return (
+                <Fragment key={p.id}>
+                {p.linea_catalogo !== previa && (
+                  <TableRow className="bg-[#1F3864]/5 hover:bg-[#1F3864]/5">
+                    <TableCell colSpan={9} className="font-semibold text-[#1F3864]">{titulo}</TableCell>
+                  </TableRow>
+                )}
                 <TableRow
-                  key={p.id}
                   className="cursor-pointer hover:bg-slate-50"
                   onClick={() => abrirDetalle(p)}
                 >
@@ -435,7 +444,8 @@ export default function AlmacenRefacciones() {
                     </Badge>
                   </TableCell>
                 </TableRow>
-              ))}
+                </Fragment>
+              );})}
               {!loading && filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center text-muted-foreground py-10">

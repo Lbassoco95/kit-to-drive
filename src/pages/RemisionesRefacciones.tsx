@@ -7,6 +7,7 @@ import { explicarError, fmtDate } from "@/lib/dazon";
 import {
   PASOS_REMISION_REFACCION,
   envioListo,
+  importeConDescuento,
   faltantesDePedido,
   puedeMarcarEntregada,
   siguienteFolioSerie,
@@ -41,13 +42,15 @@ type Remision = {
   abierta: boolean;
   created_by: string | null;
   created_at: string;
-  tipo_envio: "paqueteria" | "directo" | null;
+  tipo_envio: "paqueteria" | "directo" | "recoge" | null;
   direccion_entrega: string | null;
   contacto_entrega: string | null;
   telefono_entrega: string | null;
   paqueteria: string | null;
   guia_envio: string | null;
   tipo_pago: "anticipado" | "contra_entrega" | null;
+  forma_pago: "efectivo" | "transferencia" | null;
+  descuento_pct: number | null;
   pagado: boolean;
   nota_pago: string | null;
   entregada_at: string | null;
@@ -66,6 +69,7 @@ type Item = {
   codigo_antiguo: string | null;
   descripcion: string;
   precio_unitario: number | null;
+  descuento_pct: number | null;
   cantidad: number;
   cantidad_bloqueada: number;
   cantidad_surtida: number;
@@ -94,6 +98,7 @@ type Producto = {
   stock_bloqueado?: number | null;
   stock_disponible?: number | null;
   visible_venta: boolean;
+  linea_catalogo?: string | null;
   foto_url?: string | null;
 };
 
@@ -104,10 +109,11 @@ type Borrador = {
   precio: number | null;
   cantidad: number;
   disponible: number;
+  descuentoPct: number;
 };
 
 const CAMPOS_REMISION =
-  "id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_by, created_at, tipo_envio, direccion_entrega, contacto_entrega, telefono_entrega, paqueteria, guia_envio, tipo_pago, pagado, nota_pago, entregada_at, clientes(codigo_erp, folio_interno, nombre_comercial)";
+  "id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_by, created_at, tipo_envio, direccion_entrega, contacto_entrega, telefono_entrega, paqueteria, guia_envio, tipo_pago, forma_pago, descuento_pct, pagado, nota_pago, entregada_at, clientes(codigo_erp, folio_interno, nombre_comercial)";
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -461,11 +467,14 @@ function NuevaRemision({
   const [qProd, setQProd] = useState("");
   const [lineas, setLineas] = useState<Borrador[]>([]);
   const [notas, setNotas] = useState("");
-  const [tipoEnvio, setTipoEnvio] = useState<"paqueteria" | "directo">("paqueteria");
+  const [tipoEnvio, setTipoEnvio] = useState<"paqueteria" | "directo" | "recoge">("paqueteria");
   const [direccion, setDireccion] = useState("");
   const [contacto, setContacto] = useState("");
   const [telefono, setTelefono] = useState("");
   const [tipoPago, setTipoPago] = useState<"anticipado" | "contra_entrega">("anticipado");
+  const [formaPago, setFormaPago] = useState<"efectivo" | "transferencia">("efectivo");
+  const [descuentoGeneral, setDescuentoGeneral] = useState(0);
+  const [seccion, setSeccion] = useState("todas");
   const [guardando, setGuardando] = useState(false);
   const [catalogoListo, setCatalogoListo] = useState(false);
   const [folioPrevisto, setFolioPrevisto] = useState("RF-00001");
@@ -478,7 +487,7 @@ function NuevaRemision({
       setClientes(res.data.filter(c => c.activo !== false));
       const { data, error } = await supabase
         .from("v_almacen_refacciones" as any)
-        .select("id, codigo_nuevo, codigo_antiguo, descripcion, descripcion_corta, precio, stock, stock_bloqueado, stock_disponible, visible_venta, foto_url")
+        .select("id, codigo_nuevo, codigo_antiguo, descripcion, descripcion_corta, precio, stock, stock_bloqueado, stock_disponible, visible_venta, foto_url, linea_catalogo")
         .eq("visible_venta", true)
         .order("codigo_nuevo")
         .limit(5000);
@@ -494,6 +503,7 @@ function NuevaRemision({
   const reset = () => {
     setClienteId(""); setQCliente(""); setQProd(""); setLineas([]); setNotas("");
     setTipoEnvio("paqueteria"); setDireccion(""); setContacto(""); setTelefono(""); setTipoPago("anticipado");
+    setFormaPago("efectivo"); setDescuentoGeneral(0); setSeccion("todas");
     setCatalogoListo(false);
   };
 
@@ -503,14 +513,16 @@ function NuevaRemision({
     return base - ya;
   };
 
+  const SECCIONES = ["linea_dorada", "ref_motocarro", "linea_azul"] as const;
   const coincidencias = useMemo(() => {
     const term = qProd.trim().toLowerCase();
-    if (term.length < 2) return [];
     return productos.filter(p => {
-      const blob = [p.codigo_nuevo, p.codigo_antiguo, p.descripcion, p.descripcion_corta].filter(Boolean).join(" ").toLowerCase();
+      if (seccion !== "todas" && (p.linea_catalogo || "") !== seccion) return false;
+      if (!term) return true;
+      const blob = [p.codigo_nuevo, p.codigo_antiguo, p.descripcion, p.descripcion_corta, p.linea_catalogo].filter(Boolean).join(" ").toLowerCase();
       return blob.includes(term);
-    }).slice(0, 12);
-  }, [productos, qProd]);
+    }).slice(0, 80);
+  }, [productos, qProd, seccion]);
 
   const clientesFiltrados = useMemo(() => {
     const term = qCliente.trim().toLowerCase();
@@ -542,13 +554,14 @@ function NuevaRemision({
         precio: p.precio,
         cantidad: 1,
         disponible: p.stock_disponible ?? p.stock ?? 0,
+        descuentoPct: 0,
       }];
     });
   };
 
   const guardar = async () => {
     if (!clienteId) { toast.error(tx.seleccionaCliente); return; }
-    if (!envioListo({ tipo: tipoEnvio, direccion, tipoPago })) {
+    if (!envioListo({ tipo: tipoEnvio, direccion, tipoPago, formaPago })) {
       toast.error(tx.envioIncompleto);
       return;
     }
@@ -570,13 +583,15 @@ function NuevaRemision({
       _cliente_id: clienteId,
       _notas: notas,
       _nombre_vendedor: vendedor || null,
-      _items: lineas.map(l => ({ producto_id: l.productoId, cantidad: l.cantidad })),
+      _items: lineas.map(l => ({ producto_id: l.productoId, cantidad: l.cantidad, descuento_pct: l.descuentoPct })),
       _envio: {
         tipo_envio: tipoEnvio,
         direccion,
         contacto,
         telefono,
         tipo_pago: tipoPago,
+        forma_pago: formaPago,
+        descuento_pct: descuentoGeneral,
         vendedor_id: clientes.find(c => c.id === clienteId)?.vendedor_id ?? null,
       },
     });
@@ -631,7 +646,15 @@ function NuevaRemision({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input className="pl-9" value={qProd} onChange={e => setQProd(e.target.value)} placeholder={tx.buscarProducto} />
             </div>
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 flex flex-wrap gap-1">
+              <Button type="button" size="sm" variant={seccion === "todas" ? "default" : "outline"} onClick={() => setSeccion("todas")}>{tx.todasSecciones}</Button>
+              {SECCIONES.map(id => (
+                <Button key={id} type="button" size="sm" variant={seccion === id ? "default" : "outline"} onClick={() => setSeccion(id)}>
+                  {tx.seccionLinea[id]}
+                </Button>
+              ))}
+            </div>
+            <div className="mt-2 max-h-64 overflow-y-auto space-y-1 rounded-md border p-1">
               {coincidencias.map(p => {
                 const disp = dispDe(p);
                 return (
@@ -642,6 +665,7 @@ function NuevaRemision({
                     className="w-full text-left rounded-md border px-3 py-2 hover:bg-slate-50 flex items-center gap-3"
                   >
                     <span className="font-mono text-xs font-semibold w-28 shrink-0">{p.codigo_nuevo}</span>
+                    <span className="text-[10px] uppercase text-muted-foreground w-24 shrink-0 truncate">{tx.seccionLinea[p.linea_catalogo as keyof typeof tx.seccionLinea] || p.linea_catalogo || ""}</span>
                     <span className="flex-1 text-sm truncate">{p.descripcion_corta || p.descripcion}</span>
                     <span className="text-xs tabular-nums text-muted-foreground">{money(p.precio)}</span>
                     <span className={`text-xs tabular-nums ${disp > 0 ? "text-emerald-700" : "text-amber-700"}`}>
@@ -650,6 +674,9 @@ function NuevaRemision({
                   </button>
                 );
               })}
+              {coincidencias.length === 0 && (
+                <p className="text-xs text-muted-foreground px-2 py-3">Sin piezas en esta sección</p>
+              )}
             </div>
           </div>
 
@@ -660,8 +687,20 @@ function NuevaRemision({
                   <div className="flex-1 min-w-0">
                     <div className="font-mono text-xs font-semibold">{l.codigo}</div>
                     <div className="text-sm truncate">{l.descripcion}</div>
-                    <div className="text-xs text-muted-foreground">{tx.disponible}: {l.disponible} · {money(l.precio)}</div>
+                    <div className="text-xs text-muted-foreground">{tx.disponible}: {l.disponible} · {money(l.precio)} · {money(importeConDescuento(l.precio ?? 0, l.cantidad, l.descuentoPct, descuentoGeneral))}</div>
                   </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className="w-16"
+                    title={tx.descuentoPieza}
+                    value={l.descuentoPct}
+                    onChange={e => {
+                      const n = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                      setLineas(prev => prev.map(x => x.productoId === l.productoId ? { ...x, descuentoPct: n } : x));
+                    }}
+                  />
                   <Input
                     type="number"
                     min={1}
@@ -684,16 +723,17 @@ function NuevaRemision({
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <Label>{tx.envio}</Label>
-              <Select value={tipoEnvio} onValueChange={v => setTipoEnvio(v as "paqueteria" | "directo")}>
+              <Select value={tipoEnvio} onValueChange={v => setTipoEnvio(v as "paqueteria" | "directo" | "recoge")}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="paqueteria">{tx.paqueteria}</SelectItem>
                   <SelectItem value="directo">{tx.directo}</SelectItem>
+                  <SelectItem value="recoge">{tx.recoge}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>{tx.tipoPago}</Label>
+              <Label>{tx.cuandoPago}</Label>
               <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega")}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -703,10 +743,28 @@ function NuevaRemision({
               </Select>
             </div>
           </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>{tx.formaPago}</Label>
+              <Select value={formaPago} onValueChange={v => setFormaPago(v as "efectivo" | "transferencia")}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="efectivo">{tx.efectivo}</SelectItem>
+                  <SelectItem value="transferencia">{tx.transferencia}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{tx.descuentoGeneral}</Label>
+              <Input className="mt-1" type="number" min={0} max={100} value={descuentoGeneral} onChange={e => setDescuentoGeneral(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
+            </div>
+          </div>
+          {tipoEnvio !== "recoge" && (
           <div>
             <Label>{tx.direccion}</Label>
             <Textarea className="mt-1" value={direccion} onChange={e => setDireccion(e.target.value)} />
           </div>
+          )}
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <Label>{tx.contacto}</Label>
@@ -776,7 +834,7 @@ function Partida({
         <Dato label={tx.apartado} value={item.cantidad_bloqueada} />
         <Dato label={tx.surtidas} value={item.cantidad_surtida} />
         <Dato label={tx.faltante} value={item.cantidad_faltante} />
-        <Dato label={tx.precio} value={money(item.precio_unitario)} />
+        <Dato label={tx.precio} value={money(importeConDescuento(item.precio_unitario ?? 0, item.cantidad, item.descuento_pct ?? 0, 0))} />
       </div>
 
       {puedeAlmacen && enRevision && (
@@ -818,8 +876,12 @@ function Partida({
 
       {puedeCancelar && item.cantidad_bloqueada > 0 && (
         <div className="flex flex-wrap gap-2 border-t pt-2">
+          <div className="min-w-[12rem] flex-1">
+            <div className="text-xs font-medium">{tx.cancelarLinea}</div>
+            <p className="text-xs text-muted-foreground">{tx.cancelarLineaAyuda}</p>
+          </div>
           <Input value={motivo} onChange={e => setMotivo(e.target.value)} placeholder={tx.motivoCancelar} className="max-w-sm" />
-          <Button size="sm" variant="ghost" disabled={ocupado} onClick={() => {
+          <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
             if (motivo.trim().length < 3) { toast.error(tx.notaObligatoria); return; }
             void correr(() => supabase.rpc("cancelar_linea_refaccion" as any, {
               _item_id: item.id, _motivo: motivo.trim(),
@@ -931,6 +993,8 @@ function EnvioPanel({
   const [telefono, setTelefono] = useState(remision.telefono_entrega || "");
   const [tipoEnvio, setTipoEnvio] = useState(remision.tipo_envio || "paqueteria");
   const [tipoPago, setTipoPago] = useState(remision.tipo_pago || "anticipado");
+  const [formaPago, setFormaPago] = useState(remision.forma_pago || "efectivo");
+  const [descuentoGeneral, setDescuentoGeneral] = useState(Number(remision.descuento_pct) || 0);
   const [paqueteria, setPaqueteria] = useState(remision.paqueteria || "");
   const [guia, setGuia] = useState(remision.guia_envio || "");
   const [notaPago, setNotaPago] = useState(remision.nota_pago || "");
@@ -942,6 +1006,8 @@ function EnvioPanel({
     setTelefono(remision.telefono_entrega || "");
     setTipoEnvio(remision.tipo_envio || "paqueteria");
     setTipoPago(remision.tipo_pago || "anticipado");
+    setFormaPago(remision.forma_pago || "efectivo");
+    setDescuentoGeneral(Number(remision.descuento_pct) || 0);
     setPaqueteria(remision.paqueteria || "");
     setGuia(remision.guia_envio || "");
     setNotaPago(remision.nota_pago || "");
@@ -957,13 +1023,15 @@ function EnvioPanel({
   };
 
   const pagoLabel = remision.pagado ? tx.pagado : tx.noPagado;
-  const envioLabel = remision.tipo_envio === "directo" ? tx.directo : remision.tipo_envio === "paqueteria" ? tx.paqueteria : "—";
+  const envioLabel = remision.tipo_envio === "directo" ? tx.directo : remision.tipo_envio === "recoge" ? tx.recoge : remision.tipo_envio === "paqueteria" ? tx.paqueteria : "—";
+  const formaLabel = remision.forma_pago === "transferencia" ? tx.transferencia : tx.efectivo;
 
   return (
     <section className="rounded-md border p-3 space-y-3 text-sm">
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline"><Truck className="h-3 w-3 mr-1" />{envioLabel}</Badge>
-        <Badge variant="outline" className={remision.pagado ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}>{pagoLabel}</Badge>
+        <Badge variant="outline" className={remision.pagado ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}>{pagoLabel} · {formaLabel}</Badge>
+        {(remision.descuento_pct ?? 0) > 0 && <Badge variant="outline">{tx.descuentoGeneral} {remision.descuento_pct}</Badge>}
       </div>
       <p>{remision.direccion_entrega || "—"}</p>
       <p className="text-muted-foreground">{[remision.contacto_entrega, remision.telefono_entrega].filter(Boolean).join(" · ") || "—"}</p>
@@ -975,11 +1043,12 @@ function EnvioPanel({
       {puedeEditar && remision.etapa !== "entregada" && remision.etapa !== "cancelada" && (
         <div className="grid gap-2 border-t pt-2">
           <div className="grid gap-2 md:grid-cols-2">
-            <Select value={tipoEnvio} onValueChange={v => setTipoEnvio(v as "paqueteria" | "directo")}>
+            <Select value={tipoEnvio} onValueChange={v => setTipoEnvio(v as "paqueteria" | "directo" | "recoge")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="paqueteria">{tx.paqueteria}</SelectItem>
                 <SelectItem value="directo">{tx.directo}</SelectItem>
+                <SelectItem value="recoge">{tx.recoge}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega")}>
@@ -990,16 +1059,29 @@ function EnvioPanel({
               </SelectContent>
             </Select>
           </div>
-          <Textarea value={direccion} onChange={e => setDireccion(e.target.value)} />
+          <div className="grid gap-2 md:grid-cols-2">
+            <Select value={formaPago} onValueChange={v => setFormaPago(v as "efectivo" | "transferencia")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="efectivo">{tx.efectivo}</SelectItem>
+                <SelectItem value="transferencia">{tx.transferencia}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input type="number" min={0} max={100} value={descuentoGeneral} onChange={e => setDescuentoGeneral(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} placeholder={tx.descuentoGeneral} />
+          </div>
+          {tipoEnvio !== "recoge" && <Textarea value={direccion} onChange={e => setDireccion(e.target.value)} />}
           <div className="grid gap-2 md:grid-cols-2">
             <Input value={contacto} onChange={e => setContacto(e.target.value)} placeholder={tx.contacto} />
             <Input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder={tx.telefono} />
           </div>
           <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
-            if (!envioListo({ tipo: tipoEnvio, direccion, tipoPago })) { toast.error(tx.envioIncompleto); return; }
+            if (!envioListo({ tipo: tipoEnvio, direccion, tipoPago, formaPago })) { toast.error(tx.envioIncompleto); return; }
             void correr(() => supabase.rpc("actualizar_envio_remision_refaccion" as any, {
               _remision_id: remision.id,
-              _envio: { tipo_envio: tipoEnvio, direccion, contacto, telefono, tipo_pago: tipoPago },
+              _envio: {
+                tipo_envio: tipoEnvio, direccion, contacto, telefono, tipo_pago: tipoPago,
+                forma_pago: formaPago, descuento_pct: descuentoGeneral,
+              },
             }));
           }}>{tx.guardarEnvio}</Button>
         </div>

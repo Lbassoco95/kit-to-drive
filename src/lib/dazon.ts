@@ -255,6 +255,8 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260908000002_tope_unidades_ya_armadas.sql"],
   [/crm_actividades_tipo_check/,
     "20260908000003_crm_tipos_actividad.sql"],
+  [/forma_pago|descuento_pct|remisiones_refacciones_forma_pago/,
+    "20260925000003_remision_refacciones_pago_descuento.sql"],
   [/v_almacen_refacciones\.stock_bloqueado|v_almacen_refacciones\.stock_disponible/,
     "20260925000002_vista_refacciones_stock.sql"],
   [/avisar_faltante_refaccion|actualizar_envio_remision_refaccion|registrar_guia_remision_refaccion|entregar_remision_refaccion|marcar_pago_remision_refaccion|puede_operar_logistica_refacciones|puede_marcar_pago_refacciones|impedir_inventario_negativo|tipo_envio|direccion_entrega/,
