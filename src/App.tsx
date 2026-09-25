@@ -8,6 +8,7 @@ import { LangProvider } from "@/contexts/LangContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "@/components/AppLayout";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Produccion from "./pages/Produccion";
 import Remisiones from "./pages/Remisiones";
@@ -46,6 +47,7 @@ const App = () => (
           <LangProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/auth/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/produccion" element={<ProtectedRoute modulo="produccion"><Produccion /></ProtectedRoute>} />

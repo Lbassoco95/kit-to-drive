@@ -10,9 +10,23 @@ const ALLOWED_ORIGINS = [
   "http://localhost:3000",
 ];
 
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  try {
+    const { hostname, protocol } = new URL(origin);
+    if (protocol !== "https:" && protocol !== "http:") return false;
+    // Previews de Vercel del mismo proyecto (p. ej. kit-to-drive-xxx.vercel.app)
+    if (hostname.endsWith(".vercel.app") && hostname.includes("kit-to-drive")) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function corsHeaders(req: Request) {
   const origin = req.headers.get("Origin") ?? "";
-  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allow = isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allow,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

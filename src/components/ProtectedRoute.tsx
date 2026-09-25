@@ -37,12 +37,13 @@ export default function ProtectedRoute({
   /** Allowlist del módulo Almacén / remisiones de refacciones. */
   requireRefacciones?: boolean;
 }) {
-  const { user, area, nivel, perms, activo, loading, puedeVerRefacciones } = useAuth();
+  const { user, area, nivel, perms, activo, loading, puedeVerRefacciones, isPasswordRecovery } = useAuth();
   const { t } = useLang();
   const loc = useLocation();
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">{t.componentes.acceso.cargando}</div>;
   if (!user) return <Navigate to="/auth" state={{ from: loc }} replace />;
+  if (isPasswordRecovery) return <Navigate to="/auth/reset-password" replace />;
 
   // Dado de baja: no entra a ningún lado. El RLS ya lo corta del lado de la
   // base (`usuario_activo`); esto es para que vea el motivo en vez de una app
