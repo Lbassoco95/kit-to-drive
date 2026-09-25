@@ -1,5 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fdb } from "@/lib/finanzasDb";
+import { documentarContenedor } from "@/lib/recepcionInventarioApi";
+import { lineasDeUnidades } from "@/lib/recepcionInventario";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +13,7 @@ import { PackagePlus, Trash2, ClipboardPaste, KeyboardIcon, ArrowRight, ArrowLef
 import { toast } from "sonner";
 import { z } from "zod";
 import { parseContenedoresExcel, ContainerSheetData, ContenedorFromExcel } from "@/lib/excelParser";
-import { COLORES, normColor, normSerial } from "@/lib/dazon";
+import { COLORES, explicarError, normColor, normSerial } from "@/lib/dazon";
 import { useLang } from "@/contexts/LangContext";
 import type { Translations } from "@/i18n/es";
 
@@ -24,7 +27,11 @@ type RecepcionReport = {
   motores_insertados: number;
   motores_actualizados: number;
   motores_invalidos: number;
+  documento?: string;
+  faltantes?: number;
 };
+
+type CompraAbierta = { id: string; folio: string; estatus: string };
 
 type RpcResult = { ok: boolean; error?: string; creados?: number; insertados?: number; actualizados?: number; invalidos?: number };
 
@@ -56,8 +63,16 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
   const [parsedContainerSheets, setParsedContainerSheets] = useState<ContainerSheetData[]>([]);
   const [importMode, setImportMode] = useState<"single" | "multiple">("single");
   const [reportes, setReportes] = useState<RecepcionReport[]>([]);
+  const [compraId, setCompraId] = useState("");
+  const [comprasAbiertas, setComprasAbiertas] = useState<CompraAbierta[]>([]);
 
-  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setParsedContainerSheets([]); setImportMode("single"); setReportes([]); };
+  const reset = () => { setStep(1); setCab({ folio_contenedor: "", fecha_arribo: new Date().toISOString().slice(0,10), modelo: "200cc 2025", color: "BLANCO", cantidad: 4 }); setUnidades([]); setPasteText(""); setTab("manual"); setExcelFile(null); setParsedContenedores([]); setParsedContainerSheets([]); setImportMode("single"); setReportes([]); setCompraId(""); };
+
+  useEffect(() => {
+    if (!open) return;
+    fdb.from("compras").select("id, folio, estatus").order("created_at", { ascending: false }).limit(100)
+      .then(({ data }: { data: CompraAbierta[] | null }) => setComprasAbiertas(data ?? []));
+  }, [open]);
 
   const irPaso2 = () => {
     if (importMode === "multiple") {
@@ -211,6 +226,19 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
         }
 
         if (huboError) continue;
+
+        if (containerId) {
+          const doc = await documentarContenedor({
+            contenedorId: containerId,
+            compraId: compraId || null,
+            origen: "excel",
+          });
+          if (doc.ok === false) toast.error(explicarError(doc.error, c.errorDocumento));
+          else {
+            reporte.documento = doc.folio;
+            reporte.faltantes = doc.faltantes;
+          }
+        }
         reportesRecepcion.push(reporte);
       }
 
@@ -274,9 +302,26 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
       _color: cab.color,
       _unidades: payload,
     });
+    if (error) { setBusy(false); toast.error(error.message); return; }
+    const resultado = data as { creados?: number; contenedor_id?: string } | null;
+    let contId = resultado?.contenedor_id ?? null;
+    if (!contId) {
+      const { data: cont } = await fdb.from("contenedores").select("id").eq("folio_contenedor", cab.folio_contenedor.trim()).maybeSingle();
+      contId = (cont as { id?: string } | null)?.id ?? null;
+    }
+    if (contId) {
+      const doc = await documentarContenedor({
+        contenedorId: contId,
+        compraId: compraId || null,
+        origen: "manual",
+        lineas: lineasDeUnidades(payload, cab.modelo, cab.color),
+      });
+      if (doc.ok === false) toast.error(explicarError(doc.error, c.errorDocumento));
+      else if (doc.faltantes > 0) toast.success(c.documentoFaltante(doc.folio, doc.faltantes));
+      else toast.success(c.documentoOk(doc.folio));
+    }
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
-    toast.success(c.okRecibido((data as { creados?: number } | null)?.creados ?? unidades.length));
+    toast.success(c.okRecibido(resultado?.creados ?? unidades.length));
     setOpen(false); reset(); onDone?.();
   };
 
@@ -414,6 +459,16 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                   )}
                 </TabsContent>
               </Tabs>
+              <div>
+                <Label>{c.compra}</Label>
+                <select value={compraId} onChange={e => setCompraId(e.target.value)} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
+                  <option value="">{c.sinCompra}</option>
+                  {comprasAbiertas.map(co => (
+                    <option key={co.id} value={co.id}>{co.folio} · {co.estatus}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">{c.compraAyuda}</p>
+              </div>
             </div>
           )}
 
@@ -521,6 +576,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                     <div className="text-sm text-muted-foreground space-y-1">
                       <div><strong>{c.chasisLinea}</strong> {r.chasis_insertados} {c.insertados} · {r.chasis_actualizados} {c.actualizados}{r.chasis_invalidos > 0 && <span className="text-amber-700"> · {r.chasis_invalidos} {c.invalidos}</span>}</div>
                       <div><strong>{c.motoresLinea}</strong> {r.motores_insertados} {c.insertados} · {r.motores_actualizados} {c.actualizados}{r.motores_invalidos > 0 && <span className="text-amber-700"> · {r.motores_invalidos} {c.invalidos}</span>}</div>
+                      {r.documento && <div><strong>{r.documento}</strong>{(r.faltantes ?? 0) > 0 && <span className="text-amber-700"> · {c.documentoFaltante(r.documento, r.faltantes ?? 0)}</span>}</div>}
                     </div>
                   </div>
                 ))}

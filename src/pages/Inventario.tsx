@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike, Layers, Boxes, TriangleAlert, Pencil } from "lucide-react";
+import { Package, Wrench, Palette, Truck, AlertTriangle, CheckCircle2, Bike, Layers, Boxes, TriangleAlert, Pencil, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { ColorChasis, ChasisColor, AjustarCapacidadColor } from "@/components/ColorChasis";
+import { RecepcionesInventario } from "@/components/RecepcionesInventario";
 
 type Chasis = {
   id: string;
@@ -143,6 +144,7 @@ function agruparModeloColor<T extends { modelo: string; color?: string }>(items:
 }
 
 export default function Inventario() {
+  const [pestana, setPestana] = useState("unidades");
   const { role } = useAuth();
   const { t } = useLang();
   const puedeEditarColor = role === "admin" || role === "fabrica";
@@ -310,7 +312,7 @@ export default function Inventario() {
         <p className="text-muted-foreground mt-1">{t.inventario.subtitle}</p>
       </div>
 
-      <Tabs defaultValue="unidades" className="w-full">
+      <Tabs value={pestana} onValueChange={setPestana} className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1 p-1">
           <TabsTrigger value="unidades" className="text-base"><Bike className="h-4 w-4 mr-2" />{t.inventario.tabs.unidades}</TabsTrigger>
           <TabsTrigger value="chasis" className="text-base"><Truck className="h-4 w-4 mr-2" />{t.inventario.tabs.chasis}</TabsTrigger>
@@ -319,10 +321,11 @@ export default function Inventario() {
           <TabsTrigger value="colores" className="text-base"><Palette className="h-4 w-4 mr-2" />{t.inventario.tabs.colores}</TabsTrigger>
           <TabsTrigger value="otras" className="text-base"><Layers className="h-4 w-4 mr-2" />{t.inventario.tabs.otras}</TabsTrigger>
           <TabsTrigger value="stock" className="text-base"><Boxes className="h-4 w-4 mr-2" />{t.inventario.tabs.stock}</TabsTrigger>
+          <TabsTrigger value="recepciones" className="text-base"><ClipboardList className="h-4 w-4 mr-2" />{t.inventario.tabs.recepciones}</TabsTrigger>
         </TabsList>
 
         {/* Filtro de línea — aplica a Unidades, Chasis y Motores */}
-        <div className="flex items-center gap-2 mt-3">
+        {pestana !== "recepciones" && <div className="flex items-center gap-2 mt-3">
           <span className="text-sm text-muted-foreground">{t.inventario.lineaFiltro}</span>
           <div className="inline-flex rounded-lg border p-1 bg-card">
             {(["TODAS", "motocarro", "mototaxi", "otro"] as const).map(l => (
@@ -335,7 +338,11 @@ export default function Inventario() {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
+
+        <TabsContent value="recepciones">
+          <RecepcionesInventario />
+        </TabsContent>
 
         <TabsContent value="unidades" className="space-y-4 mt-4">
           <Card className="p-4">

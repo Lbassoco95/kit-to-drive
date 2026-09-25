@@ -304,6 +304,22 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260925000001_remision_refacciones_seguimiento', 'restriccion|almacen_refacciones_productos.almacen_refacciones_productos_stock_no_negativo|stock >= 0'),
   ('20260925000001_remision_refacciones_seguimiento', 'restriccion|inventario_colores.inventario_colores_disponible_no_negativo|cantidad_disponible >= 0'),
 
+  -- El trigger de inventario negativo ya no lee columnas de otra tabla.
+  ('20260925000005_inventario_trigger_sin_campo_ajeno', 'funcion|impedir_inventario_negativo()|almacen_refacciones_productos'),
+
+  -- Hardening: la contraseña obligatoria no la puede apagar el propio usuario.
+  ('20260925170000_security_hardening_criticos', 'columna|profiles.debe_cambiar_password'),
+  ('20260925170000_security_hardening_criticos', 'funcion|proteger_campos_privilegiados_profiles()'),
+
+  -- Cada carga de inventario deja un documento y puede ajustar la compra si llegó de menos.
+  ('20260925190000_documento_recepcion_compra', 'tabla|compras'),
+  ('20260925190000_documento_recepcion_compra', 'tabla|compra_lineas'),
+  ('20260925190000_documento_recepcion_compra', 'tabla|documentos_inventario'),
+  ('20260925190000_documento_recepcion_compra', 'tabla|documento_inventario_lineas'),
+  ('20260925190000_documento_recepcion_compra', 'funcion|crear_compra(text,uuid,uuid,date,text,jsonb)'),
+  ('20260925190000_documento_recepcion_compra', 'funcion|registrar_documento_inventario(uuid,uuid,text,text,jsonb)'),
+  ('20260925190000_documento_recepcion_compra', 'funcion|ajustar_compra_faltante(uuid,text,text)'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

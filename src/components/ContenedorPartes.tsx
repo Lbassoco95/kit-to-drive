@@ -9,6 +9,9 @@ import { Upload, FileSpreadsheet, Package, CheckCircle2, AlertTriangle } from "l
 import { toast } from "sonner";
 import { parsePackingListExcel, ParteFromExcel } from "@/lib/excelParser";
 import { explicarError } from "@/lib/dazon";
+import { fdb } from "@/lib/finanzasDb";
+import { documentarContenedor } from "@/lib/recepcionInventarioApi";
+import { lineasDeInventario } from "@/lib/recepcionInventario";
 import { useLang } from "@/contexts/LangContext";
 
 type Parte = {
@@ -34,10 +37,14 @@ export function ContenedorPartes({
   const [partes, setPartes] = useState<Parte[]>([]);
   const [busy, setBusy] = useState(false);
   const [packingListFile, setPackingListFile] = useState<File | null>(null);
+  const [compraId, setCompraId] = useState("");
+  const [compras, setCompras] = useState<{ id: string; folio: string; estatus: string }[]>([]);
 
   useEffect(() => {
     if (open && contenedorId) {
       cargarPartes();
+      fdb.from("compras").select("id, folio, estatus").order("created_at", { ascending: false }).limit(100)
+        .then(({ data }: { data: { id: string; folio: string; estatus: string }[] | null }) => setCompras(data ?? []));
     }
   }, [open, contenedorId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -109,6 +116,29 @@ export function ContenedorPartes({
     setPartes(prev => prev.map(p => 
       p.id === parteId ? { ...p, cantidad_recibida: nuevaCantidad } : p
     ));
+  };
+
+  const registrarDocumento = async () => {
+    const lineas = lineasDeInventario({ partes });
+    if (!lineas.length) {
+      toast.error(t.componentes.contenedorPartes.vacio);
+      return;
+    }
+    setBusy(true);
+    const doc = await documentarContenedor({
+      contenedorId,
+      compraId: compraId || null,
+      origen: "partes",
+      lineas,
+    });
+    setBusy(false);
+    if (doc.ok === false) {
+      toast.error(explicarError(doc.error, t.componentes.contenedorPartes.errorDocumento));
+      return;
+    }
+    toast.success(doc.faltantes > 0
+      ? t.componentes.contenedorPartes.documentoFaltante(doc.folio, doc.faltantes)
+      : t.componentes.contenedorPartes.documentoOk(doc.folio));
   };
 
   const diferencia = (esperada: number, recibida: number) => {
@@ -203,6 +233,19 @@ export function ContenedorPartes({
               <p>{t.componentes.contenedorPartes.vacio}</p>
             </div>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+          <div>
+            <Label>{t.componentes.contenedorPartes.compra}</Label>
+            <select value={compraId} onChange={e => setCompraId(e.target.value)} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">{t.componentes.contenedorPartes.sinCompra}</option>
+              {compras.map(co => <option key={co.id} value={co.id}>{co.folio} · {co.estatus}</option>)}
+            </select>
+          </div>
+          <Button onClick={() => void registrarDocumento()} disabled={busy || partes.length === 0} className="h-11 bg-[#065F46] hover:bg-[#054c38]">
+            {t.componentes.contenedorPartes.registrarDocumento}
+          </Button>
         </div>
 
         <DialogFooter>

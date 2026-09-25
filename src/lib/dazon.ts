@@ -255,6 +255,8 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260908000002_tope_unidades_ya_armadas.sql"],
   [/crm_actividades_tipo_check/,
     "20260908000003_crm_tipos_actividad.sql"],
+  [/registrar_documento_inventario|crear_compra|ajustar_compra_faltante|documentos_inventario|compra_lineas/,
+    "20260925190000_documento_recepcion_compra.sql"],
   [/record "new" has no field "cantidad_disponible"|impedir_inventario_negativo/,
     "20260925000005_inventario_trigger_sin_campo_ajeno.sql"],
   [/motivo_cancelacion|cancelada_at/,
