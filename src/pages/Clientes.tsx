@@ -9,13 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History, AlertTriangle, RefreshCw, CreditCard, ExternalLink } from "lucide-react";
+import { Link } from "react-router-dom";
+import { InputNumero } from "@/components/InputNumero";
+import { clienteTieneCredito } from "@/lib/credito";
+import { fmtMonedaPlataforma, parseNumero } from "@/lib/numeros";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { cargarClientes, displayCliente } from "@/lib/catalogoClientes";
 import { explicarError } from "@/lib/dazon";
 import { isAbsoluteHttpUrl, sanitizeStorageBasename } from "@/lib/storagePaths";
-import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History, AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function Clientes() {
   const { perms, area, user } = useAuth();
@@ -50,7 +54,7 @@ export default function Clientes() {
   const [saveMotivoDialog, setSaveMotivoDialog] = useState(false);
   const [saveMotivoSelect, setSaveMotivoSelect] = useState("");
   const [saveMotivoOther, setSaveMotivoOther] = useState("");
-  const [listTab, setListTab] = useState<"activos" | "archivados">("activos");
+  const [listTab, setListTab] = useState<"activos" | "archivados" | "credito">("activos");
   /** Por qué no se pudo leer el catálogo. `null` = se leyó bien. */
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -126,16 +130,23 @@ export default function Clientes() {
 
   const filtered = useMemo(() => {
     let base = rows;
-    if (listTab === "activos") {
-      base = rows.filter(c => c.activo !== false);
-    } else {
+    if (listTab === "archivados") {
       base = rows.filter(c => c.activo === false);
+    } else if (listTab === "credito") {
+      base = rows.filter(c => c.activo !== false && clienteTieneCredito(c));
+    } else {
+      base = rows.filter(c => c.activo !== false);
     }
-    
+
     if (!q) return base;
     const qLower = q.toLowerCase();
     return base.filter(c => c && [c.codigo_erp, c.folio_interno, c.nombre_comercial, c.telefono].filter(Boolean).join(" ").toLowerCase().includes(qLower));
   }, [rows, q, listTab]);
+
+  const conCreditoCount = useMemo(
+    () => rows.filter(c => c.activo !== false && clienteTieneCredito(c)).length,
+    [rows],
+  );
 
   const canEdit = perms.puedeEditar("clientes");
   const canCreate = perms.puedeCrear("clientes");
@@ -381,7 +392,8 @@ export default function Clientes() {
     }
     
     const payload = { ...form };
-    if (payload.limite_credito) payload.limite_credito = parseFloat(payload.limite_credito);
+    const limite = parseNumero(payload.limite_credito);
+    if (limite != null && limite > 0) payload.limite_credito = limite;
     else delete payload.limite_credito;
     if (!payload.codigo_erp?.trim()) payload.codigo_erp = null;
     if (!payload.folio_interno?.trim()) payload.folio_interno = null;
@@ -447,18 +459,33 @@ export default function Clientes() {
       </div>
 
       <Card className="p-3">
-        <div className="flex gap-3">
-          <div className="relative flex-1">
+        <div className="flex gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
             <Input className="pl-10 h-12 text-base" placeholder={t.clientes.buscar} value={q} onChange={e => setQ(e.target.value)} />
           </div>
-          <Tabs value={listTab} onValueChange={(v) => setListTab(v as "activos" | "archivados")} className="flex-1">
-            <TabsList className="grid w-full grid-cols-2 h-12">
-              <TabsTrigger value="activos">Activos</TabsTrigger>
-              <TabsTrigger value="archivados">Archivados</TabsTrigger>
+          <Tabs value={listTab} onValueChange={(v) => setListTab(v as "activos" | "archivados" | "credito")} className="flex-[1.4] min-w-[280px]">
+            <TabsList className="grid w-full grid-cols-3 h-12">
+              <TabsTrigger value="activos">{t.clientes.tabActivos}</TabsTrigger>
+              <TabsTrigger value="credito">{t.clientes.tabCredito(conCreditoCount)}</TabsTrigger>
+              <TabsTrigger value="archivados">{t.clientes.tabArchivados}</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
+        {listTab === "credito" && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground border-t pt-3">
+            <span>{t.clientes.avisoFiltroCredito}</span>
+            {perms.puedeVer("credito") && (
+              <Button asChild variant="outline" size="sm" className="h-9">
+                <Link to="/credito">
+                  <CreditCard className="h-4 w-4 mr-1.5" />
+                  {t.clientes.irModuloCredito}
+                  <ExternalLink className="h-3.5 w-3.5 ml-1.5 opacity-60" />
+                </Link>
+              </Button>
+            )}
+          </div>
+        )}
       </Card>
 
       {/*
@@ -491,9 +518,17 @@ export default function Clientes() {
             <Card key={c.id} className={`p-5 hover:shadow-md transition-shadow flex flex-col gap-3 ${isArchived ? "bg-slate-50 opacity-75" : ""}`}>
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <Badge className={`bg-[#1F3864] ${isArchived ? "bg-slate-500" : ""}`}>{clienteCodigoDisplay(c)}</Badge>
                     {clienteEsMigrado(c) && <Badge variant="outline" className="text-xs">ERP</Badge>}
+                    {clienteTieneCredito(c) && (
+                      <Badge variant="outline" className="text-xs border-teal-300 text-teal-700 bg-teal-50">
+                        {t.clientes.badgeCredito(
+                          Number(c.dias_credito) || 0,
+                          c.limite_credito != null ? fmtMonedaPlataforma(Number(c.limite_credito), c.moneda_credito || "MXN") : null,
+                        )}
+                      </Badge>
+                    )}
                     {isArchived && <Badge variant="outline" className="text-xs">Archivado</Badge>}
                   </div>
                   <div className="text-lg font-bold text-[#1F3864] truncate">{c.nombre_comercial || <em>{t.clientes.sinNombre}</em>}</div>
@@ -607,11 +642,29 @@ export default function Clientes() {
             </TabsContent>
             <TabsContent value="credito" className="space-y-3 mt-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><Label>{t.clientes.limiteCredito}</Label><Input type="number" step="0.01" value={form.limite_credito || ""} onChange={e => setForm({ ...form, limite_credito: e.target.value })} /></div>
-                <div><Label>{t.clientes.diasCredito}</Label><Input type="number" value={form.dias_credito || 0} onChange={e => setForm({ ...form, dias_credito: parseInt(e.target.value) || 0 })} /></div>
+                <div>
+                  <Label>{t.clientes.limiteCredito}</Label>
+                  <InputNumero
+                    value={form.limite_credito}
+                    onValueChange={v => setForm({ ...form, limite_credito: v == null ? "" : v })}
+                    placeholder="25,000.00"
+                  />
+                </div>
+                <div>
+                  <Label>{t.clientes.diasCredito}</Label>
+                  <Input type="number" value={form.dias_credito || 0} onChange={e => setForm({ ...form, dias_credito: parseInt(e.target.value) || 0 })} />
+                </div>
               </div>
               <div><Label>{t.clientes.monedaCredito}</Label><Input value={form.moneda_credito || "MXN"} onChange={e => setForm({ ...form, moneda_credito: e.target.value })} /></div>
               <div><Label>{t.clientes.notas}</Label><Input value={form.notas || ""} onChange={e => setForm({ ...form, notas: e.target.value })} /></div>
+              {perms.puedeVer("credito") && (
+                <p className="text-xs text-muted-foreground">
+                  {t.clientes.hintCartera}{" "}
+                  <Link to="/credito" className="text-[#1F3864] font-medium underline-offset-2 hover:underline">
+                    {t.clientes.irModuloCredito}
+                  </Link>
+                </p>
+              )}
             </TabsContent>
             {editing && (
               <TabsContent value="comentarios" className="space-y-3 mt-4">
@@ -736,11 +789,29 @@ export default function Clientes() {
               </TabsContent>
               <TabsContent value="credito" className="space-y-3 mt-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>{t.clientes.limiteCredito}</Label><Input value={selectedCliente.limite_credito || ""} disabled /></div>
+                  <div>
+                    <Label>{t.clientes.limiteCredito}</Label>
+                    <Input
+                      value={
+                        selectedCliente.limite_credito != null && selectedCliente.limite_credito !== ""
+                          ? fmtMonedaPlataforma(Number(selectedCliente.limite_credito), selectedCliente.moneda_credito || "MXN")
+                          : "—"
+                      }
+                      disabled
+                    />
+                  </div>
                   <div><Label>{t.clientes.diasCredito}</Label><Input value={selectedCliente.dias_credito || 0} disabled /></div>
                 </div>
                 <div><Label>{t.clientes.monedaCredito}</Label><Input value={selectedCliente.moneda_credito || ""} disabled /></div>
                 <div><Label>{t.clientes.notas}</Label><Input value={selectedCliente.notas || ""} disabled /></div>
+                {perms.puedeVer("credito") && clienteTieneCredito(selectedCliente) && (
+                  <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Link to="/credito">
+                      <CreditCard className="h-4 w-4 mr-1.5" />
+                      {t.clientes.verEnModuloCredito}
+                    </Link>
+                  </Button>
+                )}
               </TabsContent>
               <TabsContent value="documentos" className="space-y-4 mt-4">
                 {[

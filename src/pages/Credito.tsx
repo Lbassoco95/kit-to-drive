@@ -15,6 +15,7 @@ import {
   Search, CreditCard, AlertTriangle, Plus, Banknote, XCircle, RefreshCw,
 } from "lucide-react";
 import { fmtMoneda, fmtFecha } from "@/lib/finanzas";
+import { InputNumero } from "@/components/InputNumero";
 import {
   filtrarCartera, formCxcVacio, formAbonoVacio, validarFormCxc, validarFormAbono,
   cxcEstaVencida, creditoDisponible, calcularFechaVencimiento, diasAtraso,
@@ -455,12 +456,10 @@ export default function Credito() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>{tc.campos.monto}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <InputNumero
                   value={formCxc.monto}
-                  onChange={e => setFormCxc({ ...formCxc, monto: e.target.value })}
+                  onValueChange={v => setFormCxc({ ...formCxc, monto: v == null ? "" : String(v) })}
+                  placeholder="25,000.00"
                 />
               </div>
               <div>
@@ -533,12 +532,10 @@ export default function Credito() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>{tc.campos.montoAbono}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <InputNumero
                   value={formAbono.monto}
-                  onChange={e => setFormAbono({ ...formAbono, monto: e.target.value })}
+                  onValueChange={v => setFormAbono({ ...formAbono, monto: v == null ? "" : String(v) })}
+                  placeholder="5,000.00"
                 />
               </div>
               <div>

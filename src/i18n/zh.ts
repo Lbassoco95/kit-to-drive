@@ -576,6 +576,17 @@ export const zh = {
     limiteCredito: "信用额度",
     diasCredito: "账期（天）",
     monedaCredito: "币种",
+    tabActivos: "启用",
+    tabArchivados: "已归档",
+    tabCredito: (n: number) => `有信用（${n}）`,
+    avisoFiltroCredito: "已配置账期或额度的客户。应收账款请在「信用」模块查看。",
+    irModuloCredito: "打开信用模块",
+    verEnModuloCredito: "在信用模块查看账款",
+    hintCartera: "登记应收账款与还款请前往",
+    badgeCredito: (dias: number, limite: string | null) =>
+      limite
+        ? (dias > 0 ? `信用 ${dias}天 · ${limite}` : `信用 · ${limite}`)
+        : (dias > 0 ? `信用 ${dias}天` : "信用"),
     vendedor: "负责销售员",
     notas: "备注",
     fechaAlta: "建档日期",
@@ -968,6 +979,8 @@ export const zh = {
     nombreEmpresa: "公司名称",
     capacidadDiaria: "日产能（辆）",
     plazoMaxCredito: "最长信用期（天）",
+    formatoNumeros: "数字格式",
+    formatoNumerosDesc: "全平台金额使用逗号（,）作千分位、点（.）作小数。例如：25,000.00",
     limiteYaArmados: "可登记的既有组装车上限",
     guardada: "设置已保存",
     cargando: "正在加载设置…",

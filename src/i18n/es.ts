@@ -578,6 +578,17 @@ export const es = {
     limiteCredito: "Límite de crédito",
     diasCredito: "Días de crédito",
     monedaCredito: "Moneda",
+    tabActivos: "Activos",
+    tabArchivados: "Archivados",
+    tabCredito: (n: number) => `Con crédito (${n})`,
+    avisoFiltroCredito: "Clientes con días o límite de crédito capturado. La cartera y CxC viven en el módulo Crédito.",
+    irModuloCredito: "Abrir módulo Crédito",
+    verEnModuloCredito: "Ver cartera en Crédito",
+    hintCartera: "Para registrar cuentas por cobrar y abonos usa",
+    badgeCredito: (dias: number, limite: string | null) =>
+      limite
+        ? (dias > 0 ? `Crédito ${dias}d · ${limite}` : `Crédito · ${limite}`)
+        : (dias > 0 ? `Crédito ${dias}d` : "Crédito"),
     vendedor: "Vendedor asignado",
     notas: "Notas",
     fechaAlta: "Fecha de alta",
@@ -1001,6 +1012,8 @@ export const es = {
     nombreEmpresa: "Nombre empresa",
     capacidadDiaria: "Capacidad diaria (motocarros)",
     plazoMaxCredito: "Plazo máx. crédito (días)",
+    formatoNumeros: "Formato de números",
+    formatoNumerosDesc: "En toda la plataforma los montos usan coma (,) para miles y punto (.) para decimales. Ejemplo: 25,000.00",
     limiteYaArmados: "Tope de unidades ya ensambladas que se pueden cargar",
     guardada: "Configuración guardada",
     cargando: "Cargando configuración…",

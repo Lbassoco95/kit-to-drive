@@ -73,6 +73,10 @@ export default function Configuracion() {
           <Label>{t.configuracion.plazoMaxCredito}</Label>
           <Input type="number" value={cfg.plazo_max_credito_dias} onChange={e => setCfg({ ...cfg, plazo_max_credito_dias: Number(e.target.value) })} />
         </div>
+        <div className="rounded-md border bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
+          <div className="font-medium text-foreground">{t.configuracion.formatoNumeros}</div>
+          <p className="mt-0.5">{t.configuracion.formatoNumerosDesc}</p>
+        </div>
         {/* El lote de unidades que ya estaban ensambladas antes del sistema es
             cerrado. El tope vive aquí para que se pueda subir sin un
             despliegue, si de verdad aparecen más — y no en el código. */}
