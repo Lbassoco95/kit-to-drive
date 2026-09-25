@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
@@ -9,10 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Package, Search, Upload, Bike, RefreshCw, Eye, EyeOff, Wand2 } from "lucide-react";
+import { Package, Search, Upload, Bike, RefreshCw, Eye, EyeOff, Wand2, History, ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { extractCompat, parseListaPreciosRefacciones } from "@/lib/refaccionesParser";
 import { explicarError } from "@/lib/dazon";
+import {
+  conStockResultante,
+  etiquetaClienteMovimiento,
+  labelTipoMovimiento,
+  type MovimientoStockRefaccion,
+} from "@/lib/stockRefacciones";
 
 type Producto = {
   id: string;
@@ -64,6 +71,22 @@ export default function AlmacenRefacciones() {
   const [reprocesando, setReprocesando] = useState(false);
   const [detalle, setDetalle] = useState<Producto | null>(null);
   const [compats, setCompats] = useState<Compat[]>([]);
+  const [vista, setVista] = useState<"catalogo" | "movimientos">("catalogo");
+  const [movimientos, setMovimientos] = useState<MovimientoStockRefaccion[]>([]);
+  const [loadingMovs, setLoadingMovs] = useState(false);
+  const [kardex, setKardex] = useState<ReturnType<typeof conStockResultante<MovimientoStockRefaccion>>>([]);
+  const [loadingKardex, setLoadingKardex] = useState(false);
+  const detalleRef = useRef<Producto | null>(null);
+  const cargarKardexRef = useRef<(p: Producto) => Promise<void>>(async () => {});
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
+
+  const tipoLabels = useMemo(() => ({
+    venta: t.almacenRefacciones?.tipoVenta ?? "Venta / remisión",
+    entrada: t.almacenRefacciones?.tipoEntrada ?? "Entrada",
+    ajuste: t.almacenRefacciones?.tipoAjuste ?? "Ajuste",
+    salida: t.almacenRefacciones?.tipoSalida ?? "Salida",
+  }), [t]);
 
   const loadUnidades = useCallback(async () => {
     const { data } = await supabase
@@ -99,9 +122,77 @@ export default function AlmacenRefacciones() {
     void loadUnidades();
   }, [t, loadUnidades]);
 
+  const loadMovimientos = useCallback(async () => {
+    setLoadingMovs(true);
+    const { data, error } = await supabase
+      .from("v_almacen_refacciones_movimientos" as any)
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(300);
+    if (error) {
+      // Fallback si la vista aún no está aplicada en producción.
+      const fallback = await supabase
+        .from("almacen_refacciones_movimientos" as any)
+        .select("id, producto_id, tipo, cantidad, precio_unitario, cliente_id, notas, created_at, almacen_refacciones_productos(codigo_nuevo, codigo_antiguo, descripcion, descripcion_corta, stock), clientes(nombre_comercial, codigo_erp, folio_interno)")
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (fallback.error) {
+        toast.error(explicarError(error, t.almacenRefacciones?.errorCargarMovimientos ?? "Error al cargar movimientos"));
+        setMovimientos([]);
+      } else {
+        setMovimientos(((fallback.data as any[]) ?? []).map(r => ({
+          id: r.id,
+          producto_id: r.producto_id,
+          tipo: r.tipo,
+          cantidad: Number(r.cantidad),
+          precio_unitario: r.precio_unitario,
+          cliente_id: r.cliente_id,
+          notas: r.notas,
+          created_at: r.created_at,
+          codigo_nuevo: r.almacen_refacciones_productos?.codigo_nuevo ?? null,
+          codigo_antiguo: r.almacen_refacciones_productos?.codigo_antiguo ?? null,
+          descripcion: r.almacen_refacciones_productos?.descripcion ?? null,
+          descripcion_corta: r.almacen_refacciones_productos?.descripcion_corta ?? null,
+          stock_actual: r.almacen_refacciones_productos?.stock ?? null,
+          cliente_nombre: r.clientes?.nombre_comercial ?? null,
+          cliente_codigo_erp: r.clientes?.codigo_erp ?? null,
+          cliente_folio_interno: r.clientes?.folio_interno ?? null,
+        })));
+      }
+    } else {
+      setMovimientos(((data as unknown) as MovimientoStockRefaccion[]) ?? []);
+    }
+    setLoadingMovs(false);
+  }, [t]);
+
   useEffect(() => {
     if (puedeVerRefacciones) load();
   }, [puedeVerRefacciones, load]);
+
+  useEffect(() => {
+    if (puedeVerRefacciones && vista === "movimientos") loadMovimientos();
+  }, [puedeVerRefacciones, vista, loadMovimientos]);
+
+  // Mientras la pantalla está abierta, refresca stock y kardex al liberar remisiones.
+  useEffect(() => {
+    if (!puedeVerRefacciones) return;
+    const channel = supabase
+      .channel("stock-refacciones-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "almacen_refacciones_movimientos" },
+        () => {
+          void load();
+          if (vistaRef.current === "movimientos") void loadMovimientos();
+          const abierto = detalleRef.current;
+          if (abierto) void cargarKardexRef.current(abierto);
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [puedeVerRefacciones, load, loadMovimientos]);
 
   useEffect(() => {
     if (unidadFiltro === "todas") {
@@ -145,9 +236,57 @@ export default function AlmacenRefacciones() {
     return { total: rows.length, dual, conCompat, stock, apartado, unidades: unidades.length };
   }, [rows, unidades]);
 
+  const cargarKardex = useCallback(async (p: Producto) => {
+    setLoadingKardex(true);
+    const { data, error } = await supabase
+      .from("v_almacen_refacciones_movimientos" as any)
+      .select("*")
+      .eq("producto_id", p.id)
+      .order("created_at", { ascending: false })
+      .limit(100);
+    let rows: MovimientoStockRefaccion[] = [];
+    if (error) {
+      const fallback = await supabase
+        .from("almacen_refacciones_movimientos" as any)
+        .select("id, producto_id, tipo, cantidad, precio_unitario, cliente_id, notas, created_at, clientes(nombre_comercial, codigo_erp, folio_interno)")
+        .eq("producto_id", p.id)
+        .order("created_at", { ascending: false })
+        .limit(100);
+      rows = ((fallback.data as any[]) ?? []).map(r => ({
+        id: r.id,
+        producto_id: r.producto_id,
+        tipo: r.tipo,
+        cantidad: Number(r.cantidad),
+        precio_unitario: r.precio_unitario,
+        cliente_id: r.cliente_id,
+        notas: r.notas,
+        created_at: r.created_at,
+        stock_actual: p.stock,
+        cliente_nombre: r.clientes?.nombre_comercial ?? null,
+        cliente_codigo_erp: r.clientes?.codigo_erp ?? null,
+        cliente_folio_interno: r.clientes?.folio_interno ?? null,
+      }));
+    } else {
+      rows = ((data as unknown) as MovimientoStockRefaccion[]) ?? [];
+    }
+    const stockActual = Number(rows[0]?.stock_actual ?? p.stock);
+    setKardex(conStockResultante(rows, stockActual));
+    setDetalle(prev => {
+      if (!prev || prev.id !== p.id) return prev;
+      const next = { ...prev, stock: stockActual };
+      detalleRef.current = next;
+      return next;
+    });
+    setLoadingKardex(false);
+  }, []);
+  cargarKardexRef.current = cargarKardex;
+
   const abrirDetalle = async (p: Producto) => {
     setDetalle(p);
+    detalleRef.current = p;
     setCompats([]);
+    setKardex([]);
+    void cargarKardex(p);
     const { data } = await supabase
       .from("almacen_refacciones_producto_compat" as any)
       .select("unidad_id, almacen_refacciones_unidades(id, nombre, tipo_unidad)")
@@ -316,6 +455,19 @@ export default function AlmacenRefacciones() {
         </Card>
       </div>
 
+      <Tabs value={vista} onValueChange={v => setVista(v as "catalogo" | "movimientos")} className="space-y-3">
+        <TabsList>
+          <TabsTrigger value="catalogo" className="gap-1.5">
+            <Package className="h-4 w-4" />
+            {t.almacenRefacciones?.tabCatalogo ?? "Catálogo"}
+          </TabsTrigger>
+          <TabsTrigger value="movimientos" className="gap-1.5">
+            <History className="h-4 w-4" />
+            {t.almacenRefacciones?.tabMovimientos ?? "Movimientos de stock"}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="catalogo" className="mt-0">
       <Card className="p-4 space-y-3">
         <div className="flex flex-col md:flex-row gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
@@ -463,9 +615,133 @@ export default function AlmacenRefacciones() {
           )}
         </p>
       </Card>
+        </TabsContent>
 
-      <Dialog open={!!detalle} onOpenChange={open => { if (!open) setDetalle(null); }}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <TabsContent value="movimientos" className="mt-0">
+          <Card className="p-4 space-y-3">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="font-semibold text-[#1F3864] flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  {t.almacenRefacciones?.tabMovimientos ?? "Movimientos de stock"}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {t.almacenRefacciones?.movimientosSubtitulo ??
+                    "Cómo va bajando el stock: a quién se envió y cuánto quedó."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-emerald-700 border-emerald-200 bg-emerald-50">
+                  {t.almacenRefacciones?.enVivo ?? "Actualización en vivo"}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { void loadMovimientos(); void load(); }}
+                  disabled={loadingMovs}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingMovs ? "animate-spin" : ""}`} />
+                  {t.almacenRefacciones?.actualizar ?? "Actualizar"}
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-md border overflow-auto max-h-[65vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t.almacenRefacciones?.colFecha ?? "Fecha"}</TableHead>
+                    <TableHead>{t.almacenRefacciones?.colNuevo ?? "Código"}</TableHead>
+                    <TableHead>{t.almacenRefacciones?.colDesc ?? "Descripción"}</TableHead>
+                    <TableHead>{t.almacenRefacciones?.colTipo ?? "Tipo"}</TableHead>
+                    <TableHead className="text-right">{t.almacenRefacciones?.colCantidad ?? "Cantidad"}</TableHead>
+                    <TableHead>{t.almacenRefacciones?.colCliente ?? "Enviado a"}</TableHead>
+                    <TableHead>{t.almacenRefacciones?.colNotas ?? "Detalle"}</TableHead>
+                    <TableHead className="text-right">{t.almacenRefacciones?.colStock ?? "Stock actual"}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {movimientos.map(m => {
+                    const baja = m.cantidad < 0;
+                    return (
+                      <TableRow
+                        key={m.id}
+                        className="cursor-pointer hover:bg-slate-50"
+                        onClick={() => {
+                          const p = rows.find(r => r.id === m.producto_id);
+                          if (p) {
+                            void abrirDetalle(p);
+                            return;
+                          }
+                          void abrirDetalle({
+                            id: m.producto_id,
+                            codigo_nuevo: m.codigo_nuevo ?? "—",
+                            codigo_antiguo: m.codigo_antiguo ?? null,
+                            clave_completa: m.codigo_nuevo ?? "",
+                            linea_catalogo: "",
+                            marca: null,
+                            categoria: null,
+                            descripcion: m.descripcion ?? "",
+                            descripcion_corta: m.descripcion_corta ?? null,
+                            unidad_medida: null,
+                            precio: m.precio_unitario ?? null,
+                            stock: m.stock_actual ?? 0,
+                            visible_venta: true,
+                            num_compatibilidades: 0,
+                          });
+                        }}
+                      >
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {fmtFechaHora(m.created_at)}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm font-semibold">
+                          {m.codigo_nuevo ?? "—"}
+                        </TableCell>
+                        <TableCell className="max-w-[220px] truncate text-sm">
+                          {m.descripcion_corta || m.descripcion || "—"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{labelTipoMovimiento(m.tipo, tipoLabels)}</Badge>
+                        </TableCell>
+                        <TableCell className={`text-right tabular-nums font-semibold ${baja ? "text-red-700" : "text-emerald-700"}`}>
+                          <span className="inline-flex items-center justify-end gap-1">
+                            {baja ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
+                            {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm max-w-[200px]">
+                          <div className="truncate font-medium">{etiquetaClienteMovimiento(m)}</div>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">
+                          {m.notas ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {m.stock_actual ?? "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {!loadingMovs && movimientos.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-10">
+                        {t.almacenRefacciones?.sinMovimientos ?? "Aún no hay salidas registradas."}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={!!detalle} onOpenChange={open => {
+        if (!open) {
+          setDetalle(null);
+          detalleRef.current = null;
+          setKardex([]);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {detalle && (
             <>
               <DialogHeader>
@@ -502,6 +778,66 @@ export default function AlmacenRefacciones() {
                   </p>
                   {detalle.categoria && (
                     <p className="text-xs text-muted-foreground">{detalle.categoria}{detalle.marca ? ` · ${detalle.marca}` : ""}</p>
+                  )}
+                </section>
+
+                <section className="rounded-md border p-3 space-y-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+                    <History className="h-3.5 w-3.5" />
+                    {t.almacenRefacciones?.seccionKardex ?? "Historial de stock"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {t.almacenRefacciones?.kardexHint ??
+                      "Cada fila es una salida o ajuste. El saldo muestra cómo fue disminuyendo la existencia."}
+                  </p>
+                  {loadingKardex ? (
+                    <p className="text-muted-foreground text-sm py-2">…</p>
+                  ) : kardex.length === 0 ? (
+                    <p className="text-muted-foreground text-sm py-2">
+                      {t.almacenRefacciones?.sinMovimientos ?? "Aún no hay salidas registradas."}
+                    </p>
+                  ) : (
+                    <div className="rounded-md border overflow-auto max-h-64">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t.almacenRefacciones?.colFecha ?? "Fecha"}</TableHead>
+                            <TableHead>{t.almacenRefacciones?.colTipo ?? "Tipo"}</TableHead>
+                            <TableHead className="text-right">{t.almacenRefacciones?.colCantidad ?? "Cant."}</TableHead>
+                            <TableHead>{t.almacenRefacciones?.colCliente ?? "Enviado a"}</TableHead>
+                            <TableHead className="text-right">{t.almacenRefacciones?.colStockAntes ?? "Antes"}</TableHead>
+                            <TableHead className="text-right">{t.almacenRefacciones?.colStockDespues ?? "Quedó"}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {kardex.map(m => (
+                            <TableRow key={m.id}>
+                              <TableCell className="text-xs whitespace-nowrap">{fmtFechaHora(m.created_at)}</TableCell>
+                              <TableCell className="text-xs">
+                                <Badge variant="outline" className="text-[10px]">
+                                  {labelTipoMovimiento(m.tipo, tipoLabels)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className={`text-right tabular-nums text-xs font-semibold ${m.cantidad < 0 ? "text-red-700" : "text-emerald-700"}`}>
+                                {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}
+                              </TableCell>
+                              <TableCell className="text-xs max-w-[140px]">
+                                <div className="truncate">{etiquetaClienteMovimiento(m)}</div>
+                                {m.notas && (
+                                  <div className="truncate text-muted-foreground">{m.notas}</div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+                                {m.stock_antes}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-xs font-semibold">
+                                {m.stock_despues}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
                 </section>
 
@@ -555,4 +891,18 @@ export default function AlmacenRefacciones() {
       </Dialog>
     </div>
   );
+}
+
+function fmtFechaHora(iso: string) {
+  try {
+    return new Date(iso).toLocaleString("es-MX", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
 }
