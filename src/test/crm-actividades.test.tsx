@@ -73,6 +73,19 @@ describe("CRM · Actividades", () => {
     expect(await screen.findByText("Completada")).toBeInTheDocument();
   });
 
+  it("avisa en la lista cuando una visita agendada ya venció", async () => {
+    filas.crm_actividades = [{
+      id: "a3", tipo: "visita", estatus: "programada", agendada: true,
+      titulo: "Visita", fecha_actividad: "2020-01-01T10:00:00Z",
+      cliente_id: "c1", vendedor_id: "u1", objetivo_visita: "Cerrar pedido",
+    }];
+    filas.clientes = [{ id: "c1", nombre_comercial: "Refaccionaria San Pablo" }];
+
+    render(<CrmActividades />);
+    expect(await screen.findByText("Se te venció 1 visita o reunión")).toBeInTheDocument();
+    expect(screen.getByText("Vencida")).toBeInTheDocument();
+  });
+
   it("aguanta filas incompletas: sin estatus, sin cliente y sin vendedor", async () => {
     // Las actividades viejas del CRM no traen estatus ni objetivo_visita.
     filas.crm_actividades = [{ id: "a2", tipo: "llamada", fecha_actividad: "2026-08-19T09:00:00Z" }];

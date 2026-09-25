@@ -255,6 +255,8 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260908000002_tope_unidades_ya_armadas.sql"],
   [/crm_actividades_tipo_check/,
     "20260908000003_crm_tipos_actividad.sql"],
+  [/crm_actividades\.agendada|aviso_correo_at|trg_crm_actividades_aviso_correo/,
+    "20260925190000_crm_aviso_citas_vencidas.sql"],
   [/stock_bloqueado_producto|stock_disponible|remisiones_refacciones|remision_refaccion_|crear_remision_refacciones|liberar_refaccion_remision|reportar_faltante_refaccion|confirmar_sin_existencia_refaccion|cancelar_linea_refaccion|cancelar_remision_refacciones|puede_capturar_refacciones|puede_operar_almacen_refacciones|puede_leer_remision_refaccion|recalcular_etapa_remision_refaccion/,
     "20260923000001_remisiones_refacciones.sql"],
   [/sincronizar_compat_refacciones/,

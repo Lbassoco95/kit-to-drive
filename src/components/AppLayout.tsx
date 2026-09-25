@@ -3,11 +3,12 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { LogOut, Bell, Search } from "lucide-react";
+import { LogOut, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useLang } from "@/contexts/LangContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { CampanaCitas } from "@/components/CampanaCitas";
 
 export default function AppLayout() {
   const { profileName, area, nivel, signOut, user } = useAuth();
@@ -34,7 +35,7 @@ export default function AppLayout() {
                 className="pl-8 h-9"
               />
             </form>
-            <Button variant="ghost" size="icon"><Bell className="h-4 w-4" /></Button>
+            <CampanaCitas />
             <div className="text-right text-xs leading-tight hidden sm:block">
               <div className="font-semibold text-foreground">{profileName || user?.email}</div>
               <div className="text-muted-foreground">{area && nivel ? `${t.areas[area]} · ${t.niveles[nivel]}` : ""}</div>

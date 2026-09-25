@@ -22,6 +22,7 @@ const CRM_TIPO_ACTIVIDAD_ES: Record<string, string> = {
   email: "Email",
   whatsapp: "WhatsApp",
   videollamada: "Videollamada",
+  reunion: "Reunión",
   demo: "Demo",
   nota: "Nota",
   seguimiento: "Seguimiento",
@@ -336,6 +337,20 @@ export const es = {
   layout: {
     search: "Buscar orden, chasis, NS, remisión, cliente…",
     signOut: "Salir",
+    campanaCitas: {
+      aria: (n: number) => n > 0
+        ? `${n} visita${n > 1 ? "s" : ""} o reunión${n > 1 ? "es" : ""} vencida${n > 1 ? "s" : ""}`
+        : "Visitas y reuniones",
+      titulo: (n: number) => n === 1
+        ? "1 visita o reunión venció"
+        : `${n} visitas o reuniones vencieron`,
+      vacio: "No tienes visitas ni reuniones vencidas",
+      ver: "Ver en actividades",
+      aviso: (n: number) => n === 1
+        ? "Se te venció una visita o reunión. Revísala en Actividades."
+        : `Se te vencieron ${n} visitas o reuniones. Revísalas en Actividades.`,
+      sinCliente: "Sin cliente",
+    },
   },
 
   // Dashboard
@@ -2247,8 +2262,16 @@ export const es = {
     actividades: {
       title: "Actividades",
       subtitle: (n: number) => `${n} actividades registradas`,
-      programarVisita: "Programar visita",
+      programarVisita: "Programar visita o reunión",
       programar: "Programar",
+      citaProgramada: "Quedó programada. Te avisamos aquí cuando venza, y por correo si tienes uno real.",
+      faltaTipoReunion: "La base todavía no acepta el tipo Reunión. Corre supabase/migrations/20260925190000_crm_aviso_citas_vencidas.sql en el SQL editor de Supabase.",
+      citasVencidas: (n: number) => n === 1
+        ? "Se te venció 1 visita o reunión"
+        : `Se te vencieron ${n} visitas o reuniones`,
+      vencida: "Vencida",
+      marcarAtendida: "Ya la atendí",
+      atendida: "Quedó como atendida",
       buscar: "Buscar por cliente, vendedor, tipo…",
       sinActividades: "Sin actividades",
       completarVisita: "Completar visita →",

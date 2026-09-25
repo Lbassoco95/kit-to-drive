@@ -247,6 +247,18 @@ WITH esperado(script, objeto) AS (VALUES
   // Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
   ('20260908000003_crm_tipos_actividad',          'restriccion|crm_actividades.crm_actividades_tipo_check|videollamada'),
 
+  // Aviso cuando vence una visita o reunión agendada, y el tipo Reunión.
+  ('20260925190000_crm_aviso_citas_vencidas',     'columna|crm_actividades.agendada'),
+  ('20260925190000_crm_aviso_citas_vencidas',     'columna|crm_actividades.aviso_correo_at'),
+  ('20260925190000_crm_aviso_citas_vencidas',     'restriccion|crm_actividades.crm_actividades_tipo_check|reunion'),
+  ('20260925190000_crm_aviso_citas_vencidas',     'funcion|trg_crm_actividades_aviso_correo()'),
+  ('20260925190000_crm_aviso_citas_vencidas',     'trigger|crm_actividades.trg_crm_actividades_aviso_correo'),
+  ('20260925190000_crm_aviso_citas_vencidas',     'indice|idx_crm_actividades_citas_agendadas'),
+
+  // Contraseña obligatoria y campos de perfil que el propio usuario no puede tocar.
+  ('20260925170000_security_hardening_criticos',  'columna|profiles.debe_cambiar_password'),
+  ('20260925170000_security_hardening_criticos',  'trigger|profiles.trg_proteger_profiles_privilegiados'),
+
   -- Almacén de refacciones para venta (lista de precios, códigos duales, compat).
   ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_productos'),
   ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_codigos'),

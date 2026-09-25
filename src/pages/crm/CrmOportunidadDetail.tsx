@@ -352,6 +352,7 @@ export default function CrmOportunidadDetail() {
                   <SelectItem value="email">{t.crm.tipoActividad("email")}</SelectItem>
                   <SelectItem value="whatsapp">{t.crm.tipoActividad("whatsapp")}</SelectItem>
                   <SelectItem value="videollamada">{t.crm.tipoActividad("videollamada")}</SelectItem>
+                  <SelectItem value="reunion">{t.crm.tipoActividad("reunion")}</SelectItem>
                   <SelectItem value="nota">{t.crm.tipoActividad("nota")}</SelectItem>
                 </SelectContent>
               </Select>

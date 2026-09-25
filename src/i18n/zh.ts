@@ -24,6 +24,7 @@ const CRM_TIPO_ACTIVIDAD_ZH: Record<string, string> = {
   email: "电子邮件",
   whatsapp: "WhatsApp",
   videollamada: "视频通话",
+  reunion: "会议",
   demo: "演示",
   nota: "备注",
   seguimiento: "跟进",
@@ -334,6 +335,16 @@ export const zh = {
   layout: {
     search: "搜索工单、车架、序列号、提货单、客户…",
     signOut: "退出",
+    campanaCitas: {
+      aria: (n: number) => n > 0 ? `${n} 个拜访或会议已到期` : "拜访和会议",
+      titulo: (n: number) => n === 1 ? "1 个拜访或会议已到期" : `${n} 个拜访或会议已到期`,
+      vacio: "没有到期的拜访或会议",
+      ver: "在活动中查看",
+      aviso: (n: number) => n === 1
+        ? "有一个拜访或会议已到期。请到活动里查看。"
+        : `有 ${n} 个拜访或会议已到期。请到活动里查看。`,
+      sinCliente: "无客户",
+    },
   },
 
   // Dashboard
@@ -2228,8 +2239,14 @@ export const zh = {
     actividades: {
       title: "活动",
       subtitle: (n: number) => `共 ${n} 条活动`,
-      programarVisita: "安排拜访",
+      programarVisita: "安排拜访或会议",
       programar: "安排",
+      citaProgramada: "已安排。到期后会在这里提醒你；如果有真实邮箱，也会发邮件。",
+      faltaTipoReunion: "数据库还不接受“会议”类型。请在 Supabase 的 SQL 编辑器中运行 supabase/migrations/20260925190000_crm_aviso_citas_vencidas.sql。",
+      citasVencidas: (n: number) => n === 1 ? "有 1 个拜访或会议已到期" : `有 ${n} 个拜访或会议已到期`,
+      vencida: "已到期",
+      marcarAtendida: "已处理",
+      atendida: "已标为已处理",
       buscar: "按客户、销售员或类型搜索…",
       sinActividades: "暂无活动",
       completarVisita: "填写拜访报告 →",

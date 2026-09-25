@@ -9,3 +9,6 @@ verify_jwt = true
 
 [functions.complete-password-change]
 verify_jwt = true
+
+[functions.notificar-citas-vencidas]
+verify_jwt = true

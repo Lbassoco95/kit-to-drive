@@ -15,6 +15,7 @@ import { Plus, Pencil, Search, BookOpen, Calendar, User, Building2, CheckCircle,
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { cargarClientes, porNombreComercial } from "@/lib/catalogoClientes";
 import { isAbsoluteHttpUrl, storageExtFromFile } from "@/lib/storagePaths";
+import { citaVencida, faltaColumna } from "@/lib/citasCrm";
 
 export default function CrmActividades() {
   const { perms, user } = useAuth();
@@ -107,6 +108,7 @@ export default function CrmActividades() {
     otro: false
   });
   const [otraMarca, setOtraMarca] = useState("");
+  const [ahora, setAhora] = useState(() => new Date());
 
   const load = async () => {
     const [{ data: acts }, { data: cs }, { data: vs }, { data: ops }] = await Promise.all([
@@ -130,6 +132,10 @@ export default function CrmActividades() {
     setOportunidades(ops ?? []);
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const id = window.setInterval(() => setAhora(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const filtered = useMemo(() => {
     if (!q) return actividades;
@@ -150,6 +156,11 @@ export default function CrmActividades() {
     });
   }, [actividades, clientes, vendedores, oportunidades, q]);
 
+  const miasVencidas = useMemo(
+    () => actividades.filter((a) => citaVencida(a, ahora, user?.id)),
+    [actividades, ahora, user?.id],
+  );
+
   const canEdit = perms.puedeEditar("crm");
   const canCreate = perms.puedeCrear("crm");
   const canDelete = perms.puedeEliminar("crm");
@@ -158,13 +169,23 @@ export default function CrmActividades() {
     const payload = {
       ...programarForm,
       estatus: 'programada',
+      agendada: true,
       fecha_actividad: programarForm.fecha_actividad || new Date().toISOString(),
       vendedor_id: programarForm.vendedor_id || user?.id
     };
 
-    const { error } = await supabase.from("crm_actividades").insert(payload);
+    let { error } = await supabase.from("crm_actividades").insert(payload);
+    // `agendada` llega con 20260925190000. Si la base va atrás, la cita se
+    // guarda igual y el aviso empieza cuando corran el script.
+    if (faltaColumna(error, "agendada")) {
+      const { agendada: _ignorada, ...sinMarca } = payload;
+      ({ error } = await supabase.from("crm_actividades").insert(sinMarca));
+    }
+    if (error?.code === "23514" && /tipo|reunion/i.test(error.message ?? "")) {
+      return toast.error(t.crm.actividades.faltaTipoReunion);
+    }
     if (error) return toast.error(error.message);
-    toast.success(t.crm.actividades.visitaProgramada);
+    toast.success(t.crm.actividades.citaProgramada);
     setCreating(false);
     setProgramarForm({
       vendedor_id: user?.id || "",
@@ -337,6 +358,13 @@ export default function CrmActividades() {
     setEvidenciaFile(null);
   };
 
+  const marcarAtendida = async (id: string) => {
+    const { error } = await supabase.from("crm_actividades").update({ estatus: "completada" }).eq("id", id);
+    if (error) return toast.error(error.message);
+    toast.success(t.crm.actividades.atendida);
+    load();
+  };
+
   const deleteActividad = async (id: string) => {
     if (!confirm(t.crm.actividades.confirmarEliminar)) return;
     const { error } = await supabase.from("crm_actividades").delete().eq("id", id);
@@ -374,6 +402,34 @@ export default function CrmActividades() {
         )}
       </div>
 
+      {miasVencidas.length > 0 && (
+        <div className="rounded-xl border-2 border-red-300 bg-red-50 px-4 py-3 space-y-2">
+          <div className="font-semibold text-red-800 text-sm">{t.crm.actividades.citasVencidas(miasVencidas.length)}</div>
+          {miasVencidas.map((a) => {
+            const cliente = clientes.find((c) => c.id === a.cliente_id);
+            return (
+              <div key={a.id} className="flex items-center justify-between gap-3 rounded-lg bg-white border border-red-200 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-[#1F3864] truncate">
+                    {t.crm.tipoActividad(a.tipo)} · {cliente?.nombre_comercial || t.crm.sinCliente}
+                  </div>
+                  <div className="text-xs text-muted-foreground">{new Date(a.fecha_actividad).toLocaleString()}</div>
+                </div>
+                {a.tipo === "visita" ? (
+                  <Button size="sm" onClick={() => openCompletar(a)} className="h-8 shrink-0 bg-[#1F3864] hover:bg-[#162a4d] text-xs">
+                    {t.crm.actividades.completarVisita}
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => marcarAtendida(a.id)} className="h-8 shrink-0 text-xs">
+                    {t.crm.actividades.marcarAtendida}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <Card className="p-3">
         <div className="relative">
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
@@ -400,6 +456,11 @@ export default function CrmActividades() {
                     {a.tipo === 'visita' && (
                       <div className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${tipoColors[a.tipo]}`}>
                         {t.crm.actividades.visita}
+                      </div>
+                    )}
+                    {citaVencida(a, ahora) && (
+                      <div className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                        {t.crm.actividades.vencida}
                       </div>
                     )}
                   </div>
@@ -429,6 +490,11 @@ export default function CrmActividades() {
                   {a.tipo === 'visita' && a.estatus === 'programada' && (
                     <Button size="sm" onClick={() => openCompletar(a)} className="h-8 px-3 bg-[#1F3864] hover:bg-[#162a4d] text-xs">
                       {t.crm.actividades.completarVisita}
+                    </Button>
+                  )}
+                  {(a.tipo === 'reunion' || a.tipo === 'videollamada') && a.estatus === 'programada' && (
+                    <Button size="sm" variant="outline" onClick={() => marcarAtendida(a.id)} className="h-8 px-3 text-xs">
+                      {t.crm.actividades.marcarAtendida}
                     </Button>
                   )}
                   {a.tipo === 'visita' && a.estatus === 'completada' && (
@@ -555,6 +621,8 @@ export default function CrmActividades() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="visita">{t.crm.tipoActividad("visita")}</SelectItem>
+                  <SelectItem value="reunion">{t.crm.tipoActividad("reunion")}</SelectItem>
+                  <SelectItem value="videollamada">{t.crm.tipoActividad("videollamada")}</SelectItem>
                   <SelectItem value="llamada">{t.crm.tipoActividad("llamada")}</SelectItem>
                   <SelectItem value="whatsapp">{t.crm.tipoActividad("whatsapp")}</SelectItem>
                   <SelectItem value="email">{t.crm.tipoActividad("email")}</SelectItem>
@@ -847,6 +915,7 @@ export default function CrmActividades() {
                   <SelectItem value="email">{t.crm.tipoActividad("email")}</SelectItem>
                   <SelectItem value="whatsapp">{t.crm.tipoActividad("whatsapp")}</SelectItem>
                   <SelectItem value="videollamada">{t.crm.tipoActividad("videollamada")}</SelectItem>
+                  <SelectItem value="reunion">{t.crm.tipoActividad("reunion")}</SelectItem>
                   <SelectItem value="demo">{t.crm.tipoActividad("demo")}</SelectItem>
                   <SelectItem value="nota">{t.crm.tipoActividad("nota")}</SelectItem>
                   <SelectItem value="seguimiento">{t.crm.tipoActividad("seguimiento")}</SelectItem>

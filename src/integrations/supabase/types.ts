@@ -376,6 +376,8 @@ export type Database = {
           duracion_min: number | null
           escala_operacion: string | null
           estatus: string | null
+          agendada: boolean
+          aviso_correo_at: string | null
           evidencia_url: string | null
           fecha_actividad: string
           fecha_proxima: string | null
@@ -419,6 +421,8 @@ export type Database = {
           duracion_min?: number | null
           escala_operacion?: string | null
           estatus?: string | null
+          agendada?: boolean
+          aviso_correo_at?: string | null
           evidencia_url?: string | null
           fecha_actividad?: string
           fecha_proxima?: string | null
@@ -462,6 +466,8 @@ export type Database = {
           duracion_min?: number | null
           escala_operacion?: string | null
           estatus?: string | null
+          agendada?: boolean
+          aviso_correo_at?: string | null
           evidencia_url?: string | null
           fecha_actividad?: string
           fecha_proxima?: string | null

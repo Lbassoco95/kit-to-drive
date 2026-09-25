@@ -66,6 +66,8 @@ describe("explicarError · a qué script apunta cada objeto", () => {
     ["function public.desasignar_motocarro_de_remision(uuid) does not exist", "20260826000003"],
     ["function public.crear_remision_refacciones(uuid, text, text, jsonb) does not exist", "20260923000001"],
     ["column v_almacen_refacciones.stock_disponible does not exist", "20260923000001"],
+    ["column crm_actividades.agendada does not exist", "20260925190000"],
+    ["column crm_actividades.aviso_correo_at does not exist", "20260925190000"],
   ];
 
   for (const [crudo, esperado] of casos) {
