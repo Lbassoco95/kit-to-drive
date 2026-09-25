@@ -135,8 +135,9 @@ describe("almacén libera y la etapa dice en qué área está", () => {
     expect(envioListo({ tipo: "directo", direccion: "Av. Reforma 120, Centro", tipoPago: "contra_entrega" })).toBe(true);
     expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "anticipado", formaPago: "efectivo" })).toBe(true);
     expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "anticipado", formaPago: "otro" })).toBe(false);
-    expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "credito" })).toBe(true);
-    expect(envioListo({ tipo: "directo", direccion: "Av. Reforma 120", tipoPago: "credito", formaPago: "otro" })).toBe(true);
+    expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "anticipado", formaPago: "credito" })).toBe(true);
+    expect(envioListo({ tipo: "directo", direccion: "Av. Reforma 120", tipoPago: "contra_entrega", formaPago: "credito" })).toBe(true);
+    expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "credito", formaPago: "credito" })).toBe(false);
     const moto = readFileSync(join(process.cwd(), "src/pages/Remisiones.tsx"), "utf8");
     const ref = readFileSync(join(process.cwd(), "src/pages/RemisionesRefacciones.tsx"), "utf8");
     expect(moto).not.toContain('value="credito"');

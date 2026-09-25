@@ -1,6 +1,7 @@
--- Crédito en remisiones de refacciones.
--- Ventas puede crearla y dejarla activa a crédito (el cobro queda pendiente).
+-- Crédito como forma de pago en remisiones de refacciones.
+-- Ventas lo elige al crearla y mientras sigue activa. El cobro queda pendiente.
 -- No aplica a remisiones de motocarros. Idempotente.
+-- Si una versión previa de este archivo metió «credito» en tipo_pago, aquí se corrige.
 
 DO $preflight$
 BEGIN
@@ -12,10 +13,22 @@ BEGIN
   END IF;
 END $preflight$;
 
+-- Primero se abre la forma de pago. Si una corrida anterior guardó el crédito
+-- en tipo_pago, se pasa a forma_pago antes de volver a cerrar ese check.
 ALTER TABLE public.remisiones_refacciones DROP CONSTRAINT IF EXISTS remisiones_refacciones_tipo_pago_check;
+ALTER TABLE public.remisiones_refacciones DROP CONSTRAINT IF EXISTS remisiones_refacciones_forma_pago_check;
+ALTER TABLE public.remisiones_refacciones
+  ADD CONSTRAINT remisiones_refacciones_forma_pago_check
+  CHECK (forma_pago IS NULL OR forma_pago IN ('efectivo', 'transferencia', 'credito'));
+
+UPDATE public.remisiones_refacciones
+SET forma_pago = 'credito',
+    tipo_pago = CASE WHEN tipo_pago = 'credito' THEN 'anticipado' ELSE tipo_pago END
+WHERE tipo_pago = 'credito';
+
 ALTER TABLE public.remisiones_refacciones
   ADD CONSTRAINT remisiones_refacciones_tipo_pago_check
-  CHECK (tipo_pago IS NULL OR tipo_pago IN ('anticipado', 'contra_entrega', 'credito'));
+  CHECK (tipo_pago IS NULL OR tipo_pago IN ('anticipado', 'contra_entrega'));
 
 CREATE OR REPLACE FUNCTION public.crear_remision_refacciones(
   _cliente_id UUID,
@@ -70,13 +83,11 @@ BEGIN
   IF v_tipo <> 'recoge' AND (v_dir IS NULL OR char_length(v_dir) < 8) THEN
     RAISE EXCEPTION 'La dirección de entrega es obligatoria para logística';
   END IF;
-  IF v_pago IS NULL OR v_pago NOT IN ('anticipado', 'contra_entrega', 'credito') THEN
-    RAISE EXCEPTION 'Indica si el pago es anticipado, contra entrega o a crédito';
+  IF v_pago IS NULL OR v_pago NOT IN ('anticipado', 'contra_entrega') THEN
+    RAISE EXCEPTION 'Indica si el pago es anticipado o contra entrega';
   END IF;
-  IF v_pago = 'credito' THEN
-    v_forma := NULL;
-  ELSIF v_forma NOT IN ('efectivo', 'transferencia') THEN
-    RAISE EXCEPTION 'La forma de pago es efectivo o transferencia';
+  IF v_forma NOT IN ('efectivo', 'transferencia', 'credito') THEN
+    RAISE EXCEPTION 'La forma de pago es efectivo, transferencia o crédito';
   END IF;
   IF v_desc < 0 OR v_desc > 100 THEN
     RAISE EXCEPTION 'El descuento general va de 0 a 100';
@@ -206,7 +217,7 @@ BEGIN
   JOIN public.almacen_refacciones_productos p ON p.id = ped.producto_id;
 
   v_detalle := CASE
-    WHEN v_pago = 'credito' THEN
+    WHEN v_forma = 'credito' THEN
       'Remisión creada y activada en Ventas a crédito. La existencia queda apartada y el cobro queda pendiente.'
     ELSE
       'Remisión levantada. Envío ' || v_tipo || '. Pago ' || v_forma || '. Existencia apartada.'
@@ -219,7 +230,7 @@ BEGIN
      'Pasó a Almacén para surtir o reportar faltante.',
      auth.uid());
 
-  RETURN jsonb_build_object('id', v_id, 'folio', v_folio, 'tipo_pago', v_pago);
+  RETURN jsonb_build_object('id', v_id, 'folio', v_folio, 'forma_pago', v_forma);
 END;
 $$;
 
@@ -274,13 +285,11 @@ BEGIN
   IF v_tipo <> 'recoge' AND (v_dir IS NULL OR char_length(v_dir) < 8) THEN
     RAISE EXCEPTION 'La dirección de entrega es obligatoria para logística';
   END IF;
-  IF v_pago IS NULL OR v_pago NOT IN ('anticipado', 'contra_entrega', 'credito') THEN
-    RAISE EXCEPTION 'Indica si el pago es anticipado, contra entrega o a crédito';
+  IF v_pago IS NOT NULL AND v_pago NOT IN ('anticipado', 'contra_entrega') THEN
+    RAISE EXCEPTION 'Indica si el pago es anticipado o contra entrega';
   END IF;
-  IF v_pago = 'credito' THEN
-    v_forma := NULL;
-  ELSIF v_forma NOT IN ('efectivo', 'transferencia') THEN
-    RAISE EXCEPTION 'La forma de pago es efectivo o transferencia';
+  IF v_forma NOT IN ('efectivo', 'transferencia', 'credito') THEN
+    RAISE EXCEPTION 'La forma de pago es efectivo, transferencia o crédito';
   END IF;
   IF v_desc < 0 OR v_desc > 100 THEN
     RAISE EXCEPTION 'El descuento general va de 0 a 100';
@@ -310,7 +319,7 @@ BEGIN
   END IF;
 
   v_detalle := CASE
-    WHEN v_pago = 'credito' THEN
+    WHEN v_forma = 'credito' THEN
       'Ventas dejó la remisión activa a crédito. El cobro queda pendiente.'
     ELSE
       'Ventas actualizó envío ' || v_tipo || ', pago ' || v_forma || ' y descuento ' || v_desc || '%.'

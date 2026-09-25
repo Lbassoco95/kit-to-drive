@@ -48,8 +48,8 @@ type Remision = {
   telefono_entrega: string | null;
   paqueteria: string | null;
   guia_envio: string | null;
-  tipo_pago: "anticipado" | "contra_entrega" | "credito" | null;
-  forma_pago: "efectivo" | "transferencia" | null;
+  tipo_pago: "anticipado" | "contra_entrega" | null;
+  forma_pago: "efectivo" | "transferencia" | "credito" | null;
   descuento_pct: number | null;
   pagado: boolean;
   motivo_cancelacion: string | null;
@@ -278,7 +278,7 @@ export default function RemisionesRefacciones() {
                 <div className="flex flex-wrap items-center gap-2">
                   <EtapaBadge etapa={r.etapa} abierta={r.abierta} />
                   <AreaBadge area={r.area_actual} />
-                  {r.tipo_pago === "credito" && (
+                  {r.forma_pago === "credito" && (
                     <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">{tx.credito}</Badge>
                   )}
                 </div>
@@ -318,7 +318,7 @@ export default function RemisionesRefacciones() {
                   <span className="font-mono">{detalle.folio}</span>
                   <EtapaBadge etapa={detalle.etapa} abierta={detalle.abierta} />
                   <AreaBadge area={detalle.area_actual} />
-                  {detalle.tipo_pago === "credito" && (
+                  {detalle.forma_pago === "credito" && (
                     <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-200">
                       {detalle.pagado ? tx.creditoCobrado : tx.credito}
                     </Badge>
@@ -500,8 +500,8 @@ function NuevaRemision({
   const [direccion, setDireccion] = useState("");
   const [contacto, setContacto] = useState("");
   const [telefono, setTelefono] = useState("");
-  const [tipoPago, setTipoPago] = useState<"anticipado" | "contra_entrega" | "credito">("anticipado");
-  const [formaPago, setFormaPago] = useState<"efectivo" | "transferencia">("efectivo");
+  const [tipoPago, setTipoPago] = useState<"anticipado" | "contra_entrega">("anticipado");
+  const [formaPago, setFormaPago] = useState<"efectivo" | "transferencia" | "credito">("efectivo");
   const [descuentoGeneral, setDescuentoGeneral] = useState(0);
   const [seccion, setSeccion] = useState("todas");
   const [guardando, setGuardando] = useState(false);
@@ -619,7 +619,7 @@ function NuevaRemision({
         contacto,
         telefono,
         tipo_pago: tipoPago,
-        forma_pago: tipoPago === "credito" ? null : formaPago,
+        forma_pago: formaPago,
         descuento_pct: descuentoGeneral,
         vendedor_id: clientes.find(c => c.id === clienteId)?.vendedor_id ?? null,
       },
@@ -763,32 +763,30 @@ function NuevaRemision({
             </div>
             <div>
               <Label>{tx.cuandoPago}</Label>
-              <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega" | "credito")}>
+              <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega")}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="anticipado">{tx.anticipado}</SelectItem>
                   <SelectItem value="contra_entrega">{tx.contraEntrega}</SelectItem>
-                  <SelectItem value="credito">{tx.credito}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
-          {tipoPago === "credito" && (
-            <p className="text-xs text-amber-700">{tx.avisoCredito}</p>
-          )}
           <div className="grid gap-3 md:grid-cols-2">
-            {tipoPago !== "credito" && (
             <div>
               <Label>{tx.formaPago}</Label>
-              <Select value={formaPago} onValueChange={v => setFormaPago(v as "efectivo" | "transferencia")}>
+              <Select value={formaPago} onValueChange={v => setFormaPago(v as "efectivo" | "transferencia" | "credito")}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="efectivo">{tx.efectivo}</SelectItem>
                   <SelectItem value="transferencia">{tx.transferencia}</SelectItem>
+                  <SelectItem value="credito">{tx.credito}</SelectItem>
                 </SelectContent>
               </Select>
+              {formaPago === "credito" && (
+                <p className="text-xs text-amber-700 mt-1">{tx.avisoCredito}</p>
+              )}
             </div>
-            )}
             <div>
               <Label>{tx.descuentoGeneral}</Label>
               <Input className="mt-1" type="number" min={0} max={100} value={descuentoGeneral} onChange={e => setDescuentoGeneral(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
@@ -999,7 +997,7 @@ async function descargarPdf(remision: Remision, lineas: Item[]) {
       ${esc(remision.nombre_vendedor || "")} · ${esc(remision.fecha_remision || "")}<br>
       Envío: ${esc(remision.tipo_envio || "")} · ${esc(remision.direccion_entrega || "")}<br>
       ${esc(remision.contacto_entrega || "")} ${esc(remision.telefono_entrega || "")}<br>
-      Pago: ${esc(remision.tipo_pago === "credito" ? "A crédito" : remision.tipo_pago === "contra_entrega" ? "Contra entrega" : remision.tipo_pago === "anticipado" ? "Anticipado" : (remision.tipo_pago || ""))} · ${remision.tipo_pago === "credito" ? (remision.pagado ? "cobrado" : "pendiente") : (remision.pagado ? "Pagado" : "No pagado")}
+      Pago: ${esc(remision.tipo_pago === "contra_entrega" ? "Contra entrega" : remision.tipo_pago === "anticipado" ? "Anticipado" : (remision.tipo_pago || ""))} · ${esc(remision.forma_pago === "credito" ? "Crédito" : remision.forma_pago === "transferencia" ? "Transferencia" : "Efectivo")} · ${remision.forma_pago === "credito" ? (remision.pagado ? "cobrado" : "pendiente") : (remision.pagado ? "Pagado" : "No pagado")}
       ${remision.guia_envio ? `<br>Guía: ${esc(remision.guia_envio)}` : ""}
     </p>
     <table><thead><tr><th>Foto</th><th>Código</th><th>Pieza</th><th>Cant.</th><th>Precio</th><th>Importe</th></tr></thead>
@@ -1063,12 +1061,12 @@ function EnvioPanel({
     await onHecho();
   };
 
-  const esCredito = remision.tipo_pago === "credito";
+  const esCredito = remision.forma_pago === "credito";
   const pagoLabel = esCredito
     ? (remision.pagado ? tx.creditoCobrado : tx.credito)
     : (remision.pagado ? tx.pagado : tx.noPagado);
   const envioLabel = remision.tipo_envio === "directo" ? tx.directo : remision.tipo_envio === "recoge" ? tx.recoge : remision.tipo_envio === "paqueteria" ? tx.paqueteria : "—";
-  const formaLabel = remision.forma_pago === "transferencia" ? tx.transferencia : remision.forma_pago === "efectivo" ? tx.efectivo : "";
+  const formaLabel = esCredito ? tx.credito : remision.forma_pago === "transferencia" ? tx.transferencia : tx.efectivo;
 
   return (
     <section className="rounded-md border p-3 space-y-3 text-sm">
@@ -1097,28 +1095,28 @@ function EnvioPanel({
                 <SelectItem value="recoge">{tx.recoge}</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega" | "credito")}>
+            <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="anticipado">{tx.anticipado}</SelectItem>
                 <SelectItem value="contra_entrega">{tx.contraEntrega}</SelectItem>
-                <SelectItem value="credito">{tx.credito}</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          {tipoPago === "credito" && (
-            <p className="text-xs text-amber-700">{tx.avisoCredito}</p>
-          )}
           <div className="grid gap-2 md:grid-cols-2">
-            {tipoPago !== "credito" && (
-            <Select value={formaPago} onValueChange={v => setFormaPago(v as "efectivo" | "transferencia")}>
+            <div>
+            <Select value={formaPago} onValueChange={v => setFormaPago(v as "efectivo" | "transferencia" | "credito")}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="efectivo">{tx.efectivo}</SelectItem>
                 <SelectItem value="transferencia">{tx.transferencia}</SelectItem>
+                <SelectItem value="credito">{tx.credito}</SelectItem>
               </SelectContent>
             </Select>
+            {formaPago === "credito" && (
+              <p className="text-xs text-amber-700 mt-1">{tx.avisoCredito}</p>
             )}
+            </div>
             <Input type="number" min={0} max={100} value={descuentoGeneral} onChange={e => setDescuentoGeneral(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} placeholder={tx.descuentoGeneral} />
           </div>
           {tipoEnvio !== "recoge" && <Textarea value={direccion} onChange={e => setDireccion(e.target.value)} />}
@@ -1132,7 +1130,7 @@ function EnvioPanel({
               _remision_id: remision.id,
               _envio: {
                 tipo_envio: tipoEnvio, direccion, contacto, telefono, tipo_pago: tipoPago,
-                forma_pago: tipoPago === "credito" ? null : formaPago, descuento_pct: descuentoGeneral,
+                forma_pago: formaPago, descuento_pct: descuentoGeneral,
               },
             }));
           }}>{tx.guardarEnvio}</Button>

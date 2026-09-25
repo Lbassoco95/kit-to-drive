@@ -284,7 +284,7 @@ WITH esperado(script, objeto) AS (VALUES
 
   ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.motivo_cancelacion'),
   ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.cancelada_at'),
-  ('20260925193000_refacciones_pago_credito',        'restriccion|remisiones_refacciones.remisiones_refacciones_tipo_pago_check|credito'),
+  ('20260925193000_refacciones_pago_credito',        'restriccion|remisiones_refacciones.remisiones_refacciones_forma_pago_check|credito'),
   ('20260925193000_refacciones_pago_credito',        'funcion|crear_remision_refacciones(uuid,text,text,jsonb,jsonb)|a crédito'),
   ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.forma_pago'),
   ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.descuento_pct'),

@@ -32,7 +32,7 @@ describe("explicarError", () => {
 
   it("el crédito de refacciones señala el script nuevo si la base aún no lo acepta", () => {
     const msg = explicarError(
-      { code: "P0001", message: "Indica si el pago es anticipado o contra entrega" },
+      { code: "P0001", message: "La forma de pago es efectivo o transferencia" },
       "x",
     );
     expect(msg).toContain("20260925193000_refacciones_pago_credito.sql");

@@ -1161,7 +1161,7 @@ export const zh = {
     contraEntrega: "货到付款",
     credito: "赊销",
     creditoCobrado: "赊销已收",
-    avisoCredito: "开单即按赊销生效。仓库可以出库，货款待收。",
+    avisoCredito: "付款方式为赊销。单据保持有效，货款待收。",
     envioIncompleto: "请填写配送和付款时点；若非客户自提，地址至少 8 个字符",
     pagado: "已付款",
     noPagado: "未付款",
