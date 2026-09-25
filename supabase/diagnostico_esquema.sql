@@ -304,6 +304,15 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260925000001_remision_refacciones_seguimiento', 'restriccion|almacen_refacciones_productos.almacen_refacciones_productos_stock_no_negativo|stock >= 0'),
   ('20260925000001_remision_refacciones_seguimiento', 'restriccion|inventario_colores.inventario_colores_disponible_no_negativo|cantidad_disponible >= 0'),
 
+  -- Trigger de inventarios: cada tabla revisa sólo su propio campo.
+  ('20260925000005_inventario_trigger_sin_campo_ajeno', 'funcion|impedir_inventario_negativo()|almacen_refacciones_productos'),
+
+  -- Hardening de seguridad (profiles, RLS clientes/proveedores, storage).
+  ('20260925170000_security_hardening_criticos',     'columna|profiles.debe_cambiar_password'),
+
+  -- Kardex de stock de refacciones: a quién se envió y cómo baja.
+  ('20260925180000_vista_movimientos_stock_refacciones', 'vista|v_almacen_refacciones_movimientos'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
