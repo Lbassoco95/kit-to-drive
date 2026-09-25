@@ -1,7 +1,7 @@
 -- =============================================================================
 -- USUARIOS DEMO - Grupo Dazon Kit-to-Drive
 -- Ejecutar DESPUÉS de crear los usuarios en Supabase Authentication > Users
--- Contraseña para todos: Dazon2026!
+-- con contraseñas únicas (NO documentar passwords en este repo).
 -- =============================================================================
 
 -- 1) Perfiles

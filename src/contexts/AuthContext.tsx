@@ -96,11 +96,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const cambio = permsRef.current !== null && permsRef.current !== firma;
     permsRef.current = firma;
 
-    const { data: p } = await supabase.from("profiles").select("nombre_completo, activo").eq("id", uid).maybeSingle();
+    const { data: p } = await supabase
+      .from("profiles")
+      .select("nombre_completo, activo, debe_cambiar_password")
+      .eq("id", uid)
+      .maybeSingle();
     setProfileName(p?.nombre_completo ?? "");
     // Igual que en la base (`usuario_activo`): sólo cuenta como baja el FALSE
     // explícito. Un perfil ausente o nulo no deja a nadie fuera.
     setActivo(p?.activo !== false);
+    // Flag de servidor (columna protegida + app_metadata). user_metadata ya no manda.
+    if ((p as { debe_cambiar_password?: boolean | null } | null)?.debe_cambiar_password === true) {
+      setRequiresPasswordChange(true);
+    }
 
     // Sólo se avisa en las revisiones automáticas, no en el arranque de sesión.
     if (cambio && notificar) {
@@ -121,20 +129,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const changePassword = async (newPassword: string) => {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-      data: { must_change_password: false },
+    // 1) Cambia la contraseña. NO confiamos en user_metadata (editable por el cliente).
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { error };
+
+    // 2) Edge Function (service_role) limpia app_metadata + profiles.debe_cambiar_password.
+    const { error: clearErr } = await supabase.functions.invoke("complete-password-change", {
+      method: "POST",
+      body: {},
     });
-    if (!error) {
-      setRequiresPasswordChange(false);
-      await supabase.auth.refreshSession();
+    if (clearErr) {
+      return { error: new Error(clearErr.message || "No se pudo confirmar el cambio de contraseña") };
     }
-    return { error };
+
+    setRequiresPasswordChange(false);
+    await supabase.auth.refreshSession();
+    return { error: null };
   };
 
   useEffect(() => {
     const checkMustChange = (u: User | null) => {
-      setRequiresPasswordChange(!!u?.user_metadata?.must_change_password);
+      // Solo app_metadata (Admin API). user_metadata.must_change_password se ignora.
+      setRequiresPasswordChange(!!u?.app_metadata?.must_change_password);
     };
 
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {

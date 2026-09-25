@@ -2,17 +2,11 @@
 -- USUARIOS EQUIPO GRUPO DAZON — Kit-to-Drive
 -- =============================================================================
 -- PASO 1: Crear cada usuario en Supabase Authentication > Users > Add user
---         Usar los correos y contraseñas de la tabla de credenciales.
---         Marcar "Auto Confirm User" para que no requieran verificación de email.
+--         con correo corporativo y contraseña ÚNICA entregada por canal seguro
+--         (1Password / reset por correo). NUNCA documentar passwords aquí.
+--         Marcar "Auto Confirm User".
 --
 -- PASO 2: Ejecutar este SQL en Supabase SQL Editor
---
--- Credenciales (guardar en lugar seguro):
---   lee@dazon.demo          Contraseña: ver credenciales_individuales/
---   marco@dazon.demo        Contraseña: ver credenciales_individuales/
---   anakaren@dazon.demo     Contraseña: ver credenciales_individuales/
---   edgar@dazon.demo        Contraseña: ver credenciales_individuales/
---   erika@dazon.demo        Contraseña: ver credenciales_individuales/
 -- =============================================================================
 
 -- 1) Perfiles

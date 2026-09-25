@@ -30,6 +30,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 import { BandejaAvisos } from "@/components/BandejaAvisos";
+import { sanitizeStorageBasename } from "@/lib/storagePaths";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
 // Los modelos se leen del catálogo (ver cargarModelosMotocarro); esta lista
@@ -761,7 +762,7 @@ export default function Remisiones() {
     }
 
     if (formFile&&nueva?.id) {
-      const path=`${nueva.id}/${Date.now()}_${formFile.name}`;
+      const path=`${nueva.id}/${Date.now()}_${sanitizeStorageBasename(formFile.name)}`;
       const { error:upErr } = await supabase.storage.from("remisiones-docs").upload(path, formFile);
       if (!upErr) await supabase.from("remisiones").update({ documento_url:path }).eq("id",nueva.id);
     }
@@ -799,7 +800,7 @@ export default function Remisiones() {
   };
 
   const subirPdf = async (r:any, file:File) => {
-    const path=`${r.id}/${Date.now()}_${file.name}`;
+    const path=`${r.id}/${Date.now()}_${sanitizeStorageBasename(file.name)}`;
     const { error } = await supabase.storage.from("remisiones-docs").upload(path,file);
     if (error) return toast.error(error.message);
     await supabase.from("remisiones").update({documento_url:path}).eq("id",r.id);
@@ -818,7 +819,7 @@ export default function Remisiones() {
   const confirmarPago = async () => {
     if (!pagoDialog||!comprobanteFile) { toast.error(t.pago.sinComprobante); return; }
     setSubiendoPago(true);
-    const path=`${pagoDialog.id}/comprobante_${Date.now()}_${comprobanteFile.name}`;
+    const path=`${pagoDialog.id}/comprobante_${Date.now()}_${sanitizeStorageBasename(comprobanteFile.name)}`;
     const { error:upErr } = await supabase.storage.from("remisiones-docs").upload(path,comprobanteFile);
     if (upErr) { setSubiendoPago(false); return toast.error(upErr.message); }
     const { error } = await supabase.from("remisiones").update({pagado:true,comprobante_pago_url:path}).eq("id",pagoDialog.id);

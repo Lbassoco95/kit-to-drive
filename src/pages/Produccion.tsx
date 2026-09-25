@@ -21,6 +21,7 @@ import { InventarioStatus } from "@/components/InventarioStatus";
 import { BandejaAvisos } from "@/components/BandejaAvisos";
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { ContenedorPartes } from "@/components/ContenedorPartes";
+import { isAbsoluteHttpUrl, storageExtFromFile } from "@/lib/storagePaths";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
@@ -57,7 +58,15 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
       .select("*, profiles(nombre_completo)")
       .eq("motocarro_id", motocarroId)
       .order("created_at", { ascending: true });
-    setComments(data ?? []);
+    const rows = data ?? [];
+    const resolved = await Promise.all(rows.map(async (c) => {
+      if (!c.foto_url || isAbsoluteHttpUrl(c.foto_url)) return c;
+      const { data: signed } = await supabase.storage
+        .from("comentarios-fotos")
+        .createSignedUrl(c.foto_url, 120);
+      return { ...c, foto_url: signed?.signedUrl ?? null };
+    }));
+    setComments(resolved);
     setLoading(false);
   };
 
@@ -68,12 +77,12 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
     setSending(true);
     let foto_url: string | null = null;
     if (foto) {
-      const ext = foto.name.split(".").pop();
+      const ext = storageExtFromFile(foto, "jpg");
       const path = `${motocarroId}/${Date.now()}.${ext}`;
       const { error: uploadErr } = await supabase.storage.from("comentarios-fotos").upload(path, foto);
       if (!uploadErr) {
-        const { data } = supabase.storage.from("comentarios-fotos").getPublicUrl(path);
-        foto_url = data?.publicUrl ?? null;
+        // Guardar path del bucket (privado); la UI firma la URL al mostrar.
+        foto_url = path;
       }
     }
     const { error } = await supabase.from("comentarios_motocarros").insert({

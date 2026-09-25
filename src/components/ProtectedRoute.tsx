@@ -27,8 +27,17 @@ function SinAcceso({ icono, titulo, detalle }: { icono: JSX.Element; titulo: str
   );
 }
 
-export default function ProtectedRoute({ children, modulo }: { children: JSX.Element; modulo?: Modulo }) {
-  const { user, area, nivel, perms, activo, loading } = useAuth();
+export default function ProtectedRoute({
+  children,
+  modulo,
+  requireRefacciones,
+}: {
+  children: JSX.Element;
+  modulo?: Modulo;
+  /** Allowlist del módulo Almacén / remisiones de refacciones. */
+  requireRefacciones?: boolean;
+}) {
+  const { user, area, nivel, perms, activo, loading, puedeVerRefacciones } = useAuth();
   const { t } = useLang();
   const loc = useLocation();
 
@@ -58,6 +67,10 @@ export default function ProtectedRoute({ children, modulo }: { children: JSX.Ele
         detalle={t.componentes.acceso.sinPermisosDetalle}
       />
     );
+  }
+
+  if (requireRefacciones && !puedeVerRefacciones) {
+    return <Navigate to="/" replace />;
   }
 
   if (modulo && !perms.puedeVer(modulo)) return <Navigate to="/" replace />;

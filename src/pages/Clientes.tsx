@@ -14,6 +14,7 @@ import { useLang } from "@/contexts/LangContext";
 import { toast } from "sonner";
 import { cargarClientes, displayCliente } from "@/lib/catalogoClientes";
 import { explicarError } from "@/lib/dazon";
+import { isAbsoluteHttpUrl, sanitizeStorageBasename } from "@/lib/storagePaths";
 import { Plus, Pencil, Search, Phone, MapPin, Bike, Truck, FileText, Upload, Eye, X, Archive, RotateCcw, MessageSquare, History, AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function Clientes() {
@@ -189,27 +190,25 @@ export default function Clientes() {
     if (!selectedCliente) return;
     setUploadingDoc(tipo);
     try {
-      const fileName = `${selectedCliente.id}/${tipo}_${Date.now()}`;
+      const safe = sanitizeStorageBasename(file.name);
+      const fileName = `${selectedCliente.id}/${tipo}_${Date.now()}_${safe}`;
       const { error: uploadError } = await supabase.storage
         .from("clientes-docs")
         .upload(fileName, file);
       
       if (uploadError) throw uploadError;
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from("clientes-docs")
-        .getPublicUrl(fileName);
-      
+
+      // Guardar path (bucket privado); verDocumento firma la URL.
       const urlField = `doc_${tipo}_url` as keyof any;
       const { error: updateError } = await supabase
         .from("clientes")
-        .update({ [urlField]: publicUrl } as any)
+        .update({ [urlField]: fileName } as any)
         .eq("id", selectedCliente.id);
       
       if (updateError) throw updateError;
       
       toast.success(t.clientes.documentoSubido);
-      setSelectedCliente(prev => ({ ...prev, [urlField]: publicUrl }));
+      setSelectedCliente(prev => ({ ...prev, [urlField]: fileName }));
       load();
     } catch (error: any) {
       toast.error(t.clientes.errorSubir + ": " + error.message);
@@ -218,8 +217,19 @@ export default function Clientes() {
     }
   };
 
-  const viewDocumento = (url: string) => {
-    window.open(url, '_blank');
+  const viewDocumento = async (urlOrPath: string) => {
+    if (isAbsoluteHttpUrl(urlOrPath)) {
+      window.open(urlOrPath, "_blank");
+      return;
+    }
+    const { data, error } = await supabase.storage
+      .from("clientes-docs")
+      .createSignedUrl(urlOrPath, 120);
+    if (error || !data?.signedUrl) {
+      toast.error(error?.message || "No se pudo abrir el documento");
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
   };
 
   const archiveCliente = async (cliente: any) => {

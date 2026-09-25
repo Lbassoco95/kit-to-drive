@@ -6,7 +6,8 @@
 --   1. En Supabase Dashboard → Authentication → Users:
 --      Crear cada usuario con "Invite User" o "Add User".
 --      Usar los correos exactamente como aparecen abajo.
---      Contraseña sugerida: DazonProd2026! (pídele a cada usuario que la cambie al entrar)
+--      Contraseña: generar una única por usuario y entregarla por canal seguro.
+--      Forzar cambio al primer inicio (debe_cambiar_password / app_metadata).
 --
 --   2. Sustituye los valores PLACEHOLDER antes de ejecutar:
 --        NOMBRE_FABRICA_1 / EMAIL_FABRICA_1 → nombre y correo real
