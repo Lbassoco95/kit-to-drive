@@ -6,7 +6,9 @@ import { cargarClientes, type ClienteCatalogo } from "@/lib/catalogoClientes";
 import { explicarError, fmtDate } from "@/lib/dazon";
 import {
   PASOS_REMISION_REFACCION,
+  envioListo,
   faltantesDePedido,
+  puedeMarcarEntregada,
   type EtapaRefaccion,
   type EstatusLineaRefaccion,
   type PasoRemisionRefaccion,
@@ -20,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Boxes, Plus, Search, TriangleAlert, Warehouse } from "lucide-react";
+import { Boxes, Download, Plus, Search, TriangleAlert, Truck, Warehouse } from "lucide-react";
 
 type Etapa = EtapaRefaccion;
 type EstatusLinea = EstatusLineaRefaccion;
@@ -34,9 +36,20 @@ type Remision = {
   fecha_remision: string | null;
   notas: string | null;
   etapa: Etapa;
-  area_actual: "ventas" | "almacen";
+  area_actual: "ventas" | "almacen" | "logistica";
   abierta: boolean;
+  created_by: string | null;
   created_at: string;
+  tipo_envio: "paqueteria" | "directo" | null;
+  direccion_entrega: string | null;
+  contacto_entrega: string | null;
+  telefono_entrega: string | null;
+  paqueteria: string | null;
+  guia_envio: string | null;
+  tipo_pago: "anticipado" | "contra_entrega" | null;
+  pagado: boolean;
+  nota_pago: string | null;
+  entregada_at: string | null;
   clientes?: {
     codigo_erp?: string | null;
     folio_interno?: string | null;
@@ -63,7 +76,7 @@ type Item = {
 type Evento = {
   id: string;
   etapa: string | null;
-  area: "ventas" | "almacen";
+  area: "ventas" | "almacen" | "logistica" | "finanzas";
   accion: string;
   detalle: string | null;
   created_at: string;
@@ -80,6 +93,7 @@ type Producto = {
   stock_bloqueado?: number | null;
   stock_disponible?: number | null;
   visible_venta: boolean;
+  foto_url?: string | null;
 };
 
 type Borrador = {
@@ -90,6 +104,9 @@ type Borrador = {
   cantidad: number;
   disponible: number;
 };
+
+const CAMPOS_REMISION =
+  "id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_by, created_at, tipo_envio, direccion_entrega, contacto_entrega, telefono_entrega, paqueteria, guia_envio, tipo_pago, pagado, nota_pago, entregada_at, clientes(codigo_erp, folio_interno, nombre_comercial)";
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -107,10 +124,12 @@ export default function RemisionesRefacciones() {
   const puedeEntrar = perms.puedeVer("remisiones") || !!puedeVerRefacciones;
   const puedeCapturar = area === "comercial" || !!perms.esAdminGlobal;
   const puedeAlmacen = !!puedeVerRefacciones || !!perms.esAdminGlobal;
+  const puedeLogistica = area === "almacen_logistica" || !!perms.esAdminGlobal;
+  const puedeFinanzas = area === "administracion" || !!perms.esAdminGlobal;
 
   const [rows, setRows] = useState<Remision[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"curso" | "contingencia" | "surtida" | "cancelada">("curso");
+  const [tab, setTab] = useState<"curso" | "contingencia" | "logistica" | "entregada" | "cancelada">("curso");
   const [open, setOpen] = useState(false);
   const [detalle, setDetalle] = useState<Remision | null>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -120,7 +139,7 @@ export default function RemisionesRefacciones() {
     setLoading(true);
     const { data, error } = await supabase
       .from("remisiones_refacciones" as any)
-      .select("id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_at, clientes(codigo_erp, folio_interno, nombre_comercial)")
+      .select(CAMPOS_REMISION)
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) {
@@ -137,9 +156,10 @@ export default function RemisionesRefacciones() {
   }, [puedeEntrar, load]);
 
   const visibles = useMemo(() => rows.filter(r => {
-    if (tab === "curso") return r.abierta;
+    if (tab === "curso") return r.abierta || r.etapa === "almacen";
     if (tab === "contingencia") return r.etapa === "contingencia";
-    if (tab === "surtida") return r.etapa === "surtida";
+    if (tab === "logistica") return r.etapa === "logistica" || r.etapa === "surtida";
+    if (tab === "entregada") return r.etapa === "entregada";
     return r.etapa === "cancelada";
   }), [rows, tab]);
 
@@ -161,7 +181,7 @@ export default function RemisionesRefacciones() {
     if (!detalle) return;
     const { data } = await supabase
       .from("remisiones_refacciones" as any)
-      .select("id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_at, clientes(codigo_erp, folio_interno, nombre_comercial)")
+      .select(CAMPOS_REMISION)
       .eq("id", detalle.id)
       .maybeSingle();
     if (data) await abrir(data as unknown as Remision);
@@ -170,7 +190,7 @@ export default function RemisionesRefacciones() {
   const puedeCancelar = (r: Remision) => {
     if (!puedeCapturar || !r.abierta) return false;
     if (perms.esAdminGlobal || nivel !== "operador") return true;
-    return r.vendedor_id === user?.id;
+    return r.vendedor_id === user?.id || r.created_by === user?.id;
   };
 
   if (!puedeEntrar) {
@@ -205,7 +225,8 @@ export default function RemisionesRefacciones() {
         {([
           ["curso", tx.tabCurso],
           ["contingencia", tx.tabContingencia],
-          ["surtida", tx.tabSurtidas],
+          ["logistica", tx.tabLogistica],
+          ["entregada", tx.tabEntregadas],
           ["cancelada", tx.tabCanceladas],
         ] as const).map(([id, label]) => (
           <Button key={id} variant={tab === id ? "default" : "outline"} onClick={() => setTab(id)}>
@@ -264,6 +285,21 @@ export default function RemisionesRefacciones() {
                 {clienteLabel(detalle.clientes)} · {fmtDate(detalle.fecha_remision)} · {detalle.nombre_vendedor || "—"}
               </div>
               {detalle.notas && <p className="text-sm">{detalle.notas}</p>}
+              {detalle.etapa === "contingencia" && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{tx.avisoFaltante}</p>
+              )}
+              <EnvioPanel
+                remision={detalle}
+                puedeEditar={puedeCancelar(detalle) || (puedeCapturar && detalle.etapa !== "entregada" && detalle.etapa !== "cancelada" && (perms.esAdminGlobal || nivel !== "operador" || detalle.created_by === user?.id || detalle.vendedor_id === user?.id))}
+                puedeLogistica={puedeLogistica}
+                puedeFinanzas={puedeFinanzas}
+                onHecho={refrescarDetalle}
+              />
+              <HistorialCliente clienteId={detalle.cliente_id} actualId={detalle.id} />
+              <Button variant="outline" onClick={() => { void descargarPdf(detalle, items); }}>
+                <Download className="h-4 w-4 mr-2" />
+                {tx.descargarPdf}
+              </Button>
 
               <div className="space-y-3">
                 {items.map(it => (
@@ -307,7 +343,8 @@ export default function RemisionesRefacciones() {
 function EtapaBadge({ etapa, abierta }: { etapa: Etapa; abierta: boolean }) {
   const { t } = useLang();
   const tono =
-    etapa === "surtida" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+    etapa === "surtida" || etapa === "entregada" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+    etapa === "logistica" ? "bg-sky-100 text-sky-800 border-sky-200" :
     etapa === "contingencia" ? "bg-amber-100 text-amber-800 border-amber-200" :
     etapa === "cancelada" ? "bg-slate-100 text-slate-700 border-slate-200" :
     "bg-indigo-100 text-indigo-800 border-indigo-200";
@@ -319,14 +356,23 @@ function EtapaBadge({ etapa, abierta }: { etapa: Etapa; abierta: boolean }) {
   );
 }
 
-function AreaBadge({ area }: { area: "ventas" | "almacen" }) {
+function AreaBadge({ area }: { area: Remision["area_actual"] | Evento["area"] }) {
   const { t } = useLang();
   const tx = t.remisionesRefacciones;
-  const esAlmacen = area === "almacen";
+  const etiqueta =
+    area === "almacen" ? tx.areaAlmacen :
+    area === "logistica" ? tx.areaLogistica :
+    area === "finanzas" ? tx.areaFinanzas :
+    tx.areaVentas;
+  const tono =
+    area === "almacen" ? "bg-indigo-50 text-indigo-800" :
+    area === "logistica" ? "bg-sky-50 text-sky-800" :
+    area === "finanzas" ? "bg-violet-50 text-violet-800" :
+    "bg-teal-50 text-teal-800";
   return (
-    <Badge variant="outline" className={esAlmacen ? "bg-indigo-50 text-indigo-800" : "bg-teal-50 text-teal-800"}>
-      {esAlmacen ? <Warehouse className="h-3 w-3 mr-1" /> : null}
-      {tx.enArea(esAlmacen ? tx.areaAlmacen : tx.areaVentas)}
+    <Badge variant="outline" className={tono}>
+      {area === "almacen" ? <Warehouse className="h-3 w-3 mr-1" /> : area === "logistica" ? <Truck className="h-3 w-3 mr-1" /> : null}
+      {tx.enArea(etiqueta)}
     </Badge>
   );
 }
@@ -342,9 +388,15 @@ function marcaPaso(etapa: Etapa, paso: PasoRemisionRefaccion): "hecho" | "aqui" 
     if (paso === "contingencia") return "aqui";
     return "pendiente";
   }
-  if (etapa === "surtida") {
+  if (etapa === "surtida" || etapa === "logistica") {
     if (paso === "contingencia") return "omitido";
-    if (paso === "surtida") return "aqui";
+    if (paso === "logistica") return "aqui";
+    if (paso === "entregada") return "pendiente";
+    return "hecho";
+  }
+  if (etapa === "entregada") {
+    if (paso === "contingencia") return "omitido";
+    if (paso === "entregada") return "aqui";
     return "hecho";
   }
   return "pendiente";
@@ -392,6 +444,11 @@ function NuevaRemision({
   const [qProd, setQProd] = useState("");
   const [lineas, setLineas] = useState<Borrador[]>([]);
   const [notas, setNotas] = useState("");
+  const [tipoEnvio, setTipoEnvio] = useState<"paqueteria" | "directo">("paqueteria");
+  const [direccion, setDireccion] = useState("");
+  const [contacto, setContacto] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [tipoPago, setTipoPago] = useState<"anticipado" | "contra_entrega">("anticipado");
   const [guardando, setGuardando] = useState(false);
   const [catalogoListo, setCatalogoListo] = useState(false);
 
@@ -403,7 +460,7 @@ function NuevaRemision({
       setClientes(res.data.filter(c => c.activo !== false));
       const { data, error } = await supabase
         .from("v_almacen_refacciones" as any)
-        .select("id, codigo_nuevo, codigo_antiguo, descripcion, descripcion_corta, precio, stock, stock_bloqueado, stock_disponible, visible_venta")
+        .select("id, codigo_nuevo, codigo_antiguo, descripcion, descripcion_corta, precio, stock, stock_bloqueado, stock_disponible, visible_venta, foto_url")
         .eq("visible_venta", true)
         .order("codigo_nuevo")
         .limit(5000);
@@ -415,6 +472,7 @@ function NuevaRemision({
 
   const reset = () => {
     setClienteId(""); setQCliente(""); setQProd(""); setLineas([]); setNotas("");
+    setTipoEnvio("paqueteria"); setDireccion(""); setContacto(""); setTelefono(""); setTipoPago("anticipado");
     setCatalogoListo(false);
   };
 
@@ -469,6 +527,10 @@ function NuevaRemision({
 
   const guardar = async () => {
     if (!clienteId) { toast.error(tx.seleccionaCliente); return; }
+    if (!envioListo({ tipo: tipoEnvio, direccion, tipoPago })) {
+      toast.error(tx.envioIncompleto);
+      return;
+    }
     const faltan = faltantesDePedido(lineas.map(l => ({
       productoId: l.productoId,
       cantidad: l.cantidad,
@@ -488,6 +550,14 @@ function NuevaRemision({
       _notas: notas,
       _nombre_vendedor: vendedor || null,
       _items: lineas.map(l => ({ producto_id: l.productoId, cantidad: l.cantidad })),
+      _envio: {
+        tipo_envio: tipoEnvio,
+        direccion,
+        contacto,
+        telefono,
+        tipo_pago: tipoPago,
+        vendedor_id: clientes.find(c => c.id === clienteId)?.vendedor_id ?? null,
+      },
     });
     setGuardando(false);
     if (error) { toast.error(explicarError(error, tx.errorCrear)); return; }
@@ -509,7 +579,14 @@ function NuevaRemision({
             <Label>{tx.cliente}</Label>
             <Input className="mt-1" value={qCliente} onChange={e => setQCliente(e.target.value)} placeholder={tx.buscarCliente} />
             {catalogoListo && clientesFiltrados.length > 0 ? (
-              <Select value={clienteId || undefined} onValueChange={setClienteId}>
+              <Select value={clienteId || undefined} onValueChange={id => {
+              setClienteId(id);
+              const c = clientes.find(x => x.id === id);
+              const extra = c as (ClienteCatalogo & { direccion?: string | null; nombre_contacto?: string | null; telefono?: string | null }) | undefined;
+              if (extra?.direccion) setDireccion(extra.direccion);
+              if (extra?.nombre_contacto) setContacto(extra.nombre_contacto);
+              if (extra?.telefono) setTelefono(extra.telefono);
+            }}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder={tx.seleccionaCliente} /></SelectTrigger>
                 <SelectContent>
                   {clientesFiltrados.map(c => (
@@ -578,6 +655,42 @@ function NuevaRemision({
             </div>
           )}
 
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>{tx.envio}</Label>
+              <Select value={tipoEnvio} onValueChange={v => setTipoEnvio(v as "paqueteria" | "directo")}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paqueteria">{tx.paqueteria}</SelectItem>
+                  <SelectItem value="directo">{tx.directo}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{tx.tipoPago}</Label>
+              <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega")}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anticipado">{tx.anticipado}</SelectItem>
+                  <SelectItem value="contra_entrega">{tx.contraEntrega}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label>{tx.direccion}</Label>
+            <Textarea className="mt-1" value={direccion} onChange={e => setDireccion(e.target.value)} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <Label>{tx.contacto}</Label>
+              <Input className="mt-1" value={contacto} onChange={e => setContacto(e.target.value)} />
+            </div>
+            <div>
+              <Label>{tx.telefono}</Label>
+              <Input className="mt-1" value={telefono} onChange={e => setTelefono(e.target.value)} />
+            </div>
+          </div>
           <div>
             <Label>{tx.notas}</Label>
             <Textarea className="mt-1" value={notas} onChange={e => setNotas(e.target.value)} />
@@ -712,6 +825,259 @@ function CancelarRemision({ id, onHecho }: { id: string; onHecho: () => Promise<
         await onHecho();
       }}>{tx.cancelarRemision}</Button>
     </div>
+  );
+}
+
+async function descargarPdf(remision: Remision, lineas: Item[]) {
+  const ids = lineas.map(it => it.producto_id);
+  const fotos = new Map<string, string>();
+  if (ids.length) {
+    const { data } = await supabase
+      .from("v_almacen_refacciones" as any)
+      .select("id, foto_url")
+      .in("id", ids);
+    for (const row of (data as { id: string; foto_url: string | null }[] | null) ?? []) {
+      if (row.foto_url) fotos.set(row.id, row.foto_url);
+    }
+  }
+  const filas = lineas.map(it => {
+    const foto = fotos.get(it.producto_id);
+    const importe = (it.precio_unitario ?? 0) * it.cantidad;
+    return `<tr>
+      <td>${foto ? `<img src="${esc(foto)}" alt="" width="48" height="48">` : "—"}</td>
+      <td>${esc(it.codigo_nuevo)}</td>
+      <td>${esc(it.descripcion)}</td>
+      <td class="num">${it.cantidad}</td>
+      <td class="num">${esc(money(it.precio_unitario))}</td>
+      <td class="num">${esc(money(importe))}</td>
+    </tr>`;
+  }).join("");
+  const total = lineas.reduce((s, it) => s + (it.precio_unitario ?? 0) * it.cantidad, 0);
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(remision.folio)}</title>
+    <style>
+      body { font-family: Arial, sans-serif; color: #1F3864; margin: 32px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+      th, td { border: 1px solid #d0d7e2; padding: 6px 8px; font-size: 12px; text-align: left; }
+      th { background: #1F3864; color: white; }
+      .num { text-align: right; }
+      .meta { font-size: 13px; color: #334155; }
+      @media print { button { display: none; } }
+    </style></head><body>
+    <button onclick="print()">Imprimir / Guardar PDF</button>
+    <h1>Remisión de refacciones ${esc(remision.folio)}</h1>
+    <p class="meta">${esc(clienteLabel(remision.clientes))}<br>
+      ${esc(remision.nombre_vendedor || "")} · ${esc(remision.fecha_remision || "")}<br>
+      Envío: ${esc(remision.tipo_envio || "")} · ${esc(remision.direccion_entrega || "")}<br>
+      ${esc(remision.contacto_entrega || "")} ${esc(remision.telefono_entrega || "")}<br>
+      Pago: ${esc(remision.tipo_pago || "")} · ${remision.pagado ? "Pagado" : "No pagado"}
+      ${remision.guia_envio ? `<br>Guía: ${esc(remision.guia_envio)}` : ""}
+    </p>
+    <table><thead><tr><th>Foto</th><th>Código</th><th>Pieza</th><th>Cant.</th><th>Precio</th><th>Importe</th></tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot><tr><td colspan="5" class="num"><strong>Total</strong></td><td class="num"><strong>${esc(money(total))}</strong></td></tr></tfoot>
+    </table>
+    <script>onload=function(){setTimeout(function(){print()}, 300)}</script>
+    </body></html>`;
+  const w = window.open("", "_blank", "noopener,noreferrer");
+  if (!w) return;
+  w.document.write(html);
+  w.document.close();
+}
+
+function esc(s: string) {
+  return s.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]!));
+}
+
+function EnvioPanel({
+  remision, puedeEditar, puedeLogistica, puedeFinanzas, onHecho,
+}: {
+  remision: Remision;
+  puedeEditar: boolean;
+  puedeLogistica: boolean;
+  puedeFinanzas: boolean;
+  onHecho: () => Promise<void>;
+}) {
+  const { t } = useLang();
+  const tx = t.remisionesRefacciones;
+  const [direccion, setDireccion] = useState(remision.direccion_entrega || "");
+  const [contacto, setContacto] = useState(remision.contacto_entrega || "");
+  const [telefono, setTelefono] = useState(remision.telefono_entrega || "");
+  const [tipoEnvio, setTipoEnvio] = useState(remision.tipo_envio || "paqueteria");
+  const [tipoPago, setTipoPago] = useState(remision.tipo_pago || "anticipado");
+  const [paqueteria, setPaqueteria] = useState(remision.paqueteria || "");
+  const [guia, setGuia] = useState(remision.guia_envio || "");
+  const [notaPago, setNotaPago] = useState(remision.nota_pago || "");
+  const [ocupado, setOcupado] = useState(false);
+
+  useEffect(() => {
+    setDireccion(remision.direccion_entrega || "");
+    setContacto(remision.contacto_entrega || "");
+    setTelefono(remision.telefono_entrega || "");
+    setTipoEnvio(remision.tipo_envio || "paqueteria");
+    setTipoPago(remision.tipo_pago || "anticipado");
+    setPaqueteria(remision.paqueteria || "");
+    setGuia(remision.guia_envio || "");
+    setNotaPago(remision.nota_pago || "");
+  }, [remision]);
+
+  const correr = async (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null }>) => {
+    setOcupado(true);
+    const { error } = await fn();
+    setOcupado(false);
+    if (error) { toast.error(explicarError(error, tx.errorAccion)); return; }
+    toast.success(tx.okAccion);
+    await onHecho();
+  };
+
+  const pagoLabel = remision.pagado ? tx.pagado : tx.noPagado;
+  const envioLabel = remision.tipo_envio === "directo" ? tx.directo : remision.tipo_envio === "paqueteria" ? tx.paqueteria : "—";
+
+  return (
+    <section className="rounded-md border p-3 space-y-3 text-sm">
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="outline"><Truck className="h-3 w-3 mr-1" />{envioLabel}</Badge>
+        <Badge variant="outline" className={remision.pagado ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}>{pagoLabel}</Badge>
+      </div>
+      <p>{remision.direccion_entrega || "—"}</p>
+      <p className="text-muted-foreground">{[remision.contacto_entrega, remision.telefono_entrega].filter(Boolean).join(" · ") || "—"}</p>
+      {(remision.paqueteria || remision.guia_envio) && (
+        <p>{tx.nombrePaqueteria}: {remision.paqueteria || "—"} · {tx.guia}: {remision.guia_envio || "—"}</p>
+      )}
+      {remision.nota_pago && <p className="text-muted-foreground">{remision.nota_pago}</p>}
+
+      {puedeEditar && remision.etapa !== "entregada" && remision.etapa !== "cancelada" && (
+        <div className="grid gap-2 border-t pt-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            <Select value={tipoEnvio} onValueChange={v => setTipoEnvio(v as "paqueteria" | "directo")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="paqueteria">{tx.paqueteria}</SelectItem>
+                <SelectItem value="directo">{tx.directo}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={tipoPago} onValueChange={v => setTipoPago(v as "anticipado" | "contra_entrega")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="anticipado">{tx.anticipado}</SelectItem>
+                <SelectItem value="contra_entrega">{tx.contraEntrega}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Textarea value={direccion} onChange={e => setDireccion(e.target.value)} />
+          <div className="grid gap-2 md:grid-cols-2">
+            <Input value={contacto} onChange={e => setContacto(e.target.value)} placeholder={tx.contacto} />
+            <Input value={telefono} onChange={e => setTelefono(e.target.value)} placeholder={tx.telefono} />
+          </div>
+          <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
+            if (!envioListo({ tipo: tipoEnvio, direccion, tipoPago })) { toast.error(tx.envioIncompleto); return; }
+            void correr(() => supabase.rpc("actualizar_envio_remision_refaccion" as any, {
+              _remision_id: remision.id,
+              _envio: { tipo_envio: tipoEnvio, direccion, contacto, telefono, tipo_pago: tipoPago },
+            }));
+          }}>{tx.guardarEnvio}</Button>
+        </div>
+      )}
+
+      {puedeLogistica && (remision.etapa === "logistica" || remision.etapa === "surtida") && (
+        <div className="grid gap-2 border-t pt-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            <Input value={paqueteria} onChange={e => setPaqueteria(e.target.value)} placeholder={tx.nombrePaqueteria} />
+            <Input value={guia} onChange={e => setGuia(e.target.value)} placeholder={tx.guia} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={ocupado} onClick={() => correr(() =>
+              supabase.rpc("registrar_guia_remision_refaccion" as any, {
+                _remision_id: remision.id, _paqueteria: paqueteria, _guia: guia,
+              }),
+            )}>{tx.registrarGuia}</Button>
+            <Button size="sm" disabled={ocupado} onClick={() => {
+              if (!puedeMarcarEntregada(remision.etapa === "surtida" ? "logistica" : remision.etapa, remision.tipo_envio, guia)) {
+                toast.error(tx.guiaObligatoria);
+                return;
+              }
+              void correr(() => supabase.rpc("entregar_remision_refaccion" as any, { _remision_id: remision.id }));
+            }}>{tx.entregar}</Button>
+          </div>
+        </div>
+      )}
+
+      {puedeFinanzas && remision.etapa !== "cancelada" && (
+        <div className="grid gap-2 border-t pt-2">
+          <Input value={notaPago} onChange={e => setNotaPago(e.target.value)} placeholder={tx.notaPago} />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" disabled={ocupado} onClick={() => {
+              if (notaPago.trim().length < 3) { toast.error(tx.notaObligatoria); return; }
+              void correr(() => supabase.rpc("marcar_pago_remision_refaccion" as any, {
+                _remision_id: remision.id, _pagado: true, _nota: notaPago.trim(),
+              }));
+            }}>{tx.marcarPagado}</Button>
+            {remision.pagado && (
+              <Button size="sm" variant="outline" disabled={ocupado} onClick={() => correr(() =>
+                supabase.rpc("marcar_pago_remision_refaccion" as any, {
+                  _remision_id: remision.id, _pagado: false, _nota: notaPago.trim(),
+                }),
+              )}>{tx.quitarPago}</Button>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HistorialCliente({ clienteId, actualId }: { clienteId: string; actualId: string }) {
+  const { t } = useLang();
+  const tx = t.remisionesRefacciones;
+  const [top, setTop] = useState<{ codigo: string; descripcion: string; cantidad: number; pedidos: number }[]>([]);
+
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const { data: rems } = await supabase
+        .from("remisiones_refacciones" as any)
+        .select("id")
+        .eq("cliente_id", clienteId)
+        .neq("etapa", "cancelada")
+        .limit(200);
+      const ids = ((rems as { id: string }[] | null) ?? []).map(r => r.id).filter(id => id !== actualId);
+      if (!ids.length) { if (vivo) setTop([]); return; }
+      const { data: its } = await supabase
+        .from("remision_refaccion_items" as any)
+        .select("codigo_nuevo, descripcion, cantidad, remision_id")
+        .in("remision_id", ids);
+      const mapa = new Map<string, { codigo: string; descripcion: string; cantidad: number; pedidos: Set<string> }>();
+      for (const it of (its as { codigo_nuevo: string; descripcion: string; cantidad: number; remision_id: string }[] | null) ?? []) {
+        const prev = mapa.get(it.codigo_nuevo) ?? { codigo: it.codigo_nuevo, descripcion: it.descripcion, cantidad: 0, pedidos: new Set<string>() };
+        prev.cantidad += it.cantidad;
+        prev.pedidos.add(it.remision_id);
+        mapa.set(it.codigo_nuevo, prev);
+      }
+      const lista = [...mapa.values()]
+        .map(v => ({ codigo: v.codigo, descripcion: v.descripcion, cantidad: v.cantidad, pedidos: v.pedidos.size }))
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .slice(0, 5);
+      if (vivo) setTop(lista);
+    })();
+    return () => { vivo = false; };
+  }, [clienteId, actualId]);
+
+  return (
+    <section className="space-y-1">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tx.pedidosCliente}</h3>
+      {top.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{tx.sinHistorial}</p>
+      ) : (
+        <ul className="text-sm space-y-1">
+          {top.map(p => (
+            <li key={p.codigo} className="flex justify-between gap-2">
+              <span className="truncate"><span className="font-mono text-xs">{p.codigo}</span> {p.descripcion}</span>
+              <span className="tabular-nums text-muted-foreground shrink-0">{p.cantidad} · {p.pedidos}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

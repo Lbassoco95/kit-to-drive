@@ -4,10 +4,12 @@ import {
   cancelarApartado,
   confirmarSinExistencia,
   disponibleRefaccion,
+  envioListo,
   etapaDeLineas,
   faltantesDePedido,
   indicePaso,
   liberarLinea,
+  puedeMarcarEntregada,
   reportarFaltante,
   type LineaRefaccion,
 } from "@/lib/remisionesRefacciones";
@@ -23,8 +25,9 @@ const apartada = (cantidad: number, extra: Partial<LineaRefaccion> = {}): LineaR
 
 describe("etapas visibles", () => {
   it("muestra ventas, almacén, contingencia y surtida", () => {
-    expect(PASOS_REMISION_REFACCION).toEqual(["ventas", "almacen", "contingencia", "surtida"]);
+    expect(PASOS_REMISION_REFACCION).toEqual(["ventas", "almacen", "contingencia", "logistica", "entregada"]);
     expect(indicePaso("almacen")).toBe(1);
+    expect(indicePaso("logistica")).toBe(3);
     expect(indicePaso("contingencia")).toBe(2);
     expect(indicePaso("cancelada")).toBe(-1);
   });
@@ -56,12 +59,16 @@ describe("almacén libera y la etapa dice en qué área está", () => {
     expect(efecto.ok).toBe(true);
     if (!efecto.ok) return;
     expect(efecto.stock).toBe(6);
+    expect(efecto.stock).toBeGreaterThanOrEqual(0);
     expect(efecto.linea.cantidad_bloqueada).toBe(0);
     expect(efecto.linea.cantidad_surtida).toBe(4);
     expect(efecto.linea.estatus).toBe("surtida");
     expect(disponibleRefaccion(efecto.stock, efecto.linea.cantidad_bloqueada)).toBe(antes);
     expect(etapaDeLineas([efecto.linea])).toEqual({
-      etapa: "surtida", area: "almacen", abierta: false,
+      etapa: "logistica", area: "logistica", abierta: false,
+    });
+    expect(etapaDeLineas([efecto.linea], { entregada: true })).toEqual({
+      etapa: "entregada", area: "logistica", abierta: false,
     });
   });
 
@@ -108,6 +115,15 @@ describe("almacén libera y la etapa dice en qué área está", () => {
     expect(etapaDeLineas([efecto.linea])).toEqual({
       etapa: "cancelada", area: "ventas", abierta: false,
     });
+  });
+
+  it("logística recibe dirección y la paquetería no se cierra sin guía", () => {
+    expect(envioListo({ tipo: "paqueteria", direccion: "Calle 1", tipoPago: "anticipado" })).toBe(false);
+    expect(envioListo({ tipo: "directo", direccion: "Av. Reforma 120, Centro", tipoPago: "contra_entrega" })).toBe(true);
+    expect(puedeMarcarEntregada("logistica", "paqueteria", "")).toBe(false);
+    expect(puedeMarcarEntregada("logistica", "paqueteria", "GUIDA-1")).toBe(true);
+    expect(puedeMarcarEntregada("logistica", "directo", "")).toBe(true);
+    expect(puedeMarcarEntregada("almacen", "directo", "")).toBe(false);
   });
 
   it("una partida surtida y otra en faltante sigue en almacén, en contingencia", () => {

@@ -8,8 +8,16 @@
  * hacer el mismo cálculo.
  */
 
-export type EtapaRefaccion = "almacen" | "contingencia" | "surtida" | "cancelada";
-export type AreaRemisionRefaccion = "ventas" | "almacen";
+export type EtapaRefaccion =
+  | "almacen"
+  | "contingencia"
+  | "surtida"
+  | "logistica"
+  | "entregada"
+  | "cancelada";
+export type AreaRemisionRefaccion = "ventas" | "almacen" | "logistica" | "finanzas";
+export type TipoEnvioRefaccion = "paqueteria" | "directo";
+export type TipoPagoRefaccion = "anticipado" | "contra_entrega";
 export type EstatusLineaRefaccion =
   | "bloqueada"
   | "surtida"
@@ -25,7 +33,7 @@ export type LineaRefaccion = {
   cantidad_faltante: number;
 };
 
-export const PASOS_REMISION_REFACCION = ["ventas", "almacen", "contingencia", "surtida"] as const;
+export const PASOS_REMISION_REFACCION = ["ventas", "almacen", "contingencia", "logistica", "entregada"] as const;
 export type PasoRemisionRefaccion = (typeof PASOS_REMISION_REFACCION)[number];
 
 /** Lo que otros pedidos pueden tomar: existencia física menos lo apartado. */
@@ -73,11 +81,17 @@ export function faltantesDePedido(lineas: readonly PedidoRefaccion[]): FaltanteP
   return faltantes;
 }
 
+export type CierreRefaccion = { entregada?: boolean };
+
 /**
  * Etapa del encabezado y área donde se ve la remisión.
- * Abierta mientras haya piezas apartadas (en revisión o en contingencia).
+ * Con piezas surtidas y nada apartado, pasa a logística. Si ya se entregó,
+ * el cierre queda en entregada. `surtida` se conserva como alias histórico.
  */
-export function etapaDeLineas(lineas: readonly Pick<LineaRefaccion, "estatus" | "cantidad_surtida">[]): {
+export function etapaDeLineas(
+  lineas: readonly Pick<LineaRefaccion, "estatus" | "cantidad_surtida">[],
+  cierre: CierreRefaccion = {},
+): {
   etapa: EtapaRefaccion;
   area: AreaRemisionRefaccion;
   abierta: boolean;
@@ -92,9 +106,29 @@ export function etapaDeLineas(lineas: readonly Pick<LineaRefaccion, "estatus" | 
 
   if (abierta && hayFaltante) return { etapa: "contingencia", area: "almacen", abierta: true };
   if (abierta) return { etapa: "almacen", area: "almacen", abierta: true };
-  if (haySurtida) return { etapa: "surtida", area: "almacen", abierta: false };
+  if (haySurtida && cierre.entregada) return { etapa: "entregada", area: "logistica", abierta: false };
+  if (haySurtida) return { etapa: "logistica", area: "logistica", abierta: false };
   if (haySin) return { etapa: "contingencia", area: "almacen", abierta: false };
   return { etapa: "cancelada", area: "ventas", abierta: false };
+}
+
+/** La dirección y el medio de envío tienen que ir completos para logística. */
+export function envioListo(envio: {
+  tipo: string;
+  direccion: string;
+  tipoPago: string;
+}): boolean {
+  const dir = envio.direccion.trim();
+  return (envio.tipo === "paqueteria" || envio.tipo === "directo")
+    && dir.length >= 8
+    && (envio.tipoPago === "anticipado" || envio.tipoPago === "contra_entrega");
+}
+
+/** Paquetería no se cierra como entregada sin número de guía. */
+export function puedeMarcarEntregada(etapa: EtapaRefaccion, tipoEnvio: string | null, guia: string | null): boolean {
+  if (etapa !== "logistica") return false;
+  if (tipoEnvio === "paqueteria") return (guia ?? "").trim().length > 0;
+  return true;
 }
 
 /** Índice del paso visible. Cancelada no recorre el resto del camino. */
