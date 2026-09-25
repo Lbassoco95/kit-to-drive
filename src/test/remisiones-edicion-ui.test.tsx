@@ -80,6 +80,45 @@ describe("Remisiones · selector de cliente", () => {
     expect(cuerpo.textContent).not.toContain("El catálogo de clientes está vacío");
   });
 
+  it("deja capturar una venta de sola cabina, sin motocarro", async () => {
+    filas.clientes = [
+      { id: "c1", codigo_erp: "R195", folio_interno: null, nombre_comercial: "Ferretería del Sur" },
+    ];
+    const cuerpo = await dibujar();
+    await act(async () => { fireEvent.click(boton(/Nueva remisión/i)!); });
+
+    expect(cuerpo.textContent).toContain("Con caja montada");
+    await act(async () => { fireEvent.click(boton(/Solo cabina/)!); });
+
+    expect(cuerpo.textContent).toContain("Cabina 1");
+    expect(cuerpo.textContent).toContain("Venta de cabina, sin motocarro");
+    expect(cuerpo.textContent).toContain("Instalación de cabina");
+    expect(cuerpo.textContent).not.toContain("Con caja montada");
+    expect(cuerpo.textContent).not.toContain("Motocarro 1");
+  });
+
+  it("abre la edición de una remisión de sola cabina", async () => {
+    filas.remisiones = [{
+      ...REMISION, tipo_remision: "cabina", total_unidades_solicitadas: 0, motocarros: [],
+    }];
+    filas.clientes = [
+      { id: "c1", codigo_erp: "R195", folio_interno: null, nombre_comercial: "Ferretería del Sur" },
+    ];
+    filas.remision_items = [
+      { id: "c1", remision_id: "r1", tipo_servicio: "cabina", modelo: "200cc 2026", color: null, cantidad: 2, con_caja: false, orden_linea: 0 },
+    ];
+    const cuerpo = await dibujar();
+
+    expect(cuerpo.textContent).toContain("Solo cabina");
+    expect(cuerpo.textContent).toContain("200cc 2026");
+    expect(cuerpo.textContent).not.toContain("chasis asignados");
+    expect(boton(/^\s*Asignar\s*$/)).toBeUndefined();
+
+    await act(async () => { fireEvent.click(boton(/^\s*Editar\s*$/)!); });
+    expect(cuerpo.textContent).toContain("Cabina 1");
+    expect(cuerpo.textContent).not.toContain("Con caja montada");
+  });
+
   it("explica por qué no hay a quién elegir cuando el catálogo llega vacío", async () => {
     const cuerpo = await dibujar();
     await act(async () => { fireEvent.click(boton(/Nueva remisión/i)!); });
