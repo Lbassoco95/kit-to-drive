@@ -13,6 +13,7 @@ import { fmtDate, COLORES, claveStock, explicarError, normColor, normSerial,
          LineaProducto, ModeloInfo } from "@/lib/dazon";
 import { cargarCapacidadColor } from "@/components/ColorChasis";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
+import { remisionEsSoloCabina } from "@/lib/remisionesEdicion";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
@@ -54,6 +55,7 @@ type RemisionCard = {
   cliente: string;
   total_unidades: number;
   asignados: number;
+  tipo_remision: string | null;
   items: any[];
 };
 
@@ -191,6 +193,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         : "—",
       total_unidades: 1,
       asignados: (r.motocarros ?? []).length,
+      tipo_remision: null,
       items: [],
     }));
     setItems(mapped);
@@ -201,7 +204,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     try {
       const { data: ext } = await supabase
         .from("remisiones")
-        .select("id,total_unidades_solicitadas,nombre_vendedor,documento_url,tipo_pago,pagado")
+        .select("id,total_unidades_solicitadas,nombre_vendedor,documento_url,tipo_pago,pagado,tipo_remision")
         .in("id", ids);
       if (ext?.length) {
         const extMap = Object.fromEntries(ext.map((r: any) => [r.id, r]));
@@ -212,6 +215,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           documento_url: extMap[r.id]?.documento_url ?? null,
           tipo_pago: extMap[r.id]?.tipo_pago ?? null,
           pagado: extMap[r.id]?.pagado ?? null,
+          tipo_remision: extMap[r.id]?.tipo_remision ?? null,
         })));
       }
     } catch (_) {}
@@ -734,7 +738,14 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     );
   });
 
-  if (!items.length && !loading) return null;
+  // La venta de sola cabina no espera chasis: no entra a la bandeja de fábrica.
+  const pendientesDeChasis = items.filter(rem => {
+    if (rem.tipo_remision === "cabina") return false;
+    if (rem.items.length && remisionEsSoloCabina(rem.items)) return false;
+    return true;
+  });
+
+  if (!pendientesDeChasis.length && !loading) return null;
 
   return (
     <>
@@ -745,7 +756,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-[#1F3864]">{b.title}</h2>
-            <p className="text-sm text-muted-foreground">{b.subtitle(items.length)}</p>
+            <p className="text-sm text-muted-foreground">{b.subtitle(pendientesDeChasis.length)}</p>
           </div>
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="h-9 shrink-0">
             <RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? "animate-spin" : ""}`} /> {b.actualizar}
@@ -753,7 +764,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         </div>
 
         <div className="responsive-card-grid gap-3">
-          {items.map(rem => {
+          {pendientesDeChasis.map(rem => {
             const faltan = rem.total_unidades - rem.asignados;
             const sinAsignar = rem.asignados === 0;
             const vendedorDisplay = rem.nombre_vendedor || rem.vendedor;

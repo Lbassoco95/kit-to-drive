@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  agruparRenglones, planEditarRenglones, motivoValido, MOTIVO_MIN, ORDEN_FLETE,
-  faltantesDeExistencia, mensajeFaltantes, repartoAlBajar,
+  agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, ORDEN_FLETE,
+  faltantesDeExistencia, mensajeFaltantes, repartoAlBajar, remisionEsSoloCabina,
   type LineaMoto, type RenglonRemision,
 } from "@/lib/remisionesEdicion";
 
@@ -65,6 +65,43 @@ describe("agruparRenglones", () => {
     const g = agruparRenglones([moto("m1", 0), servicio("s1", "instalacion_cabina", 0)]);
     expect(g.lineas[0].con_instalacion).toBe(true);
     expect(g.lineas[0].con_caja).toBe(true);
+  });
+
+  it("una remisión sin motocarro se lee como venta de cabina", () => {
+    const g = agruparRenglones([
+      { id: "c1", tipo_servicio: "cabina", modelo: "200cc 2026", color: null, cantidad: 2, con_caja: false, orden_linea: 0 },
+      servicio("i1", "instalacion_cabina", 0),
+      { id: "c2", tipo_servicio: "cabina", modelo: "300cc 2026", color: null, cantidad: 1, con_caja: false, orden_linea: 1 },
+    ]);
+
+    expect(g.sueltos).toHaveLength(0);
+    expect(g.lineas).toHaveLength(2);
+    expect(g.lineas.every(l => l.solo_cabina)).toBe(true);
+    expect(g.lineas[0]._svcIds?.cabina).toBe("c1");
+    expect(g.lineas[0].cantidad).toBe(2);
+    expect(g.lineas[0].con_instalacion).toBe(true);
+    // Sin motocarro, la instalación no exige caja.
+    expect(g.lineas[0].con_caja).toBe(false);
+    expect(g.lineas[1].modelo).toBe("300cc 2026");
+    expect(remisionEsSoloCabina([
+      { tipo_servicio: "cabina" },
+      { tipo_servicio: "flete" },
+    ])).toBe(true);
+    expect(remisionEsSoloCabina([
+      { tipo_servicio: "motocarro" },
+      { tipo_servicio: "cabina" },
+    ])).toBe(false);
+  });
+
+  it("sin orden_linea, la cabina y su instalación siguen siendo una sola línea", () => {
+    const g = agruparRenglones([
+      { id: "c1", tipo_servicio: "cabina", modelo: "200cc 2026", color: null, cantidad: 1, con_caja: false, orden_linea: null },
+      servicio("i1", "instalacion_cabina", null),
+    ]);
+    expect(g.lineas).toHaveLength(1);
+    expect(g.lineas[0].solo_cabina).toBe(true);
+    expect(g.lineas[0].con_instalacion).toBe(true);
+    expect(g.sueltos).toHaveLength(0);
   });
 });
 
@@ -152,6 +189,45 @@ describe("planEditarRenglones", () => {
     const originales = [servicio("s1", "cabina", null), moto("m1", null)];
     const plan = planEditarRenglones("r1", [linea({ _itemId: "m1" })], false, originales);
     expect(plan.deleteIds).not.toContain("s1");
+  });
+
+  it("da de alta una cabina sin crear motocarro", () => {
+    const plan = planEditarRenglones("r1", [
+      linea({ solo_cabina: true, con_cabina: true, cantidad: 2, con_instalacion: true }),
+    ], true, []);
+
+    expect(plan.soloCabina).toBe(true);
+    expect(plan.totalUnidades).toBe(0);
+    expect(plan.totalCabinas).toBe(2);
+    expect(plan.inserts.map(i => i.tipo_servicio)).toEqual(["cabina", "instalacion_cabina", "flete"]);
+    expect(plan.inserts[0]).toMatchObject({ modelo: "200cc 2026", color: null, cantidad: 2, con_caja: false });
+    expect(plan.updates).toHaveLength(0);
+    expect(plan.deleteIds).toHaveLength(0);
+  });
+
+  it("corrige la cabina ya capturada sin inventar un motocarro", () => {
+    const originales: RenglonRemision[] = [
+      { id: "c1", tipo_servicio: "cabina", modelo: "200cc 2026", color: null, cantidad: 1, con_caja: false, orden_linea: 0 },
+    ];
+    const plan = planEditarRenglones("r1", [
+      linea({ solo_cabina: true, con_cabina: true, _svcIds: { cabina: "c1" }, cantidad: 3, modelo: "300cc 2026" }),
+    ], false, originales);
+
+    expect(plan.inserts).toHaveLength(0);
+    expect(plan.deleteIds).toEqual([]);
+    expect(plan.updates).toEqual([
+      { id: "c1", cambios: { modelo: "300cc 2026", color: null, cantidad: 3, con_caja: false, orden_linea: 0 } },
+    ]);
+    expect(plan.totalUnidades).toBe(0);
+    expect(plan.totalCabinas).toBe(3);
+  });
+
+  it("la instalación de una cabina sola no prende la caja", () => {
+    const base = linea({ solo_cabina: true, con_cabina: true });
+    const siguiente = aplicarCambioMoto(base, "con_instalacion", true);
+    expect(siguiente.con_instalacion).toBe(true);
+    expect(siguiente.con_caja).toBe(false);
+    expect(siguiente.con_cabina).toBe(true);
   });
 
   it("renumera orden_linea al reordenar, para que los servicios no se cuelguen de otra línea", () => {

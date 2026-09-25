@@ -12,7 +12,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, normColor, normModelo, StockColor, explicarError } from "@/lib/dazon";
 import {
   agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, MOTIVOS_EDICION,
-  faltantesDeExistencia, mensajeFaltantes, repartoAlBajar,
+  faltantesDeExistencia, mensajeFaltantes, repartoAlBajar, remisionEsSoloCabina,
   type LineaMoto, type RenglonRemision,
 } from "@/lib/remisionesEdicion";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
@@ -77,6 +77,15 @@ const defaultMoto = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
   con_cabina: false,
   con_instalacion: false,
   con_activacion: false,
+  solo_cabina: false,
+});
+
+/** Línea de venta de cabina, sin motocarro. */
+const defaultCabina = (modelo = MODELOS_RESPALDO[0]): MotoItem => ({
+  ...defaultMoto(modelo),
+  solo_cabina: true,
+  con_cabina: true,
+  con_caja: false,
 });
 
 export interface NuevoCliente { nombre_comercial: string; codigo_erp: string; telefono: string }
@@ -177,7 +186,7 @@ function CampoCliente({ clientes, value, onChange, onCrearCliente }:{
  */
 function LineasMotocarro({
   motos, modelos, totalUnidades, disponiblesPara,
-  onAdd, onRemove, onUpdate, conFlete, onFlete,
+  onAdd, onRemove, onUpdate, conFlete, onFlete, soloCabina = false,
 }:{
   motos: MotoItem[];
   modelos: string[];
@@ -188,22 +197,28 @@ function LineasMotocarro({
   onUpdate: (idx: number, campo: keyof MotoItem, valor: unknown) => void;
   conFlete: boolean;
   onFlete: (v: boolean) => void;
+  /** Venta de cabina sin motocarro: no pide color, caja ni chasis. */
+  soloCabina?: boolean;
 }) {
   const { t } = useLang();
   return (
     <>
-      {/* ── MOTOCARROS ──────────────────────────────────── */}
+      {/* ── MOTOCARROS o CABINAS ────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="text-base font-semibold">{t.remisiones.motocarros}</Label>
-          <span className="text-sm font-semibold text-[#1F3864]">{t.remisiones.unidades(totalUnidades)}</span>
+          <Label className="text-base font-semibold">{soloCabina ? t.remisiones.cabinas : t.remisiones.motocarros}</Label>
+          <span className="text-sm font-semibold text-[#1F3864]">
+            {soloCabina ? t.remisiones.cabinasN(totalUnidades) : t.remisiones.unidades(totalUnidades)}
+          </span>
         </div>
 
         {motos.map((moto, idx) => (
           <div key={moto._key} className="border rounded-xl overflow-hidden">
             {/* Header motocarro */}
             <div className="flex items-center justify-between px-3 py-2 bg-[#1F3864]/5 border-b">
-              <span className="text-xs font-bold text-[#1F3864] uppercase tracking-wide">🏍️ {t.remisiones.motocarroN(idx+1)}</span>
+              <span className="text-xs font-bold text-[#1F3864] uppercase tracking-wide">
+                {soloCabina ? `🛖 ${t.remisiones.cabinaN(idx+1)}` : `🏍️ ${t.remisiones.motocarroN(idx+1)}`}
+              </span>
               {motos.length>1&&(
                 <button type="button" onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
               )}
@@ -211,7 +226,7 @@ function LineasMotocarro({
 
             {/* Modelo / color / cantidad / caja */}
             <div className="p-3 space-y-2 bg-slate-50">
-              <div className="grid grid-cols-2 gap-2">
+              <div className={soloCabina ? "" : "grid grid-cols-2 gap-2"}>
                 <div>
                   <Label className="text-xs text-muted-foreground">{t.remisiones.modelo}</Label>
                   <Select value={moto.modelo} onValueChange={v=>onUpdate(idx,"modelo",v)}>
@@ -219,7 +234,7 @@ function LineasMotocarro({
                     <SelectContent>{modelos.map(m=><SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div>
+                {!soloCabina && <div>
                   <Label className="text-xs text-muted-foreground">{t.remisiones.color}</Label>
                   <Select value={moto.color} onValueChange={v=>onUpdate(idx,"color",v)}>
                     <SelectTrigger className="h-10 text-sm"><SelectValue/></SelectTrigger>
@@ -279,7 +294,7 @@ function LineasMotocarro({
                       </div>
                     );
                   })()}
-                </div>
+                </div>}
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-28">
@@ -288,20 +303,24 @@ function LineasMotocarro({
                     onChange={e=>onUpdate(idx,"cantidad",Math.max(1,parseInt(e.target.value)||1))}
                     className="h-10 text-sm"/>
                 </div>
-                <label className="flex items-center gap-2 cursor-pointer pt-5 flex-1">
-                  <input type="checkbox" checked={moto.con_caja} onChange={e=>onUpdate(idx,"con_caja",e.target.checked)} className="w-4 h-4 accent-[#1F3864]"/>
-                  <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-[#1F3864]"/> {t.remisiones.conCajaMontada}</span>
-                </label>
+                {!soloCabina && (
+                  <label className="flex items-center gap-2 cursor-pointer pt-5 flex-1">
+                    <input type="checkbox" checked={moto.con_caja} onChange={e=>onUpdate(idx,"con_caja",e.target.checked)} className="w-4 h-4 accent-[#1F3864]"/>
+                    <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-[#1F3864]"/> {t.remisiones.conCajaMontada}</span>
+                  </label>
+                )}
               </div>
             </div>
 
-            {/* Servicios adicionales por motocarro */}
+            {/* Servicios adicionales por motocarro. En sola cabina la línea ya es la cabina. */}
             <div className="px-3 py-2.5 bg-white border-t space-y-1.5">
               <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t.remisiones.serviciosAdicionales}</div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={moto.con_cabina} onChange={e=>onUpdate(idx,"con_cabina",e.target.checked)} className="w-3.5 h-3.5 accent-violet-600"/>
-                <span className="text-sm">🛖 {t.remisiones.cabina}</span>
-              </label>
+              {!soloCabina && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={moto.con_cabina} onChange={e=>onUpdate(idx,"con_cabina",e.target.checked)} className="w-3.5 h-3.5 accent-violet-600"/>
+                  <span className="text-sm">🛖 {t.remisiones.cabina}</span>
+                </label>
+              )}
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={moto.con_instalacion} onChange={e=>onUpdate(idx,"con_instalacion",e.target.checked)} className="w-3.5 h-3.5 accent-purple-600"/>
                 <span className="text-sm">🔧 {t.remisiones.instalacionCabina}</span>
@@ -316,7 +335,7 @@ function LineasMotocarro({
 
         <Button type="button" variant="outline" onClick={onAdd}
           className="w-full h-10 border-dashed border-[#2E75B6]/50 text-[#2E75B6] hover:bg-[#DBEAFE]/30">
-          <Plus className="h-4 w-4 mr-2"/> {t.remisiones.agregarMotocarro}
+          <Plus className="h-4 w-4 mr-2"/> {soloCabina ? t.remisiones.agregarCabina : t.remisiones.agregarMotocarro}
         </Button>
       </div>
 
@@ -382,6 +401,8 @@ export default function Remisiones() {
   });
   const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
   const [motos, setMotos]     = useState<MotoItem[]>([defaultMoto()]);
+  /** Alta de cabina sin motocarro. La edición lo deduce de los renglones. */
+  const [ventaCabina, setVentaCabina] = useState(false);
   const [conFlete, setConFlete] = useState(false);
   const [formFile, setFormFile] = useState<File|null>(null);
 
@@ -532,7 +553,7 @@ export default function Remisiones() {
     try {
       const { data: ext } = await supabase
         .from("remisiones")
-        .select("id,tipo_pago,pagado,nombre_vendedor,color_solicitado,total_unidades_solicitadas,documento_url,comprobante_pago_url")
+        .select("id,tipo_pago,pagado,nombre_vendedor,color_solicitado,total_unidades_solicitadas,tipo_remision,documento_url,comprobante_pago_url")
         .in("id", ids);
       if (ext?.length) {
         const extMap = Object.fromEntries(ext.map((r:any) => [r.id, r]));
@@ -625,7 +646,7 @@ export default function Remisiones() {
     });
 
   // ── Moto helpers ────────────────────────────────────────────────────────────
-  const addMoto   = () => setMotos(m => [...m, defaultMoto(modelos[0])]);
+  const addMoto   = () => setMotos(m => [...m, ventaCabina ? defaultCabina(modelos[0]) : defaultMoto(modelos[0])]);
   const removeMoto = (idx:number) => setMotos(m => m.filter((_,i)=>i!==idx));
   const updateMoto = (idx:number, field:keyof MotoItem, val:any) =>
     setMotos(m => m.map((item,i) => (i===idx ? aplicarCambioMoto(item, field, val) : item)));
@@ -653,14 +674,20 @@ export default function Remisiones() {
     );
 
   // ── Dialog open/reset ───────────────────────────────────────────────────────
+  const elegirTipoVenta = (cabina: boolean) => {
+    setVentaCabina(cabina);
+    setMotos([cabina ? defaultCabina(modelos[0]) : defaultMoto(modelos[0])]);
+  };
   const abrirNueva = () => {
     const allFolios = rows.map((r:any) => r.folio_remision);
     setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(allFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
+    setVentaCabina(false);
     setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null); setOpen(true);
   };
   const resetForm = () => {
     setForm({ folio_remision:"",cliente_id:"",vendedor_asignado_id:"",nombre_vendedor:"",
       fecha_remision:new Date().toISOString().slice(0,10),notas:"",tipo_pago:"anticipado",pagado:true });
+    setVentaCabina(false);
     setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null);
   };
 
@@ -705,12 +732,17 @@ export default function Remisiones() {
   const crearRemision = async () => {
     if (!form.folio_remision||!form.cliente_id) { toast.error(t.remisiones.folioYCliente); return; }
     if (activeFolios.includes(form.folio_remision.trim())) { toast.error(t.remisiones.folioEnUso); return; }
-    if (totalUnidades===0) { toast.error(t.remisiones.agregaMotocarro); return; }
+    const esCabina = ventaCabina && motos.every(m => m.solo_cabina);
+    if (esCabina) {
+      if (!motos.length || totalUnidades === 0) { toast.error(t.remisiones.agregaCabina); return; }
+    } else if (totalUnidades===0) { toast.error(t.remisiones.agregaMotocarro); return; }
 
-    // No se compromete lo que no hay. Sin dato de inventario no se bloquea:
-    // ver faltantesDeExistencia().
-    const faltan = faltantesDeExistencia(motos, disponiblesPara);
-    if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes)); return; }
+    // No se compromete lo que no hay. La cabina sola no aparta chasis.
+    // Sin dato de inventario no se bloquea: ver faltantesDeExistencia().
+    if (!esCabina) {
+      const faltan = faltantesDeExistencia(motos, disponiblesPara);
+      if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes)); return; }
+    }
 
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
 
@@ -737,8 +769,11 @@ export default function Remisiones() {
       const extended: TablesUpdate<"remisiones"> = {
         tipo_pago: form.tipo_pago,
         pagado: form.tipo_pago === "anticipado",
-        color_solicitado: motos[0]?.color || "BLANCO",
-        total_unidades_solicitadas: totalUnidades,
+        tipo_remision: esCabina ? "cabina" : "motocarro",
+        // Cero motocarros: si se guardara la cantidad de cabinas aquí, la
+        // asignación de chasis la tomaría como unidades por armar.
+        color_solicitado: esCabina ? null : (motos[0]?.color || "BLANCO"),
+        total_unidades_solicitadas: esCabina ? 0 : totalUnidades,
       };
       if (form.nombre_vendedor) extended.nombre_vendedor = form.nombre_vendedor;
       await supabase.from("remisiones").update(extended).eq("id", nueva.id);
@@ -746,19 +781,18 @@ export default function Remisiones() {
       // Una vez que se corra NOTIFY pgrst en Supabase, todo queda guardado automáticamente.
     }
 
-    // Build remision_items
+    // Mismas líneas que la edición, para que una venta de sola cabina no
+    // invente un renglón de motocarro.
     if (nueva?.id) {
-      const items:any[] = [];
-      for (const moto of motos) {
-        const cant = Number(moto.cantidad)||1;
-        items.push({ remision_id:nueva.id, tipo_servicio:"motocarro", modelo:moto.modelo, color:moto.color, cantidad:cant, con_caja:moto.con_caja });
-        if (moto.con_cabina)      items.push({ remision_id:nueva.id, tipo_servicio:"cabina",             modelo:moto.modelo, color:null, cantidad:cant, con_caja:false });
-        if (moto.con_instalacion) items.push({ remision_id:nueva.id, tipo_servicio:"instalacion_cabina", modelo:null,        color:null, cantidad:cant, con_caja:false });
-        if (moto.con_activacion)  items.push({ remision_id:nueva.id, tipo_servicio:"activacion",         modelo:null,        color:null, cantidad:cant, con_caja:false });
+      const planAlta = planEditarRenglones(nueva.id, motos, conFlete, []);
+      const sinOrden = planAlta.inserts.map(({ orden_linea: _orden, ...resto }) => resto);
+      let { error: err } = await supabase.from("remision_items").insert(planAlta.inserts);
+      if (err) ({ error: err } = await supabase.from("remision_items").insert(sinOrden));
+      if (err) {
+        toast.error(t.remisiones.errorLineasAlta(err.message));
+        setOpen(false); resetForm(); load();
+        return;
       }
-      if (conFlete) items.push({ remision_id:nueva.id, tipo_servicio:"flete", modelo:null, color:null, cantidad:1, con_caja:false });
-      const { error: err } = await supabase.from("remision_items").insert(items);
-      if (err) console.error("Items:", err.message);
     }
 
     if (formFile&&nueva?.id) {
@@ -951,8 +985,13 @@ export default function Remisiones() {
     }
 
     const agrupado = agruparRenglones(items!, { modeloPorDefecto: modelos[0] });
+    const soloCabina = agrupado.lineas.length
+      ? agrupado.lineas.every(l => !!l.solo_cabina)
+      : r.tipo_remision === "cabina";
     setEditItems(items!);
-    setEditMotos(agrupado.lineas.length ? agrupado.lineas : [defaultMoto(modelos[0])]);
+    setEditMotos(agrupado.lineas.length
+      ? agrupado.lineas
+      : [soloCabina ? defaultCabina(modelos[0]) : defaultMoto(modelos[0])]);
     setEditFlete(agrupado.conFlete);
     setEditForm({
       folio_remision: r.folio_remision ?? "",
@@ -971,7 +1010,10 @@ export default function Remisiones() {
     setEditFlete(false); setEditMotivo(""); setEditMotivoSugerido("");
   };
 
-  const addMotoEdit    = () => setEditMotos(m => [...m, defaultMoto(modelos[0])]);
+  const addMotoEdit    = () => setEditMotos(m => [
+    ...m,
+    m.length > 0 && m.every(l => !!l.solo_cabina) ? defaultCabina(modelos[0]) : defaultMoto(modelos[0]),
+  ]);
   const removeMotoEdit = (idx:number) => setEditMotos(m => m.filter((_,i)=>i!==idx));
   const updateMotoEdit = (idx:number, campo:keyof MotoItem, valor:unknown) =>
     setEditMotos(m => m.map((item,i) => (i===idx ? aplicarCambioMoto(item, campo, valor) : item)));
@@ -1012,18 +1054,23 @@ export default function Remisiones() {
     if (rows.some((r:any) => r.id !== editar.id && r.estatus !== "CANCELADA" && r.folio_remision === folio))
       return toast.error(t.remisiones.folioEnUsoOtra);
 
-    const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
-    if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes));
-
     const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
-    if (!plan.totalUnidades) return toast.error(t.remisiones.necesitaMotocarro);
+    if (plan.soloCabina) {
+      if (!plan.totalCabinas) return toast.error(t.remisiones.necesitaCabina);
+    } else {
+      // La cabina sola no aparta chasis. El motocarro sí.
+      const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
+      if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes));
+      if (!plan.totalUnidades) return toast.error(t.remisiones.necesitaMotocarro);
+    }
 
     // Bajar el total ya no frena a Comercial. Lo que aún no entra a armado se
     // suelta solo; lo que Fábrica ya empezó se le PIDE; y lo que ya salió del
     // almacén no se puede deshacer desde ninguna pantalla.
-    const asignadas = (editar.motocarros ?? []).length;
-    const reparto   = repartoDe(editar, plan.totalUnidades);
-    if (reparto.imposible > 0)
+    // Una venta de sola cabina no tiene unidades que soltar.
+    const asignadas = plan.soloCabina ? 0 : (editar.motocarros ?? []).length;
+    const reparto   = repartoDe(editar, plan.soloCabina ? asignadas : plan.totalUnidades);
+    if (!plan.soloCabina && reparto.imposible > 0)
       return toast.error(t.remisiones.noSePuedeBajar(plan.totalUnidades, reparto.yaSalieron));
 
     setGuardandoEdicion(true);
@@ -1039,7 +1086,7 @@ export default function Remisiones() {
       folio_remision: folio, cliente_id: editForm.cliente_id,
       fecha_remision: editForm.fecha_remision, notas: editForm.notas || null,
       tipo_pago: editForm.tipo_pago, nombre_vendedor: editForm.nombre_vendedor || null,
-      total_unidades_solicitadas: plan.totalUnidades,
+      total_unidades_solicitadas: plan.soloCabina ? 0 : plan.totalUnidades,
       renglones: { agregados: plan.inserts, corregidos: plan.updates, quitados: plan.deleteIds },
     };
 
@@ -1087,8 +1134,9 @@ export default function Remisiones() {
       // comprobante ya subido sí se respeta.
       pagado: editForm.tipo_pago === "anticipado" ? true : !!editar.comprobante_pago_url,
       nombre_vendedor: editForm.nombre_vendedor || null,
-      color_solicitado: editMotos[0]?.color || "BLANCO",
-      total_unidades_solicitadas: plan.totalUnidades,
+      tipo_remision: plan.soloCabina ? "cabina" : "motocarro",
+      color_solicitado: plan.soloCabina ? null : (editMotos[0]?.color || "BLANCO"),
+      total_unidades_solicitadas: plan.soloCabina ? 0 : plan.totalUnidades,
     }).eq("id", editar.id);
 
     // 4. Renglones.
@@ -1185,7 +1233,9 @@ export default function Remisiones() {
             </DialogTrigger>
 
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{t.remisiones.crearTitulo}</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>{ventaCabina ? t.remisiones.crearTituloCabina : t.remisiones.crearTitulo}</DialogTitle>
+              </DialogHeader>
 
               <div className="space-y-4">
                 {/* Folio */}
@@ -1235,7 +1285,35 @@ export default function Remisiones() {
                   <Input value={form.nombre_vendedor} onChange={e=>setForm({...form,nombre_vendedor:e.target.value})} placeholder={t.remisiones.nombreVendedorPlaceholder} className="h-12 text-base"/>
                 </div>
 
-                {/* ── MOTOCARROS + FLETE ─────────────────────────── */}
+                {/* Tipo de venta: motocarro, o cabina sin motocarro */}
+                <div>
+                  <Label className="text-base">{t.remisiones.tipoVenta}</Label>
+                  <div className="mt-1.5 inline-flex w-full rounded-md border border-slate-200 bg-slate-50 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => elegirTipoVenta(false)}
+                      className={`flex-1 px-3 py-2 rounded text-sm font-semibold transition-colors ${
+                        !ventaCabina ? "bg-white text-[#1F3864] shadow-sm" : "text-muted-foreground hover:text-[#1F3864]"
+                      }`}
+                    >
+                      🏍️ {t.remisiones.ventaMotocarro}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => elegirTipoVenta(true)}
+                      className={`flex-1 px-3 py-2 rounded text-sm font-semibold transition-colors ${
+                        ventaCabina ? "bg-white text-violet-800 shadow-sm" : "text-muted-foreground hover:text-violet-800"
+                      }`}
+                    >
+                      🛖 {t.remisiones.ventaSoloCabina}
+                    </button>
+                  </div>
+                  {ventaCabina && (
+                    <p className="text-xs text-violet-800 mt-1.5">{t.remisiones.ventaSoloCabinaAyuda}</p>
+                  )}
+                </div>
+
+                {/* ── MOTOCARROS o CABINAS + FLETE ───────────────── */}
                 <LineasMotocarro
                   motos={motos}
                   modelos={modelos}
@@ -1246,6 +1324,7 @@ export default function Remisiones() {
                   onUpdate={updateMoto}
                   conFlete={conFlete}
                   onFlete={setConFlete}
+                  soloCabina={ventaCabina}
                 />
                 {/* Fecha */}
                 <div>
@@ -1404,6 +1483,9 @@ export default function Remisiones() {
           const motos_   = r.motocarros??[];
           const items:any[] = r.remision_items??[];
           const motoItems  = items.filter((i:any)=>i.tipo_servicio==="motocarro");
+          const cabinaItems = items.filter((i:any)=>i.tipo_servicio==="cabina");
+          const esSoloCabina = items.length ? remisionEsSoloCabina(items) : r.tipo_remision === "cabina";
+          const totalCabinas = cabinaItems.reduce((s:number, i:any) => s + Number(i.cantidad || 0), 0);
           const asignadas  = motos_.length;
           const listas     = motos_.filter((m:any)=>["ARMADO","LISTO"].includes(m.estatus_armado)).length;
           const total      = r.total_unidades_solicitadas||asignadas||1;
@@ -1460,8 +1542,31 @@ export default function Remisiones() {
                 )}
               </div>
 
+              {/* Venta de cabina, sin motocarro */}
+              {esSoloCabina&&(
+                <div className="space-y-1.5">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${tipoBadgeClass.cabina}`}>
+                    🛖 {t.remisiones.soloCabinaBadge}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {cabinaItems.map((cabina:any)=>(
+                      <span key={cabina.id} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${tipoBadgeClass.cabina}`}>
+                        {cabina.cantidad>1&&<span>{cabina.cantidad}×</span>}
+                        🛖 {cabina.modelo}
+                      </span>
+                    ))}
+                    {items.filter((i:any)=>["instalacion_cabina","activacion","flete"].includes(i.tipo_servicio)).map((s:any)=>(
+                      <span key={s.id} className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${tipoBadgeClass[s.tipo_servicio]??""}`}>
+                        {tipoIcon[s.tipo_servicio]}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{t.remisiones.cabinasN(totalCabinas)}. {t.remisiones.sinChasisCabina}</p>
+                </div>
+              )}
+
               {/* Items summary — grouped by motocarro */}
-              {motoItems.length>0&&(
+              {!esSoloCabina&&motoItems.length>0&&(
                 <div className="space-y-1">
                   {motoItems.map((moto:any, idx:number)=>{
                     // Find services that came after this moto in the item list (by position)
@@ -1489,8 +1594,8 @@ export default function Remisiones() {
                 </div>
               )}
 
-              {/* Progress */}
-              <div>
+              {/* Progress — la cabina sola no lleva chasis */}
+              {!esSoloCabina&&<div>
                 <div className="flex justify-between text-sm font-medium mb-1.5">
                   <span>{t.remisiones.listosDe(listas, total)}</span>
                   <span style={{color:pctColor}} className="font-bold">{pct}%</span>
@@ -1499,7 +1604,7 @@ export default function Remisiones() {
                   <div className="h-full transition-all" style={{width:`${Math.min(pct,100)}%`,backgroundColor:pctColor}}/>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">{t.remisiones.chasisAsignadosDe(asignadas, total)}</div>
-              </div>
+              </div>}
 
               {/* Moto list */}
               {motos_.length>0&&(
@@ -1526,7 +1631,7 @@ export default function Remisiones() {
                     <Pencil className="h-5 w-5 mr-2"/> {t.remisiones.editar}
                   </Button>
                 )}
-                {canAssign&&asignadas<total&&r.estatus!=="COMPLETA"&&r.estatus!=="CANCELADA"&&(
+                {canAssign&&!esSoloCabina&&asignadas<total&&r.estatus!=="COMPLETA"&&r.estatus!=="CANCELADA"&&(
                   <Button onClick={()=>asignarChasis(r)} className="flex-1 h-12 bg-[#2E75B6] hover:bg-[#246094] text-base min-w-[100px]">
                     <Wand2 className="h-5 w-5 mr-2"/> {t.remisiones.asignar}
                   </Button>
@@ -1635,14 +1740,34 @@ export default function Remisiones() {
                   <div className="text-xs text-muted-foreground">{t.remisiones.estadoPago}</div>
                   <div className="font-semibold">{detalleRemision.pagado===false?t.estatus.PENDIENTE:t.pago.pagado}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">{t.remisiones.unidadesSolicitadas}</div>
-                  <div className="font-semibold">{detalleRemision.total_unidades_solicitadas||detalleRemision.motocarros?.length||1}</div>
-                </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
-                  <div className="text-xs text-muted-foreground">{t.remisiones.unidadesAsignadas}</div>
-                  <div className="font-semibold">{detalleRemision.motocarros?.length||0}</div>
-                </div>
+                {(() => {
+                  const detItems = detalleRemision.remision_items ?? [];
+                  const detSolo = detItems.length ? remisionEsSoloCabina(detItems) : detalleRemision.tipo_remision === "cabina";
+                  const detCabinas = detItems
+                    .filter((i:any) => i.tipo_servicio === "cabina")
+                    .reduce((s:number, i:any) => s + Number(i.cantidad || 0), 0);
+                  if (detSolo) {
+                    return (
+                      <div className="rounded-lg border bg-violet-50 p-3 sm:col-span-2">
+                        <div className="text-xs text-muted-foreground">{t.remisiones.cabinasSolicitadas}</div>
+                        <div className="font-semibold">{detCabinas || "—"}</div>
+                        <div className="text-xs text-violet-800 mt-1">{t.remisiones.sinChasisCabina}</div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <>
+                      <div className="rounded-lg border bg-slate-50 p-3">
+                        <div className="text-xs text-muted-foreground">{t.remisiones.unidadesSolicitadas}</div>
+                        <div className="font-semibold">{detalleRemision.total_unidades_solicitadas||detalleRemision.motocarros?.length||1}</div>
+                      </div>
+                      <div className="rounded-lg border bg-slate-50 p-3">
+                        <div className="text-xs text-muted-foreground">{t.remisiones.unidadesAsignadas}</div>
+                        <div className="font-semibold">{detalleRemision.motocarros?.length||0}</div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div>
@@ -1666,7 +1791,11 @@ export default function Remisiones() {
 
               <div>
                 <h3 className="text-base mb-2">{t.remisiones.unidadesAsignadas}</h3>
-                {detalleRemision.motocarros?.length?(
+                {(detalleRemision.remision_items?.length
+                  ? remisionEsSoloCabina(detalleRemision.remision_items)
+                  : detalleRemision.tipo_remision === "cabina") ? (
+                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{t.remisiones.sinChasisCabina}</div>
+                ) : detalleRemision.motocarros?.length?(
                   <div className="space-y-2">
                     {detalleRemision.motocarros.map((m:any)=>(
                       <div key={m.id} className="rounded-lg border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
@@ -1803,6 +1932,7 @@ export default function Remisiones() {
                 onUpdate={updateMotoEdit}
                 conFlete={editFlete}
                 onFlete={setEditFlete}
+                soloCabina={editMotos.length > 0 && editMotos.every(m => !!m.solo_cabina)}
               />
 
               {/* Fecha */}

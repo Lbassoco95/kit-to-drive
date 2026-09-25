@@ -14,6 +14,10 @@
  * cada renglón (ver la migración 20260902000001). Para las remisiones viejas,
  * que no lo traen, se sigue usando la posición como respaldo.
  *
+ * También se puede vender la cabina sola, sin motocarro. Esa remisión no tiene
+ * renglón `motocarro`: la línea ES la cabina y, si acaso, le cuelgan instalación,
+ * activación y el flete de la orden. No compromete chasis.
+ *
  * Aquí vive sólo la parte que se puede probar sin base de datos: reconstruir el
  * formulario desde los renglones guardados, y calcular qué se inserta, qué se
  * actualiza y qué se borra al guardar los cambios.
@@ -75,6 +79,11 @@ export interface LineaMoto {
   con_cabina: boolean;
   con_instalacion: boolean;
   con_activacion: boolean;
+  /**
+   * Venta de cabina sin motocarro. No hay renglón `motocarro`: el id de la
+   * cabina vive en `_svcIds.cabina`.
+   */
+  solo_cabina?: boolean;
 }
 
 /**
@@ -86,9 +95,27 @@ export interface LineaMoto {
  */
 export function aplicarCambioMoto<T extends LineaMoto>(linea: T, campo: keyof LineaMoto, valor: unknown): T {
   const siguiente = { ...linea, [campo]: valor } as T;
+  // Sin motocarro no hay caja que montar: la instalación es un servicio de la cabina.
+  if (siguiente.solo_cabina) {
+    siguiente.con_cabina = true;
+    siguiente.con_caja = false;
+    return siguiente;
+  }
   if (campo === "con_instalacion") siguiente.con_caja = valor === true;
   if (campo === "con_caja" && valor === false && linea.con_instalacion) siguiente.con_caja = true;
   return siguiente;
+}
+
+/** La remisión vende cabinas y no trae ningún motocarro. */
+export function remisionEsSoloCabina(
+  renglones: readonly { tipo_servicio?: string | null }[],
+): boolean {
+  let hayCabina = false;
+  for (const r of renglones) {
+    if (r.tipo_servicio === "motocarro") return false;
+    if (r.tipo_servicio === "cabina") hayCabina = true;
+  }
+  return hayCabina;
 }
 
 export interface AgrupadoRemision {
@@ -147,12 +174,25 @@ export function agruparRenglones(
     linea._svcIds = { ...linea._svcIds, [tipo]: servicio.id };
     linea[BANDERA_SERVICIO[tipo]] = true;
     // Instalación de cabina implica caja montada, igual que en la captura.
-    if (tipo === "instalacion_cabina") linea.con_caja = true;
+    // En una venta de sola cabina no hay motocarro ni caja.
+    if (tipo === "instalacion_cabina" && !linea.solo_cabina) linea.con_caja = true;
     return true;
   };
 
+  const desdeCabina = (cabina: RenglonRemision): LineaMoto => ({
+    ...lineaVacia(cabina.modelo || modeloPorDefecto, cabina.color || colorPorDefecto),
+    solo_cabina: true,
+    con_cabina: true,
+    _svcIds: { cabina: cabina.id },
+    cantidad: Math.max(1, Number(cabina.cantidad) || 1),
+  });
+
   const lineas: LineaMoto[] = [];
   const sueltos: RenglonRemision[] = [];
+  // Si la remisión SÍ trae motocarros, una cabina sin el suyo sigue siendo un
+  // suelto (dato viejo que no se debe borrar). Si no trae ninguno, cada cabina
+  // es una línea de venta por sí misma.
+  const hayMotocarro = cuerpo.some(r => r.tipo_servicio === "motocarro");
 
   const todosConOrden = cuerpo.length > 0 && cuerpo.every(r => r.orden_linea != null);
   if (todosConOrden) {
@@ -165,13 +205,21 @@ export function agruparRenglones(
     for (const k of [...grupos.keys()].sort((a, b) => a - b)) {
       const grupo = grupos.get(k)!;
       const moto = grupo.find(r => r.tipo_servicio === "motocarro");
-      if (!moto) { sueltos.push(...grupo); continue; }
-      const linea = desdeRenglon(moto);
+      const cabina = grupo.find(r => r.tipo_servicio === "cabina");
+      const ancla = moto ?? (!hayMotocarro ? cabina : undefined);
+      if (!ancla) { sueltos.push(...grupo); continue; }
+      const linea = moto ? desdeRenglon(moto) : desdeCabina(cabina!);
       for (const r of grupo) {
-        if (r.id === moto.id) continue;
+        if (r.id === ancla.id) continue;
         if (!colgar(linea, r)) sueltos.push(r);
       }
       lineas.push(linea);
+    }
+  } else if (!hayMotocarro) {
+    for (const r of cuerpo) {
+      if (r.tipo_servicio === "cabina") { lineas.push(desdeCabina(r)); continue; }
+      const actual = lineas[lineas.length - 1];
+      if (!actual || !colgar(actual, r)) sueltos.push(r);
     }
   } else {
     for (const r of cuerpo) {
@@ -209,8 +257,12 @@ export interface PlanEdicion {
   inserts: RenglonNuevo[];
   updates: RenglonCambio[];
   deleteIds: string[];
-  /** Suma de unidades pedidas — va al encabezado de la remisión. */
+  /** Suma de motocarros pedidos — va al encabezado. Cero si es solo cabina. */
   totalUnidades: number;
+  /** Cabinas vendidas sin motocarro. */
+  totalCabinas: number;
+  /** Todas las líneas son venta de cabina, sin motocarro. */
+  soloCabina: boolean;
 }
 
 /**
@@ -241,33 +293,43 @@ export function planEditarRenglones(
     if (l._itemId) vigentes.add(l._itemId);
     for (const tipo of SERVICIOS_MOTO) {
       const id = l._svcIds?.[tipo];
-      if (id && l[BANDERA_SERVICIO[tipo]]) vigentes.add(id);
+      const prendido = (!!l.solo_cabina && tipo === "cabina") || !!l[BANDERA_SERVICIO[tipo]];
+      if (id && prendido) vigentes.add(id);
     }
   }
 
   let totalUnidades = 0;
+  let totalCabinas = 0;
 
   lineas.forEach((l, idx) => {
     const cantidad = Math.max(1, Number(l.cantidad) || 1);
-    totalUnidades += cantidad;
+    const solo = !!l.solo_cabina;
 
-    if (l._itemId) {
-      updates.push({
-        id: l._itemId,
-        cambios: { modelo: l.modelo, color: l.color, cantidad, con_caja: !!l.con_caja, orden_linea: idx },
-      });
+    if (solo) {
+      totalCabinas += cantidad;
     } else {
-      inserts.push({
-        remision_id: remisionId, tipo_servicio: "motocarro",
-        modelo: l.modelo, color: l.color, cantidad, con_caja: !!l.con_caja, orden_linea: idx,
-      });
+      totalUnidades += cantidad;
+
+      if (l._itemId) {
+        updates.push({
+          id: l._itemId,
+          cambios: { modelo: l.modelo, color: l.color, cantidad, con_caja: !!l.con_caja, orden_linea: idx },
+        });
+      } else {
+        inserts.push({
+          remision_id: remisionId, tipo_servicio: "motocarro",
+          modelo: l.modelo, color: l.color, cantidad, con_caja: !!l.con_caja, orden_linea: idx,
+        });
+      }
     }
 
     for (const tipo of SERVICIOS_MOTO) {
       const id = l._svcIds?.[tipo];
-      const prendido = !!l[BANDERA_SERVICIO[tipo]];
-      // La cabina se cotiza contra el modelo del motocarro; los demás servicios
-      // no llevan modelo ni color, igual que al capturar.
+      // En sola cabina la línea misma es el renglón `cabina`, aunque la bandera
+      // no viniera prendida.
+      const prendido = (solo && tipo === "cabina") || !!l[BANDERA_SERVICIO[tipo]];
+      // La cabina se cotiza contra el modelo; los demás servicios no llevan
+      // modelo ni color, igual que al capturar.
       const modelo = tipo === "cabina" ? l.modelo : null;
 
       if (prendido && id) {
@@ -299,7 +361,11 @@ export function planEditarRenglones(
     deleteIds.push(original.fleteId);
   }
 
-  return { inserts, updates, deleteIds: [...new Set(deleteIds)], totalUnidades };
+  return {
+    inserts, updates, deleteIds: [...new Set(deleteIds)],
+    totalUnidades, totalCabinas,
+    soloCabina: lineas.length > 0 && lineas.every(l => !!l.solo_cabina),
+  };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────

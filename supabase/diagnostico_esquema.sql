@@ -282,6 +282,9 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260923000001_remisiones_refacciones',       'columna|v_almacen_refacciones.stock_disponible'),
   ('20260923000001_remisiones_refacciones',       'politica|remisiones_refacciones.leer remisiones refacciones|puede_leer_remision_refaccion'),
 
+  -- Venta de cabina sin motocarro: no asigna chasis ni marca COMPLETA.
+  ('20260925180000_remision_solo_cabina',         'funcion|asignar_remision_items(uuid)|solo_cabina'),
+
   ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.motivo_cancelacion'),
   ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.cancelada_at'),
   ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.forma_pago'),
