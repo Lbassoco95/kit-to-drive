@@ -1326,6 +1326,7 @@ export type Database = {
           activo: boolean
           codigo_vendedor: string | null
           created_at: string
+          debe_cambiar_password: boolean
           email: string | null
           id: string
           nombre_completo: string
@@ -1335,6 +1336,7 @@ export type Database = {
           activo?: boolean
           codigo_vendedor?: string | null
           created_at?: string
+          debe_cambiar_password?: boolean
           email?: string | null
           id: string
           nombre_completo?: string
@@ -1344,6 +1346,7 @@ export type Database = {
           activo?: boolean
           codigo_vendedor?: string | null
           created_at?: string
+          debe_cambiar_password?: boolean
           email?: string | null
           id?: string
           nombre_completo?: string

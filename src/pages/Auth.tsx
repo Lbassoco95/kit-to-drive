@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,6 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
-import { Building2, Wrench, Truck, Briefcase, Wallet, Crown } from "lucide-react";
-
-const DEMO_ROLES = [
-  { email: "admin@dazon.demo",     pwd: "Dazon2026!", labelKey: "direccion" as const,  icon: Building2 },
-  { email: "fabrica@dazon.demo",   pwd: "Dazon2026!", labelKey: "fabrica" as const,   icon: Wrench },
-  { email: "logistica@dazon.demo", pwd: "Dazon2026!", labelKey: "logistica" as const, icon: Truck },
-  { email: "gerente@dazon.demo",   pwd: "Dazon2026!", labelKey: "gerente" as const,   icon: Crown },
-  { email: "ventas@dazon.demo",    pwd: "Dazon2026!", labelKey: "ventas" as const,     icon: Briefcase },
-  { email: "finanzas@dazon.demo",  pwd: "Dazon123!$", labelKey: "finanzas" as const,  icon: Wallet },
-];
 
 export default function Auth() {
   const [email, setEmail] = useState("");
@@ -26,11 +16,10 @@ export default function Auth() {
   const nav = useNavigate();
   const { user } = useAuth();
   const { t, toggleLang } = useLang();
-  const devMode = useMemo(() => new URLSearchParams(window.location.search).get("dev") === "1", []);
 
   useEffect(() => { if (user) nav("/"); }, [user, nav]);
 
-  const login = async (e?: any) => {
+  const login = async (e?: React.FormEvent) => {
     e?.preventDefault();
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password: pwd });
@@ -38,18 +27,9 @@ export default function Auth() {
     if (error) toast.error(error.message); else nav("/");
   };
 
-  const quickLogin = async (em: string, p: string) => {
-    setEmail(em); setPwd(p); setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email: em, password: p });
-    setBusy(false);
-    if (error) toast.error(t.auth.demoNotCreated);
-    else nav("/");
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4">
       <Card className="w-full max-w-lg p-8 shadow-2xl relative">
-        {/* Language toggle */}
         <button
           onClick={toggleLang}
           className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-[#1F3864] hover:border-[#1F3864] transition-all text-sm font-medium"
@@ -74,24 +54,6 @@ export default function Auth() {
             {busy ? t.auth.signingIn : t.auth.signIn}
           </Button>
         </form>
-        {devMode && <div className="mt-8 pt-6 border-t">
-          <p className="text-sm text-muted-foreground mb-3 text-center">{t.auth.quickAccess}</p>
-          <div className="grid grid-cols-3 gap-3">
-            {DEMO_ROLES.map(d => (
-              <button
-                key={d.email}
-                type="button"
-                disabled={busy}
-                onClick={() => quickLogin(d.email, d.pwd)}
-                className="min-h-[80px] flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-[#2E75B6]/30 bg-white hover:bg-[#2E75B6]/10 hover:border-[#2E75B6] transition-all text-[#1F3864] font-semibold disabled:opacity-50"
-              >
-                <d.icon size={28} strokeWidth={2.2} />
-                <span className="text-base">{t.roles[d.labelKey]}</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-4 text-center">{t.auth.demoPassword}</p>
-        </div>}
       </Card>
     </div>
   );

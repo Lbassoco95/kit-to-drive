@@ -50,11 +50,11 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/produccion" element={<ProtectedRoute modulo="produccion"><Produccion /></ProtectedRoute>} />
               <Route path="/inventario" element={<ProtectedRoute modulo="inventario"><Inventario /></ProtectedRoute>} />
-              <Route path="/almacen-refacciones" element={<ProtectedRoute><AlmacenRefacciones /></ProtectedRoute>} />
+              <Route path="/almacen-refacciones" element={<ProtectedRoute requireRefacciones><AlmacenRefacciones /></ProtectedRoute>} />
               <Route path="/incidencias" element={<ProtectedRoute modulo="inventario"><Incidencias /></ProtectedRoute>} />
               <Route path="/reportes-turno" element={<ProtectedRoute modulo="reportesTurno"><ReportesTurno /></ProtectedRoute>} />
               <Route path="/remisiones" element={<ProtectedRoute modulo="remisiones"><Remisiones /></ProtectedRoute>} />
-              <Route path="/remisiones-refacciones" element={<ProtectedRoute><RemisionesRefacciones /></ProtectedRoute>} />
+              <Route path="/remisiones-refacciones" element={<ProtectedRoute requireRefacciones><RemisionesRefacciones /></ProtectedRoute>} />
               <Route path="/entregas" element={<ProtectedRoute modulo="entregas"><Entregas /></ProtectedRoute>} />
               <Route path="/mis-motocarros" element={<ProtectedRoute modulo="misMotocarros"><MisMotocarros /></ProtectedRoute>} />
               <Route path="/clientes" element={<ProtectedRoute modulo="clientes"><Clientes /></ProtectedRoute>} />

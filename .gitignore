@@ -1,4 +1,3 @@
-
 data/almacen_refacciones_seed.json
 data/sql_batches/
 dist
@@ -30,3 +29,12 @@ tmp_*.sql
 !.vscode/extensions.json
 yarn-debug.log*
 yarn-error.log*
+
+# Credenciales / accesos — NUNCA versionar contraseñas ni fichas de acceso
+credenciales/
+credenciales_individuales/
+**/credenciales/
+*_acceso*.txt
+*_admin.txt
+*_ventas.txt
+*_fabrica.txt
