@@ -52,6 +52,8 @@ type Remision = {
   forma_pago: "efectivo" | "transferencia" | null;
   descuento_pct: number | null;
   pagado: boolean;
+  motivo_cancelacion: string | null;
+  cancelada_at: string | null;
   nota_pago: string | null;
   entregada_at: string | null;
   clientes?: {
@@ -113,7 +115,7 @@ type Borrador = {
 };
 
 const CAMPOS_REMISION =
-  "id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_by, created_at, tipo_envio, direccion_entrega, contacto_entrega, telefono_entrega, paqueteria, guia_envio, tipo_pago, forma_pago, descuento_pct, pagado, nota_pago, entregada_at, clientes(codigo_erp, folio_interno, nombre_comercial)";
+  "id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_by, created_at, tipo_envio, direccion_entrega, contacto_entrega, telefono_entrega, paqueteria, guia_envio, tipo_pago, forma_pago, descuento_pct, pagado, nota_pago, entregada_at, motivo_cancelacion, cancelada_at, clientes(codigo_erp, folio_interno, nombre_comercial)";
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -251,18 +253,27 @@ export default function RemisionesRefacciones() {
         ] as const).map(([id, label]) => (
           <Button key={id} variant={tab === id ? "default" : "outline"} onClick={() => setTab(id)}>
             {label}
+            {id === "cancelada" && (
+              <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 text-xs font-bold text-slate-700">
+                {rows.filter(r => r.etapa === "cancelada").length}
+              </span>
+            )}
           </Button>
         ))}
       </div>
 
+      {tab === "cancelada" && (
+        <p className="text-sm text-muted-foreground">{tx.canceladasAyuda}</p>
+      )}
+
       <div className="space-y-3">
         {visibles.map(r => (
-          <Card key={r.id} className="p-4">
+          <Card key={r.id} className={`p-4 ${r.etapa === "cancelada" ? "border-slate-300 bg-slate-50" : ""}`}>
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
                 <div className="space-y-0.5">
                   <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{tx.folioSeguimiento}</div>
-                  <div className="font-mono text-2xl font-bold text-[#1F3864] leading-tight">{r.folio}</div>
+                  <div className={`font-mono text-2xl font-bold leading-tight ${r.etapa === "cancelada" ? "text-slate-500 line-through" : "text-[#1F3864]"}`}>{r.folio}</div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <EtapaBadge etapa={r.etapa} abierta={r.abierta} />
@@ -272,6 +283,9 @@ export default function RemisionesRefacciones() {
                 <div className="text-xs text-muted-foreground">
                   {fmtDate(r.fecha_remision)} · {r.nombre_vendedor || "—"}
                 </div>
+                {r.etapa === "cancelada" && (
+                  <p className="text-sm text-slate-700">{tx.motivoCancelacion}: {r.motivo_cancelacion || "—"}</p>
+                )}
               </div>
               <Button variant="outline" onClick={() => abrir(r)}>{tx.detalle}</Button>
             </div>
@@ -308,6 +322,13 @@ export default function RemisionesRefacciones() {
                 {clienteLabel(detalle.clientes)} · {fmtDate(detalle.fecha_remision)} · {detalle.nombre_vendedor || "—"}
               </div>
               {detalle.notas && <p className="text-sm">{detalle.notas}</p>}
+              {detalle.etapa === "cancelada" && (
+                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                  <p className="font-medium">{tx.canceladaBanner}</p>
+                  <p className="mt-1">{tx.motivoCancelacion}: {detalle.motivo_cancelacion || "—"}</p>
+                  {detalle.cancelada_at && <p className="text-xs text-muted-foreground mt-1">{fmtDate(detalle.cancelada_at)}</p>}
+                </div>
+              )}
               {detalle.etapa === "contingencia" && (
                 <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{tx.avisoFaltante}</p>
               )}
@@ -336,8 +357,8 @@ export default function RemisionesRefacciones() {
                 ))}
               </div>
 
-              {puedeCancelar(detalle) && items.some(i => i.cantidad_bloqueada > 0) && (
-                <CancelarRemision id={detalle.id} onHecho={refrescarDetalle} />
+              {puedeCancelar(detalle) && detalle.etapa !== "entregada" && (
+                <CancelarRemision id={detalle.id} onHecho={async () => { setTab("cancelada"); await refrescarDetalle(); }} />
               )}
 
               <section className="space-y-2">
@@ -899,7 +920,12 @@ function CancelarRemision({ id, onHecho }: { id: string; onHecho: () => Promise<
   const [motivo, setMotivo] = useState("");
   const [ocupado, setOcupado] = useState(false);
   return (
-    <div className="flex flex-wrap gap-2 rounded-md border border-dashed p-3">
+    <div className="space-y-2 rounded-md border border-dashed p-3">
+      <div>
+        <div className="text-sm font-medium">{tx.cancelarRemision}</div>
+        <p className="text-xs text-muted-foreground">{tx.cancelarRemisionAyuda}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
       <Input value={motivo} onChange={e => setMotivo(e.target.value)} placeholder={tx.motivoCancelar} className="max-w-sm" />
       <Button variant="outline" disabled={ocupado} onClick={async () => {
         if (motivo.trim().length < 3) { toast.error(tx.notaObligatoria); return; }
@@ -909,9 +935,10 @@ function CancelarRemision({ id, onHecho }: { id: string; onHecho: () => Promise<
         });
         setOcupado(false);
         if (error) { toast.error(explicarError(error, tx.errorAccion)); return; }
-        toast.success(tx.okAccion);
+        toast.success(tx.canceladaBanner);
         await onHecho();
       }}>{tx.cancelarRemision}</Button>
+      </div>
     </div>
   );
 }
