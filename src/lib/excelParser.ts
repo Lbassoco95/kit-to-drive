@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import { readFileAsArrayBuffer, readWorkbookSheets } from "@/lib/excelRead";
 
 export type ContenedorFromExcel = {
   folio_contenedor: string;
@@ -15,7 +15,7 @@ export type ContenedorFromExcel = {
 
 export type ContainerSheetData = {
   folio_contenedor: string;
-  tipo: 'chasis' | 'motores';
+  tipo: "chasis" | "motores";
   modelo: string;
   chasis: VinFromExcel[];
   motores: MotorFromExcel[];
@@ -43,238 +43,180 @@ export type ParteFromExcel = {
  * Parse Excel file with multiple sheets (one per container)
  * Sheet name = container number (e.g., EGSU1319874)
  * Detects type by headers: FRAME NUMBER = chasis, ENGINE NUMBER = motores
- * Returns separate data for each sheet
  */
-export function parseContenedoresExcel(file: File): Promise<ContainerSheetData[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        const containerSheets: ContainerSheetData[] = [];
-        
-        // Process each sheet as a container
-        workbook.SheetNames.forEach(sheetName => {
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
-          
-          if (jsonData.length === 0) return;
-          
-          // Use sheet name as container number
-          const folioContenedor = sheetName.trim();
-          
-          // Find header row dynamically by searching for "FRAME NUMBER" or "ENGINE NUMBER"
-          let headerRowIndex = -1;
-          let sheetType: 'chasis' | 'motores' | null = null;
-          let frameColIndex = -1;
-          let engineColIndex = -1;
-          let colorColIndex = -1;
-          let modelColIndex = -1;
-          
-          for (let i = 0; i < Math.min(30, jsonData.length); i++) {
-            const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-            if (!row || row.length === 0) continue;
-            
-            row.forEach((cell, colIndex) => {
-              const cellStr = String(cell || '').trim().toUpperCase();
-              if (cellStr === 'FRAME NUMBER' || cellStr === 'FRAME NO.') {
-                headerRowIndex = i;
-                frameColIndex = colIndex;
-                sheetType = 'chasis';
-              } else if (cellStr === 'ENGINE NUMBER' || cellStr === 'ENGINE NO.') {
-                headerRowIndex = i;
-                engineColIndex = colIndex;
-                sheetType = 'motores';
-              } else if (cellStr === 'COLOR' && headerRowIndex === i) {
-                colorColIndex = colIndex;
-              } else if ((cellStr === 'MODEL NO' || cellStr === 'MODEL') && headerRowIndex === i) {
-                modelColIndex = colIndex;
-              }
-            });
-            
-            if (headerRowIndex !== -1 && sheetType) break;
-          }
-          
-          if (!sheetType || headerRowIndex === -1) return; // Skip sheets without valid headers
-          
-          // Extract data based on sheet type
-          const chasis: VinFromExcel[] = [];
-          const motores: MotorFromExcel[] = [];
-          let modelo = '';
-          
-          if (sheetType === 'chasis') {
-            // Extract chassis VINs
-            for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-              const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-              if (!row || row.length === 0) continue;
-              
-              const nsChasis = String(row[frameColIndex] || '').trim();
-              if (!nsChasis || nsChasis.length < 4) continue; // Skip empty or invalid VINs
-              
-              // Skip rows that look like supplier info (contain BRAND)
-              const rowStr = row.join(' ').toUpperCase();
-              if (rowStr.includes('BRAND') || rowStr.includes('SUPPLIER') || rowStr.includes('LUOYANG')) {
-                continue;
-              }
-              
-              chasis.push({
-                numero_chasis: nsChasis,
-                color: colorColIndex !== -1 ? String(row[colorColIndex] || '').trim() : 'BLANCO',
-                modelo: modelColIndex !== -1 ? String(row[modelColIndex] || '').trim() : undefined,
-              });
-            }
-            
-            // Get model from first VIN row if not found in metadata
-            if (!modelo && chasis.length > 0 && modelColIndex !== -1) {
-              const firstRow = jsonData[headerRowIndex + 1] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-              if (firstRow && firstRow[modelColIndex]) {
-                modelo = String(firstRow[modelColIndex]).trim();
-              }
-            }
-          } else if (sheetType === 'motores') {
-            // Extract motor numbers
-            for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-              const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-              if (!row || row.length === 0) continue;
-              
-              const numeroMotor = String(row[engineColIndex] || '').trim();
-              if (!numeroMotor || numeroMotor.length < 4) continue; // Skip empty or invalid motors
-              
-              // Skip rows that look like supplier info (contain BRAND)
-              const rowStr = row.join(' ').toUpperCase();
-              if (rowStr.includes('BRAND') || rowStr.includes('SUPPLIER') || rowStr.includes('LUOYANG')) {
-                continue;
-              }
-              
-              motores.push({
-                numero_motor: numeroMotor,
-                color: colorColIndex !== -1 ? String(row[colorColIndex] || '').trim() : undefined,
-                modelo: modelColIndex !== -1 ? String(row[modelColIndex] || '').trim() : undefined,
-              });
-            }
-            
-            // Get model from first motor row - motors can have mixed models
-            if (!modelo && motores.length > 0 && modelColIndex !== -1) {
-              const firstRow = jsonData[headerRowIndex + 1] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-              if (firstRow && firstRow[modelColIndex]) {
-                modelo = String(firstRow[modelColIndex]).trim();
-              }
-            }
-          }
-          
-          // Only add if we have valid data
-          if ((sheetType === 'chasis' && chasis.length > 0) || (sheetType === 'motores' && motores.length > 0)) {
-            containerSheets.push({
-              folio_contenedor: folioContenedor,
-              tipo: sheetType,
-              modelo: modelo || '200cc 2025',
-              chasis,
-              motores,
-            });
-          }
+export async function parseContenedoresExcel(file: File): Promise<ContainerSheetData[]> {
+  const buf = await readFileAsArrayBuffer(file);
+  const sheets = await readWorkbookSheets(buf);
+  const containerSheets: ContainerSheetData[] = [];
+
+  for (const { name: sheetName, rows: jsonData } of sheets) {
+    if (jsonData.length === 0) continue;
+
+    const folioContenedor = sheetName.trim();
+
+    let headerRowIndex = -1;
+    let sheetType: "chasis" | "motores" | null = null;
+    let frameColIndex = -1;
+    let engineColIndex = -1;
+    let colorColIndex = -1;
+    let modelColIndex = -1;
+
+    for (let i = 0; i < Math.min(30, jsonData.length); i++) {
+      const row = jsonData[i];
+      if (!row || row.length === 0) continue;
+
+      row.forEach((cell, colIndex) => {
+        const cellStr = String(cell || "").trim().toUpperCase();
+        if (cellStr === "FRAME NUMBER" || cellStr === "FRAME NO.") {
+          headerRowIndex = i;
+          frameColIndex = colIndex;
+          sheetType = "chasis";
+        } else if (cellStr === "ENGINE NUMBER" || cellStr === "ENGINE NO.") {
+          headerRowIndex = i;
+          engineColIndex = colIndex;
+          sheetType = "motores";
+        } else if (cellStr === "COLOR" && headerRowIndex === i) {
+          colorColIndex = colIndex;
+        } else if ((cellStr === "MODEL NO" || cellStr === "MODEL") && headerRowIndex === i) {
+          modelColIndex = colIndex;
+        }
+      });
+
+      if (headerRowIndex !== -1 && sheetType) break;
+    }
+
+    if (!sheetType || headerRowIndex === -1) continue;
+
+    const chasis: VinFromExcel[] = [];
+    const motores: MotorFromExcel[] = [];
+    let modelo = "";
+
+    if (sheetType === "chasis") {
+      for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row.length === 0) continue;
+
+        const nsChasis = String(row[frameColIndex] || "").trim();
+        if (!nsChasis || nsChasis.length < 4) continue;
+
+        const rowStr = row.join(" ").toUpperCase();
+        if (rowStr.includes("BRAND") || rowStr.includes("SUPPLIER") || rowStr.includes("LUOYANG")) {
+          continue;
+        }
+
+        chasis.push({
+          numero_chasis: nsChasis,
+          color: colorColIndex !== -1 ? String(row[colorColIndex] || "").trim() : "BLANCO",
+          modelo: modelColIndex !== -1 ? String(row[modelColIndex] || "").trim() : undefined,
         });
-        
-        resolve(containerSheets);
-      } catch (error) {
-        reject(error);
       }
-    };
-    
-    reader.onerror = (error) => reject(error);
-    reader.readAsArrayBuffer(file);
-  });
+
+      if (!modelo && chasis.length > 0 && modelColIndex !== -1) {
+        const firstRow = jsonData[headerRowIndex + 1];
+        if (firstRow && firstRow[modelColIndex]) {
+          modelo = String(firstRow[modelColIndex]).trim();
+        }
+      }
+    } else {
+      for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        if (!row || row.length === 0) continue;
+
+        const numeroMotor = String(row[engineColIndex] || "").trim();
+        if (!numeroMotor || numeroMotor.length < 4) continue;
+
+        const rowStr = row.join(" ").toUpperCase();
+        if (rowStr.includes("BRAND") || rowStr.includes("SUPPLIER") || rowStr.includes("LUOYANG")) {
+          continue;
+        }
+
+        motores.push({
+          numero_motor: numeroMotor,
+          color: colorColIndex !== -1 ? String(row[colorColIndex] || "").trim() : undefined,
+          modelo: modelColIndex !== -1 ? String(row[modelColIndex] || "").trim() : undefined,
+        });
+      }
+
+      if (!modelo && motores.length > 0 && modelColIndex !== -1) {
+        const firstRow = jsonData[headerRowIndex + 1];
+        if (firstRow && firstRow[modelColIndex]) {
+          modelo = String(firstRow[modelColIndex]).trim();
+        }
+      }
+    }
+
+    if ((sheetType === "chasis" && chasis.length > 0) || (sheetType === "motores" && motores.length > 0)) {
+      containerSheets.push({
+        folio_contenedor: folioContenedor,
+        tipo: sheetType,
+        modelo: modelo || "200cc 2025",
+        chasis,
+        motores,
+      });
+    }
+  }
+
+  return containerSheets;
 }
 
 /**
- * Parse Excel file for packing list (parts inventory)
- * Extracts parts from DESCRIPTIONS, MODEL, QUANTITY columns
- * Uses dynamic header search instead of fixed row numbers and column positions
- * Skips rows with empty descriptions
+ * Parse Excel packing list (parts inventory).
  */
-export function parsePackingListExcel(file: File): Promise<ParteFromExcel[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        const partes: ParteFromExcel[] = [];
-        
-        // Process first sheet only
-        const firstSheet = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheet];
-        const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
-        
-        if (jsonData.length === 0) {
-          resolve([]);
-          return;
-        }
-        
-        // Find header row dynamically by searching for "DESCRIPTIONS"
-        let headerRowIndex = -1;
-        let descColIndex = -1;
-        let modelColIndex = -1;
-        let qtyColIndex = -1;
-        
-        for (let i = 0; i < Math.min(50, jsonData.length); i++) {
-          const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-          if (!row || row.length === 0) continue;
-          
-          row.forEach((cell, colIndex) => {
-            const cellStr = String(cell || '').trim().toUpperCase();
-            if (cellStr === 'DESCRIPTIONS' || cellStr === 'DESCRIPTION') {
-              headerRowIndex = i;
-              descColIndex = colIndex;
-            } else if (cellStr === 'MODEL' && headerRowIndex === i) {
-              modelColIndex = colIndex;
-            } else if ((cellStr === 'QUANTITY' || cellStr === 'QTY') && headerRowIndex === i) {
-              qtyColIndex = colIndex;
-            }
-          });
-          
-          if (headerRowIndex !== -1 && descColIndex !== -1) break;
-        }
-        
-        // Extract parts from rows after header
-        if (headerRowIndex !== -1) {
-          for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
-            const row = jsonData[i] as any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-            if (!row || row.length === 0) continue;
-            
-            const descripcion = String(row[descColIndex] || '').trim();
-            
-            // Skip rows where description cell is empty or None
-            if (!descripcion || descripcion.toLowerCase() === 'none' || descripcion.toLowerCase() === 'null') {
-              continue;
-            }
-            
-            // Skip rows that look like supplier info
-            // Supplier name (LUOYANG SHUAIYING...) is never displayed or stored per business rule
-            const rowStr = row.join(' ').toUpperCase();
-            if (rowStr.includes('BRAND') || rowStr.includes('SUPPLIER') || rowStr.includes('LUOYANG')) {
-              continue;
-            }
-            
-            partes.push({
-              descripcion,
-              modelo: modelColIndex !== -1 ? String(row[modelColIndex] || '').trim() : undefined,
-              cantidad_esperada: qtyColIndex !== -1 ? parseInt(String(row[qtyColIndex] || '0'), 10) || 0 : 0,
-            });
-          }
-        }
-        
-        resolve(partes);
-      } catch (error) {
-        reject(error);
+export async function parsePackingListExcel(file: File): Promise<ParteFromExcel[]> {
+  const buf = await readFileAsArrayBuffer(file);
+  const sheets = await readWorkbookSheets(buf);
+  const first = sheets[0];
+  if (!first || first.rows.length === 0) return [];
+
+  const jsonData = first.rows;
+  const partes: ParteFromExcel[] = [];
+
+  let headerRowIndex = -1;
+  let descColIndex = -1;
+  let modelColIndex = -1;
+  let qtyColIndex = -1;
+
+  for (let i = 0; i < Math.min(50, jsonData.length); i++) {
+    const row = jsonData[i];
+    if (!row || row.length === 0) continue;
+
+    row.forEach((cell, colIndex) => {
+      const cellStr = String(cell || "").trim().toUpperCase();
+      if (cellStr === "DESCRIPTIONS" || cellStr === "DESCRIPTION") {
+        headerRowIndex = i;
+        descColIndex = colIndex;
+      } else if (cellStr === "MODEL" && headerRowIndex === i) {
+        modelColIndex = colIndex;
+      } else if ((cellStr === "QUANTITY" || cellStr === "QTY") && headerRowIndex === i) {
+        qtyColIndex = colIndex;
       }
-    };
-    
-    reader.onerror = (error) => reject(error);
-    reader.readAsArrayBuffer(file);
-  });
+    });
+
+    if (headerRowIndex !== -1 && descColIndex !== -1) break;
+  }
+
+  if (headerRowIndex === -1) return [];
+
+  for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+    const row = jsonData[i];
+    if (!row || row.length === 0) continue;
+
+    const descripcion = String(row[descColIndex] || "").trim();
+    if (!descripcion || descripcion.toLowerCase() === "none" || descripcion.toLowerCase() === "null") {
+      continue;
+    }
+
+    const rowStr = row.join(" ").toUpperCase();
+    if (rowStr.includes("BRAND") || rowStr.includes("SUPPLIER") || rowStr.includes("LUOYANG")) {
+      continue;
+    }
+
+    partes.push({
+      descripcion,
+      modelo: modelColIndex !== -1 ? String(row[modelColIndex] || "").trim() : undefined,
+      cantidad_esperada: qtyColIndex !== -1 ? parseInt(String(row[qtyColIndex] || "0"), 10) || 0 : 0,
+    });
+  }
+
+  return partes;
 }

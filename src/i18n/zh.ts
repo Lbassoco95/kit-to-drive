@@ -199,6 +199,7 @@ export const zh = {
     signingIn: "登录中…",
     invalidCredentials: "邮箱或密码不正确。",
     emailNotConfirmed: "请先确认邮箱后再登录。",
+    loginRateLimited: "登录尝试过多。请稍后再试。",
     forgotPassword: "忘记密码？",
     forgotSubtitle: "如果该邮箱已注册，我们将发送重置链接。",
     sendResetLink: "发送链接",

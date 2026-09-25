@@ -304,6 +304,21 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260925000001_remision_refacciones_seguimiento', 'restriccion|almacen_refacciones_productos.almacen_refacciones_productos_stock_no_negativo|stock >= 0'),
   ('20260925000001_remision_refacciones_seguimiento', 'restriccion|inventario_colores.inventario_colores_disponible_no_negativo|cantidad_disponible >= 0'),
 
+  ('20260925000005_inventario_trigger_sin_campo_ajeno', 'funcion|impedir_inventario_negativo()'),
+
+  ('20260925170000_security_hardening_criticos', 'columna|profiles.debe_cambiar_password'),
+  ('20260925170000_security_hardening_criticos', 'funcion|proteger_campos_privilegiados_profiles()'),
+  ('20260925170000_security_hardening_criticos', 'politica|profiles.profiles_update_propio'),
+  ('20260925170000_security_hardening_criticos', 'politica|bitacora_eliminaciones.bitacora_elim_select_admin'),
+  ('20260925170000_security_hardening_criticos', 'politica|proveedores.proveedores_select|es_finanzas'),
+  ('20260925170000_security_hardening_criticos', 'politica|almacen_refacciones_acceso.ref_acceso_escribir|es_admin_global'),
+
+  ('20260925193000_security_hardening_fase2', 'funcion|puede_escribir_inventario(uuid)'),
+  ('20260925193000_security_hardening_fase2', 'funcion|puede_leer_inventario(uuid)'),
+  ('20260925193000_security_hardening_fase2', 'politica|inventario_chasis.inv_select_operativo'),
+  ('20260925193000_security_hardening_fase2', 'politica|compras.leer compras|es_compras'),
+  ('20260925193000_security_hardening_fase2', 'politica|cuentas_por_cobrar.cxc_select|es_finanzas'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),

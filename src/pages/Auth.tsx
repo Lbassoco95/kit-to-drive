@@ -10,10 +10,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 
 const RESET_COOLDOWN_MS = 60_000;
+const LOGIN_LOCK_MS = 30_000;
+const LOGIN_FAIL_THRESHOLD = 5;
 
-function mapLoginError(message: string, auth: { invalidCredentials: string; emailNotConfirmed: string }): string {
+function mapLoginError(
+  message: string,
+  auth: { invalidCredentials: string; emailNotConfirmed: string; loginRateLimited: string },
+): string {
   if (/invalid login credentials/i.test(message)) return auth.invalidCredentials;
   if (/email not confirmed/i.test(message)) return auth.emailNotConfirmed;
+  if (/rate|too many|exceed/i.test(message)) return auth.loginRateLimited;
   return message;
 }
 
@@ -23,6 +29,8 @@ export default function Auth() {
   const [pwd, setPwd] = useState("");
   const [busy, setBusy] = useState(false);
   const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [loginLockUntil, setLoginLockUntil] = useState(0);
+  const [loginFails, setLoginFails] = useState(0);
   const [now, setNow] = useState(Date.now());
   const nav = useNavigate();
   const { user, isPasswordRecovery } = useAuth();
@@ -37,18 +45,36 @@ export default function Auth() {
   }, [user, isPasswordRecovery, nav]);
 
   useEffect(() => {
-    if (cooldownUntil <= Date.now()) return;
+    const until = Math.max(cooldownUntil, loginLockUntil);
+    if (until <= Date.now()) return;
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [cooldownUntil]);
+  }, [cooldownUntil, loginLockUntil]);
 
   const login = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (Date.now() < loginLockUntil) {
+      toast.error(t.auth.loginRateLimited);
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password: pwd });
     setBusy(false);
-    if (error) toast.error(mapLoginError(error.message, t.auth));
-    else nav("/");
+    if (error) {
+      const nextFails = loginFails + 1;
+      setLoginFails(nextFails);
+      if (nextFails >= LOGIN_FAIL_THRESHOLD) {
+        setLoginLockUntil(Date.now() + LOGIN_LOCK_MS);
+        setLoginFails(0);
+        toast.error(t.auth.loginRateLimited);
+      } else {
+        toast.error(mapLoginError(error.message, t.auth));
+      }
+      return;
+    }
+    setLoginFails(0);
+    setLoginLockUntil(0);
+    nav("/");
   };
 
   const requestReset = async (e?: React.FormEvent) => {
@@ -73,6 +99,7 @@ export default function Auth() {
   };
 
   const cooldownLeft = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
+  const loginLockLeft = Math.max(0, Math.ceil((loginLockUntil - now) / 1000));
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4">
@@ -102,8 +129,16 @@ export default function Auth() {
               <Label className="text-base">{t.auth.password}</Label>
               <Input type="password" required value={pwd} onChange={(e) => setPwd(e.target.value)} className="h-12 text-base" />
             </div>
-            <Button type="submit" disabled={busy} className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]">
-              {busy ? t.auth.signingIn : t.auth.signIn}
+            <Button
+              type="submit"
+              disabled={busy || loginLockLeft > 0}
+              className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]"
+            >
+              {busy
+                ? t.auth.signingIn
+                : loginLockLeft > 0
+                  ? `${t.auth.signIn} (${loginLockLeft}s)`
+                  : t.auth.signIn}
             </Button>
             <div className="text-center">
               <button

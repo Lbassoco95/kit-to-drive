@@ -201,6 +201,7 @@ export const es = {
     signingIn: "Ingresando…",
     invalidCredentials: "Correo o contraseña incorrectos.",
     emailNotConfirmed: "Confirma tu correo antes de ingresar.",
+    loginRateLimited: "Demasiados intentos de acceso. Espera un momento e inténtalo de nuevo.",
     forgotPassword: "¿Olvidaste tu contraseña?",
     forgotSubtitle: "Te enviaremos un enlace si el correo está registrado.",
     sendResetLink: "Enviar enlace",

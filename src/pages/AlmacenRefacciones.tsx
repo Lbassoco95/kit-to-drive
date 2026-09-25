@@ -171,7 +171,7 @@ export default function AlmacenRefacciones() {
     setImportando(true);
     try {
       const buf = await file.arrayBuffer();
-      const items = parseListaPreciosRefacciones(buf);
+      const items = await parseListaPreciosRefacciones(buf);
       if (!items.length) {
         toast.error(t.almacenRefacciones?.sinProductos ?? "No se encontraron productos en el Excel");
         return;
