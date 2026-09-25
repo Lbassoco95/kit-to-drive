@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fmtDate, effEstatusArmado, diasDesvio, normColor, lineaDe, CatalogoModelos, nombreComercial, displayFabrica } from "@/lib/dazon";
+import { topVendedores, type RemisionConVendedor } from "@/lib/vendedoresRemision";
 import { fmtMoneda, totalYMes } from "@/lib/finanzas";
 import { fdb } from "@/lib/finanzasDb";
 import { useLang } from "@/contexts/LangContext";
@@ -92,7 +93,7 @@ export default function Dashboard() {
           supabase
             .from("remisiones")
             .select(
-              "id, folio_remision, estatus, vendedor_id, total_unidades_solicitadas, notas, profiles:vendedor_id(nombre_completo)"
+              "id, folio_remision, estatus, vendedor_id, nombre_vendedor, total_unidades_solicitadas, notas, profiles:vendedor_id(nombre_completo)"
             ),
           supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
           supabase.from("inventario_chasis").select("modelo").is("motocarro_id", null),
@@ -347,8 +348,9 @@ export default function Dashboard() {
           <SeccionDashboard titulo={t.dashboard.seccionComercial}>
             <div className="grid md:grid-cols-2 gap-4">
               <Card className="p-6">
-                <h3 className="mb-4 flex items-center gap-2"><Users size={22}/> {t.dashboard.topVendedores}</h3>
-                <TopVendedores rems={rems} />
+                <h3 className="mb-1 flex items-center gap-2"><Users size={22}/> {t.dashboard.topVendedores}</h3>
+                <p className="text-sm text-muted-foreground mb-4">{t.dashboard.topVendedoresNota}</p>
+                <TopVendedores rems={rems} sinAsignar={t.dashboard.sinVendedor} />
               </Card>
               <Card className="p-6">
                 <h3 className="mb-4">{t.dashboard.resumenRapido}</h3>
@@ -403,17 +405,12 @@ export default function Dashboard() {
   );
 }
 
-function TopVendedores({ rems }: { rems: any[] }) {
-  const map: Record<string, number> = {};
-  rems.forEach(r => {
-    const v = r.profiles?.nombre_completo || (r.notas || "").replace("Vendedor original: ", "") || "Sin asignar";
-    map[v] = (map[v] || 0) + 1;
-  });
-  const top = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const max = top[0]?.[1] || 1;
+function TopVendedores({ rems, sinAsignar }: { rems: RemisionConVendedor[]; sinAsignar: string }) {
+  const top = topVendedores(rems, { sinAsignar });
+  const max = top[0]?.n || 1;
   return (
     <ul className="space-y-3">
-      {top.map(([v, n]) => {
+      {top.map(({ nombre: v, n }) => {
         const initials = v.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase();
         return (
           <li key={v} className="flex items-center gap-3">

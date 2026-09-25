@@ -404,6 +404,8 @@ export const zh = {
     atrasados: (n: number) => `延误三轮车 (${n})`,
     planVsReal: "计划 vs 实际（累计）",
     topVendedores: "销售排行",
+    topVendedoresNota: "按提货单上指定的销售员，而不是录入人",
+    sinVendedor: "未指定",
     resumenRapido: "快速汇总",
     listosParaEntregar: (n: number) => `${n} 辆待交付`,
     remisionesParciales: (n: number) => `${n} 张部分完成提货单`,

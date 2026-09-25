@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { fmtDate, normColor } from "@/lib/dazon";
+import { nombreVendedorDe } from "@/lib/vendedoresRemision";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { Bike, Truck, Calendar, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +24,7 @@ export default function Entregas() {
   const load = async () => {
     const { data } = await supabase
       .from("motocarros")
-      .select("*, remisiones(folio_remision, tipo_pago, pagado, clientes(codigo_erp,folio_interno), profiles:vendedor_id(nombre_completo))")
+      .select("*, remisiones(folio_remision, tipo_pago, pagado, nombre_vendedor, notas, clientes(codigo_erp,folio_interno), profiles:vendedor_id(nombre_completo))")
       .in("estatus_armado", ["ARMADO", "LISTO"])
       .not("chasis_asignado", "is", null)
       .order("orden_armado");
@@ -105,7 +106,7 @@ export default function Entregas() {
                     </span>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground pt-1">Vendedor: <strong className="text-foreground">{r.remisiones?.profiles?.nombre_completo || "—"}</strong></div>
+                <div className="text-xs text-muted-foreground pt-1">{t.fields.vendedor}: <strong className="text-foreground">{nombreVendedorDe(r.remisiones) || "—"}</strong></div>
                 {r.fecha_estimada_entrega && <div className="text-xs">{t.entregas.fechaEstimada} <strong>{fmtDate(r.fecha_estimada_entrega)}</strong></div>}
                 {r.fecha_real_entrega && <div className="text-xs">{t.entregas.fechaReal} <strong>{fmtDate(r.fecha_real_entrega)}</strong></div>}
               </div>
