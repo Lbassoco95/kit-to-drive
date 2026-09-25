@@ -5,13 +5,17 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { fmtDate, normColor } from "@/lib/dazon";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { fmtDate, normColor, explicarError } from "@/lib/dazon";
+import { esPagoCredito, faltaRegistrarPaqueteria, validarRegistroPaqueteria } from "@/lib/entregaCredito";
 import { EstatusBadge } from "@/components/EstatusBadge";
-import { Bike, Truck, Calendar, CheckCircle } from "lucide-react";
+import { Bike, Truck, Calendar, CheckCircle, Package } from "lucide-react";
 import { toast } from "sonner";
 
 type Filter = "PENDIENTES" | "PROGRAMADAS_HOY" | "ENTREGADAS_HOY";
+
+const pendienteDeEntrega = (estatus: string) =>
+  estatus === "NO_APLICA" || estatus === "PROGRAMADA" || estatus === "EN_RUTA";
 
 export default function Entregas() {
   const { t } = useLang();
@@ -19,11 +23,14 @@ export default function Entregas() {
   const [filter, setFilter] = useState<Filter>("PENDIENTES");
   const [scheduling, setScheduling] = useState<any | null>(null);
   const [date, setDate] = useState(new Date().toISOString().slice(0,10));
+  const [paqueteria, setPaqueteria] = useState("");
+  const [guia, setGuia] = useState("");
+  const [guardando, setGuardando] = useState(false);
 
   const load = async () => {
     const { data } = await supabase
       .from("motocarros")
-      .select("*, remisiones(folio_remision, tipo_pago, pagado, clientes(codigo_erp,folio_interno), profiles:vendedor_id(nombre_completo))")
+      .select("*, remisiones(folio_remision, tipo_pago, pagado, clientes(codigo_erp,folio_interno,nombre_comercial), profiles:vendedor_id(nombre_completo))")
       .in("estatus_armado", ["ARMADO", "LISTO"])
       .not("chasis_asignado", "is", null)
       .order("orden_armado");
@@ -33,19 +40,19 @@ export default function Entregas() {
 
   const update = async (id: string, patch: any) => {
     const { error } = await supabase.from("motocarros").update(patch).eq("id", id);
-    if (error) toast.error(error.message); else { toast.success(t.produccion.toastOk); load(); }
+    if (error) toast.error(explicarError(error, error.message)); else { toast.success(t.produccion.toastOk); load(); }
   };
 
   const today = new Date().toISOString().slice(0,10);
   const counts = useMemo(() => ({
-    PENDIENTES: rows.filter(r => r.estatus_entrega === "NO_APLICA").length,
-    PROGRAMADAS_HOY: rows.filter(r => r.estatus_entrega === "PROGRAMADA" && r.fecha_estimada_entrega === today).length,
+    PENDIENTES: rows.filter(r => pendienteDeEntrega(r.estatus_entrega)).length,
+    PROGRAMADAS_HOY: rows.filter(r => pendienteDeEntrega(r.estatus_entrega) && r.estatus_entrega !== "NO_APLICA" && r.fecha_estimada_entrega === today).length,
     ENTREGADAS_HOY: rows.filter(r => r.estatus_entrega === "ENTREGADA" && r.fecha_real_entrega === today).length,
   }), [rows, today]);
 
   const filtered = useMemo(() => rows.filter(r => {
-    if (filter === "PENDIENTES") return r.estatus_entrega === "NO_APLICA" || r.estatus_entrega === "PROGRAMADA";
-    if (filter === "PROGRAMADAS_HOY") return r.estatus_entrega === "PROGRAMADA" && r.fecha_estimada_entrega === today;
+    if (filter === "PENDIENTES") return pendienteDeEntrega(r.estatus_entrega);
+    if (filter === "PROGRAMADAS_HOY") return pendienteDeEntrega(r.estatus_entrega) && r.estatus_entrega !== "NO_APLICA" && r.fecha_estimada_entrega === today;
     return r.estatus_entrega === "ENTREGADA" && r.fecha_real_entrega === today;
   }), [rows, filter, today]);
 
@@ -54,6 +61,38 @@ export default function Entregas() {
     { key: "PROGRAMADAS_HOY", label: t.entregas.filtros.programadasHoy },
     { key: "ENTREGADAS_HOY", label: t.entregas.filtros.entregadasHoy },
   ];
+
+  const abrirPaqueteria = (r: any) => {
+    setScheduling({ ...r, modo: "paqueteria" });
+    setDate(r.fecha_estimada_entrega || today);
+    setPaqueteria(r.paqueteria || "");
+    setGuia(r.numero_guia || "");
+  };
+
+  const guardarPaqueteria = async () => {
+    if (!scheduling) return;
+    const error = validarRegistroPaqueteria({ paqueteria, fechaEstimada: date });
+    if (error === "paqueteria") return toast.error(t.entregas.faltaPaqueteria);
+    if (error === "fecha") return toast.error(t.entregas.faltaFecha);
+    setGuardando(true);
+    const { error: rpcError } = await supabase.rpc("registrar_paqueteria", {
+      _motocarro_id: scheduling.id,
+      _paqueteria: paqueteria.trim(),
+      _numero_guia: guia.trim(),
+      _fecha_estimada: date,
+    });
+    setGuardando(false);
+    if (rpcError) return toast.error(explicarError(rpcError, rpcError.message));
+    toast.success(t.entregas.paqueteriaOk);
+    setScheduling(null);
+    load();
+  };
+
+  const confirmarCredito = async (id: string) => {
+    const { error } = await supabase.rpc("confirmar_entrega_credito", { _motocarro_id: id });
+    if (error) toast.error(explicarError(error, error.message));
+    else { toast.success(t.entregas.entregaAvisada); load(); }
+  };
 
   return (
     <div className="space-y-5">
@@ -75,8 +114,10 @@ export default function Entregas() {
         {filtered.map(r => {
           const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
           const colorBg = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";
-          // Bloquear si contra_entrega sin pago confirmado
+          const credito = esPagoCredito(r.remisiones?.tipo_pago);
           const pagoPendiente = r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado;
+          const sinPaqueteria = credito && faltaRegistrarPaqueteria(r);
+          const enCamino = credito && !sinPaqueteria && r.estatus_entrega !== "ENTREGADA";
           return (
             <Card key={r.id} className="overflow-hidden flex flex-col">
               <div className="p-4 flex items-center gap-3" style={{ background: colorBg }}>
@@ -99,6 +140,11 @@ export default function Entregas() {
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">👤 {r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "—"}</span>
                   <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">📄 {r.remisiones?.folio_remision || "—"}</span>
+                  {credito && (
+                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-indigo-100 text-indigo-800 text-xs font-semibold">
+                      {t.pago.credito}
+                    </span>
+                  )}
                   {pagoPendiente && (
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">
                       {t.pago.pendiente}
@@ -106,8 +152,18 @@ export default function Entregas() {
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground pt-1">Vendedor: <strong className="text-foreground">{r.remisiones?.profiles?.nombre_completo || "—"}</strong></div>
+                {credito && <div className="text-xs text-indigo-800">{t.entregas.creditoNota}</div>}
+                {r.paqueteria && (
+                  <div className="text-xs">
+                    {t.entregas.paqueteria}: <strong>{r.paqueteria}</strong>
+                    {r.numero_guia ? <> · {t.entregas.guia} <strong>{r.numero_guia}</strong></> : null}
+                  </div>
+                )}
                 {r.fecha_estimada_entrega && <div className="text-xs">{t.entregas.fechaEstimada} <strong>{fmtDate(r.fecha_estimada_entrega)}</strong></div>}
                 {r.fecha_real_entrega && <div className="text-xs">{t.entregas.fechaReal} <strong>{fmtDate(r.fecha_real_entrega)}</strong></div>}
+                {credito && r.cliente_avisado_at && (
+                  <div className="text-xs text-emerald-700">{t.entregas.clienteAvisado}</div>
+                )}
               </div>
               <div className="border-t p-3 space-y-2">
                 {pagoPendiente && (
@@ -115,16 +171,29 @@ export default function Entregas() {
                     {t.pago.vendedorDebeConfirmar}
                   </div>
                 )}
-                {r.estatus_entrega === "NO_APLICA" && (
+                {sinPaqueteria && (
+                  <Button
+                    onClick={() => abrirPaqueteria(r)}
+                    className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]"
+                  >
+                    <Package className="h-5 w-5 mr-2"/> {t.entregas.registrarPaqueteria}
+                  </Button>
+                )}
+                {enCamino && (
+                  <Button onClick={() => confirmarCredito(r.id)} className="w-full h-12 text-base bg-[#5B21B6] hover:bg-[#4c1d95]">
+                    <Truck className="h-5 w-5 mr-2"/> {t.entregas.confirmarLlegada}
+                  </Button>
+                )}
+                {!credito && r.estatus_entrega === "NO_APLICA" && (
                   <Button
                     disabled={pagoPendiente}
-                    onClick={() => { setScheduling(r); setDate(new Date().toISOString().slice(0,10)); }}
+                    onClick={() => { setScheduling({ ...r, modo: "fecha" }); setDate(new Date().toISOString().slice(0,10)); }}
                     className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Calendar className="h-5 w-5 mr-2"/> {t.entregas.programar}
                   </Button>
                 )}
-                {r.estatus_entrega === "PROGRAMADA" && (
+                {!credito && (r.estatus_entrega === "PROGRAMADA" || r.estatus_entrega === "EN_RUTA") && (
                   <Button onClick={() => update(r.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: today })} className="w-full h-12 text-base bg-[#5B21B6] hover:bg-[#4c1d95]">
                     <Truck className="h-5 w-5 mr-2"/> {t.entregas.confirmar}
                   </Button>
@@ -143,13 +212,46 @@ export default function Entregas() {
 
       <Dialog open={!!scheduling} onOpenChange={o => { if (!o) setScheduling(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{t.entregas.dialogTitulo(scheduling?.chasis_asignado)}</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>{t.entregas.fechaEntrega}</Label>
-            <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 text-base" />
-          </div>
+          <DialogHeader>
+            <DialogTitle>
+              {scheduling?.modo === "paqueteria"
+                ? t.entregas.dialogPaqueteria(scheduling?.chasis_asignado)
+                : t.entregas.dialogTitulo(scheduling?.chasis_asignado)}
+            </DialogTitle>
+            <DialogDescription>
+              {scheduling?.modo === "paqueteria" ? t.entregas.creditoNota : t.entregas.fechaEntrega}
+            </DialogDescription>
+          </DialogHeader>
+          {scheduling?.modo === "paqueteria" ? (
+            <div className="space-y-3 py-2">
+              <div>
+                <Label>{t.entregas.paqueteria}</Label>
+                <Input value={paqueteria} onChange={e => setPaqueteria(e.target.value)} placeholder={t.entregas.paqueteriaPlaceholder} className="h-12 text-base" />
+              </div>
+              <div>
+                <Label>{t.entregas.numeroGuia}</Label>
+                <Input value={guia} onChange={e => setGuia(e.target.value)} className="h-12 text-base" />
+                <p className="text-xs text-muted-foreground mt-1">{t.entregas.guiaOpcional}</p>
+              </div>
+              <div>
+                <Label>{t.entregas.fechaEntrega}</Label>
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 text-base" />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3 py-2">
+              <Label>{t.entregas.fechaEntrega}</Label>
+              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-12 text-base" />
+            </div>
+          )}
           <DialogFooter>
-            <Button onClick={async () => { await update(scheduling.id, { estatus_entrega: "PROGRAMADA", fecha_estimada_entrega: date }); setScheduling(null); }} className="h-12 px-5 text-base">Programar</Button>
+            {scheduling?.modo === "paqueteria" ? (
+              <Button onClick={guardarPaqueteria} disabled={guardando} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+                {guardando ? t.actions.loading : t.entregas.registrarPaqueteria}
+              </Button>
+            ) : (
+              <Button onClick={async () => { await update(scheduling.id, { estatus_entrega: "PROGRAMADA", fecha_estimada_entrega: date }); setScheduling(null); }} className="h-12 px-5 text-base">Programar</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

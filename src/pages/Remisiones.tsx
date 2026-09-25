@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { fmtDate, effEstatusArmado, COLORES, claveStock, disponiblesEnOrden, normColor, normModelo, StockColor, explicarError } from "@/lib/dazon";
+import { esPagoCredito } from "@/lib/entregaCredito";
 import {
   agruparRenglones, planEditarRenglones, aplicarCambioMoto, motivoValido, MOTIVO_MIN, MOTIVOS_EDICION,
   faltantesDeExistencia, mensajeFaltantes, repartoAlBajar,
@@ -571,6 +572,22 @@ export default function Remisiones() {
         setRows(prev => prev.map(r => ({ ...r, motocarros: motosMap[r.id] ?? [] })));
       }
     } catch (_) { /* cache stale — ignorar */ }
+
+    // Paquetería del crédito. Si la migración todavía no está, el resto de la
+    // bandeja no se cae: simplemente no se ve la guía ni la fecha.
+    try {
+      const { data: paq, error: errPaq } = await supabase
+        .from("motocarros")
+        .select("id,paqueteria,numero_guia,cliente_avisado_at")
+        .in("remision_id", ids);
+      if (!errPaq && paq?.length) {
+        const paqMap = Object.fromEntries(paq.map((m: any) => [m.id, m]));
+        setRows(prev => prev.map(r => ({
+          ...r,
+          motocarros: (r.motocarros ?? []).map((m: any) => ({ ...m, ...paqMap[m.id] })),
+        })));
+      }
+    } catch (_) { /* columnas nuevas — ignorar */ }
   };
 
   /**
@@ -1085,7 +1102,8 @@ export default function Remisiones() {
       tipo_pago: editForm.tipo_pago,
       // Pasar a contra entrega no da por pagado lo que no lo está; el
       // comprobante ya subido sí se respeta.
-      pagado: editForm.tipo_pago === "anticipado" ? true : !!editar.comprobante_pago_url,
+      // Crédito no se da por pagado: logística confirma la llegada, no el cobro.
+      pagado: editForm.tipo_pago === "anticipado" ? true : editForm.tipo_pago === "credito" ? false : !!editar.comprobante_pago_url,
       nombre_vendedor: editForm.nombre_vendedor || null,
       color_solicitado: editMotos[0]?.color || "BLANCO",
       total_unidades_solicitadas: plan.totalUnidades,
@@ -1260,9 +1278,11 @@ export default function Remisiones() {
                     <SelectContent>
                       <SelectItem value="anticipado">{t.remisiones.anticipado}</SelectItem>
                       <SelectItem value="contra_entrega">{t.remisiones.contraEntrega}</SelectItem>
+                      <SelectItem value="credito">{t.remisiones.credito}</SelectItem>
                     </SelectContent>
                   </Select>
                   {form.tipo_pago==="contra_entrega"&&<p className="text-xs text-amber-600 mt-1">{t.remisiones.avisoPagoLogistica}</p>}
+                  {form.tipo_pago==="credito"&&<p className="text-xs text-indigo-700 mt-1">{t.remisiones.avisoCreditoLogistica}</p>}
                 </div>
 
                 {/* Notas */}
@@ -1450,7 +1470,9 @@ export default function Remisiones() {
                 <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
                   👤 {r.clientes?.codigo_erp || r.clientes?.folio_interno || "—"}
                 </span>
-                {r.tipo_pago==="contra_entrega"&&!r.pagado ? (
+                {esPagoCredito(r.tipo_pago) ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-indigo-100 text-indigo-800 text-xs font-semibold">{t.pago.credito}</span>
+                ) : r.tipo_pago==="contra_entrega"&&!r.pagado ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">{t.pago.pendiente}</span>
                 ):(
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-700 text-xs font-semibold">
@@ -1508,7 +1530,7 @@ export default function Remisiones() {
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id]?"rotate-180":""}`}/>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-2">
-                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} canPropose={canPropose} canConfirmFab={confirmaFabrica} canConfirmLog={confirmaLogistica} onChange={load}/>)}
+                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} esCredito={esPagoCredito(r.tipo_pago)} canPropose={canPropose} canConfirmFab={confirmaFabrica} canConfirmLog={confirmaLogistica} onChange={load}/>)}
                   </CollapsibleContent>
                 </Collapsible>
               )}
@@ -1628,11 +1650,11 @@ export default function Remisiones() {
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.tipoPagoLbl}</div>
-                  <div className="font-semibold">{detalleRemision.tipo_pago==="contra_entrega"?t.pago.contra_entrega:t.pago.anticipado}</div>
+                  <div className="font-semibold">{esPagoCredito(detalleRemision.tipo_pago)?t.pago.credito:detalleRemision.tipo_pago==="contra_entrega"?t.pago.contra_entrega:t.pago.anticipado}</div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.estadoPago}</div>
-                  <div className="font-semibold">{detalleRemision.pagado===false?t.estatus.PENDIENTE:t.pago.pagado}</div>
+                  <div className="font-semibold">{esPagoCredito(detalleRemision.tipo_pago)?t.pago.credito:detalleRemision.pagado===false?t.estatus.PENDIENTE:t.pago.pagado}</div>
                 </div>
                 <div className="rounded-lg border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.unidadesSolicitadas}</div>
@@ -1818,8 +1840,10 @@ export default function Remisiones() {
                   <SelectContent>
                     <SelectItem value="anticipado">{t.remisiones.anticipado}</SelectItem>
                     <SelectItem value="contra_entrega">{t.remisiones.contraEntrega}</SelectItem>
+                    <SelectItem value="credito">{t.remisiones.credito}</SelectItem>
                   </SelectContent>
                 </Select>
+                {editForm.tipo_pago==="credito"&&<p className="text-xs text-indigo-700 mt-1">{t.remisiones.avisoCreditoLogistica}</p>}
               </div>
 
               {/* Notas */}
@@ -1985,7 +2009,7 @@ export default function Remisiones() {
 }
 
 // ─── MotoRow ──────────────────────────────────────────────────────────────────
-function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:any;canPropose:boolean;canConfirmFab:boolean;canConfirmLog:boolean;onChange:()=>void}) {
+function MotoRow({ m, esCredito, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:any;esCredito?:boolean;canPropose:boolean;canConfirmFab:boolean;canConfirmLog:boolean;onChange:()=>void}) {
   const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [fecha, setFecha]     = useState<string>(m.fecha_propuesta_entrega||"");
@@ -2018,7 +2042,16 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:an
       <div className="px-3 pb-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         <div className="text-muted-foreground">{t.remisiones.estimArmado}</div><div className="text-right font-medium">{fmtDate(m.fecha_estimada_armado)}</div>
         <div className="text-muted-foreground">{t.remisiones.estimEntrega}</div><div className="text-right font-medium">{fmtDate(m.fecha_estimada_entrega||m.fecha_propuesta_entrega)}</div>
+        {m.paqueteria && (
+          <>
+            <div className="text-muted-foreground">{t.entregas.paqueteria}</div>
+            <div className="text-right font-medium">{m.paqueteria}{m.numero_guia ? ` · ${m.numero_guia}` : ""}</div>
+          </>
+        )}
       </div>
+      {esCredito && m.estatus_entrega === "ENTREGADA" && (
+        <div className="px-3 pb-2 text-xs font-medium text-indigo-800">{t.misMotocarros.avisarCliente}</div>
+      )}
       {!editing?(
         <div className="px-3 pb-3 flex flex-wrap items-center gap-2">
           {m.fecha_propuesta_entrega?(

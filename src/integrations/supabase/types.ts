@@ -1124,6 +1124,7 @@ export type Database = {
           con_caja: boolean
           confirmada_fabrica_at: string | null
           confirmada_fabrica_por: string | null
+          cliente_avisado_at: string | null
           confirmada_logistica_at: string | null
           confirmada_logistica_por: string | null
           contenedor_id: string | null
@@ -1140,8 +1141,12 @@ export type Database = {
           modelo: string
           ns_chasis: string | null
           ns_motor: string | null
+          numero_guia: string | null
           observaciones_paro: string | null
           orden_armado: number
+          paqueteria: string | null
+          paqueteria_registrada_at: string | null
+          paqueteria_registrada_por: string | null
           propuesta_entrega_at: string | null
           propuesta_entrega_notas: string | null
           propuesta_entrega_por: string | null
@@ -1151,6 +1156,7 @@ export type Database = {
         Insert: {
           carga_ya_armado?: boolean
           chasis_asignado?: string | null
+          cliente_avisado_at?: string | null
           color?: string
           con_caja?: boolean
           confirmada_fabrica_at?: string | null
@@ -1171,8 +1177,12 @@ export type Database = {
           modelo?: string
           ns_chasis?: string | null
           ns_motor?: string | null
+          numero_guia?: string | null
           observaciones_paro?: string | null
           orden_armado: number
+          paqueteria?: string | null
+          paqueteria_registrada_at?: string | null
+          paqueteria_registrada_por?: string | null
           propuesta_entrega_at?: string | null
           propuesta_entrega_notas?: string | null
           propuesta_entrega_por?: string | null
@@ -1182,6 +1192,7 @@ export type Database = {
         Update: {
           carga_ya_armado?: boolean
           chasis_asignado?: string | null
+          cliente_avisado_at?: string | null
           color?: string
           con_caja?: boolean
           confirmada_fabrica_at?: string | null
@@ -1202,8 +1213,12 @@ export type Database = {
           modelo?: string
           ns_chasis?: string | null
           ns_motor?: string | null
+          numero_guia?: string | null
           observaciones_paro?: string | null
           orden_armado?: number
+          paqueteria?: string | null
+          paqueteria_registrada_at?: string | null
+          paqueteria_registrada_por?: string | null
           propuesta_entrega_at?: string | null
           propuesta_entrega_notas?: string | null
           propuesta_entrega_por?: string | null
@@ -1943,9 +1958,26 @@ export type Database = {
         }
         Returns: Json
       }
+      confirmar_entrega_credito: {
+        Args: { _motocarro_id: string }
+        Returns: Json
+      }
       confirmar_fecha_entrega: {
         Args: { _area: string; _motocarro_id: string }
         Returns: undefined
+      }
+      logistica_puede_entregar: {
+        Args: { _user_id?: string }
+        Returns: boolean
+      }
+      registrar_paqueteria: {
+        Args: {
+          _fecha_estimada: string
+          _motocarro_id: string
+          _numero_guia: string
+          _paqueteria: string
+        }
+        Returns: Json
       }
       decrementar_inventario_color: {
         Args: { _cantidad?: number; _color: string; _modelo: string }

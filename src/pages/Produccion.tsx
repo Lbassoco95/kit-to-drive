@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor, lineaDe, displayFabrica, CatalogoModelos, normSerial, NS_REGEX, serialesCompletos, ESTATUS_INCIDENCIA, EstatusIncidencia } from "@/lib/dazon";
+import { fmtDate, ESTATUS_ENTREGA_COLOR, effEstatusArmado, diasDesvio, normColor, lineaDe, displayFabrica, CatalogoModelos, normSerial, NS_REGEX, serialesCompletos, ESTATUS_INCIDENCIA, EstatusIncidencia, explicarError } from "@/lib/dazon";
+import { esPagoCredito, faltaRegistrarPaqueteria, validarRegistroPaqueteria } from "@/lib/entregaCredito";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { Download, Pencil, Bike, Search, LayoutGrid, Table as TableIcon, CheckCircle, Truck as TruckIcon, MessageSquare, Send, X, Package, Unlock, History, ArrowUpDown, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -182,6 +183,9 @@ export default function Produccion() {
   const [catalogo, setCatalogo] = useState<CatalogoModelos>(new Map());
   const [verHistorial, setVerHistorial] = useState<{ id: string; orden: number; items: any[] } | null>(null);
   const [incidencias, setIncidencias] = useState<Map<string, any[]>>(new Map());
+  const [paqueteriaDe, setPaqueteriaDe] = useState<any | null>(null);
+  const [paqForm, setPaqForm] = useState({ paqueteria: "", guia: "", fecha: "" });
+  const [guardandoPaq, setGuardandoPaq] = useState(false);
 
   const load = async () => {
     // ── -1. Catálogo de líneas de producto — sólo línea "motocarro" entra aquí ─
@@ -213,6 +217,7 @@ export default function Produccion() {
       // defaults para columnas extendidas
       fecha_propuesta_entrega: null, propuesta_entrega_notas: null,
       confirmada_fabrica_at: null, confirmada_logistica_at: null, con_caja: false,
+      paqueteria: null, numero_guia: null, cliente_avisado_at: null,
       remision_items: [],
     }));
     setRows(mapped);
@@ -256,6 +261,20 @@ export default function Produccion() {
       if (ext?.length) {
         const extMap = Object.fromEntries(ext.map((r: any) => [r.id, r]));
         setRows(prev => prev.map(r => ({ ...r, ...extMap[r.id] })));
+      }
+    } catch (_) {}
+
+    // Paquetería del crédito, aparte: si la columna aún no existe, no se pierden
+    // las fechas de propuesta que acaba de cargar el bloque anterior.
+    try {
+      const ids = baseFiltrado.map((r: any) => r.id);
+      const { data: paq, error: errPaq } = await supabase
+        .from("motocarros")
+        .select("id,paqueteria,numero_guia,cliente_avisado_at")
+        .in("id", ids);
+      if (!errPaq && paq?.length) {
+        const paqMap = Object.fromEntries(paq.map((r: any) => [r.id, r]));
+        setRows(prev => prev.map(r => ({ ...r, ...paqMap[r.id] })));
       }
     } catch (_) {}
 
@@ -361,7 +380,25 @@ export default function Produccion() {
     if (action === "EN_PROCESO") await updateMoto(moto.id, { estatus_armado: "EN_PROCESO" });
     else if (action === "ARMADO") await updateMoto(moto.id, { estatus_armado: "ARMADO", fecha_real_armado: today });
     else if (action === "LISTO") await updateMoto(moto.id, { estatus_armado: "LISTO" });
-    else if (action === "ENTREGADA") await updateMoto(moto.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: today });
+    else if (action === "ENTREGADA") {
+      if (esPagoCredito(moto.remisiones?.tipo_pago)) {
+        if (faltaRegistrarPaqueteria(moto)) {
+          toast.error(t.entregas.faltaFecha);
+          setPaqueteriaDe(moto);
+          setPaqForm({
+            paqueteria: moto.paqueteria || "",
+            guia: moto.numero_guia || "",
+            fecha: moto.fecha_estimada_entrega || today,
+          });
+        } else {
+          const { error } = await supabase.rpc("confirmar_entrega_credito", { _motocarro_id: moto.id });
+          if (error) toast.error(explicarError(error, error.message));
+          else { toast.success(t.entregas.entregaAvisada); load(); }
+        }
+      } else {
+        await updateMoto(moto.id, { estatus_entrega: "ENTREGADA", fecha_real_entrega: today });
+      }
+    }
     setConfirm(null);
   };
 
@@ -497,6 +534,10 @@ export default function Produccion() {
       {view === "cards" ? (
         <div className="responsive-card-grid gap-4">
           {filtered.map(r => <MotocarroCard key={r.id} r={r} canEditFabrica={canEditFabrica} canEditEntrega={canEditEntrega}
+            onPaqueteria={() => {
+              setPaqueteriaDe(r);
+              setPaqForm({ paqueteria: r.paqueteria || "", guia: r.numero_guia || "", fecha: r.fecha_estimada_entrega || new Date().toISOString().slice(0, 10) });
+            }}
             catalogo={catalogo}
             incidencias={incidencias.get(r.id) ?? []}
             historialCount={historial.get(r.id) ?? 0}
@@ -693,6 +734,56 @@ export default function Produccion() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!paqueteriaDe} onOpenChange={o => { if (!o) setPaqueteriaDe(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t.entregas.dialogPaqueteria(paqueteriaDe?.chasis_asignado || `#${paqueteriaDe?.orden_armado ?? ""}`)}</DialogTitle>
+            <DialogDescription>{t.entregas.creditoNota}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>{t.entregas.paqueteria}</Label>
+              <Input value={paqForm.paqueteria} onChange={e => setPaqForm({ ...paqForm, paqueteria: e.target.value })} placeholder={t.entregas.paqueteriaPlaceholder} className="h-12 text-base" />
+            </div>
+            <div>
+              <Label>{t.entregas.numeroGuia}</Label>
+              <Input value={paqForm.guia} onChange={e => setPaqForm({ ...paqForm, guia: e.target.value })} className="h-12 text-base" />
+              <p className="text-xs text-muted-foreground mt-1">{t.entregas.guiaOpcional}</p>
+            </div>
+            <div>
+              <Label>{t.entregas.fechaEntrega}</Label>
+              <Input type="date" value={paqForm.fecha} onChange={e => setPaqForm({ ...paqForm, fecha: e.target.value })} className="h-12 text-base" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              disabled={guardandoPaq}
+              className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
+              onClick={async () => {
+                if (!paqueteriaDe) return;
+                const error = validarRegistroPaqueteria({ paqueteria: paqForm.paqueteria, fechaEstimada: paqForm.fecha });
+                if (error === "paqueteria") return toast.error(t.entregas.faltaPaqueteria);
+                if (error === "fecha") return toast.error(t.entregas.faltaFecha);
+                setGuardandoPaq(true);
+                const { error: rpcError } = await supabase.rpc("registrar_paqueteria", {
+                  _motocarro_id: paqueteriaDe.id,
+                  _paqueteria: paqForm.paqueteria.trim(),
+                  _numero_guia: paqForm.guia.trim(),
+                  _fecha_estimada: paqForm.fecha,
+                });
+                setGuardandoPaq(false);
+                if (rpcError) return toast.error(explicarError(rpcError, rpcError.message));
+                toast.success(t.entregas.paqueteriaOk);
+                setPaqueteriaDe(null);
+                load();
+              }}
+            >
+              {guardandoPaq ? t.actions.loading : t.entregas.registrarPaqueteria}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Historial de orden */}
       <Dialog open={!!verHistorial} onOpenChange={(o) => { if (!o) setVerHistorial(null); }}>
         <DialogContent>
@@ -714,7 +805,7 @@ export default function Produccion() {
   );
 }
 
-function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, incidencias = [], t }: any) {
+function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, onPaqueteria, onComentarios, onLiberar, onVerHistorial, historialCount, catalogo, incidencias = [], t }: any) {
   const desv = diasDesvio(r);
   const desvLabel = desv == null ? null : desv > 0 ? `+${desv}d` : `${desv}d`;
   const desvCls = desv == null ? "" : desv > 0 ? "bg-[#FEE2E2] text-[#991B1B]" : "bg-[#D1FAE5] text-[#065F46]";
@@ -755,6 +846,11 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <EstatusBadge estatus={r.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : r._eff} size="md" />
           <div className="flex gap-1.5 flex-wrap">
+            {esPagoCredito(r.remisiones?.tipo_pago) && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs font-bold border border-indigo-200">
+                {t.pago.credito}
+              </span>
+            )}
             {r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado && (
               <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-300">
                 {t.pago.retenido}
@@ -886,7 +982,17 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
             <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarListo}
           </Button>
         )}
-        {canEditEntrega && r._eff === "LISTO" && r.estatus_entrega !== "ENTREGADA" && (
+        {canEditEntrega && r._eff === "LISTO" && r.estatus_entrega !== "ENTREGADA" && esPagoCredito(r.remisiones?.tipo_pago) && faltaRegistrarPaqueteria(r) && (
+          <Button onClick={onPaqueteria} disabled={!conSerial} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base">
+            <Package className="h-5 w-5 mr-2" /> {t.entregas.registrarPaqueteria}
+          </Button>
+        )}
+        {canEditEntrega && r._eff === "LISTO" && r.estatus_entrega !== "ENTREGADA" && esPagoCredito(r.remisiones?.tipo_pago) && !faltaRegistrarPaqueteria(r) && (
+          <Button onClick={() => onAction("ENTREGADA")} disabled={!conSerial} className="flex-1 h-12 bg-[#5B21B6] hover:bg-[#4c1d95] text-base">
+            <TruckIcon className="h-5 w-5 mr-2" /> {t.entregas.confirmarLlegada}
+          </Button>
+        )}
+        {canEditEntrega && r._eff === "LISTO" && r.estatus_entrega !== "ENTREGADA" && !esPagoCredito(r.remisiones?.tipo_pago) && (
           <Button onClick={() => onAction("ENTREGADA")} disabled={!conSerial} className="flex-1 h-12 bg-[#5B21B6] hover:bg-[#4c1d95] text-base">
             <TruckIcon className="h-5 w-5 mr-2" /> {t.produccion.marcarEntregado}
           </Button>

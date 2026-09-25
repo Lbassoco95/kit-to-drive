@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fmtDate, normColor, effEstatusArmado } from "@/lib/dazon";
+import { esPagoCredito } from "@/lib/entregaCredito";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { Copy, ChevronDown, Bike, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -93,6 +94,12 @@ export default function MisMotocarros() {
                         <div className="text-xs font-mono text-muted-foreground truncate">{r.ns_chasis || r.chasis_asignado || t.misMotocarros.sinNS}</div>
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <EstatusBadge estatus={r.estatus_entrega === "ENTREGADA" ? "ENTREGADA" : effEstatusArmado(r)} size="sm" />
+                          {esPagoCredito(r.remisiones?.tipo_pago) && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800">{t.pago.credito}</span>
+                          )}
+                          {esPagoCredito(r.remisiones?.tipo_pago) && r.estatus_entrega === "ENTREGADA" && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">{t.misMotocarros.avisarCliente}</span>
+                          )}
                           {r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700">{t.pago.retenidoCorto}</span>
                           )}
@@ -131,6 +138,14 @@ export default function MisMotocarros() {
                 <>
                   <Row k={t.misMotocarros.fechaEstimadaEntrega} v={fmtDate(detail.fecha_estimada_entrega)}/>
                   <Row k={t.misMotocarros.fechaRealEntrega} v={fmtDate(detail.fecha_real_entrega)}/>
+                  {esPagoCredito(detail.remisiones?.tipo_pago) && detail.paqueteria && (
+                    <Row k={t.misMotocarros.paqueteria} v={`${detail.paqueteria}${detail.numero_guia ? ` · ${detail.numero_guia}` : ""}`}/>
+                  )}
+                  {esPagoCredito(detail.remisiones?.tipo_pago) && detail.estatus_entrega === "ENTREGADA" && (
+                    <div className="rounded-md bg-indigo-50 border border-indigo-200 px-3 py-2 text-indigo-900 text-sm font-medium">
+                      {t.misMotocarros.avisarCliente}
+                    </div>
+                  )}
                 </>
               )}
               <div className="flex gap-2 pt-2">

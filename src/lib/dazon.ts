@@ -241,6 +241,8 @@ export const claveCapacidad = (modelo: string, color: string) =>
 // arriba. Ojo con `nombre_comercial`: existe en `modelos_producto` (KIT-3) y
 // también en `inventario_colores` (KIT-4), y son scripts distintos.
 const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
+  [/paqueteria|numero_guia|cliente_avisado_at|registrar_paqueteria|confirmar_entrega_credito|logistica_puede_entregar/,
+    "20260925183000_credito_paqueteria_entrega.sql"],
   [/remisiones_bitacora|puede_editar_remision|puede_capturar_remision|rol_comercial|orden_linea/,
     "20260902000001_operador_edita_remisiones.sql"],
   // Los clientes se vieron «sin resultados» en producción por esto: la lista
@@ -307,6 +309,11 @@ export function explicarError(e: unknown, fallback: string): string {
   const err = (e ?? {}) as { code?: string; message?: string };
   const crudo = err.message ?? "";
   // 42703 = undefined_column, 42P01 = undefined_table, 42883 = undefined_function.
+  // 23514 = check_violation. El tipo de pago «credito» no entra en la
+  // restricción vieja (sólo anticipado / contra entrega).
+  if (err.code === "23514" && /tipo_pago/.test(crudo)) {
+    return `La base de datos va atrás del sistema: falta correr supabase/migrations/20260925183000_credito_paqueteria_entrega.sql en el SQL editor de Supabase. (${crudo})`;
+  }
   if (["42703", "42P01", "42883"].includes(err.code ?? "")) {
     const script = SCRIPT_DE_OBJETO.find(([re]) => re.test(crudo))?.[1];
     return script

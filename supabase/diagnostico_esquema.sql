@@ -285,7 +285,15 @@ WITH esperado(script, objeto) AS (VALUES
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
-  ('fix_remisiones_columns',                      'restriccion|remisiones.remisiones_tipo_pago_check|contra_entrega')
+  ('fix_remisiones_columns',                      'restriccion|remisiones.remisiones_tipo_pago_check|contra_entrega'),
+
+  -- Crédito: paquetería con fecha estimada, y aviso al cliente al entregar.
+  ('20260925183000_credito_paqueteria_entrega',   'restriccion|remisiones.remisiones_tipo_pago_check|credito'),
+  ('20260925183000_credito_paqueteria_entrega',   'columna|motocarros.paqueteria'),
+  ('20260925183000_credito_paqueteria_entrega',   'columna|motocarros.numero_guia'),
+  ('20260925183000_credito_paqueteria_entrega',   'columna|motocarros.cliente_avisado_at'),
+  ('20260925183000_credito_paqueteria_entrega',   'funcion|registrar_paqueteria(uuid,text,text,date)'),
+  ('20260925183000_credito_paqueteria_entrega',   'funcion|confirmar_entrega_credito(uuid)')
 ), superado(script, por) AS (VALUES
   -- Scripts que otro posterior reemplazó por completo (les tiró la función y
   -- la volvió a crear con otra firma). No hay que correrlos y revisarlos
