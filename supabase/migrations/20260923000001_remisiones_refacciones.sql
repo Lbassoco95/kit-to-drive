@@ -152,6 +152,7 @@ BEGIN
   SELECT string_agg(
     CASE column_name
       WHEN 'num_compatibilidades' THEN 'coalesce(c.num_compat, 0)::integer AS num_compatibilidades'
+      WHEN 'tiene_compatibilidad' THEN '(coalesce(c.num_compat, 0) > 0) AS tiene_compatibilidad'
       ELSE 'p.' || quote_ident(column_name)
     END,
     ', ' ORDER BY ordinal_position

@@ -1192,6 +1192,7 @@ export default function Remisiones() {
                 <div>
                   <Label className="text-base">{t.remisiones.folioRemision}</Label>
                   <Input value={form.folio_remision} onChange={e=>setForm({...form,folio_remision:e.target.value})} placeholder={t.remisiones.folioPlaceholder} className="h-12 text-base font-mono" />
+                  <p className="text-xs text-muted-foreground mt-1">{t.remisiones.folioSerie}</p>
                   {recentFolios.length>0&&(
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {recentFolios.map(f=>(
@@ -1374,8 +1375,8 @@ export default function Remisiones() {
             <Card key={r.id} className="p-5 flex flex-col gap-3 border-red-100 bg-red-50/30 opacity-80">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
-                  <div className="text-2xl font-bold text-slate-500 leading-tight line-through">{r.folio_remision}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.remisiones.folioRemision}</div>
+                  <div className="text-2xl font-bold font-mono text-slate-500 leading-tight line-through">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{t.remisiones.cancelada}</span>
@@ -1420,8 +1421,8 @@ export default function Remisiones() {
             <Card key={r.id} className="p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
-                  <div className="text-2xl font-bold text-[#1F3864] leading-tight">{r.folio_remision}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.remisiones.folioRemision}</div>
+                  <div className="text-2xl font-bold font-mono text-[#1F3864] leading-tight">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                   {!!modificaciones[r.id] && (
                     <button

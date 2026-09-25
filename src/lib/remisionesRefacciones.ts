@@ -36,6 +36,25 @@ export type LineaRefaccion = {
 export const PASOS_REMISION_REFACCION = ["ventas", "almacen", "contingencia", "logistica", "entregada"] as const;
 export type PasoRemisionRefaccion = (typeof PASOS_REMISION_REFACCION)[number];
 
+/**
+ * Siguiente folio de una serie. Refacciones usan RF-00001; motocarros usan REM-.
+ * El número real lo confirma la base al guardar; esto es el que se va a asignar
+ * si nadie más levanta una remisión antes.
+ */
+export function siguienteFolioSerie(
+  folios: readonly string[],
+  prefijo = "RF-",
+  digitos = 5,
+): string {
+  const re = new RegExp(`^${prefijo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\d+)$`);
+  let max = 0;
+  for (const folio of folios) {
+    const m = (folio || "").trim().match(re);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return `${prefijo}${String(max + 1).padStart(digitos, "0")}`;
+}
+
 /** Lo que otros pedidos pueden tomar: existencia física menos lo apartado. */
 export function disponibleRefaccion(stock: number, bloqueado: number): number {
   return Math.max(0, Math.trunc(stock) - Math.trunc(bloqueado));

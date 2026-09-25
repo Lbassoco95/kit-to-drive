@@ -9,6 +9,7 @@ import {
   envioListo,
   faltantesDePedido,
   puedeMarcarEntregada,
+  siguienteFolioSerie,
   type EtapaRefaccion,
   type EstatusLineaRefaccion,
   type PasoRemisionRefaccion,
@@ -130,6 +131,7 @@ export default function RemisionesRefacciones() {
   const [rows, setRows] = useState<Remision[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"curso" | "contingencia" | "logistica" | "entregada" | "cancelada">("curso");
+  const [qFolio, setQFolio] = useState("");
   const [open, setOpen] = useState(false);
   const [detalle, setDetalle] = useState<Remision | null>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -155,13 +157,20 @@ export default function RemisionesRefacciones() {
     if (puedeEntrar) void load();
   }, [puedeEntrar, load]);
 
-  const visibles = useMemo(() => rows.filter(r => {
-    if (tab === "curso") return r.abierta || r.etapa === "almacen";
-    if (tab === "contingencia") return r.etapa === "contingencia";
-    if (tab === "logistica") return r.etapa === "logistica" || r.etapa === "surtida";
-    if (tab === "entregada") return r.etapa === "entregada";
-    return r.etapa === "cancelada";
-  }), [rows, tab]);
+  const visibles = useMemo(() => {
+    const term = qFolio.trim().toLowerCase();
+    return rows.filter(r => {
+      if (tab === "curso") return r.abierta || r.etapa === "almacen";
+      if (tab === "contingencia") return r.etapa === "contingencia";
+      if (tab === "logistica") return r.etapa === "logistica" || r.etapa === "surtida";
+      if (tab === "entregada") return r.etapa === "entregada";
+      return r.etapa === "cancelada";
+    }).filter(r => {
+      if (!term) return true;
+      const blob = [r.folio, r.nombre_vendedor, clienteLabel(r.clientes), r.direccion_entrega].filter(Boolean).join(" ").toLowerCase();
+      return blob.includes(term);
+    });
+  }, [rows, tab, qFolio]);
 
   const abrir = async (r: Remision) => {
     setDetalle(r);
@@ -221,6 +230,11 @@ export default function RemisionesRefacciones() {
         {tx.leyendaBloqueo}
       </Card>
 
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input className="pl-9" value={qFolio} onChange={e => setQFolio(e.target.value)} placeholder={tx.buscarFolio} />
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {([
           ["curso", tx.tabCurso],
@@ -240,8 +254,11 @@ export default function RemisionesRefacciones() {
           <Card key={r.id} className="p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
+                <div className="space-y-0.5">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{tx.folioSeguimiento}</div>
+                  <div className="font-mono text-2xl font-bold text-[#1F3864] leading-tight">{r.folio}</div>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono font-semibold text-[#1F3864]">{r.folio}</span>
                   <EtapaBadge etapa={r.etapa} abierta={r.abierta} />
                   <AreaBadge area={r.area_actual} />
                 </div>
@@ -451,6 +468,7 @@ function NuevaRemision({
   const [tipoPago, setTipoPago] = useState<"anticipado" | "contra_entrega">("anticipado");
   const [guardando, setGuardando] = useState(false);
   const [catalogoListo, setCatalogoListo] = useState(false);
+  const [folioPrevisto, setFolioPrevisto] = useState("RF-00001");
 
   useEffect(() => {
     if (!open) return;
@@ -466,6 +484,9 @@ function NuevaRemision({
         .limit(5000);
       if (error) toast.error(explicarError(error, tx.errorCargar));
       else setProductos(((data as unknown) as Producto[]) ?? []);
+      const folios = await supabase.from("remisiones_refacciones" as any).select("folio").limit(2000);
+      const lista = ((folios.data as unknown) as { folio?: string }[] | null) ?? [];
+      setFolioPrevisto(siguienteFolioSerie(lista.map(r => r.folio ?? "")));
       setCatalogoListo(true);
     })();
   }, [open, tx.errorCargar]);
@@ -575,6 +596,11 @@ function NuevaRemision({
           <DialogTitle>{tx.crearTitulo}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="rounded-md border border-[#1F3864]/20 bg-[#EFF6FF] px-3 py-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[#1F3864]">{tx.folioSeguimiento}</div>
+            <div className="font-mono text-2xl font-bold text-[#1F3864]">{folioPrevisto}</div>
+            <p className="text-xs text-muted-foreground mt-1">{tx.folioSerie}</p>
+          </div>
           <div>
             <Label>{tx.cliente}</Label>
             <Input className="mt-1" value={qCliente} onChange={e => setQCliente(e.target.value)} placeholder={tx.buscarCliente} />

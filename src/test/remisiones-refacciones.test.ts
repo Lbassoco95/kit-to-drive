@@ -10,6 +10,7 @@ import {
   indicePaso,
   liberarLinea,
   puedeMarcarEntregada,
+  siguienteFolioSerie,
   reportarFaltante,
   type LineaRefaccion,
 } from "@/lib/remisionesRefacciones";
@@ -21,6 +22,14 @@ const apartada = (cantidad: number, extra: Partial<LineaRefaccion> = {}): LineaR
   cantidad_surtida: 0,
   cantidad_faltante: 0,
   ...extra,
+});
+
+describe("folio de seguimiento", () => {
+  it("asigna RF- y no se mezcla con la serie REM- de motocarros", () => {
+    expect(siguienteFolioSerie([])).toBe("RF-00001");
+    expect(siguienteFolioSerie(["RF-00001", "RF-00007", "REM-031"])).toBe("RF-00008");
+    expect(siguienteFolioSerie(["REM-031", "REM-024"], "REM-", 3)).toBe("REM-032");
+  });
 });
 
 describe("etapas visibles", () => {
