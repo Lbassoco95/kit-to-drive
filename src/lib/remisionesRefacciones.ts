@@ -17,7 +17,7 @@ export type EtapaRefaccion =
   | "cancelada";
 export type AreaRemisionRefaccion = "ventas" | "almacen" | "logistica" | "finanzas";
 export type TipoEnvioRefaccion = "paqueteria" | "directo" | "recoge";
-export type TipoPagoRefaccion = "anticipado" | "contra_entrega";
+export type TipoPagoRefaccion = "anticipado" | "contra_entrega" | "credito";
 export type FormaPagoRefaccion = "efectivo" | "transferencia";
 export type EstatusLineaRefaccion =
   | "bloqueada"
@@ -142,9 +142,10 @@ export function envioListo(envio: {
   const dir = envio.direccion.trim();
   const tipoOk = envio.tipo === "paqueteria" || envio.tipo === "directo" || envio.tipo === "recoge";
   const dirOk = envio.tipo === "recoge" || dir.length >= 8;
-  const cuandoOk = envio.tipoPago === "anticipado" || envio.tipoPago === "contra_entrega";
+  const cuandoOk = envio.tipoPago === "anticipado" || envio.tipoPago === "contra_entrega" || envio.tipoPago === "credito";
   const forma = envio.formaPago ?? "efectivo";
-  const formaOk = forma === "efectivo" || forma === "transferencia";
+  // A crédito no hay forma de cobro todavía: el pago queda pendiente.
+  const formaOk = envio.tipoPago === "credito" || forma === "efectivo" || forma === "transferencia";
   return tipoOk && dirOk && cuandoOk && formaOk;
 }
 

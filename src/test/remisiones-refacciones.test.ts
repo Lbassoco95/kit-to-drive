@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   PASOS_REMISION_REFACCION,
@@ -133,6 +135,12 @@ describe("almacén libera y la etapa dice en qué área está", () => {
     expect(envioListo({ tipo: "directo", direccion: "Av. Reforma 120, Centro", tipoPago: "contra_entrega" })).toBe(true);
     expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "anticipado", formaPago: "efectivo" })).toBe(true);
     expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "anticipado", formaPago: "otro" })).toBe(false);
+    expect(envioListo({ tipo: "recoge", direccion: "", tipoPago: "credito" })).toBe(true);
+    expect(envioListo({ tipo: "directo", direccion: "Av. Reforma 120", tipoPago: "credito", formaPago: "otro" })).toBe(true);
+    const moto = readFileSync(join(process.cwd(), "src/pages/Remisiones.tsx"), "utf8");
+    const ref = readFileSync(join(process.cwd(), "src/pages/RemisionesRefacciones.tsx"), "utf8");
+    expect(moto).not.toContain('value="credito"');
+    expect(ref.match(/value="credito"/g)?.length).toBe(2);
     expect(descuentoValido(10)).toBe(true);
     expect(descuentoValido(101)).toBe(false);
     expect(importeConDescuento(100, 2, 10, 0)).toBe(180);

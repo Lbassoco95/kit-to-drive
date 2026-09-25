@@ -30,6 +30,14 @@ describe("explicarError", () => {
     expect(msg).toContain("20260823000001_incidencias_chasis_colores_cierre.sql");
   });
 
+  it("el crédito de refacciones señala el script nuevo si la base aún no lo acepta", () => {
+    const msg = explicarError(
+      { code: "P0001", message: "Indica si el pago es anticipado o contra entrega" },
+      "x",
+    );
+    expect(msg).toContain("20260925193000_refacciones_pago_credito.sql");
+  });
+
   it("no toca los errores normales", () => {
     expect(explicarError({ code: "P0001", message: "Solo admin/fábrica puede configurar unidades" }, "x"))
       .toBe("Solo admin/fábrica puede configurar unidades");
