@@ -57,4 +57,19 @@ GRANT SELECT ON public.v_almacen_refacciones_movimientos TO authenticated;
 COMMENT ON VIEW public.v_almacen_refacciones_movimientos IS
   'Kardex de refacciones: salidas/ajustes con cliente y stock actual del producto.';
 
+-- Para que el inventario refresque al liberar remisiones sin recargar la página.
+DO $rt$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'almacen_refacciones_movimientos'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime
+      ADD TABLE public.almacen_refacciones_movimientos;
+  END IF;
+END $rt$;
+
 NOTIFY pgrst, 'reload schema';
