@@ -879,15 +879,15 @@ function Partida({
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
-                if (nota.trim().length < 3) { toast.error(tx.notaObligatoria); return; }
+                const texto = nota.trim().length >= 3 ? nota.trim() : tx.notaFaltanteDefault;
                 void correr(() => supabase.rpc("reportar_faltante_refaccion" as any, {
-                  _item_id: item.id, _cantidad: qtyFalta, _nota: nota.trim(),
+                  _item_id: item.id, _cantidad: qtyFalta, _nota: texto,
                 }));
               }}>{tx.reportar}</Button>
               <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
-                if (nota.trim().length < 3) { toast.error(tx.notaObligatoria); return; }
+                const texto = nota.trim().length >= 3 ? nota.trim() : tx.notaSinDefault;
                 void correr(() => supabase.rpc("confirmar_sin_existencia_refaccion" as any, {
-                  _item_id: item.id, _nota: nota.trim(),
+                  _item_id: item.id, _nota: texto,
                 }));
               }}>{tx.confirmarSin}</Button>
             </div>
@@ -903,9 +903,9 @@ function Partida({
           </div>
           <Input value={motivo} onChange={e => setMotivo(e.target.value)} placeholder={tx.motivoCancelar} className="max-w-sm" />
           <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
-            if (motivo.trim().length < 3) { toast.error(tx.notaObligatoria); return; }
+            const texto = motivo.trim().length >= 3 ? motivo.trim() : tx.motivoLineaDefault;
             void correr(() => supabase.rpc("cancelar_linea_refaccion" as any, {
-              _item_id: item.id, _motivo: motivo.trim(),
+              _item_id: item.id, _motivo: texto,
             }));
           }}>{tx.cancelarLinea}</Button>
         </div>
