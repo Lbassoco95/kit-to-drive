@@ -51,6 +51,7 @@ export type Modulo =
   | "crm"
   | "crmEquipo"
   | "finanzas"
+  | "credito"
   | "proveedores"
   | "importar"
   | "usuarios"
@@ -74,6 +75,9 @@ export const MODULOS: Record<Modulo, { areas: Area[]; minNivel: Nivel }> = {
   crm:           { areas: ["comercial", "administracion"],                              minNivel: "operador"   },
   crmEquipo:     { areas: ["comercial", "administracion"],                              minNivel: "supervisor" },
   finanzas:      { areas: ["administracion"],                                           minNivel: "operador"   },
+  // Cartera de crédito / CxC: Administración captura; Comercial consulta la
+  // cartera de sus clientes (el bloqueo en remisiones usa la RPC, no este módulo).
+  credito:       { areas: ["administracion", "comercial"],                              minNivel: "operador"   },
   // Catálogo de proveedores: lo opera Compras; Administración (Finanzas) también.
   proveedores:   { areas: ["compras", "administracion"],                                minNivel: "operador"   },
   importar:      { areas: ["fabrica", "almacen_logistica"],                             minNivel: "admin"      },

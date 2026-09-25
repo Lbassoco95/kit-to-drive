@@ -17,6 +17,12 @@ import {
 } from "@/lib/remisionesEdicion";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { cargarClientes } from "@/lib/catalogoClientes";
+import {
+  evaluarBloqueoPorCartera,
+} from "@/lib/creditoDb";
+import {
+  mensajeBloqueoCartera,
+} from "@/lib/credito";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -712,6 +718,22 @@ export default function Remisiones() {
     const faltan = faltantesDeExistencia(motos, disponiblesPara);
     if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes)); return; }
 
+    // Cartera vencida: si el cliente tiene CxC abiertas y fuera de tiempo,
+    // se detiene el alta. Si la migración aún no corre, no bloqueamos.
+    const cartera = await evaluarBloqueoPorCartera(form.cliente_id);
+    if (cartera.error && !cartera.schemaFalta) {
+      toast.error(cartera.error.message);
+      return;
+    }
+    if (cartera.bloqueado) {
+      toast.error(mensajeBloqueoCartera(
+        cartera.resumen,
+        t.remisiones.bloqueadoPorCartera,
+        t.remisiones.bloqueadoPorCarteraSinDetalle,
+      ));
+      return;
+    }
+
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
 
     // INSERT mínimo: solo columnas que siempre han existido en la tabla.
@@ -1014,6 +1036,19 @@ export default function Remisiones() {
 
     const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
     if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes));
+
+    // Mismo corte que en el alta: cliente con CxC vencida no avanza.
+    const cartera = await evaluarBloqueoPorCartera(editForm.cliente_id);
+    if (cartera.error && !cartera.schemaFalta) {
+      return toast.error(cartera.error.message);
+    }
+    if (cartera.bloqueado) {
+      return toast.error(mensajeBloqueoCartera(
+        cartera.resumen,
+        t.remisiones.bloqueadoPorCartera,
+        t.remisiones.bloqueadoPorCarteraSinDetalle,
+      ));
+    }
 
     const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
     if (!plan.totalUnidades) return toast.error(t.remisiones.necesitaMotocarro);

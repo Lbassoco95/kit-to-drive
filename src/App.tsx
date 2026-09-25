@@ -23,6 +23,7 @@ import ReportesTurno from "./pages/ReportesTurno";
 import Finanzas from "./pages/Finanzas";
 import FinanzasMovimiento from "./pages/FinanzasMovimiento";
 import Proveedores from "./pages/Proveedores";
+import Credito from "./pages/Credito";
 import CrmOportunidades from "./pages/crm/CrmOportunidades";
 import CrmOportunidadDetail from "./pages/crm/CrmOportunidadDetail";
 import CrmActividades from "./pages/crm/CrmActividades";
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/configuracion" element={<ProtectedRoute modulo="configuracion"><Configuracion /></ProtectedRoute>} />
               <Route path="/finanzas" element={<ProtectedRoute modulo="finanzas"><Finanzas /></ProtectedRoute>} />
               <Route path="/finanzas/:id" element={<ProtectedRoute modulo="finanzas"><FinanzasMovimiento /></ProtectedRoute>} />
+              <Route path="/credito" element={<ProtectedRoute modulo="credito"><Credito /></ProtectedRoute>} />
               <Route path="/proveedores" element={<ProtectedRoute modulo="proveedores"><Proveedores /></ProtectedRoute>} />
               <Route path="/crm/oportunidades" element={<ProtectedRoute modulo="crm"><CrmOportunidades /></ProtectedRoute>} />
               <Route path="/crm/oportunidades/:id" element={<ProtectedRoute modulo="crm"><CrmOportunidadDetail /></ProtectedRoute>} />
