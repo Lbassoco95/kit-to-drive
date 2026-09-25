@@ -303,6 +303,7 @@ export default function AlmacenRefacciones() {
   const filtrarPorUnidad = (unidadId: string) => {
     setUnidadFiltro(unidadId);
     setDetalle(null);
+    detalleRef.current = null;
     setSoloConCompat(true);
   };
 
