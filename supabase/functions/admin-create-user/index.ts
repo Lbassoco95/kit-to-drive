@@ -146,6 +146,8 @@ serve(async (req) => {
     // Flag de privilegio en app_metadata (solo Admin API); user_metadata es editable por el cliente.
     const appMeta = {
       must_change_password: mustChangePassword,
+      created_via_admin: true,
+      managed_by: "admin-create-user",
     };
     const userMeta = {
       full_name: nombre_completo.trim(),

@@ -319,6 +319,8 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260925193000_security_hardening_fase2', 'politica|compras.leer compras|es_compras'),
   ('20260925193000_security_hardening_fase2', 'politica|cuentas_por_cobrar.cxc_select|es_finanzas'),
 
+  ('20260925210000_disable_public_signups', 'funcion|reject_public_signups()'),
+
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
