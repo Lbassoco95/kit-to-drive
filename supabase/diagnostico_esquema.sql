@@ -324,7 +324,15 @@ WITH esperado(script, objeto) AS (VALUES
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
-  ('fix_remisiones_columns',                      'restriccion|remisiones.remisiones_tipo_pago_check|contra_entrega')
+  ('fix_remisiones_columns',                      'restriccion|remisiones.remisiones_tipo_pago_check|contra_entrega'),
+
+  -- Módulo de crédito: cartera CxC y bloqueo por vencidos.
+  ('20260925190000_modulo_credito_cxc',           'tabla|cuentas_por_cobrar'),
+  ('20260925190000_modulo_credito_cxc',           'tabla|cxc_abonos'),
+  ('20260925190000_modulo_credito_cxc',           'vista|v_clientes_credito'),
+  ('20260925190000_modulo_credito_cxc',           'funcion|cliente_tiene_cxc_vencidas(uuid)'),
+  ('20260925190000_modulo_credito_cxc',           'funcion|cxc_vencidas_resumen(uuid)'),
+  ('20260925190000_modulo_credito_cxc',           'funcion|cliente_tiene_credito(uuid)')
 ), superado(script, por) AS (VALUES
   -- Scripts que otro posterior reemplazó por completo (les tiró la función y
   -- la volvió a crear con otra firma). No hay que correrlos y revisarlos

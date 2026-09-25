@@ -74,6 +74,7 @@ const paginas: Record<string, () => Promise<{ default: React.ComponentType }>> =
   "Bitácora":         () => import("@/pages/Bitacora"),
   "Configuración":    () => import("@/pages/Configuracion"),
   "Finanzas":         () => import("@/pages/Finanzas"),
+  "Crédito":          () => import("@/pages/Credito"),
   "Proveedores":      () => import("@/pages/Proveedores"),
   "CRM · Oportunidades": () => import("@/pages/crm/CrmOportunidades"),
   "CRM · Actividades":   () => import("@/pages/crm/CrmActividades"),

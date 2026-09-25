@@ -176,6 +176,7 @@ export const zh = {
     crmEquipo: "销售团队",
     crmTracker: "销售员追踪",
     finanzas: "财务管理",
+    credito: "信用",
     proveedores: "供应商",
   },
   groups: {
@@ -602,6 +603,17 @@ export const zh = {
     limiteCredito: "信用额度",
     diasCredito: "账期（天）",
     monedaCredito: "币种",
+    tabActivos: "启用",
+    tabArchivados: "已归档",
+    tabCredito: (n: number) => `有信用（${n}）`,
+    avisoFiltroCredito: "已配置账期或额度的客户。应收账款请在「信用」模块查看。",
+    irModuloCredito: "打开信用模块",
+    verEnModuloCredito: "在信用模块查看账款",
+    hintCartera: "登记应收账款与还款请前往",
+    badgeCredito: (dias: number, limite: string | null) =>
+      limite
+        ? (dias > 0 ? `信用 ${dias}天 · ${limite}` : `信用 · ${limite}`)
+        : (dias > 0 ? `信用 ${dias}天` : "信用"),
     vendedor: "负责销售员",
     notas: "备注",
     fechaAlta: "建档日期",
@@ -763,6 +775,12 @@ export const zh = {
     folioYCliente: "单号和客户为必填",
     folioEnUso: "该单号已被一张有效提货单占用",
     agregaMotocarro: "请至少添加一辆三轮车",
+    bloqueadoPorCartera: (folio: string, n: number) =>
+      n === 1
+        ? `无法继续：该客户有逾期未付账款 ${folio}。请先在「信用」模块处理。`
+        : `无法继续：该客户有 ${n} 笔逾期应收账款（例如 ${folio}）。请先在「信用」模块处理。`,
+    bloqueadoPorCarteraSinDetalle: (n: number) =>
+      `无法继续：该客户有 ${n} 笔已逾期且未结清的应收账款。`,
     chasisAsignados: (n: number) => `✓ 已分配 ${n} 个车架`,
     sinModeloColor: "无型号/颜色",
     faltanDe: (faltan: number, que: string, porque: string) => `${que} 还缺 ${faltan} 台：${porque}`,
@@ -988,6 +1006,8 @@ export const zh = {
     nombreEmpresa: "公司名称",
     capacidadDiaria: "日产能（辆）",
     plazoMaxCredito: "最长信用期（天）",
+    formatoNumeros: "数字格式",
+    formatoNumerosDesc: "全平台金额使用逗号（,）作千分位、点（.）作小数。例如：25,000.00",
     limiteYaArmados: "可登记的既有组装车上限",
     guardada: "设置已保存",
     cargando: "正在加载设置…",
@@ -2448,6 +2468,88 @@ export const zh = {
       oportunidadesActivas: (n: number) => `进行中的商机（${n}）`,
       sinOportunidadesActivas: "暂无进行中的商机",
       unid: "台",
+    },
+  },
+
+  credito: {
+    title: "信用",
+    subtitle: (clientes: number, vencidos: number) =>
+      `${clientes} 位有信用额度的客户` +
+      (vencidos > 0 ? ` · ${vencidos} 位有逾期账款` : ""),
+    actualizar: "刷新",
+    cargando: "正在加载信用组合…",
+    buscar: "按名称、内部单号、ERP 代码、收款邮箱搜索…",
+    vacio: "尚无客户配置信用额度。请在客户档案中填写账期或额度。",
+    sinCoincidencias: "没有符合搜索条件的客户。",
+    schemaFaltaTitulo: "尚未应用信用模块迁移",
+    schemaFaltaDesc:
+      "请在 Supabase SQL 编辑器中执行 supabase/migrations/20260925190000_modulo_credito_cxc.sql 后重新加载。",
+    kpiClientes: "有信用",
+    kpiVencidos: "有逾期",
+    kpiSaldoAbierto: "未结余额",
+    kpiSaldoVencido: "逾期余额",
+    filtros: {
+      TODOS: "全部",
+      VENCIDOS: "逾期",
+      AL_CORRIENTE: "正常",
+    },
+    badgeVencido: "逾期",
+    badgeAlCorriente: "正常",
+    diasCorto: (n: number) => `${n} 天`,
+    limite: "额度",
+    disponible: "可用",
+    saldoAbierto: "未结余额",
+    saldoVencido: "逾期余额",
+    bloqueaProceso: "结清前将阻止新建提货单",
+    avisoBloqueo:
+      "该客户有逾期未付的应收账款。在结清或调整前，无法创建或编辑提货单。",
+    carteraTitle: "应收账款",
+    nuevaCxC: "新建应收账款",
+    sinCxC: "暂无应收账款记录。",
+    vence: "到期",
+    diasAtraso: (n: number) => `逾期 ${n} 天`,
+    remision: "提货单",
+    registrarAbono: "登记还款",
+    cancelarCxC: "取消",
+    confirmarCancelar: (folio: string) =>
+      `确定取消账款 ${folio || ""}？取消后将不再阻止提货单。`,
+    cxcRegistrada: (folio: string) =>
+      folio ? `✓ 已登记 ${folio}` : "✓ 应收账款已登记",
+    abonoRegistrado: "✓ 还款已登记",
+    cxcCancelada: "账款已取消",
+    guardando: "保存中…",
+    guardarCxC: "保存账款",
+    guardarAbono: "保存还款",
+    saldoPendiente: "待付余额",
+    estatus: {
+      ABIERTA: "未结",
+      PARCIAL: "部分付款",
+      PAGADA: "已付清",
+      CANCELADA: "已取消",
+    },
+    campos: {
+      concepto: "摘要 *",
+      conceptoPlaceholder: "例如：赊销提货单 1234",
+      monto: "金额 *",
+      moneda: "币种",
+      fechaEmision: "开立日期",
+      fechaVencimiento: "到期日",
+      notas: "备注",
+      montoAbono: "还款金额 *",
+      fechaAbono: "还款日期",
+      metodoPago: "付款方式",
+      referencia: "参考号",
+    },
+    validacion: {
+      conceptoObligatorio: "摘要为必填",
+      montoInvalido: "金额必须大于零",
+      fechasInvalidas: "请填写开立日期和到期日",
+      vencimientoAntesEmision: "到期日不能早于开立日期",
+    },
+    validacionAbono: {
+      montoInvalido: "还款金额必须大于零",
+      superaSaldo: "还款金额不能超过待付余额",
+      fechaObligatoria: "请填写还款日期",
     },
   },
 } satisfies Translations;

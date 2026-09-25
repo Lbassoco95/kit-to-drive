@@ -178,6 +178,7 @@ export const es = {
     crmDashboard: "Monitor equipo",
     crmTracker: "Tracker Vendedores",
     finanzas: "Control Financiero",
+    credito: "Crédito",
     proveedores: "Proveedores",
   },
   groups: {
@@ -604,6 +605,17 @@ export const es = {
     limiteCredito: "Límite de crédito",
     diasCredito: "Días de crédito",
     monedaCredito: "Moneda",
+    tabActivos: "Activos",
+    tabArchivados: "Archivados",
+    tabCredito: (n: number) => `Con crédito (${n})`,
+    avisoFiltroCredito: "Clientes con días o límite de crédito capturado. La cartera y CxC viven en el módulo Crédito.",
+    irModuloCredito: "Abrir módulo Crédito",
+    verEnModuloCredito: "Ver cartera en Crédito",
+    hintCartera: "Para registrar cuentas por cobrar y abonos usa",
+    badgeCredito: (dias: number, limite: string | null) =>
+      limite
+        ? (dias > 0 ? `Crédito ${dias}d · ${limite}` : `Crédito · ${limite}`)
+        : (dias > 0 ? `Crédito ${dias}d` : "Crédito"),
     vendedor: "Vendedor asignado",
     notas: "Notas",
     fechaAlta: "Fecha de alta",
@@ -768,6 +780,12 @@ export const es = {
     folioYCliente: "Folio y cliente son obligatorios",
     folioEnUso: "Ese folio ya está en uso por una remisión activa",
     agregaMotocarro: "Agrega al menos un motocarro",
+    bloqueadoPorCartera: (folio: string, n: number) =>
+      n === 1
+        ? `No se puede continuar: el cliente tiene la cuenta ${folio} abierta y vencida (sin pagar). Regulariza en Crédito.`
+        : `No se puede continuar: el cliente tiene ${n} cuentas por cobrar vencidas (p. ej. ${folio}). Regulariza en Crédito.`,
+    bloqueadoPorCarteraSinDetalle: (n: number) =>
+      `No se puede continuar: el cliente tiene ${n} cuenta${n === 1 ? "" : "s"} por cobrar abierta${n === 1 ? "" : "s"} y fuera de tiempo.`,
     chasisAsignados: (n: number) => `✓ ${n} chasis asignados`,
     sinModeloColor: "sin modelo/color",
     faltanDe: (faltan: number, que: string, porque: string) => `Faltan ${faltan} de ${que}: ${porque}`,
@@ -1021,6 +1039,8 @@ export const es = {
     nombreEmpresa: "Nombre empresa",
     capacidadDiaria: "Capacidad diaria (motocarros)",
     plazoMaxCredito: "Plazo máx. crédito (días)",
+    formatoNumeros: "Formato de números",
+    formatoNumerosDesc: "En toda la plataforma los montos usan coma (,) para miles y punto (.) para decimales. Ejemplo: 25,000.00",
     limiteYaArmados: "Tope de unidades ya ensambladas que se pueden cargar",
     guardada: "Configuración guardada",
     cargando: "Cargando configuración…",
@@ -2467,6 +2487,89 @@ export const es = {
       oportunidadesActivas: (n: number) => `Oportunidades activas (${n})`,
       sinOportunidadesActivas: "Sin oportunidades activas",
       unid: "unid",
+    },
+  },
+
+  // Crédito / cuentas por cobrar
+  credito: {
+    title: "Crédito",
+    subtitle: (clientes: number, vencidos: number) =>
+      `${clientes} cliente${clientes === 1 ? "" : "s"} con crédito` +
+      (vencidos > 0 ? ` · ${vencidos} con cartera vencida` : ""),
+    actualizar: "Actualizar",
+    cargando: "Cargando cartera…",
+    buscar: "Buscar por nombre, folio, código ERP, cobranza…",
+    vacio: "Ningún cliente tiene línea de crédito. Captura días o límite en el expediente del cliente.",
+    sinCoincidencias: "Ningún cliente coincide con la búsqueda.",
+    schemaFaltaTitulo: "Falta aplicar la migración de crédito",
+    schemaFaltaDesc:
+      "Pega en el SQL editor de Supabase el archivo supabase/migrations/20260925190000_modulo_credito_cxc.sql y vuelve a cargar.",
+    kpiClientes: "Con crédito",
+    kpiVencidos: "Con vencidos",
+    kpiSaldoAbierto: "Saldo abierto",
+    kpiSaldoVencido: "Saldo vencido",
+    filtros: {
+      TODOS: "Todos",
+      VENCIDOS: "Vencidos",
+      AL_CORRIENTE: "Al corriente",
+    },
+    badgeVencido: "Vencido",
+    badgeAlCorriente: "Al corriente",
+    diasCorto: (n: number) => `${n} días`,
+    limite: "Límite",
+    disponible: "Disponible",
+    saldoAbierto: "Saldo abierto",
+    saldoVencido: "Saldo vencido",
+    bloqueaProceso: "Bloquea nuevas remisiones hasta regularizar",
+    avisoBloqueo:
+      "Este cliente tiene cuentas por cobrar abiertas y fuera de tiempo. No se pueden crear ni editar remisiones hasta que pague o se regularice la cartera.",
+    carteraTitle: "Cuentas por cobrar",
+    nuevaCxC: "Nueva cuenta por cobrar",
+    sinCxC: "Sin cuentas por cobrar registradas.",
+    vence: "Vence",
+    diasAtraso: (n: number) => `${n} día${n === 1 ? "" : "s"} de atraso`,
+    remision: "Remisión",
+    registrarAbono: "Registrar abono",
+    cancelarCxC: "Cancelar",
+    confirmarCancelar: (folio: string) =>
+      `¿Cancelar la cuenta ${folio || ""}? Dejará de contar para el bloqueo de remisiones.`,
+    cxcRegistrada: (folio: string) =>
+      folio ? `✓ ${folio} registrada` : "✓ Cuenta por cobrar registrada",
+    abonoRegistrado: "✓ Abono registrado",
+    cxcCancelada: "Cuenta cancelada",
+    guardando: "Guardando…",
+    guardarCxC: "Guardar cuenta",
+    guardarAbono: "Guardar abono",
+    saldoPendiente: "Saldo pendiente",
+    estatus: {
+      ABIERTA: "Abierta",
+      PARCIAL: "Parcial",
+      PAGADA: "Pagada",
+      CANCELADA: "Cancelada",
+    },
+    campos: {
+      concepto: "Concepto *",
+      conceptoPlaceholder: "Ej. Venta a crédito remisión 1234",
+      monto: "Monto *",
+      moneda: "Moneda",
+      fechaEmision: "Fecha de emisión",
+      fechaVencimiento: "Fecha de vencimiento",
+      notas: "Notas",
+      montoAbono: "Monto del abono *",
+      fechaAbono: "Fecha del abono",
+      metodoPago: "Método de pago",
+      referencia: "Referencia",
+    },
+    validacion: {
+      conceptoObligatorio: "El concepto es obligatorio",
+      montoInvalido: "El monto debe ser mayor a cero",
+      fechasInvalidas: "Captura la fecha de emisión y de vencimiento",
+      vencimientoAntesEmision: "El vencimiento no puede ser anterior a la emisión",
+    },
+    validacionAbono: {
+      montoInvalido: "El monto del abono debe ser mayor a cero",
+      superaSaldo: "El abono no puede superar el saldo pendiente",
+      fechaObligatoria: "Captura la fecha del abono",
     },
   },
 };
