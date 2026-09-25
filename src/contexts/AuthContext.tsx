@@ -129,17 +129,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const changePassword = async (newPassword: string) => {
-    // 1) Cambia la contraseña. NO confiamos en user_metadata (editable por el cliente).
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) return { error };
-
-    // 2) Edge Function (service_role) limpia app_metadata + profiles.debe_cambiar_password.
-    const { error: clearErr } = await supabase.functions.invoke("complete-password-change", {
+    // Única vía: Edge Function (Admin API) setea password + limpia flags.
+    // El cliente no puede limpiar must_change_password sin enviar password nueva.
+    const { data, error: invokeErr } = await supabase.functions.invoke("complete-password-change", {
       method: "POST",
-      body: {},
+      body: { password: newPassword },
     });
-    if (clearErr) {
-      return { error: new Error(clearErr.message || "No se pudo confirmar el cambio de contraseña") };
+    if (invokeErr) {
+      return { error: new Error(invokeErr.message || "No se pudo cambiar la contraseña") };
+    }
+    if (data?.error) {
+      return { error: new Error(String(data.error)) };
     }
 
     setRequiresPasswordChange(false);

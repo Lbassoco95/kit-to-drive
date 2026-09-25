@@ -1,6 +1,6 @@
-// Tras un cambio de contraseña exitoso en el cliente, limpia el flag
-// must_change_password en app_metadata y profiles.debe_cambiar_password.
-// El cliente NO puede tocar app_metadata ni esa columna de profiles.
+// Cambia la contraseña del caller Y limpia must_change_password en
+// app_metadata + profiles.debe_cambiar_password de forma atómica (Admin API).
+// El cliente NO puede limpiar el flag sin enviar una password nueva válida.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -45,16 +45,27 @@ serve(async (req) => {
       });
     }
 
-    // Defensa: no limpiar el flag si el JWT aún declara must_change y el
-    // cliente no acababa de rotar password. Confianza mínima: el caller
-    // autenticado pide limpiar DESPUÉS de updateUser({ password }).
-    // No re-aceptamos user_metadata.must_change_password=false del cliente.
+    const body = await req.json().catch(() => ({})) as { password?: string };
+    const password = typeof body.password === "string" ? body.password : "";
+    if (password.length < 8) {
+      return new Response(JSON.stringify({ error: "password inválida (mínimo 8 caracteres)" }), {
+        status: 400, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+    if (/dazon/i.test(password) || password.includes("1234")) {
+      return new Response(JSON.stringify({ error: "Elige una contraseña más segura" }), {
+        status: 400, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
+    // Atómico: set password + clear flags. Sin password en body → 400 (arriba).
     const { error: updErr } = await admin.auth.admin.updateUserById(user.id, {
+      password,
       app_metadata: {
         ...(user.app_metadata || {}),
         must_change_password: false,
@@ -70,7 +81,15 @@ serve(async (req) => {
       });
     }
 
-    await admin.from("profiles").update({ debe_cambiar_password: false }).eq("id", user.id);
+    const { error: profErr } = await admin
+      .from("profiles")
+      .update({ debe_cambiar_password: false })
+      .eq("id", user.id);
+    if (profErr) {
+      return new Response(JSON.stringify({ error: profErr.message }), {
+        status: 500, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200, headers: { ...CORS, "Content-Type": "application/json" },
