@@ -1,0 +1,29 @@
+---
+description: Los cambios de base se agregan; un merge no puede borrar mejoras ya guardadas
+alwaysApply: true
+---
+
+# Migraciones que no se pisan
+
+Los scripts de `supabase/migrations/` se pegan a mano en el SQL editor. Un archivo que ya está en `main` ya puede estar aplicado. Reescribirlo o borrarlo en un pull request tira las mejoras de las sesiones anteriores.
+
+## Al cambiar la base
+
+1. No edites ni borres un archivo de `supabase/migrations/` que ya exista en `main`.
+2. Crea el script nuevo con `npm run migracion:nueva -- descripcion_corta`. El número tiene que ser posterior al último de `origin/main`. Antes, trae `main`: si otro pull request se adelantó, vuelve a numerar el archivo nuevo (el viejo no se toca).
+3. Si reemplazas una función, copia el cuerpo de `supabase/funciones-vigentes/funcion__<nombre>.sql` y modifica encima. No partes del `CREATE OR REPLACE` de un script viejo: ese cuerpo ya no es el vigente y al pegarlo se pierden las mejoras de en medio.
+4. Si el cuerpo nuevo quita líneas del vigente, escribe en el script `-- acepto-reemplazo: nombre_funcion` y explica en la cabecera qué se quitó. Sin esa línea, `npm test` falla.
+5. Lo mismo con una política o una vista: copia la definición del script más nuevo que la crea, no de uno anterior.
+6. Registra el script en `supabase/diagnostico_esquema.sql`. Agrega renglones. No borres los de scripts anteriores.
+7. En el mismo cambio: `npm run migraciones:sellar` y `npm test`. El sello (`supabase/migrations.lock`) y `supabase/funciones-vigentes/` se commitean junto con el script. Si no se sellan, el siguiente merge no tiene con qué darse cuenta de que faltan.
+
+## Al resolver un merge
+
+- Conserva todos los `.sql` de los dos lados. No resuelvas eligiendo una rama y tirando los scripts de la otra.
+- Si dos scripts salieron con el mismo número, renumera solamente el que no está en `main`.
+- `supabase/migrations.lock` usa `merge=union` para quedarse con las dos listas. Después corre `npm run migraciones:sellar` para ordenarla, sin borrar hashes.
+- No reviertas un commit solo porque chocó: un revert de un script ya mergeado vuelve a dejar la base y el repo en la versión vieja.
+
+## Al cerrar la sesión
+
+Deja el cambio commiteado y empujado en su rama, con el sello actualizado. Una mejora que sólo quedó en el SQL editor, o sólo en el working tree, no sobrevive al siguiente pull request.

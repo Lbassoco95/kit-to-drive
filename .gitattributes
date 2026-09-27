@@ -1,0 +1,3 @@
+# Dos pull requests pueden sellar scripts distintos a la vez. Union se queda
+# con las líneas de los dos lados; `npm run migraciones:sellar` las ordena.
+supabase/migrations.lock merge=union

@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "migraciones:verificar": "node scripts/proteger-migraciones.mjs verificar",
+    "migraciones:sellar": "node scripts/proteger-migraciones.mjs sellar",
+    "migracion:nueva": "node scripts/proteger-migraciones.mjs nueva"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -13,6 +13,40 @@ la que el sistema pide a la base cosas que no existen.
 Y cuando eso pasa, casi nunca se ve como un error: se ve como si se hubiera
 perdido la información.
 
+## Cada mejora es un archivo nuevo
+
+Hay otra forma de perder lo ya hecho, y no es la base: es el merge. Una sesión
+reescribe un script que otra sesión ya había corregido, o vuelve a crear una
+función con `CREATE OR REPLACE` copiando un cuerpo viejo. Al juntar los pull
+requests queda una sola versión, y es la de atrás.
+
+Por eso un script que ya está en `main` no se edita y no se borra. La mejora
+va en un archivo posterior:
+
+```bash
+npm run migracion:nueva -- descripcion_corta
+npm run migraciones:sellar
+npm test
+```
+
+`npm test` (y el workflow `Verificar`) rechaza el pull request si:
+
+- se reescribió o se borró un script que ya estaba en `main`;
+- dos scripts comparten el mismo número (el choque de `20260922000002` entre
+  refacciones y Compras);
+- un `CREATE OR REPLACE` quita líneas de la versión vigente de una función
+  sin declarar `-- acepto-reemplazo: nombre_funcion`;
+- el diagnóstico dejó de mencionar un script que antes revisaba.
+
+La versión que manda de cada función está en `supabase/funciones-vigentes/`.
+Se parte de ahí, no del primer script que creó la función. El sello
+`supabase/migrations.lock` usa `merge=union` para que dos pull requests que
+agregan scripts distintos no se borren el sello entre sí; después
+`migraciones:sellar` lo ordena.
+
+En un conflicto se conservan los `.sql` de los dos lados. Si el número chocó,
+se renumera el archivo que todavía no está en `main`.
+
 ## Los tres incidentes de Clientes, para no repetirlos
 
 **«Los clientes no se están viendo».** La pantalla pedía
