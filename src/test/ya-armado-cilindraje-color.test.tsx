@@ -46,7 +46,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
     user: { id: "u9" }, area: "fabrica", nivel: "coordinador", role: "fabrica", activo: true,
-    profileName: "Eri", loading: false,
+    profileName: "Eri", loading: false, puedeAsignarRemisiones: true,
     perms: { puedeVer: () => true, puedeCrear: () => true, puedeEditar: () => true,
              puedeEliminar: () => false, soloPropios: () => false, esAdminGlobal: false,
              nivel: "coordinador", area: "fabrica" },

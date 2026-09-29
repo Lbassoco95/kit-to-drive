@@ -285,6 +285,8 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260823000001_incidencias_chasis_colores_cierre.sql"],
   [/modelos_producto|bitacora_orden_armado|nombre_comercial|configurar_unidad|desconfigurar_unidad|cambiar_orden_armado|importar_vins_inventario|importar_motores_inventario/,
     "20260822000001_configuracion_manual_unidades.sql"],
+  [/remisiones_asignacion_acceso|puede_asignar_remisiones/,
+    "20260929000002_permiso_asignar_remisiones.sql"],
   [/historial_conexiones|registrar_conexion/,
     "20260929000001_historial_conexiones.sql"],
   [/bitacora_eliminaciones/,
