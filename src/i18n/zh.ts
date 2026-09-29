@@ -198,6 +198,13 @@ export const zh = {
     quickAccess: "快速演示入口",
     demoPassword: "演示密码：",
     demoNotCreated: "演示用户尚未创建，请联系管理员执行初始化。",
+    passwordRequirements: {
+      title: "密码必须满足以下条件：",
+      minLength: "至少 8 个字符",
+      noDazon: "不能包含 \"dazon\"",
+      no1234: "不能包含 \"1234\"",
+      passwordsMatch: "两次输入的密码一致",
+    },
   },
 
   // Roles
@@ -921,6 +928,18 @@ export const zh = {
     passwordCorta: "密码至少需要 8 个字符",
     errorCrear: "创建用户时出错",
     creado: (email: string) => `✓ 用户 ${email} 已创建`,
+    solicitarPasswordTemporal: "申请新的临时密码",
+    passwordTemporalTitulo: "新的临时密码",
+    passwordTemporal: "临时密码",
+    confirmarPasswordTemporal: (usuario: string) => `${usuario} 的密码将被替换，并且下次登录时必须修改密码。`,
+    generarPasswordTemporal: "生成密码",
+    generandoPassword: "生成中…",
+    passwordTemporalCreada: (usuario: string) => `${usuario} 的新临时密码已生成。`,
+    copiarPassword: "复制密码",
+    passwordCopiada: "密码已复制",
+    passwordRestablecida: "临时密码已生成",
+    passwordTemporalAviso: "请立即复制并通过安全方式发送。出于安全考虑，该密码不会再次显示，用户登录时必须修改密码。",
+    errorRestablecer: "无法生成临时密码",
   },
 
   // Bitácora

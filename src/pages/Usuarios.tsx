@@ -13,7 +13,7 @@ import {
   Area, Nivel, AREAS, NIVELES, AREA_COLORS, NIVEL_COLORS,
   rolLegacy, desdeRolLegacy,
 } from "@/lib/permissions";
-import { Plus, Pencil, Search, UserCheck, UserX, ShieldCheck, Info } from "lucide-react";
+import { Check, Copy, Info, KeyRound, Pencil, Plus, Search, ShieldCheck, UserCheck, UserX } from "lucide-react";
 
 interface FormUsuario {
   nombre_completo: string;
@@ -54,7 +54,11 @@ export default function Usuarios() {
   });
   const [newOpen, setNewOpen] = useState(false);
   const [newForm, setNewForm] = useState({ ...EMPTY_NEW });
+  const [resetTarget, setResetTarget] = useState<Usuario | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   // Un admin de área solo administra su propia área; el admin global, todas.
   const areasDisponibles: Area[] = perms.esAdminGlobal ? AREAS : (miArea ? [miArea] : []);
@@ -134,6 +138,33 @@ export default function Usuarios() {
     const { error } = await supabase.from("profiles").update({ activo: !u.activo }).eq("id", u.id);
     if (error) toast.error(error.message);
     else { toast.success(u.activo ? t.usuarios.desactivado : t.usuarios.activado); load(); }
+  };
+
+  const openPasswordReset = (u: Usuario) => {
+    setResetTarget(u);
+    setTemporaryPassword("");
+    setCopied(false);
+  };
+
+  const resetPassword = async () => {
+    if (!resetTarget) return;
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("admin-reset-user-password", {
+      body: { user_id: resetTarget.id },
+    });
+    setResetting(false);
+    if (error || data?.error || !data?.temporary_password) {
+      toast.error(data?.error ?? error?.message ?? t.usuarios.errorRestablecer);
+      return;
+    }
+    setTemporaryPassword(data.temporary_password);
+    toast.success(t.usuarios.passwordRestablecida);
+  };
+
+  const copyTemporaryPassword = async () => {
+    await navigator.clipboard.writeText(temporaryPassword);
+    setCopied(true);
+    toast.success(t.usuarios.passwordCopiada);
   };
 
   // ── Crear usuario (Edge Function) ──────────────────────────────────
@@ -250,6 +281,9 @@ export default function Usuarios() {
                     <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openEdit(u)} title={t.actions.edit}>
                       <Pencil size={15} />
                     </Button>
+                    <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => openPasswordReset(u)} title={t.usuarios.solicitarPasswordTemporal}>
+                      <KeyRound size={15} className="text-amber-600" />
+                    </Button>
                     <Button size="icon" variant="ghost" className="h-9 w-9" onClick={() => toggleActivo(u)} title={u.activo ? t.usuarios.desactivar : t.usuarios.activar}>
                       {u.activo ? <UserX size={15} className="text-red-400" /> : <UserCheck size={15} className="text-emerald-500" />}
                     </Button>
@@ -348,6 +382,38 @@ export default function Usuarios() {
             <Button onClick={saveEdit} disabled={saving} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
               {saving ? t.usuarios.guardando : t.actions.save}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!resetTarget} onOpenChange={o => { if (!o) setResetTarget(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><KeyRound size={18} /> {t.usuarios.passwordTemporalTitulo}</DialogTitle>
+          </DialogHeader>
+          {temporaryPassword ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t.usuarios.passwordTemporalCreada(resetTarget?.nombre_completo || resetTarget?.email || "")}</p>
+              <div className="flex gap-2">
+                <Input value={temporaryPassword} readOnly className="h-11 font-mono text-base" aria-label={t.usuarios.passwordTemporal} />
+                <Button variant="outline" size="icon" className="h-11 w-11 shrink-0" onClick={copyTemporaryPassword} title={t.usuarios.copiarPassword}>
+                  {copied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} />}
+                </Button>
+              </div>
+              <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{t.usuarios.passwordTemporalAviso}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t.usuarios.confirmarPasswordTemporal(resetTarget?.nombre_completo || resetTarget?.email || "")}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetTarget(null)} className="h-11">
+              {temporaryPassword ? t.actions.close : t.actions.cancel}
+            </Button>
+            {!temporaryPassword && (
+              <Button onClick={resetPassword} disabled={resetting} className="h-11 bg-[#1F3864] hover:bg-[#162a4d]">
+                {resetting ? t.usuarios.generandoPassword : t.usuarios.generarPasswordTemporal}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

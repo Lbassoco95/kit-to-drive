@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Lock, LogOut } from "lucide-react";
+import { Lock, LogOut, Check, X } from "lucide-react";
+import { useLang } from "@/contexts/LangContext";
 
 interface Props {
   onChangePassword: (newPassword: string) => Promise<{ error: Error | null }>;
@@ -12,23 +13,32 @@ interface Props {
 }
 
 export default function ForcePasswordChange({ onChangePassword, onSignOut }: Props) {
+  const { t } = useLang();
   const [pwd, setPwd] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
 
+  const checks = useMemo(() => ({
+    minLength: pwd.length >= 8,
+    noDazon: !pwd.toLowerCase().includes("dazon"),
+    no1234: !pwd.includes("1234"),
+    passwordsMatch: pwd.length > 0 && pwd === confirm,
+  }), [pwd, confirm]);
+
+  const allMet = useMemo(() => Object.values(checks).every(Boolean), [checks]);
+
+  const requirements = [
+    { key: "minLength", met: checks.minLength },
+    { key: "noDazon", met: checks.noDazon },
+    { key: "no1234", met: checks.no1234 },
+    { key: "passwordsMatch", met: checks.passwordsMatch },
+  ] as const;
+
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (pwd.length < 8) {
-      toast.error("La contraseña debe tener al menos 8 caracteres");
-      return;
-    }
-    if (pwd !== confirm) {
-      toast.error("Las contraseñas no coinciden");
-      return;
-    }
-    if (pwd.toLowerCase().includes("dazon") || pwd.toLowerCase().includes("1234")) {
-      toast.error("Elige una contraseña más segura");
+    if (!allMet) {
+      toast.error(t.auth.passwordRequirements.title);
       return;
     }
     setBusy(true);
@@ -55,8 +65,9 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
         </p>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <Label>Contraseña nueva</Label>
+            <Label htmlFor="new-password">Contraseña nueva</Label>
             <Input
+              id="new-password"
               type={showPwd ? "text" : "password"}
               value={pwd}
               onChange={(e) => setPwd(e.target.value)}
@@ -66,14 +77,30 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
             />
           </div>
           <div>
-            <Label>Confirmar contraseña</Label>
+            <Label htmlFor="confirm-password">Confirmar contraseña</Label>
             <Input
+              id="confirm-password"
               type={showPwd ? "text" : "password"}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               className="h-11"
               placeholder="Repite la contraseña"
             />
+          </div>
+          <div className="rounded-lg border bg-slate-50 p-3">
+            <p className="mb-2 text-sm font-medium text-[#1F3864]">{t.auth.passwordRequirements.title}</p>
+            <ul className="space-y-1.5">
+              {requirements.map(({ key, met }) => (
+                <li key={key} className="flex items-start gap-2 text-sm">
+                  <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${met ? "bg-green-100 text-green-600" : "bg-slate-200 text-slate-500"}`}>
+                    {met ? <Check size={10} strokeWidth={4} /> : <X size={10} strokeWidth={4} />}
+                  </span>
+                  <span className={met ? "text-muted-foreground line-through" : "text-slate-700"}>
+                    {t.auth.passwordRequirements[key]}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <input
@@ -87,7 +114,7 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
           </div>
           <Button
             type="submit"
-            disabled={busy}
+            disabled={busy || !allMet}
             className="w-full h-11 bg-[#1F3864] hover:bg-[#162a4d]"
           >
             {busy ? "Actualizando…" : "Guardar y continuar"}

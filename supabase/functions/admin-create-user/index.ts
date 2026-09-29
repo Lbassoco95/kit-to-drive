@@ -156,6 +156,7 @@ serve(async (req) => {
         email,
         password,
         email_confirm: true,
+        app_metadata: { created_via_admin: true, managed_by: "admin-create-user" },
         user_metadata: userMetadata,
       });
       if (createErr) {

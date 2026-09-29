@@ -200,6 +200,13 @@ export const es = {
     quickAccess: "Acceso rápido demo",
     demoPassword: "Contraseña demo:",
     demoNotCreated: "Usuario demo no creado todavía. Pídele al Admin que ejecute el seed.",
+    passwordRequirements: {
+      title: "La contraseña debe cumplir:",
+      minLength: "Al menos 8 caracteres",
+      noDazon: "No incluir \"dazon\"",
+      no1234: "No incluir \"1234\"",
+      passwordsMatch: "Las contraseñas coinciden",
+    },
   },
 
   // Roles
@@ -954,6 +961,18 @@ export const es = {
     passwordCorta: "La contraseña debe tener al menos 8 caracteres",
     errorCrear: "Error al crear usuario",
     creado: (email: string) => `✓ Usuario ${email} creado`,
+    solicitarPasswordTemporal: "Solicitar nueva contraseña temporal",
+    passwordTemporalTitulo: "Nueva contraseña temporal",
+    passwordTemporal: "Contraseña temporal",
+    confirmarPasswordTemporal: (usuario: string) => `Se reemplazará la contraseña de ${usuario} y deberá cambiarla cuando vuelva a iniciar sesión.`,
+    generarPasswordTemporal: "Generar contraseña",
+    generandoPassword: "Generando…",
+    passwordTemporalCreada: (usuario: string) => `La nueva contraseña temporal de ${usuario} está lista.`,
+    copiarPassword: "Copiar contraseña",
+    passwordCopiada: "Contraseña copiada",
+    passwordRestablecida: "Contraseña temporal generada",
+    passwordTemporalAviso: "Cópiala ahora y compártela de forma segura. Por seguridad, no volverá a mostrarse y el usuario deberá cambiarla al iniciar sesión.",
+    errorRestablecer: "No se pudo generar la contraseña temporal",
   },
 
   // Bitácora
