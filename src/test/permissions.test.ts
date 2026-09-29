@@ -9,8 +9,8 @@ describe("tipos de usuario y áreas", () => {
     expect(NIVELES).toEqual(["operador", "supervisor", "admin"]);
   });
 
-  it("las áreas son las cinco del negocio", () => {
-    expect(AREAS).toEqual(["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"]);
+  it("las áreas son las seis del negocio", () => {
+    expect(AREAS).toEqual(["comercial", "fabrica", "almacen_logistica", "administracion", "compras", "direccion"]);
   });
 });
 
@@ -34,6 +34,24 @@ describe("acceso por área", () => {
     expect(admin.puedeVer("crm")).toBe(true);
     expect(admin.puedeVer("usuarios")).toBe(false);
     expect(admin.puedeVer("bitacora")).toBe(false);
+
+    // Compras opera proveedores e inventario; no entra a finanzas ni al CRM.
+    const compras = permisosDe("compras", "operador");
+    expect(compras.puedeVer("proveedores")).toBe(true);
+    expect(compras.puedeCrear("proveedores")).toBe(true);
+    expect(compras.puedeVer("inventario")).toBe(true);
+    expect(compras.puedeVer("finanzas")).toBe(false);
+    expect(compras.puedeVer("credito")).toBe(false);
+    expect(compras.puedeVer("crm")).toBe(false);
+    expect(compras.inicio).toBe("/proveedores");
+
+    // Crédito: Administración captura; Comercial consulta.
+    const finanzasOp = permisosDe("administracion", "operador");
+    expect(finanzasOp.puedeVer("credito")).toBe(true);
+    expect(finanzasOp.puedeCrear("credito")).toBe(true);
+    const ventas = permisosDe("comercial", "operador");
+    expect(ventas.puedeVer("credito")).toBe(true);
+    expect(ventas.puedeCrear("credito")).toBe(true);
   });
 
   it("Dirección tiene visibilidad transversal pero no escribe fuera de su área", () => {

@@ -38,7 +38,13 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!allMet) {
-      toast.error(t.auth.passwordRequirements.title);
+      if (!checks.minLength) {
+        toast.error(t.auth.passwordTooShort);
+      } else if (!checks.passwordsMatch) {
+        toast.error(t.auth.passwordMismatch);
+      } else {
+        toast.error(t.auth.passwordWeak);
+      }
       return;
     }
     setBusy(true);
@@ -48,7 +54,7 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
       toast.error(error.message);
       return;
     }
-    toast.success("Contraseña actualizada. Bienvenido.");
+    toast.success(t.auth.passwordUpdated);
   };
 
   return (
@@ -58,33 +64,33 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
           <div className="rounded-full bg-amber-100 p-2 text-amber-600">
             <Lock size={20} />
           </div>
-          <h2 className="text-xl font-bold text-[#1F3864]">Actualiza tu contraseña</h2>
+          <h2 className="text-xl font-bold text-[#1F3864]">{t.auth.forceTitle}</h2>
         </div>
         <p className="mb-4 text-sm text-muted-foreground">
-          Es la primera vez que ingresas. Por seguridad, crea una contraseña personal antes de continuar.
+          {t.auth.forceSubtitle}
         </p>
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <Label htmlFor="new-password">Contraseña nueva</Label>
+            <Label htmlFor="new-password">{t.auth.newPassword}</Label>
             <Input
               id="new-password"
               type={showPwd ? "text" : "password"}
               value={pwd}
               onChange={(e) => setPwd(e.target.value)}
               className="h-11"
-              placeholder="Mínimo 8 caracteres"
+              placeholder={t.auth.passwordTooShort}
               autoFocus
             />
           </div>
           <div>
-            <Label htmlFor="confirm-password">Confirmar contraseña</Label>
+            <Label htmlFor="confirm-password">{t.auth.confirmPassword}</Label>
             <Input
               id="confirm-password"
               type={showPwd ? "text" : "password"}
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
               className="h-11"
-              placeholder="Repite la contraseña"
+              placeholder={t.auth.confirmPassword}
             />
           </div>
           <div className="rounded-lg border bg-slate-50 p-3">
@@ -110,19 +116,19 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
               onChange={(e) => setShowPwd(e.target.checked)}
               className="h-4 w-4"
             />
-            <label htmlFor="showPwd" className="text-muted-foreground cursor-pointer">Mostrar contraseñas</label>
+            <label htmlFor="showPwd" className="text-muted-foreground cursor-pointer">{t.auth.showPasswords}</label>
           </div>
           <Button
             type="submit"
             disabled={busy || !allMet}
             className="w-full h-11 bg-[#1F3864] hover:bg-[#162a4d]"
           >
-            {busy ? "Actualizando…" : "Guardar y continuar"}
+            {busy ? t.auth.savingPassword : t.auth.savePassword}
           </Button>
         </form>
         <div className="mt-4 flex justify-center">
           <Button variant="ghost" size="sm" onClick={() => void onSignOut()} className="text-muted-foreground">
-            <LogOut size={16} className="mr-2" /> Cerrar sesión
+            <LogOut size={16} className="mr-2" /> {t.auth.signOut}
           </Button>
         </div>
       </Card>

@@ -12,10 +12,10 @@
  */
 
 export type Nivel = "operador" | "supervisor" | "admin";
-export type Area = "comercial" | "fabrica" | "almacen_logistica" | "administracion" | "direccion";
+export type Area = "comercial" | "fabrica" | "almacen_logistica" | "administracion" | "compras" | "direccion";
 
 export const NIVELES: Nivel[] = ["operador", "supervisor", "admin"];
-export const AREAS: Area[] = ["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"];
+export const AREAS: Area[] = ["comercial", "fabrica", "almacen_logistica", "administracion", "compras", "direccion"];
 
 // Las etiquetas de nivel y área (y sus descripciones) viven en el diccionario
 // —`t.niveles`, `t.nivelDesc` y `t.areas`— para que salgan en el idioma activo.
@@ -34,6 +34,7 @@ export const AREA_COLORS: Record<Area, string> = {
   fabrica: "bg-amber-100 text-amber-700 border-amber-200",
   almacen_logistica: "bg-indigo-100 text-indigo-700 border-indigo-200",
   administracion: "bg-violet-100 text-violet-700 border-violet-200",
+  compras: "bg-orange-100 text-orange-700 border-orange-200",
   direccion: "bg-slate-200 text-slate-700 border-slate-300",
 };
 
@@ -50,6 +51,8 @@ export type Modulo =
   | "crm"
   | "crmEquipo"
   | "finanzas"
+  | "credito"
+  | "proveedores"
   | "importar"
   | "usuarios"
   | "bitacora"
@@ -63,7 +66,7 @@ export type Modulo =
 export const MODULOS: Record<Modulo, { areas: Area[]; minNivel: Nivel }> = {
   dashboard:     { areas: AREAS,                                                        minNivel: "operador"   },
   produccion:    { areas: ["fabrica", "almacen_logistica", "administracion"],           minNivel: "operador"   },
-  inventario:    { areas: ["fabrica", "almacen_logistica", "administracion"],           minNivel: "operador"   },
+  inventario:    { areas: ["fabrica", "almacen_logistica", "administracion", "compras"], minNivel: "operador"   },
   reportesTurno: { areas: ["fabrica", "almacen_logistica", "administracion"],           minNivel: "operador"   },
   remisiones:    { areas: ["comercial", "fabrica", "almacen_logistica", "administracion"], minNivel: "operador" },
   entregas:      { areas: ["almacen_logistica", "administracion"],                      minNivel: "operador"   },
@@ -72,6 +75,11 @@ export const MODULOS: Record<Modulo, { areas: Area[]; minNivel: Nivel }> = {
   crm:           { areas: ["comercial", "administracion"],                              minNivel: "operador"   },
   crmEquipo:     { areas: ["comercial", "administracion"],                              minNivel: "supervisor" },
   finanzas:      { areas: ["administracion"],                                           minNivel: "operador"   },
+  // Cartera de crédito / CxC: Administración captura; Comercial consulta la
+  // cartera de sus clientes (el bloqueo en remisiones usa la RPC, no este módulo).
+  credito:       { areas: ["administracion", "comercial"],                              minNivel: "operador"   },
+  // Catálogo de proveedores: lo opera Compras; Administración (Finanzas) también.
+  proveedores:   { areas: ["compras", "administracion"],                                minNivel: "operador"   },
   importar:      { areas: ["fabrica", "almacen_logistica"],                             minNivel: "admin"      },
   usuarios:      { areas: AREAS.filter(a => a !== "administracion"),                    minNivel: "admin"      },
   bitacora:      { areas: AREAS.filter(a => a !== "administracion"),                    minNivel: "admin"      },
@@ -87,13 +95,14 @@ export const MODULOS: Record<Modulo, { areas: Area[]; minNivel: Nivel }> = {
 export type LegacyRole =
   | "admin" | "fabrica" | "logistica" | "ventas" | "coordinador"
   | "director_ventas" | "coordinador_ventas" | "auxiliar_ventas"
-  | "finanzas" | "admin_financiero";
+  | "finanzas" | "admin_financiero" | "compras";
 
 const LEGACY_ROLE: Record<Area, Record<Nivel, LegacyRole>> = {
   comercial:         { operador: "ventas",     supervisor: "coordinador_ventas", admin: "director_ventas"  },
   fabrica:           { operador: "fabrica",    supervisor: "fabrica",            admin: "fabrica"          },
   almacen_logistica: { operador: "logistica",  supervisor: "logistica",          admin: "logistica"        },
   administracion:    { operador: "finanzas",   supervisor: "admin_financiero",   admin: "admin_financiero" },
+  compras:           { operador: "compras",    supervisor: "compras",            admin: "compras"          },
   // El enum legacy no tenía rol para Dirección sin mando: 'coordinador' es el que
   // daba lectura amplia de operación, así que se reutiliza para eso.
   direccion:         { operador: "coordinador", supervisor: "coordinador",       admin: "admin"            },
@@ -115,6 +124,7 @@ export const desdeRolLegacy = (role?: string | null): { area: Area; nivel: Nivel
     case "logistica":          return { area: "almacen_logistica", nivel: "operador"   };
     case "admin_financiero":   return { area: "administracion",    nivel: "admin"      };
     case "finanzas":           return { area: "administracion",    nivel: "operador"   };
+    case "compras":            return { area: "compras",           nivel: "operador"   };
     default:                   return { area: "comercial",         nivel: "operador"   };
   }
 };
@@ -157,6 +167,7 @@ const INICIO: Record<Area, string> = {
   fabrica: "/",
   almacen_logistica: "/",
   administracion: "/",
+  compras: "/proveedores",
   direccion: "/",
 };
 

@@ -17,6 +17,12 @@ import {
 } from "@/lib/remisionesEdicion";
 import { cargarModelosMotocarro, MODELOS_RESPALDO } from "@/lib/catalogoModelos";
 import { cargarClientes } from "@/lib/catalogoClientes";
+import {
+  evaluarBloqueoPorCartera,
+} from "@/lib/creditoDb";
+import {
+  mensajeBloqueoCartera,
+} from "@/lib/credito";
 import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,6 +36,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 import { BandejaAvisos } from "@/components/BandejaAvisos";
+import { sanitizeStorageBasename } from "@/lib/storagePaths";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
 // Los modelos se leen del catálogo (ver cargarModelosMotocarro); esta lista
@@ -711,6 +718,22 @@ export default function Remisiones() {
     const faltan = faltantesDeExistencia(motos, disponiblesPara);
     if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes)); return; }
 
+    // Cartera vencida: si el cliente tiene CxC abiertas y fuera de tiempo,
+    // se detiene el alta. Si la migración aún no corre, no bloqueamos.
+    const cartera = await evaluarBloqueoPorCartera(form.cliente_id);
+    if (cartera.error && !cartera.schemaFalta) {
+      toast.error(cartera.error.message);
+      return;
+    }
+    if (cartera.bloqueado) {
+      toast.error(mensajeBloqueoCartera(
+        cartera.resumen,
+        t.remisiones.bloqueadoPorCartera,
+        t.remisiones.bloqueadoPorCarteraSinDetalle,
+      ));
+      return;
+    }
+
     const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
 
     // INSERT mínimo: solo columnas que siempre han existido en la tabla.
@@ -761,7 +784,7 @@ export default function Remisiones() {
     }
 
     if (formFile&&nueva?.id) {
-      const path=`${nueva.id}/${Date.now()}_${formFile.name}`;
+      const path=`${nueva.id}/${Date.now()}_${sanitizeStorageBasename(formFile.name)}`;
       const { error:upErr } = await supabase.storage.from("remisiones-docs").upload(path, formFile);
       if (!upErr) await supabase.from("remisiones").update({ documento_url:path }).eq("id",nueva.id);
     }
@@ -799,7 +822,7 @@ export default function Remisiones() {
   };
 
   const subirPdf = async (r:any, file:File) => {
-    const path=`${r.id}/${Date.now()}_${file.name}`;
+    const path=`${r.id}/${Date.now()}_${sanitizeStorageBasename(file.name)}`;
     const { error } = await supabase.storage.from("remisiones-docs").upload(path,file);
     if (error) return toast.error(error.message);
     await supabase.from("remisiones").update({documento_url:path}).eq("id",r.id);
@@ -818,7 +841,7 @@ export default function Remisiones() {
   const confirmarPago = async () => {
     if (!pagoDialog||!comprobanteFile) { toast.error(t.pago.sinComprobante); return; }
     setSubiendoPago(true);
-    const path=`${pagoDialog.id}/comprobante_${Date.now()}_${comprobanteFile.name}`;
+    const path=`${pagoDialog.id}/comprobante_${Date.now()}_${sanitizeStorageBasename(comprobanteFile.name)}`;
     const { error:upErr } = await supabase.storage.from("remisiones-docs").upload(path,comprobanteFile);
     if (upErr) { setSubiendoPago(false); return toast.error(upErr.message); }
     const { error } = await supabase.from("remisiones").update({pagado:true,comprobante_pago_url:path}).eq("id",pagoDialog.id);
@@ -1014,6 +1037,19 @@ export default function Remisiones() {
     const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
     if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes));
 
+    // Mismo corte que en el alta: cliente con CxC vencida no avanza.
+    const cartera = await evaluarBloqueoPorCartera(editForm.cliente_id);
+    if (cartera.error && !cartera.schemaFalta) {
+      return toast.error(cartera.error.message);
+    }
+    if (cartera.bloqueado) {
+      return toast.error(mensajeBloqueoCartera(
+        cartera.resumen,
+        t.remisiones.bloqueadoPorCartera,
+        t.remisiones.bloqueadoPorCarteraSinDetalle,
+      ));
+    }
+
     const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
     if (!plan.totalUnidades) return toast.error(t.remisiones.necesitaMotocarro);
 
@@ -1191,6 +1227,7 @@ export default function Remisiones() {
                 <div>
                   <Label className="text-base">{t.remisiones.folioRemision}</Label>
                   <Input value={form.folio_remision} onChange={e=>setForm({...form,folio_remision:e.target.value})} placeholder={t.remisiones.folioPlaceholder} className="h-12 text-base font-mono" />
+                  <p className="text-xs text-muted-foreground mt-1">{t.remisiones.folioSerie}</p>
                   {recentFolios.length>0&&(
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {recentFolios.map(f=>(
@@ -1373,8 +1410,8 @@ export default function Remisiones() {
             <Card key={r.id} className="p-5 flex flex-col gap-3 border-red-100 bg-red-50/30 opacity-80">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
-                  <div className="text-2xl font-bold text-slate-500 leading-tight line-through">{r.folio_remision}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.remisiones.folioRemision}</div>
+                  <div className="text-2xl font-bold font-mono text-slate-500 leading-tight line-through">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{t.remisiones.cancelada}</span>
@@ -1419,8 +1456,8 @@ export default function Remisiones() {
             <Card key={r.id} className="p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.fields.folio}</div>
-                  <div className="text-2xl font-bold text-[#1F3864] leading-tight">{r.folio_remision}</div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.remisiones.folioRemision}</div>
+                  <div className="text-2xl font-bold font-mono text-[#1F3864] leading-tight">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                   {!!modificaciones[r.id] && (
                     <button

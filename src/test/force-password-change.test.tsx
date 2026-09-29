@@ -9,6 +9,8 @@ vi.mock("@/contexts/LangContext", () => ({
 
 import ForcePasswordChange from "@/components/ForcePasswordChange";
 
+const BTN_GUARDAR = es.auth.savePassword;
+
 const renderizar = () => {
   const onChangePassword = vi.fn().mockResolvedValue({ error: null });
   const onSignOut = vi.fn().mockResolvedValue(undefined);
@@ -30,11 +32,11 @@ describe("ForcePasswordChange", () => {
 
   it("deshabilita el botón hasta que todos los requisitos se cumplan", async () => {
     const { getByLabelText, getByText } = renderizar();
-    const guardar = getByText("Guardar y continuar").closest("button")!;
+    const guardar = getByText(BTN_GUARDAR).closest("button")!;
     expect(guardar).toBeDisabled();
 
-    const nueva = getByLabelText("Contraseña nueva");
-    const confirmar = getByLabelText("Confirmar contraseña");
+    const nueva = getByLabelText(es.auth.newPassword);
+    const confirmar = getByLabelText(es.auth.confirmPassword);
 
     await act(async () => { fireEvent.change(nueva, { target: { value: "Corta1!" } }); });
     expect(guardar).toBeDisabled();
@@ -48,7 +50,7 @@ describe("ForcePasswordChange", () => {
 
   it("rechaza contraseñas débiles como 'Dazon1234!' y refleja el checklist", async () => {
     const { getByLabelText, getByText } = renderizar();
-    const nueva = getByLabelText("Contraseña nueva");
+    const nueva = getByLabelText(es.auth.newPassword);
 
     await act(async () => { fireEvent.change(nueva, { target: { value: "Dazon1234!" } }); });
 
@@ -61,13 +63,13 @@ describe("ForcePasswordChange", () => {
 
   it("envía la contraseña cuando todos los requisitos se cumplen", async () => {
     const { getByLabelText, getByText, onChangePassword } = renderizar();
-    const nueva = getByLabelText("Contraseña nueva");
-    const confirmar = getByLabelText("Confirmar contraseña");
+    const nueva = getByLabelText(es.auth.newPassword);
+    const confirmar = getByLabelText(es.auth.confirmPassword);
 
     await act(async () => { fireEvent.change(nueva, { target: { value: "SeguraPass1!" } }); });
     await act(async () => { fireEvent.change(confirmar, { target: { value: "SeguraPass1!" } }); });
 
-    const guardar = getByText("Guardar y continuar").closest("button")!;
+    const guardar = getByText(BTN_GUARDAR).closest("button")!;
     await act(async () => { fireEvent.click(guardar); });
 
     expect(onChangePassword).toHaveBeenCalledWith("SeguraPass1!");

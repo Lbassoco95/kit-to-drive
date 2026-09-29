@@ -1326,6 +1326,7 @@ export type Database = {
           activo: boolean
           codigo_vendedor: string | null
           created_at: string
+          debe_cambiar_password: boolean
           email: string | null
           id: string
           nombre_completo: string
@@ -1335,6 +1336,7 @@ export type Database = {
           activo?: boolean
           codigo_vendedor?: string | null
           created_at?: string
+          debe_cambiar_password?: boolean
           email?: string | null
           id: string
           nombre_completo?: string
@@ -1344,6 +1346,7 @@ export type Database = {
           activo?: boolean
           codigo_vendedor?: string | null
           created_at?: string
+          debe_cambiar_password?: boolean
           email?: string | null
           id?: string
           nombre_completo?: string
@@ -2064,6 +2067,7 @@ export type Database = {
         | "director_ventas"
         | "coordinador_ventas"
         | "auxiliar_ventas"
+        | "compras"
       estatus_armado:
         | "PENDIENTE"
         | "EN_PROCESO"
@@ -2076,6 +2080,7 @@ export type Database = {
         | "fabrica"
         | "almacen_logistica"
         | "administracion"
+        | "compras"
         | "direccion"
       user_nivel: "operador" | "supervisor" | "admin"
       estatus_remision: "NUEVA" | "PARCIAL" | "COMPLETA" | "CANCELADA"
@@ -2217,6 +2222,7 @@ export const Constants = {
         "director_ventas",
         "coordinador_ventas",
         "auxiliar_ventas",
+        "compras",
       ],
       estatus_armado: [
         "PENDIENTE",
@@ -2232,6 +2238,7 @@ export const Constants = {
         "fabrica",
         "almacen_logistica",
         "administracion",
+        "compras",
         "direccion",
       ],
       user_nivel: ["operador", "supervisor", "admin"],

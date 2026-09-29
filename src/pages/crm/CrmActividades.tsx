@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Plus, Pencil, Search, BookOpen, Calendar, User, Building2, CheckCircle, XCircle, AlertTriangle, Camera, ChevronRight, ChevronLeft, Expand } from "lucide-react";
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { cargarClientes, porNombreComercial } from "@/lib/catalogoClientes";
+import { isAbsoluteHttpUrl, storageExtFromFile } from "@/lib/storagePaths";
 
 export default function CrmActividades() {
   const { perms, user } = useAuth();
@@ -116,7 +117,14 @@ export default function CrmActividades() {
       supabase.from("profiles").select("id, nombre_completo").eq("activo", true),
       supabase.from("crm_oportunidades").select("*")
     ]);
-    setActividades(acts ?? []);
+    const withSigned = await Promise.all((acts ?? []).map(async (a) => {
+      if (!a.evidencia_url || isAbsoluteHttpUrl(a.evidencia_url)) return a;
+      const { data: signed } = await supabase.storage
+        .from("actividades-evidencia")
+        .createSignedUrl(a.evidencia_url, 300);
+      return { ...a, evidencia_url: signed?.signedUrl ?? null, evidencia_path: a.evidencia_url };
+    }));
+    setActividades(withSigned);
     setClientes([...(cs ?? [])].sort(porNombreComercial));
     setVendedores(vs ?? []);
     setOportunidades(ops ?? []);
@@ -174,15 +182,19 @@ export default function CrmActividades() {
     
     // Upload evidence file if present
     if (evidenciaFile) {
-      const fileExt = evidenciaFile.name.split('.').pop();
-      const fileName = `${completing?.vendedor_id || user?.id}/${Date.now()}.${fileExt}`;
+      if (!user?.id) {
+        toast.error(t.crm.actividades.errorEvidencia + "sin sesión");
+        return;
+      }
+      const fileExt = storageExtFromFile(evidenciaFile, "jpg");
+      // Prefijo = auth.uid() para casar con RLS de Storage.
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('actividades-evidencia').upload(fileName, evidenciaFile);
       if (uploadError) {
         toast.error(t.crm.actividades.errorEvidencia + uploadError.message);
         return;
       }
-      const { data: { publicUrl } } = supabase.storage.from('actividades-evidencia').getPublicUrl(fileName);
-      evidenciaUrl = publicUrl;
+      evidenciaUrl = fileName;
     }
 
     // Build marcas string from checkboxes

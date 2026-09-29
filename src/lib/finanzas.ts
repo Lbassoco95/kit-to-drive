@@ -5,6 +5,8 @@
 // reglas se puedan probar solas. El acceso a datos vive en `finanzasDb.ts`.
 // ============================================================
 
+import { fmtMonedaPlataforma } from "@/lib/numeros";
+
 export const BUCKET_FINANZAS = "finanzas-docs";
 
 // ── Tipos del dominio ───────────────────────────────────────
@@ -251,12 +253,9 @@ export function etiquetaIntermediario(tipo: MovTipo, msgs: MensajesFinanzas = ME
 }
 
 // ── Formato ─────────────────────────────────────────────────
-export function fmtMoneda(monto: number, moneda = "MXN", locale = "es-MX"): string {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: moneda,
-    minimumFractionDigits: 2,
-  }).format(monto ?? 0);
+// Los montos de toda la plataforma usan coma (,) de miles — ver `lib/numeros`.
+export function fmtMoneda(monto: number, moneda = "MXN", _locale = "es-MX"): string {
+  return fmtMonedaPlataforma(monto, moneda);
 }
 
 export function fmtFecha(fecha: string | null, locale = "es-MX"): string {
@@ -422,9 +421,11 @@ export function coincideBusqueda(m: Movimiento, q: string): boolean {
 
 /** Ruta del archivo dentro del bucket de expedientes. */
 export function rutaAdjunto(movimientoId: string, nombreArchivo: string): string {
-  const ext = nombreArchivo.includes(".") ? nombreArchivo.split(".").pop() : "bin";
+  const safeId = String(movimientoId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "mov";
+  const rawExt = nombreArchivo.includes(".") ? nombreArchivo.split(".").pop()!.toLowerCase() : "bin";
+  const ext = /^[a-z0-9]{1,8}$/.test(rawExt) ? rawExt : "bin";
   const slug = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  return `movimientos/${movimientoId}/${slug}.${ext}`;
+  return `movimientos/${safeId}/${slug}.${ext}`;
 }
 
 /** Total histórico y del mes en curso (YYYY-MM) de una lista de importes con fecha. */

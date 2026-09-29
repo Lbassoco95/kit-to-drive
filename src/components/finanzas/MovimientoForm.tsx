@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowDownCircle, ArrowUpCircle, AlertTriangle, Search } from "lucide-react";
 import ContraparteSelector from "./ContraparteSelector";
+import { InputNumero } from "@/components/InputNumero";
 import { useLang } from "@/contexts/LangContext";
 import { fdb } from "@/lib/finanzasDb";
 import {
@@ -157,12 +158,11 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <Label>{t.finanzas.form.monto}</Label>
-          <Input
-            type="number" min="0" step="0.01"
+          <InputNumero
             value={form.monto}
-            onChange={e => set({ monto: e.target.value })}
+            onValueChange={v => set({ monto: v == null ? "" : String(v) })}
             className="h-11"
-            placeholder="0.00"
+            placeholder="25,000.00"
           />
         </div>
         <div>

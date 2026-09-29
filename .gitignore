@@ -1,31 +1,41 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
+data/almacen_refacciones_seed.json
+data/sql_batches/
 dist
 dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# Environment variables
+# Editor directories and files
 .env
-
+# Environment variables
+.idea
+lerna-debug.log*
+*.local
+*.log
+logs
+# Logs
+*.njsproj
+node_modules
+npm-debug.log*
+*.ntvs*
+pnpm-debug.log*
+__pycache__/
+# Seed local del almacén de refacciones (se regenera con el script)
+*.sln
+*.suo
 # Supabase CLI temporary files
 supabase/.temp/
 .vercel
+*.sw?
+tmp_*.sql
+.vscode/*
+!.vscode/extensions.json
+yarn-debug.log*
+yarn-error.log*
+
+# Credenciales / accesos — NUNCA versionar contraseñas ni fichas de acceso
+credenciales/
+credenciales_individuales/
+**/credenciales/
+*_acceso*.txt
+*_admin.txt
+*_ventas.txt
+*_fabrica.txt

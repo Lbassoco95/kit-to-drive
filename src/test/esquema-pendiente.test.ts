@@ -64,6 +64,9 @@ describe("explicarError · a qué script apunta cada objeto", () => {
     ["column remision_items.orden_linea does not exist", "20260902000001"],
     ["function public.asignar_motocarro_a_remision(uuid, uuid) does not exist", "20260826000003"],
     ["function public.desasignar_motocarro_de_remision(uuid) does not exist", "20260826000003"],
+    ["function public.crear_remision_refacciones(uuid, text, text, jsonb) does not exist", "20260923000001"],
+    ["column v_almacen_refacciones.stock_disponible does not exist", "20260925000002"],
+    ["column v_almacen_refacciones.stock_bloqueado does not exist", "20260925000002"],
   ];
 
   for (const [crudo, esperado] of casos) {

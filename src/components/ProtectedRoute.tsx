@@ -27,13 +27,23 @@ function SinAcceso({ icono, titulo, detalle }: { icono: JSX.Element; titulo: str
   );
 }
 
-export default function ProtectedRoute({ children, modulo }: { children: JSX.Element; modulo?: Modulo }) {
-  const { user, area, nivel, perms, activo, loading } = useAuth();
+export default function ProtectedRoute({
+  children,
+  modulo,
+  requireRefacciones,
+}: {
+  children: JSX.Element;
+  modulo?: Modulo;
+  /** Allowlist del módulo Almacén / remisiones de refacciones. */
+  requireRefacciones?: boolean;
+}) {
+  const { user, area, nivel, perms, activo, loading, puedeVerRefacciones, isPasswordRecovery } = useAuth();
   const { t } = useLang();
   const loc = useLocation();
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">{t.componentes.acceso.cargando}</div>;
   if (!user) return <Navigate to="/auth" state={{ from: loc }} replace />;
+  if (isPasswordRecovery) return <Navigate to="/auth/reset-password" replace />;
 
   // Dado de baja: no entra a ningún lado. El RLS ya lo corta del lado de la
   // base (`usuario_activo`); esto es para que vea el motivo en vez de una app
@@ -58,6 +68,10 @@ export default function ProtectedRoute({ children, modulo }: { children: JSX.Ele
         detalle={t.componentes.acceso.sinPermisosDetalle}
       />
     );
+  }
+
+  if (requireRefacciones && !puedeVerRefacciones) {
+    return <Navigate to="/" replace />;
   }
 
   if (modulo && !perms.puedeVer(modulo)) return <Navigate to="/" replace />;

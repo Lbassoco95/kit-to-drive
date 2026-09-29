@@ -1,12 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://kit-to-drive.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") ?? "";
+  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 serve(async (req) => {
+  const CORS = corsHeaders(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
@@ -23,7 +35,6 @@ serve(async (req) => {
     const { data: { user: caller }, error: authErr } = await supabaseClient.auth.getUser();
     if (authErr || !caller) return new Response("Unauthorized", { status: 401, headers: CORS });
 
-    // Verificar rol admin usando service_role para saltear RLS en la lectura
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -35,7 +46,6 @@ serve(async (req) => {
       .eq("user_id", caller.id)
       .single();
 
-    // Solo un administrador (de cualquier área) puede crear usuarios.
     const callerNivel = roleRow?.nivel ?? (roleRow?.role === "admin" ? "admin" : null);
     const callerArea = roleRow?.area ?? (roleRow?.role === "admin" ? "direccion" : null);
     const esAdminGlobal = callerNivel === "admin" && callerArea === "direccion";
@@ -46,7 +56,6 @@ serve(async (req) => {
       });
     }
 
-    // 2. Parsear body
     const body = await req.json();
     const { email, password, nombre_completo, codigo_vendedor, force_password_change } = body;
 
@@ -58,11 +67,9 @@ serve(async (req) => {
 
     const mustChangePassword = force_password_change === true;
 
-    const AREAS = ["comercial", "fabrica", "almacen_logistica", "administracion", "direccion"];
+    const AREAS = ["comercial", "fabrica", "almacen_logistica", "administracion", "compras", "direccion"];
     const NIVELES = ["operador", "supervisor", "admin"];
 
-    // Traduce un rol del enum legacy al par (área, nivel), para clientes que
-    // todavía no se han actualizado al modelo nuevo.
     const desdeRolLegacy = (role: string) => {
       switch (role) {
         case "admin":              return { area: "direccion",         nivel: "admin"      };
@@ -75,11 +82,11 @@ serve(async (req) => {
         case "logistica":          return { area: "almacen_logistica", nivel: "operador"   };
         case "admin_financiero":   return { area: "administracion",    nivel: "admin"      };
         case "finanzas":           return { area: "administracion",    nivel: "operador"   };
+        case "compras":            return { area: "compras",           nivel: "operador"   };
         default:                   return null;
       }
     };
 
-    // El modelo vigente es (área, nivel); `role` se acepta solo por compatibilidad.
     let area = body.area;
     let nivel = body.nivel;
     if (!area || !nivel) {
@@ -104,46 +111,56 @@ serve(async (req) => {
       });
     }
 
-    // Un admin de área solo puede crear usuarios dentro de su propia área.
     if (!esAdminGlobal && area !== callerArea) {
       return new Response(JSON.stringify({ error: "Solo puedes crear usuarios de tu propia área" }), {
         status: 403, headers: { ...CORS, "Content-Type": "application/json" }
       });
     }
 
-    // Rol legacy derivado de (área, nivel) — el trigger de la BD lo recalcula igual.
     const rolLegacy = (a: string, n: string) => {
       if (a === "comercial") return n === "admin" ? "director_ventas" : n === "supervisor" ? "coordinador_ventas" : "ventas";
       if (a === "fabrica") return "fabrica";
       if (a === "almacen_logistica") return "logistica";
       if (a === "administracion") return n === "operador" ? "finanzas" : "admin_financiero";
-      return n === "admin" ? "admin" : "coordinador"; // direccion
+      if (a === "compras") return "compras";
+      return n === "admin" ? "admin" : "coordinador";
     };
     const rolDerivado = rolLegacy(area, nivel);
 
-    // 3. Crear o actualizar usuario en Supabase Auth.
-    // Si ya existe, sólo se renueva la contraseña; esto evita tener que borrar
-    // el usuario y recrear sus perfiles/roles.
-    const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    if (listErr) {
-      return new Response(JSON.stringify({ error: listErr.message }), {
-        status: 500, headers: { ...CORS, "Content-Type": "application/json" }
-      });
+    // Buscar por email sin volcar 1000 usuarios: paginar hasta encontrar o agotar.
+    let existente: { id: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> } | undefined;
+    for (let page = 1; page <= 10 && !existente; page++) {
+      const { data: list, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (listErr) {
+        return new Response(JSON.stringify({ error: listErr.message }), {
+          status: 500, headers: { ...CORS, "Content-Type": "application/json" }
+        });
+      }
+      const users = list?.users ?? [];
+      existente = users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (users.length < 200) break;
     }
 
-    const existente = (list?.users ?? []).find((u) => u.email?.toLowerCase() === email.toLowerCase());
     let uid: string;
 
-    const userMetadata = {
+    // Flag de privilegio en app_metadata (solo Admin API); user_metadata es editable por el cliente.
+    const appMeta = {
       must_change_password: mustChangePassword,
+      created_via_admin: true,
+      managed_by: "admin-create-user",
+    };
+    const userMeta = {
       full_name: nombre_completo.trim(),
+      // limpia flag legacy editable por el cliente si existía
+      must_change_password: false,
     };
 
     if (existente) {
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(existente.id, {
         password,
         email_confirm: true,
-        user_metadata: { ...(existente.user_metadata || {}), ...userMetadata },
+        app_metadata: { ...(existente.app_metadata || {}), ...appMeta },
+        user_metadata: { ...(existente.user_metadata || {}), ...userMeta },
       });
       if (updateErr) {
         return new Response(JSON.stringify({ error: updateErr.message }), {
@@ -156,8 +173,8 @@ serve(async (req) => {
         email,
         password,
         email_confirm: true,
-        app_metadata: { created_via_admin: true, managed_by: "admin-create-user" },
-        user_metadata: userMetadata,
+        app_metadata: appMeta,
+        user_metadata: userMeta,
       });
       if (createErr) {
         return new Response(JSON.stringify({ error: createErr.message }), {
@@ -167,16 +184,15 @@ serve(async (req) => {
       uid = newUser.user!.id;
     }
 
-    // 4. Crear perfil
     await supabaseAdmin.from("profiles").upsert({
       id: uid,
       email: email.toLowerCase().trim(),
       nombre_completo: nombre_completo.trim(),
       codigo_vendedor: codigo_vendedor?.trim() || null,
       activo: true,
+      debe_cambiar_password: mustChangePassword,
     });
 
-    // 5. Asignar rol
     await supabaseAdmin.from("user_roles").upsert({
       user_id: uid,
       area,
@@ -188,8 +204,9 @@ serve(async (req) => {
       status: 200, headers: { ...CORS, "Content-Type": "application/json" }
     });
 
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: message }), {
       status: 500, headers: { ...CORS, "Content-Type": "application/json" }
     });
   }

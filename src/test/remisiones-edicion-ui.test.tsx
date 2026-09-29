@@ -24,7 +24,10 @@ vi.mock("@/integrations/supabase/client", () => ({
     },
     rpc: (fn: string, args: Record<string, unknown>) => {
       rpcs.push({ fn, args });
-      return Promise.resolve({ data: { liberadas: 2 }, error: null });
+      if (fn === "ajustar_unidades_remision") return Promise.resolve({ data: { liberadas: 2 }, error: null });
+      if (fn === "cliente_tiene_cxc_vencidas") return Promise.resolve({ data: false, error: null });
+      if (fn === "cxc_vencidas_resumen") return Promise.resolve({ data: [], error: null });
+      return Promise.resolve({ data: null, error: null });
     },
     storage: { from: () => ({}) },
   },
@@ -181,14 +184,16 @@ describe("Remisiones · bajar una remisión con chasis asignados", () => {
   const conAsignados = (unidades: { armado: string; entrega?: string }[]) => {
     for (const k of Object.keys(filas)) delete filas[k];
     rpcs.length = 0;
+    const motos = unidades.map((u, i) => ({
+      id: `m${i}`, remision_id: "r1", orden_armado: 100 + i,
+      estatus_armado: u.armado, estatus_entrega: u.entrega ?? "PROGRAMADA",
+    }));
     filas.remisiones = [{
       ...REMISION,
       total_unidades_solicitadas: unidades.length,
-      motocarros: unidades.map((u, i) => ({
-        id: `m${i}`, remision_id: "r1", orden_armado: 100 + i,
-        estatus_armado: u.armado, estatus_entrega: u.entrega ?? "PROGRAMADA",
-      })),
+      motocarros: motos,
     }];
+    filas.motocarros = motos;
     filas.clientes = [{ id: "c1", codigo_erp: "R195", folio_interno: null, nombre_comercial: "Ferretería del Sur" }];
     filas.remision_items = [
       { id: "i1", remision_id: "r1", tipo_servicio: "motocarro", modelo: "200cc 2026", color: "BLANCO", cantidad: unidades.length, con_caja: false, orden_linea: 0 },
@@ -252,6 +257,8 @@ describe("Remisiones · bajar una remisión con chasis asignados", () => {
     await abrirYBajarA("1");
     await conMotivo();
     await act(async () => { fireEvent.click(boton(/Guardar cambios/i)!); });
+    // Dejar que terminen las llamadas async del guardado.
+    await act(async () => { await Promise.resolve(); });
 
     const ajuste = rpcs.find(r => r.fn === "ajustar_unidades_remision");
     expect(ajuste).toBeTruthy();

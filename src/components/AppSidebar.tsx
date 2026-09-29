@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert } from "lucide-react";
+import { LayoutDashboard, Factory, FileText, Truck, Bike, Users, Database, ScrollText, Upload, Settings, ClipboardList, TrendingUp, BookOpen, MapPin, BarChart2, Wallet, Package, Building2, TriangleAlert, Boxes, Receipt, CreditCard } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar,
@@ -10,16 +10,29 @@ import { useLang } from "@/contexts/LangContext";
 
 type Group = "Inicio" | "Operación" | "Catálogos" | "CRM" | "Finanzas" | "Sistema";
 
-type Item = { key: keyof ReturnType<typeof useLang>["t"]["nav"]; url: string; icon: any; modulo: Modulo; group: Group };
+type Item = {
+  key: keyof ReturnType<typeof useLang>["t"]["nav"];
+  url: string;
+  icon: any;
+  modulo?: Modulo;
+  /** Acceso por allowlist (p.ej. almacén de refacciones), no por área×nivel. */
+  requiereRefacciones?: boolean;
+  /** También visible para quien tiene el almacén de refacciones, aunque su área no vea el módulo. */
+  oRefacciones?: boolean;
+  group: Group;
+};
 
-// La visibilidad la resuelven los permisos del módulo (área × tipo de usuario).
+// La visibilidad la resuelven los permisos del módulo (área × tipo de usuario),
+// salvo ítems con `requiereRefacciones` (allowlist en base).
 const ITEMS: Item[] = [
   { key: "dashboard",       url: "/",                 icon: LayoutDashboard, modulo: "dashboard",     group: "Inicio"    },
   { key: "produccion",      url: "/produccion",       icon: Factory,         modulo: "produccion",    group: "Operación" },
   { key: "inventario",      url: "/inventario",       icon: Package,         modulo: "inventario",    group: "Operación" },
+  { key: "almacenRefacciones", url: "/almacen-refacciones", icon: Boxes, requiereRefacciones: true, group: "Operación" },
   { key: "incidencias",     url: "/incidencias",      icon: TriangleAlert,   modulo: "inventario",    group: "Operación" },
   { key: "reportesTurno",   url: "/reportes-turno",   icon: ClipboardList,   modulo: "reportesTurno", group: "Operación" },
   { key: "remisiones",      url: "/remisiones",       icon: FileText,        modulo: "remisiones",    group: "Operación" },
+  { key: "remisionesRefacciones", url: "/remisiones-refacciones", icon: Receipt, modulo: "remisiones", oRefacciones: true, group: "Operación" },
   { key: "entregas",        url: "/entregas",         icon: Truck,           modulo: "entregas",      group: "Operación" },
   { key: "misMotocarros",   url: "/mis-motocarros",   icon: Bike,            modulo: "misMotocarros", group: "Catálogos" },
   { key: "clientes",        url: "/clientes",         icon: Users,           modulo: "clientes",      group: "Catálogos" },
@@ -29,7 +42,8 @@ const ITEMS: Item[] = [
   { key: "crmRutas",        url: "/crm/rutas",        icon: MapPin,          modulo: "crm",           group: "CRM"       },
   { key: "crmTracker",      url: "/crm/tracker",      icon: BarChart2,       modulo: "crmEquipo",     group: "CRM"       },
   { key: "finanzas",        url: "/finanzas",         icon: Wallet,          modulo: "finanzas",      group: "Finanzas"  },
-  { key: "proveedores",     url: "/proveedores",      icon: Building2,       modulo: "finanzas",      group: "Finanzas"  },
+  { key: "credito",         url: "/credito",          icon: CreditCard,      modulo: "credito",       group: "Finanzas"  },
+  { key: "proveedores",     url: "/proveedores",      icon: Building2,       modulo: "proveedores",   group: "Finanzas"  },
   { key: "importar",        url: "/importar",         icon: Upload,          modulo: "importar",      group: "Sistema"   },
   { key: "usuarios",        url: "/usuarios",         icon: Database,        modulo: "usuarios",      group: "Sistema"   },
   { key: "bitacora",        url: "/bitacora",         icon: ScrollText,      modulo: "bitacora",      group: "Sistema"   },
@@ -42,9 +56,15 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const { pathname } = useLocation();
-  const { perms, area, nivel } = useAuth();
+  const { perms, area, nivel, puedeVerRefacciones } = useAuth();
   const { t, toggleLang } = useLang();
-  const items = area && nivel ? ITEMS.filter(i => perms.puedeVer(i.modulo)) : [];
+  const items = area && nivel
+    ? ITEMS.filter(i => {
+        if (i.requiereRefacciones) return puedeVerRefacciones;
+        if (i.oRefacciones && puedeVerRefacciones) return true;
+        return i.modulo ? perms.puedeVer(i.modulo) : false;
+      })
+    : [];
 
   return (
     <Sidebar collapsible="icon">

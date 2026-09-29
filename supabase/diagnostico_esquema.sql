@@ -244,13 +244,95 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260908000002_tope_unidades_ya_armadas',     'vista|v_carga_ya_armados'),
   ('20260908000002_tope_unidades_ya_armadas',     'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|limite_ya_armados'),
 
-  -- Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
+  // Los tipos de actividad del CRM que la pantalla ofrece y la base rechazaba.
   ('20260908000003_crm_tipos_actividad',          'restriccion|crm_actividades.crm_actividades_tipo_check|videollamada'),
+
+  -- Almacén de refacciones para venta (lista de precios, códigos duales, compat).
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_productos'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_codigos'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_unidades'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_producto_compat'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_movimientos'),
+  ('20260922000001_almacen_refacciones',          'tabla|almacen_refacciones_acceso'),
+  ('20260922000001_almacen_refacciones',          'funcion|puede_ver_almacen_refacciones(uuid)'),
+  ('20260922000001_almacen_refacciones',          'funcion|importar_almacen_refacciones(jsonb)'),
+  ('20260922000001_almacen_refacciones',          'vista|v_almacen_refacciones'),
+
+  -- Reproceso de descripción vs compatibilidades reutilizables.
+  ('20260922000002_sincronizar_compat_refacciones', 'funcion|sincronizar_compat_refacciones(jsonb)'),
+
+  -- Área Compras (dos pasos: enum primero, luego helpers/RLS).
+  ('20260922000003_area_compras_enum',            'tipo|user_area.compras'),
+  ('20260922000003_area_compras_enum',            'tipo|app_role.compras'),
+  ('20260922000004_area_compras',                 'funcion|es_compras(uuid)'),
+  ('20260922000004_area_compras',                 'funcion|es_compras_admin(uuid)'),
+  ('20260922000004_area_compras',                 'funcion|rol_legacy(user_area,user_nivel)|compras'),
+  ('20260922000004_area_compras',                 'politica|proveedores.proveedores_insert|es_compras'),
+
+  -- Remisión de venta de refacciones: apartado, liberación en almacén y contingencia.
+  ('20260923000001_remisiones_refacciones',       'tabla|remisiones_refacciones'),
+  ('20260923000001_remisiones_refacciones',       'tabla|remision_refaccion_items'),
+  ('20260923000001_remisiones_refacciones',       'tabla|remision_refaccion_eventos'),
+  ('20260923000001_remisiones_refacciones',       'funcion|stock_bloqueado_producto(uuid)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|liberar_refaccion_remision(uuid,integer)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|liberar_refaccion_remision(uuid,integer)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|reportar_faltante_refaccion(uuid,integer,text)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|confirmar_sin_existencia_refaccion(uuid,text)'),
+  ('20260923000001_remisiones_refacciones',       'funcion|cancelar_remision_refacciones(uuid,text)'),
+  ('20260923000001_remisiones_refacciones',       'columna|v_almacen_refacciones.stock_disponible'),
+  ('20260923000001_remisiones_refacciones',       'politica|remisiones_refacciones.leer remisiones refacciones|puede_leer_remision_refaccion'),
+
+  ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.motivo_cancelacion'),
+  ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.cancelada_at'),
+  ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.forma_pago'),
+  ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.descuento_pct'),
+  ('20260925000003_remision_refacciones_pago_descuento', 'columna|remision_refaccion_items.descuento_pct'),
+  ('20260925000002_vista_refacciones_stock',        'columna|v_almacen_refacciones.stock_bloqueado'),
+  ('20260925000002_vista_refacciones_stock',        'columna|v_almacen_refacciones.stock_disponible'),
+  ('20260925000001_remision_refacciones_seguimiento', 'columna|remisiones_refacciones.tipo_envio'),
+  ('20260925000001_remision_refacciones_seguimiento', 'columna|remisiones_refacciones.direccion_entrega'),
+  ('20260925000001_remision_refacciones_seguimiento', 'columna|remisiones_refacciones.pagado'),
+  ('20260925000001_remision_refacciones_seguimiento', 'columna|remisiones_refacciones.entregada_at'),
+  ('20260925000001_remision_refacciones_seguimiento', 'columna|avisos.remision_refaccion_id'),
+  ('20260925000001_remision_refacciones_seguimiento', 'columna|avisos.destinatario_id'),
+  ('20260925000001_remision_refacciones_seguimiento', 'funcion|crear_remision_refacciones(uuid,text,text,jsonb,jsonb)'),
+  ('20260925000001_remision_refacciones_seguimiento', 'funcion|avisar_faltante_refaccion(uuid,uuid,text)'),
+  ('20260925000001_remision_refacciones_seguimiento', 'funcion|actualizar_envio_remision_refaccion(uuid,jsonb)'),
+  ('20260925000001_remision_refacciones_seguimiento', 'funcion|registrar_guia_remision_refaccion(uuid,text,text)'),
+  ('20260925000001_remision_refacciones_seguimiento', 'funcion|entregar_remision_refaccion(uuid)'),
+  ('20260925000001_remision_refacciones_seguimiento', 'funcion|marcar_pago_remision_refaccion(uuid,boolean,text)'),
+  ('20260925000001_remision_refacciones_seguimiento', 'restriccion|almacen_refacciones_productos.almacen_refacciones_productos_stock_no_negativo|stock >= 0'),
+  ('20260925000001_remision_refacciones_seguimiento', 'restriccion|inventario_colores.inventario_colores_disponible_no_negativo|cantidad_disponible >= 0'),
+
+  ('20260925000005_inventario_trigger_sin_campo_ajeno', 'funcion|impedir_inventario_negativo()'),
+
+  ('20260925170000_security_hardening_criticos', 'columna|profiles.debe_cambiar_password'),
+  ('20260925170000_security_hardening_criticos', 'funcion|proteger_campos_privilegiados_profiles()'),
+  ('20260925170000_security_hardening_criticos', 'politica|profiles.profiles_update_propio'),
+  ('20260925170000_security_hardening_criticos', 'politica|bitacora_eliminaciones.bitacora_elim_select_admin'),
+  ('20260925170000_security_hardening_criticos', 'politica|proveedores.proveedores_select|es_finanzas'),
+  ('20260925170000_security_hardening_criticos', 'politica|almacen_refacciones_acceso.ref_acceso_escribir|es_admin_global'),
+
+  ('20260925193000_security_hardening_fase2', 'funcion|puede_escribir_inventario(uuid)'),
+  ('20260925193000_security_hardening_fase2', 'funcion|puede_leer_inventario(uuid)'),
+  ('20260925193000_security_hardening_fase2', 'politica|inventario_chasis.inv_select_operativo'),
+  ('20260925193000_security_hardening_fase2', 'politica|compras.leer compras|es_compras'),
+  ('20260925193000_security_hardening_fase2', 'politica|cuentas_por_cobrar.cxc_select|es_finanzas'),
+
+  ('20260925210000_disable_public_signups', 'funcion|reject_public_signups()'),
 
   -- Parche suelto, sin fecha en el nombre: columnas de pago de la remisión.
   ('fix_remisiones_columns',                      'columna|remisiones.tipo_pago'),
   ('fix_remisiones_columns',                      'columna|remisiones.color_solicitado'),
-  ('fix_remisiones_columns',                      'restriccion|remisiones.remisiones_tipo_pago_check|contra_entrega')
+  ('fix_remisiones_columns',                      'restriccion|remisiones.remisiones_tipo_pago_check|contra_entrega'),
+
+  -- Módulo de crédito: cartera CxC y bloqueo por vencidos.
+  ('20260925190000_modulo_credito_cxc',           'tabla|cuentas_por_cobrar'),
+  ('20260925190000_modulo_credito_cxc',           'tabla|cxc_abonos'),
+  ('20260925190000_modulo_credito_cxc',           'vista|v_clientes_credito'),
+  ('20260925190000_modulo_credito_cxc',           'funcion|cliente_tiene_cxc_vencidas(uuid)'),
+  ('20260925190000_modulo_credito_cxc',           'funcion|cxc_vencidas_resumen(uuid)'),
+  ('20260925190000_modulo_credito_cxc',           'funcion|cliente_tiene_credito(uuid)')
 ), superado(script, por) AS (VALUES
   -- Scripts que otro posterior reemplazó por completo (les tiró la función y
   -- la volvió a crear con otra firma). No hay que correrlos y revisarlos
