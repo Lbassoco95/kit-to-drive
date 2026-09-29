@@ -164,6 +164,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     writeRecoveryFlag(true);
   };
 
+  const recordConnection = async () => {
+    await supabase.rpc("registrar_conexion" as any);
+  };
+
   const changePassword = async (newPassword: string) => {
     // Única vía: Edge Function (Admin API) setea password + limpia flags.
     // El cliente no puede limpiar must_change_password sin enviar password nueva.
@@ -202,6 +206,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (event === "SIGNED_OUT") {
         clearPasswordRecovery();
       }
+      if (event === "SIGNED_IN") void recordConnection();
       if (s?.user) setTimeout(() => loadRole(s.user.id), 0);
       else clear();
     });
@@ -222,8 +227,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(s?.user ?? null);
       checkMustChange(s?.user ?? null);
       uidRef.current = s?.user?.id ?? null;
-      if (s?.user) loadRole(s.user.id).finally(() => setLoading(false));
-      else setLoading(false);
+      if (s?.user) {
+        void recordConnection();
+        loadRole(s.user.id).finally(() => setLoading(false));
+      } else setLoading(false);
     });
     return () => sub.subscription.unsubscribe();
   }, [navigate]);

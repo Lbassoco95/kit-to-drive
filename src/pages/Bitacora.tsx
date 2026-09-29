@@ -9,20 +9,38 @@ import { useLang } from "@/contexts/LangContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Eye } from "lucide-react";
 
+type Connection = {
+  id: string;
+  usuario_id: string;
+  conectado_at: string;
+};
+
+type ConnectionProfile = {
+  id: string;
+  nombre_completo: string;
+  email: string | null;
+  activo: boolean;
+};
+
 export default function Bitacora() {
   const [rows, setRows] = useState<any[]>([]);
   const [eliminaciones, setEliminaciones] = useState<any[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connectionProfiles, setConnectionProfiles] = useState<ConnectionProfile[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const [selectedDeletion, setSelectedDeletion] = useState<any>(null);
   const { t, lang } = useLang();
-  const { perms } = useAuth();
+  const { area, perms } = useAuth();
 
   useEffect(() => {
     loadEventos();
     if (perms.esAdminGlobal) {
       loadEliminaciones();
     }
-  }, [perms.esAdminGlobal]);
+    if (area === "direccion") {
+      loadConnections();
+    }
+  }, [area, perms.esAdminGlobal]);
 
   const loadEventos = async () => {
     const { data } = await supabase.from("bitacora_eventos").select("*").order("created_at", { ascending: false }).limit(200);
@@ -41,7 +59,24 @@ export default function Bitacora() {
     setEliminaciones(data ?? []);
   };
 
+  const loadConnections = async () => {
+    const [{ data: history }, { data: users }] = await Promise.all([
+      supabase.from("historial_conexiones" as any).select("id, usuario_id, conectado_at").order("conectado_at", { ascending: false }).limit(500),
+      supabase.from("profiles").select("id, nombre_completo, email, activo").order("nombre_completo"),
+    ]);
+    setConnections((history ?? []) as unknown as Connection[]);
+    setConnectionProfiles((users ?? []) as ConnectionProfile[]);
+  };
+
   const locale = lang === "zh" ? "zh-CN" : "es-MX";
+  const latestConnection = connections.reduce<Record<string, string>>((latest, connection) => {
+    if (!latest[connection.usuario_id]) latest[connection.usuario_id] = connection.conectado_at;
+    return latest;
+  }, {});
+  const connectionNames = connectionProfiles.reduce<Record<string, string>>((names, profile) => {
+    names[profile.id] = profile.nombre_completo || profile.email || "—";
+    return names;
+  }, {});
 
   return (
     <div className="space-y-4">
@@ -53,6 +88,9 @@ export default function Bitacora() {
       <Tabs defaultValue="eventos" className="w-full">
         <TabsList>
           <TabsTrigger value="eventos">{t.bitacora.tabEventos}</TabsTrigger>
+          {area === "direccion" && (
+            <TabsTrigger value="conexiones">{t.bitacora.tabConexiones}</TabsTrigger>
+          )}
           {perms.esAdminGlobal && (
             <TabsTrigger value="eliminaciones">{t.bitacora.tabEliminaciones}</TabsTrigger>
           )}
@@ -87,6 +125,66 @@ export default function Bitacora() {
             </div>
           </Card>
         </TabsContent>
+
+        {area === "direccion" && (
+          <TabsContent value="conexiones" className="space-y-4 mt-4">
+            <div>
+              <h2 className="font-semibold">{t.bitacora.ultimaConexionTitulo}</h2>
+              <p className="text-sm text-muted-foreground">{t.bitacora.ultimaConexionDesc}</p>
+            </div>
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{t.bitacora.usuario}</th>
+                      <th>{t.bitacora.correo}</th>
+                      <th>{t.bitacora.estatus}</th>
+                      <th>{t.bitacora.ultimaConexion}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {connectionProfiles.map(profile => (
+                      <tr key={profile.id}>
+                        <td>{profile.nombre_completo || "—"}</td>
+                        <td>{profile.email || "—"}</td>
+                        <td><Badge variant={profile.activo ? "default" : "secondary"}>{profile.activo ? t.bitacora.activo : t.bitacora.inactivo}</Badge></td>
+                        <td className="whitespace-nowrap">{latestConnection[profile.id] ? new Date(latestConnection[profile.id]).toLocaleString(locale) : t.bitacora.nunca}</td>
+                      </tr>
+                    ))}
+                    {!connectionProfiles.length && <tr><td colSpan={4} className="text-center py-6 text-muted-foreground">{t.bitacora.sinUsuarios}</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <div>
+              <h2 className="font-semibold">{t.bitacora.historialConexionesTitulo}</h2>
+              <p className="text-sm text-muted-foreground">{t.bitacora.historialConexionesDesc(connections.length)}</p>
+            </div>
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{t.bitacora.fechaConexion}</th>
+                      <th>{t.bitacora.usuario}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {connections.map(connection => (
+                      <tr key={connection.id}>
+                        <td className="text-xs text-muted-foreground whitespace-nowrap">{new Date(connection.conectado_at).toLocaleString(locale)}</td>
+                        <td>{connectionNames[connection.usuario_id] || "—"}</td>
+                      </tr>
+                    ))}
+                    {!connections.length && <tr><td colSpan={2} className="text-center py-6 text-muted-foreground">{t.bitacora.sinConexiones}</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </TabsContent>
+        )}
 
         {perms.esAdminGlobal && (
           <TabsContent value="eliminaciones" className="space-y-4 mt-4">

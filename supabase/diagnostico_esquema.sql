@@ -332,7 +332,11 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260925190000_modulo_credito_cxc',           'vista|v_clientes_credito'),
   ('20260925190000_modulo_credito_cxc',           'funcion|cliente_tiene_cxc_vencidas(uuid)'),
   ('20260925190000_modulo_credito_cxc',           'funcion|cxc_vencidas_resumen(uuid)'),
-  ('20260925190000_modulo_credito_cxc',           'funcion|cliente_tiene_credito(uuid)')
+  ('20260925190000_modulo_credito_cxc',           'funcion|cliente_tiene_credito(uuid)'),
+
+  ('20260929000001_historial_conexiones',         'tabla|historial_conexiones'),
+  ('20260929000001_historial_conexiones',         'funcion|registrar_conexion()'),
+  ('20260929000001_historial_conexiones',         'politica|historial_conexiones.direccion lee historial conexiones|es_area')
 ), superado(script, por) AS (VALUES
   -- Scripts que otro posterior reemplazó por completo (les tiró la función y
   -- la volvió a crear con otra firma). No hay que correrlos y revisarlos
