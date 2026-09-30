@@ -284,6 +284,13 @@ WITH esperado(script, objeto) AS (VALUES
 
   ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.motivo_cancelacion'),
   ('20260925000004_remision_refacciones_canceladas', 'columna|remisiones_refacciones.cancelada_at'),
+  ('20260930100000_pagos_multi_remision_refacciones', 'tabla|pagos_refacciones'),
+  ('20260930100000_pagos_multi_remision_refacciones', 'tabla|pago_refaccion_aplicaciones'),
+  ('20260930100000_pagos_multi_remision_refacciones', 'columna|remisiones_refacciones.naturaleza'),
+  ('20260930100000_pagos_multi_remision_refacciones', 'columna|remisiones_refacciones.estado_pago'),
+  ('20260930100000_pagos_multi_remision_refacciones', 'funcion|registrar_pago_refacciones(uuid,numeric,text,text,text,text,jsonb)'),
+  ('20260930100000_pagos_multi_remision_refacciones', 'funcion|conciliar_pago_refacciones(uuid,text,text)'),
+  ('20260930100000_pagos_multi_remision_refacciones', 'funcion|registrar_deposito_pago_refacciones(uuid,text,text,text)'),
   ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.forma_pago'),
   ('20260925000003_remision_refacciones_pago_descuento', 'columna|remisiones_refacciones.descuento_pct'),
   ('20260925000003_remision_refacciones_pago_descuento', 'columna|remision_refaccion_items.descuento_pct'),

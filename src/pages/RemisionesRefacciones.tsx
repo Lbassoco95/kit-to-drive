@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Boxes, Download, Plus, Search, TriangleAlert, Truck, Warehouse } from "lucide-react";
+import { PanelDepositosCompras, PanelPagosFinanzas } from "@/components/PagosRefaccionesPanel";
 
 type Etapa = EtapaRefaccion;
 type EstatusLinea = EstatusLineaRefaccion;
@@ -38,7 +39,7 @@ type Remision = {
   fecha_remision: string | null;
   notas: string | null;
   etapa: Etapa;
-  area_actual: "ventas" | "almacen" | "logistica";
+  area_actual: "ventas" | "almacen" | "logistica" | "finanzas" | "compras";
   abierta: boolean;
   created_by: string | null;
   created_at: string;
@@ -52,6 +53,10 @@ type Remision = {
   forma_pago: "efectivo" | "transferencia" | null;
   descuento_pct: number | null;
   pagado: boolean;
+  naturaleza?: "cotizacion" | "remision_final" | null;
+  monto_total?: number | null;
+  monto_pagado?: number | null;
+  estado_pago?: "sin_pago" | "parcial" | "pagado" | null;
   motivo_cancelacion: string | null;
   cancelada_at: string | null;
   nota_pago: string | null;
@@ -83,7 +88,7 @@ type Item = {
 type Evento = {
   id: string;
   etapa: string | null;
-  area: "ventas" | "almacen" | "logistica" | "finanzas";
+  area: "ventas" | "almacen" | "logistica" | "finanzas" | "compras";
   accion: string;
   detalle: string | null;
   created_at: string;
@@ -115,7 +120,7 @@ type Borrador = {
 };
 
 const CAMPOS_REMISION =
-  "id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_by, created_at, tipo_envio, direccion_entrega, contacto_entrega, telefono_entrega, paqueteria, guia_envio, tipo_pago, forma_pago, descuento_pct, pagado, nota_pago, entregada_at, motivo_cancelacion, cancelada_at, clientes(codigo_erp, folio_interno, nombre_comercial)";
+  "id, folio, cliente_id, vendedor_id, nombre_vendedor, fecha_remision, notas, etapa, area_actual, abierta, created_by, created_at, tipo_envio, direccion_entrega, contacto_entrega, telefono_entrega, paqueteria, guia_envio, tipo_pago, forma_pago, descuento_pct, pagado, naturaleza, monto_total, monto_pagado, estado_pago, nota_pago, entregada_at, motivo_cancelacion, cancelada_at, clientes(codigo_erp, folio_interno, nombre_comercial)";
 
 const money = (n: number | null | undefined) =>
   n == null ? "—" : n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -130,15 +135,22 @@ export default function RemisionesRefacciones() {
   const { t } = useLang();
   const tx = t.remisionesRefacciones;
   const { perms, puedeVerRefacciones, area, user, profileName, nivel } = useAuth();
-  const puedeEntrar = perms.puedeVer("remisiones") || !!puedeVerRefacciones;
+  const puedeEntrar =
+    perms.puedeVer("remisiones") ||
+    !!puedeVerRefacciones ||
+    area === "administracion" ||
+    area === "compras" ||
+    area === "direccion" ||
+    !!perms.esAdminGlobal;
   const puedeCapturar = area === "comercial" || !!perms.esAdminGlobal;
   const puedeAlmacen = !!puedeVerRefacciones || !!perms.esAdminGlobal;
   const puedeLogistica = area === "almacen_logistica" || !!perms.esAdminGlobal;
   const puedeFinanzas = area === "administracion" || !!perms.esAdminGlobal;
+  const puedeCompras = area === "compras" || !!perms.esAdminGlobal;
 
   const [rows, setRows] = useState<Remision[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"curso" | "contingencia" | "logistica" | "entregada" | "cancelada">("curso");
+  const [tab, setTab] = useState<"curso" | "contingencia" | "logistica" | "entregada" | "cancelada" | "pagos" | "depositos">("curso");
   const [qFolio, setQFolio] = useState("");
   const [open, setOpen] = useState(false);
   const [detalle, setDetalle] = useState<Remision | null>(null);
@@ -166,6 +178,7 @@ export default function RemisionesRefacciones() {
   }, [puedeEntrar, load]);
 
   const visibles = useMemo(() => {
+    if (tab === "pagos" || tab === "depositos") return [];
     const term = qFolio.trim().toLowerCase();
     return rows.filter(r => {
       if (tab === "curso") return r.abierta || r.etapa === "almacen";
@@ -250,8 +263,10 @@ export default function RemisionesRefacciones() {
           ["logistica", tx.tabLogistica],
           ["entregada", tx.tabEntregadas],
           ["cancelada", tx.tabCanceladas],
+          ...(puedeFinanzas ? [["pagos", tx.tabPagos] as const] : []),
+          ...((puedeCompras || puedeFinanzas) ? [["depositos", tx.tabDepositos] as const] : []),
         ] as const).map(([id, label]) => (
-          <Button key={id} variant={tab === id ? "default" : "outline"} onClick={() => setTab(id)}>
+          <Button key={id} variant={tab === id ? "default" : "outline"} onClick={() => setTab(id as typeof tab)}>
             {label}
             {id === "cancelada" && (
               <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 text-xs font-bold text-slate-700">
@@ -266,6 +281,10 @@ export default function RemisionesRefacciones() {
         <p className="text-sm text-muted-foreground">{tx.canceladasAyuda}</p>
       )}
 
+      {tab === "pagos" && puedeFinanzas && <PanelPagosFinanzas onChanged={load} />}
+      {tab === "depositos" && (puedeCompras || puedeFinanzas) && <PanelDepositosCompras onChanged={load} />}
+
+      {tab !== "pagos" && tab !== "depositos" && (
       <div className="space-y-3">
         {visibles.map(r => (
           <Card key={r.id} className={`p-4 ${r.etapa === "cancelada" ? "border-slate-300 bg-slate-50" : ""}`}>
@@ -278,6 +297,17 @@ export default function RemisionesRefacciones() {
                 <div className="flex flex-wrap items-center gap-2">
                   <EtapaBadge etapa={r.etapa} abierta={r.abierta} />
                   <AreaBadge area={r.area_actual} />
+                  <Badge variant="outline">
+                    {r.naturaleza === "remision_final" ? tx.naturalezaFinal : tx.naturalezaCotizacion}
+                  </Badge>
+                  <Badge variant="outline" className={
+                    r.estado_pago === "pagado" ? "bg-emerald-50 text-emerald-800"
+                    : r.estado_pago === "parcial" ? "bg-amber-50 text-amber-800"
+                    : ""
+                  }>
+                    {tx.estadoPagoRemision[r.estado_pago || "sin_pago"] ?? (r.pagado ? tx.pagado : tx.noPagado)}
+                    {r.monto_total != null ? ` · ${money(Number(r.monto_pagado || 0))}/${money(Number(r.monto_total))}` : ""}
+                  </Badge>
                 </div>
                 <div className="text-sm">{clienteLabel(r.clientes)}</div>
                 <div className="text-xs text-muted-foreground">
@@ -298,6 +328,8 @@ export default function RemisionesRefacciones() {
           <p className="text-sm text-muted-foreground py-8 text-center">{tx.sinRegistros}</p>
         )}
       </div>
+
+      )}
 
       <NuevaRemision
         open={open}
@@ -407,11 +439,13 @@ function AreaBadge({ area }: { area: Remision["area_actual"] | Evento["area"] })
     area === "almacen" ? tx.areaAlmacen :
     area === "logistica" ? tx.areaLogistica :
     area === "finanzas" ? tx.areaFinanzas :
+    area === "compras" ? tx.areaCompras :
     tx.areaVentas;
   const tono =
     area === "almacen" ? "bg-indigo-50 text-indigo-800" :
     area === "logistica" ? "bg-sky-50 text-sky-800" :
     area === "finanzas" ? "bg-violet-50 text-violet-800" :
+    area === "compras" ? "bg-orange-50 text-orange-800" :
     "bg-teal-50 text-teal-800";
   return (
     <Badge variant="outline" className={tono}>
@@ -1049,15 +1083,22 @@ function EnvioPanel({
     await onHecho();
   };
 
-  const pagoLabel = remision.pagado ? tx.pagado : tx.noPagado;
+  const pagoLabel = remision.estado_pago
+    ? (tx.estadoPagoRemision[remision.estado_pago] ?? (remision.pagado ? tx.pagado : tx.noPagado))
+    : (remision.pagado ? tx.pagado : tx.noPagado);
   const envioLabel = remision.tipo_envio === "directo" ? tx.directo : remision.tipo_envio === "recoge" ? tx.recoge : remision.tipo_envio === "paqueteria" ? tx.paqueteria : "—";
   const formaLabel = remision.forma_pago === "transferencia" ? tx.transferencia : tx.efectivo;
+  const natLabel = remision.naturaleza === "remision_final" ? tx.naturalezaFinal : tx.naturalezaCotizacion;
 
   return (
     <section className="rounded-md border p-3 space-y-3 text-sm">
       <div className="flex flex-wrap gap-2">
+        <Badge variant="outline">{natLabel}</Badge>
         <Badge variant="outline"><Truck className="h-3 w-3 mr-1" />{envioLabel}</Badge>
-        <Badge variant="outline" className={remision.pagado ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}>{pagoLabel} · {formaLabel}</Badge>
+        <Badge variant="outline" className={remision.estado_pago === "pagado" || remision.pagado ? "bg-emerald-50 text-emerald-800" : remision.estado_pago === "parcial" ? "bg-amber-50 text-amber-800" : "bg-amber-50 text-amber-800"}>{pagoLabel} · {formaLabel}</Badge>
+        {remision.monto_total != null && (
+          <Badge variant="outline">{money(Number(remision.monto_pagado || 0))} / {money(Number(remision.monto_total))}</Badge>
+        )}
         {(remision.descuento_pct ?? 0) > 0 && <Badge variant="outline">{tx.descuentoGeneral} {remision.descuento_pct}</Badge>}
       </div>
       <p>{remision.direccion_entrega || "—"}</p>
