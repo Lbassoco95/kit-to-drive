@@ -73,9 +73,22 @@ serve(async (req) => {
     const temporaryPassword = generateTemporaryPassword();
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
       password: temporaryPassword,
-      user_metadata: { ...(target.user.user_metadata || {}), must_change_password: true },
+      app_metadata: {
+        ...(target.user.app_metadata || {}),
+        must_change_password: true,
+      },
+      user_metadata: {
+        ...(target.user.user_metadata || {}),
+        must_change_password: true,
+      },
     });
     if (updateError) return respond({ error: updateError.message }, 400);
+
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({ debe_cambiar_password: true })
+      .eq("id", user_id);
+    if (profileError) return respond({ error: profileError.message }, 500);
 
     return respond({ temporary_password: temporaryPassword });
   } catch (error) {

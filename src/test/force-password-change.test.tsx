@@ -74,4 +74,10 @@ describe("ForcePasswordChange", () => {
 
     expect(onChangePassword).toHaveBeenCalledWith("SeguraPass1!");
   });
+
+  it("explica que tras guardar se inicia sesión de nuevo", () => {
+    const { getByText } = renderizar();
+    expect(getByText(es.auth.forceSubtitle)).toBeInTheDocument();
+    expect(es.auth.forceSubtitle).toMatch(/sesión de nuevo/i);
+  });
 });

@@ -14,7 +14,9 @@ describe("contraseña temporal de usuarios", () => {
 
   it("obliga al usuario a cambiar la contraseña generada", () => {
     expect(edgeFunction).toContain("password: temporaryPassword");
+    expect(edgeFunction).toContain("app_metadata:");
     expect(edgeFunction).toContain("must_change_password: true");
+    expect(edgeFunction).toContain("debe_cambiar_password: true");
   });
 
   it("restringe el restablecimiento a administradores y a su área", () => {

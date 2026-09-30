@@ -135,6 +135,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // explícito. Un perfil ausente o nulo no deja a nadie fuera.
     setActivo(p?.activo !== false);
     // Flag de servidor (columna protegida + app_metadata). user_metadata ya no manda.
+    // Solo sube el flag a true; bajarlo ocurre tras complete-password-change + signOut
+    // (el Admin API revoca tokens, así que no confiamos en refreshSession).
     if ((p as { debe_cambiar_password?: boolean | null } | null)?.debe_cambiar_password === true) {
       setRequiresPasswordChange(true);
     }
@@ -188,8 +190,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error(String(data.error)) };
     }
 
+    // Admin API al cambiar password revoca refresh tokens. Un refresh de sesión
+    // falla con "Refresh Token Not Found" y el JWT viejo (must_change_password: true)
+    // vuelve a mostrar el modal en bucle. Cerrar sesión local + redirect duro a
+    // /auth para que NINGÚN usuario (actual o nuevo) quede con estado stale.
     setRequiresPasswordChange(false);
-    await supabase.auth.refreshSession();
+    await supabase.auth.signOut({ scope: "local" });
+    if (typeof window !== "undefined") {
+      const url = new URL("/auth", window.location.origin);
+      url.searchParams.set("passwordUpdated", "1");
+      window.location.replace(url.toString());
+    }
     return { error: null };
   };
 
@@ -228,15 +239,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       /* ignore */
     }
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
+    // getUser() lee app_metadata fresco del servidor (el JWT local puede quedar
+    // stale tras complete-password-change). Así se desbloquea a quien ya cambió
+    // la contraseña pero el modal seguía apareciendo.
+    supabase.auth.getSession().then(async ({ data: { session: s } }) => {
       setSession(s);
       setUser(s?.user ?? null);
-      checkMustChange(s?.user ?? null);
       uidRef.current = s?.user?.id ?? null;
       if (s?.user) {
+        const { data: { user: fresh } } = await supabase.auth.getUser();
+        checkMustChange(fresh ?? s.user);
+        if (fresh) setUser(fresh);
         void recordConnection();
         loadRole(s.user.id).finally(() => setLoading(false));
-      } else setLoading(false);
+      } else {
+        checkMustChange(null);
+        setLoading(false);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, [navigate]);
