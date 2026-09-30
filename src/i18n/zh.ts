@@ -219,7 +219,7 @@ export const zh = {
     passwordTooShort: "密码至少需要 8 个字符",
     passwordMismatch: "两次输入的密码不一致",
     passwordWeak: "请选择更安全的密码",
-    passwordUpdated: "密码已更新，可以继续使用。",
+    passwordUpdated: "密码已更新。请使用新密码重新登录。",
     forceTitle: "必须更新密码",
     forceSubtitle: "出于系统安全，所有用户在继续使用前必须设置新密码。请选择与之前不同的密码，且不要与他人分享。",
     signOut: "退出登录",

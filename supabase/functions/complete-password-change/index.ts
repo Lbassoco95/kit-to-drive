@@ -1,6 +1,8 @@
 // Cambia la contraseña del caller Y limpia must_change_password en
 // app_metadata + profiles.debe_cambiar_password de forma atómica (Admin API).
-// El cliente NO puede limpiar el flag sin enviar una password nueva válida.
+// El cliente NO puede limpiar el flag sin enviar una password nueva.
+// IMPORTANTE: updateUserById con password revoca refresh tokens → el cliente
+// debe cerrar sesión local y pedir re-login (reauth_required: true).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -78,6 +80,7 @@ serve(async (req) => {
     );
 
     // Atómico: set password + clear flags. Sin password en body → 400 (arriba).
+    // Nota: esto revoca refresh tokens del usuario.
     const { error: updErr } = await admin.auth.admin.updateUserById(user.id, {
       password,
       app_metadata: {
@@ -95,17 +98,24 @@ serve(async (req) => {
       });
     }
 
-    const { error: profErr } = await admin
-      .from("profiles")
-      .update({ debe_cambiar_password: false })
-      .eq("id", user.id);
+    // RPC SECURITY DEFINER (service_role): más fiable que UPDATE directo + trigger.
+    const { error: profErr } = await admin.rpc("admin_clear_debe_cambiar_password", {
+      _user_id: user.id,
+    });
     if (profErr) {
-      return new Response(JSON.stringify({ error: profErr.message }), {
-        status: 500, headers: { ...CORS, "Content-Type": "application/json" },
-      });
+      // Fallback: UPDATE directo (service_role → auth.uid() null → trigger OK).
+      const { error: updProfErr } = await admin
+        .from("profiles")
+        .update({ debe_cambiar_password: false })
+        .eq("id", user.id);
+      if (updProfErr) {
+        return new Response(JSON.stringify({ error: updProfErr.message }), {
+          status: 500, headers: { ...CORS, "Content-Type": "application/json" },
+        });
+      }
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, reauth_required: true }), {
       status: 200, headers: { ...CORS, "Content-Type": "application/json" },
     });
   } catch (err: any) {

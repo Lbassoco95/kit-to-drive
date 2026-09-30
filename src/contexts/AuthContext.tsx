@@ -135,6 +135,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // explícito. Un perfil ausente o nulo no deja a nadie fuera.
     setActivo(p?.activo !== false);
     // Flag de servidor (columna protegida + app_metadata). user_metadata ya no manda.
+    // Solo sube el flag a true; bajarlo ocurre tras complete-password-change + signOut
+    // (el Admin API revoca tokens, así que no confiamos en refreshSession).
     if ((p as { debe_cambiar_password?: boolean | null } | null)?.debe_cambiar_password === true) {
       setRequiresPasswordChange(true);
     }
@@ -188,8 +190,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { error: new Error(String(data.error)) };
     }
 
+    // Admin API al cambiar password revoca refresh tokens. Un refresh de sesión
+    // falla con "Refresh Token Not Found" y el JWT viejo (must_change_password: true)
+    // vuelve a mostrar el modal en bucle. Cerrar sesión local y pedir re-login.
     setRequiresPasswordChange(false);
-    await supabase.auth.refreshSession();
+    await supabase.auth.signOut({ scope: "local" });
     return { error: null };
   };
 

@@ -51,7 +51,8 @@ export default function ResetPassword() {
     }
     clearPasswordRecovery();
     toast.success(t.auth.passwordUpdated);
-    nav("/", { replace: true });
+    // changePassword ya cerró la sesión local (Admin API revoca refresh tokens).
+    nav("/auth", { replace: true });
   };
 
   if (loading) {

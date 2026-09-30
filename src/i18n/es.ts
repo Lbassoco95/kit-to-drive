@@ -221,7 +221,7 @@ export const es = {
     passwordTooShort: "La contraseña debe tener al menos 8 caracteres",
     passwordMismatch: "Las contraseñas no coinciden",
     passwordWeak: "Elige una contraseña más segura",
-    passwordUpdated: "Contraseña actualizada. Ya puedes continuar.",
+    passwordUpdated: "Contraseña actualizada. Inicia sesión con tu nueva contraseña.",
     forceTitle: "Debes actualizar tu contraseña",
     forceSubtitle: "Por seguridad del sistema, todos los usuarios deben crear una contraseña nueva antes de continuar. Elige una distinta a las anteriores y no la compartas.",
     signOut: "Cerrar sesión",
