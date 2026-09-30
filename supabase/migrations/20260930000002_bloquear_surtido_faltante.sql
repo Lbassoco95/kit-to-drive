@@ -73,6 +73,9 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.recalcular_etapa_remision_refaccion(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.recalcular_etapa_remision_refaccion(UUID) TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.liberar_refaccion_remision(_item_id UUID, _cantidad INTEGER)
 RETURNS void
 LANGUAGE plpgsql
@@ -162,6 +165,9 @@ BEGIN
   PERFORM public.recalcular_etapa_remision_refaccion(v_item.remision_id);
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.liberar_refaccion_remision(UUID, INTEGER) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.liberar_refaccion_remision(UUID, INTEGER) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.confirmar_sin_existencia_refaccion(_item_id UUID, _nota TEXT)
 RETURNS void
@@ -282,6 +288,9 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.confirmar_sin_existencia_refaccion(UUID, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.confirmar_sin_existencia_refaccion(UUID, TEXT) TO authenticated, service_role;
+
 -- Remisiones ya en contingencia abierta: área pasa a Ventas.
 DO $$
 DECLARE
@@ -295,3 +304,5 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+NOTIFY pgrst, 'reload schema';
