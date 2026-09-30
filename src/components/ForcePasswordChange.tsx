@@ -49,12 +49,11 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
     }
     setBusy(true);
     const { error } = await onChangePassword(pwd);
-    setBusy(false);
+    // Éxito: changePassword cierra sesión y hace redirect a /auth?passwordUpdated=1.
     if (error) {
+      setBusy(false);
       toast.error(error.message);
-      return;
     }
-    toast.success(t.auth.passwordUpdated);
   };
 
   return (

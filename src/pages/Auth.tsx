@@ -44,6 +44,21 @@ export default function Auth() {
     if (user && !isPasswordRecovery) nav("/");
   }, [user, isPasswordRecovery, nav]);
 
+  // Tras forzar/actualizar contraseña, el redirect llega con ?passwordUpdated=1
+  // (aplica a usuarios actuales y nuevos; evita quedar atrapados con JWT viejo).
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("passwordUpdated") !== "1") return;
+      toast.success(t.auth.passwordUpdated);
+      params.delete("passwordUpdated");
+      const qs = params.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+    } catch {
+      /* ignore */
+    }
+  }, [t.auth.passwordUpdated]);
+
   useEffect(() => {
     const until = Math.max(cooldownUntil, loginLockUntil);
     if (until <= Date.now()) return;

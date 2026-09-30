@@ -221,7 +221,7 @@ export const zh = {
     passwordWeak: "请选择更安全的密码",
     passwordUpdated: "密码已更新。请使用新密码重新登录。",
     forceTitle: "必须更新密码",
-    forceSubtitle: "出于系统安全，所有用户在继续使用前必须设置新密码。请选择与之前不同的密码，且不要与他人分享。",
+    forceSubtitle: "出于系统安全，继续使用前必须设置新密码。请选择与之前不同的密码。保存后需使用新密码重新登录。",
     signOut: "退出登录",
     resetLinkInvalid: "链接无效或已过期。请重新申请。",
     requestNewLink: "申请新链接",

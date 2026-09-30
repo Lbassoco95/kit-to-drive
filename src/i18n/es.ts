@@ -223,7 +223,7 @@ export const es = {
     passwordWeak: "Elige una contraseña más segura",
     passwordUpdated: "Contraseña actualizada. Inicia sesión con tu nueva contraseña.",
     forceTitle: "Debes actualizar tu contraseña",
-    forceSubtitle: "Por seguridad del sistema, todos los usuarios deben crear una contraseña nueva antes de continuar. Elige una distinta a las anteriores y no la compartas.",
+    forceSubtitle: "Por seguridad del sistema, debes crear una contraseña nueva antes de continuar. Elige una distinta a las anteriores. Al guardar, iniciarás sesión de nuevo con la contraseña nueva.",
     signOut: "Cerrar sesión",
     resetLinkInvalid: "El enlace no es válido o ya expiró. Solicita uno nuevo.",
     requestNewLink: "Solicitar nuevo enlace",

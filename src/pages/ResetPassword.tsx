@@ -44,15 +44,13 @@ export default function ResetPassword() {
     }
     setBusy(true);
     const { error } = await changePassword(pwd);
-    setBusy(false);
+    // Éxito: changePassword limpia recovery al firmar signOut y redirige a /auth.
     if (error) {
+      setBusy(false);
       toast.error(error.message);
       return;
     }
     clearPasswordRecovery();
-    toast.success(t.auth.passwordUpdated);
-    // changePassword ya cerró la sesión local (Admin API revoca refresh tokens).
-    nav("/auth", { replace: true });
   };
 
   if (loading) {
