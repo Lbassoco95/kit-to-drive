@@ -824,7 +824,12 @@ function Partida({
   const [nota, setNota] = useState("");
   const [motivo, setMotivo] = useState("");
   const [ocupado, setOcupado] = useState(false);
-  const enRevision = item.estatus === "bloqueada" || item.estatus === "faltante";
+  const enFaltante = item.estatus === "faltante" || item.cantidad_faltante > 0;
+  const puedeSurtir = puedeAlmacen && item.estatus === "bloqueada" && !enFaltante;
+  const puedeReportar = puedeAlmacen && (item.estatus === "bloqueada" || item.estatus === "faltante");
+  // Tras reportar faltante, Almacén queda bloqueado: Ventas confirma o cancela.
+  const puedeConfirmarSin = (enFaltante && puedeCancelar)
+    || (puedeAlmacen && item.estatus === "bloqueada" && !enFaltante);
 
   const correr = async (fn: () => PromiseLike<{ error: { message?: string; code?: string } | null }>) => {
     setOcupado(true);
@@ -847,6 +852,9 @@ function Partida({
               {item.nota_almacen}
             </p>
           )}
+          {enFaltante && (
+            <p className="text-xs text-amber-900 mt-1 font-medium">{tx.bloqueadoFaltante}</p>
+          )}
         </div>
         <Badge variant="outline">{tx.estatus[item.estatus]}</Badge>
       </div>
@@ -858,40 +866,57 @@ function Partida({
         <Dato label={tx.precio} value={money(importeConDescuento(item.precio_unitario ?? 0, item.cantidad, item.descuento_pct ?? 0, 0))} />
       </div>
 
-      {puedeAlmacen && enRevision && (
+      {(puedeSurtir || puedeReportar) && (
         <div className="grid gap-2 md:grid-cols-2 border-t pt-2">
-          <div className="space-y-1">
-            <Label className="text-xs">{tx.liberar}</Label>
-            <div className="flex gap-2">
-              <Input type="number" min={1} max={item.cantidad_bloqueada} value={qtyLib}
-                onChange={e => setQtyLib(Number(e.target.value) || 1)} className="w-20" />
-              <Button size="sm" disabled={ocupado} onClick={() => correr(() =>
-                supabase.rpc("liberar_refaccion_remision" as any, { _item_id: item.id, _cantidad: qtyLib }),
-              )}>{tx.liberar}</Button>
+          {puedeSurtir ? (
+            <div className="space-y-1">
+              <Label className="text-xs">{tx.liberar}</Label>
+              <div className="flex gap-2">
+                <Input type="number" min={1} max={item.cantidad_bloqueada} value={qtyLib}
+                  onChange={e => setQtyLib(Number(e.target.value) || 1)} className="w-20" />
+                <Button size="sm" disabled={ocupado} onClick={() => correr(() =>
+                  supabase.rpc("liberar_refaccion_remision" as any, { _item_id: item.id, _cantidad: qtyLib }),
+                )}>{tx.liberar}</Button>
+              </div>
             </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">{tx.reportar}</Label>
-            <div className="flex gap-2">
-              <Input type="number" min={1} max={item.cantidad_bloqueada} value={qtyFalta}
-                onChange={e => setQtyFalta(Number(e.target.value) || 1)} className="w-20" />
-              <Input value={nota} onChange={e => setNota(e.target.value)} placeholder={tx.notaAlmacen} />
+          ) : (
+            <div className="space-y-1 text-xs text-muted-foreground">
+              <p className="font-medium text-amber-900">{tx.surtidoBloqueado}</p>
+              <p>{tx.bloqueadoFaltanteAyuda}</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+          )}
+          {puedeReportar && !enFaltante && (
+            <div className="space-y-1">
+              <Label className="text-xs">{tx.reportar}</Label>
+              <div className="flex gap-2">
+                <Input type="number" min={1} max={item.cantidad_bloqueada} value={qtyFalta}
+                  onChange={e => setQtyFalta(Number(e.target.value) || 1)} className="w-20" />
+                <Input value={nota} onChange={e => setNota(e.target.value)} placeholder={tx.notaAlmacen} />
+              </div>
               <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
                 const texto = nota.trim().length >= 3 ? nota.trim() : tx.notaFaltanteDefault;
                 void correr(() => supabase.rpc("reportar_faltante_refaccion" as any, {
                   _item_id: item.id, _cantidad: qtyFalta, _nota: texto,
                 }));
               }}>{tx.reportar}</Button>
-              <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
-                const texto = nota.trim().length >= 3 ? nota.trim() : tx.notaSinDefault;
-                void correr(() => supabase.rpc("confirmar_sin_existencia_refaccion" as any, {
-                  _item_id: item.id, _nota: texto,
-                }));
-              }}>{tx.confirmarSin}</Button>
             </div>
+          )}
+        </div>
+      )}
+
+      {puedeConfirmarSin && (
+        <div className="flex flex-wrap gap-2 border-t pt-2 items-end">
+          <div className="min-w-[12rem] flex-1 space-y-1">
+            <div className="text-xs font-medium">{tx.confirmarSin}</div>
+            <p className="text-xs text-muted-foreground">{tx.confirmarSinAyuda}</p>
+            <Input value={nota} onChange={e => setNota(e.target.value)} placeholder={tx.notaAlmacen} />
           </div>
+          <Button size="sm" variant="outline" disabled={ocupado} onClick={() => {
+            const texto = nota.trim().length >= 3 ? nota.trim() : tx.notaSinDefault;
+            void correr(() => supabase.rpc("confirmar_sin_existencia_refaccion" as any, {
+              _item_id: item.id, _nota: texto,
+            }));
+          }}>{tx.confirmarSin}</Button>
         </div>
       )}
 

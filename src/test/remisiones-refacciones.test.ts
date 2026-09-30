@@ -97,8 +97,21 @@ describe("almacén libera y la etapa dice en qué área está", () => {
     expect(efecto.linea.cantidad_faltante).toBe(2);
     expect(disponibleRefaccion(efecto.stock, efecto.linea.cantidad_bloqueada)).toBe(6);
     expect(etapaDeLineas([efecto.linea])).toEqual({
-      etapa: "contingencia", area: "almacen", abierta: true,
+      etapa: "contingencia", area: "ventas", abierta: true,
     });
+  });
+
+  it("no deja surtir una partida con faltante reportado", () => {
+    const reportada = apartada(1, { estatus: "faltante", cantidad_faltante: 1 });
+    expect(liberarLinea(reportada, 1, 10)).toEqual({ ok: false, error: "en_faltante" });
+    expect(etapaDeLineas([reportada])).toEqual({
+      etapa: "contingencia", area: "ventas", abierta: true,
+    });
+  });
+
+  it("tampoco deja surtir si aún marca cantidad faltante", () => {
+    const parcial = apartada(4, { estatus: "bloqueada", cantidad_faltante: 2 });
+    expect(liberarLinea(parcial, 2, 10)).toEqual({ ok: false, error: "en_faltante" });
   });
 
   it("confirmar que no hay corrige la existencia y cierra la contingencia", () => {
@@ -112,7 +125,7 @@ describe("almacén libera y la etapa dice en qué área está", () => {
     expect(efecto.linea.cantidad_bloqueada).toBe(0);
     expect(disponibleRefaccion(efecto.stock, efecto.linea.cantidad_bloqueada)).toBe(antes);
     expect(etapaDeLineas([efecto.linea])).toEqual({
-      etapa: "contingencia", area: "almacen", abierta: false,
+      etapa: "contingencia", area: "ventas", abierta: false,
     });
   });
 
@@ -143,13 +156,14 @@ describe("almacén libera y la etapa dice en qué área está", () => {
     expect(puedeMarcarEntregada("almacen", "directo", "")).toBe(false);
   });
 
-  it("una partida surtida y otra en faltante sigue en almacén, en contingencia", () => {
+  it("una partida surtida y otra en faltante sigue en contingencia con Ventas", () => {
     const surtida = apartada(2, {
       estatus: "surtida", cantidad_bloqueada: 0, cantidad_surtida: 2,
     });
     const faltante = apartada(1, { estatus: "faltante", cantidad_faltante: 1 });
     expect(etapaDeLineas([surtida, faltante])).toEqual({
-      etapa: "contingencia", area: "almacen", abierta: true,
+      etapa: "contingencia", area: "ventas", abierta: true,
     });
+    expect(liberarLinea(faltante, 1, 5)).toEqual({ ok: false, error: "en_faltante" });
   });
 });
