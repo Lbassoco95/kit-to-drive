@@ -346,7 +346,13 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260929000002_permiso_asignar_remisiones',   'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|puede_asignar_remisiones'),
 
   ('20260930000001_marcar_entrega_asignacion',    'funcion|marcar_unidad_entregada(uuid,date)|puede_asignar_remisiones'),
-  ('20260930000001_marcar_entrega_asignacion',    'funcion|marcar_remision_entregada(uuid)|puede_asignar_remisiones')
+  ('20260930000001_marcar_entrega_asignacion',    'funcion|marcar_remision_entregada(uuid)|puede_asignar_remisiones'),
+
+  ('20260930000002_bloquear_surtido_faltante',    'funcion|liberar_refaccion_remision(uuid,integer)|Hay faltante reportado'),
+  ('20260930000002_bloquear_surtido_faltante',    'funcion|confirmar_sin_existencia_refaccion(uuid,text)|Sólo Ventas puede confirmar'),
+  ('20260930000002_bloquear_surtido_faltante',    'funcion|recalcular_etapa_remision_refaccion(uuid)|espera a Ventas'),
+
+  ('20260930000003_corregir_surtido_indebido_faltante', 'funcion|patch_corregir_surtido_indebido_faltante()')
 ), superado(script, por) AS (VALUES
   -- Scripts que otro posterior reemplazó por completo (les tiró la función y
   -- la volvió a crear con otra firma). No hay que correrlos y revisarlos

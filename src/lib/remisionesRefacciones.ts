@@ -124,11 +124,13 @@ export function etapaDeLineas(
   const haySurtida = lineas.some(l => l.cantidad_surtida > 0);
   const haySin = lineas.some(l => l.estatus === "sin_existencia");
 
-  if (abierta && hayFaltante) return { etapa: "contingencia", area: "almacen", abierta: true };
+  // Contingencia con faltante abierto: Almacén ya reportó y queda bloqueado;
+  // la remisión vuelve a Ventas hasta que confirme sin existencia o cancele.
+  if (abierta && hayFaltante) return { etapa: "contingencia", area: "ventas", abierta: true };
   if (abierta) return { etapa: "almacen", area: "almacen", abierta: true };
   if (haySurtida && cierre.entregada) return { etapa: "entregada", area: "logistica", abierta: false };
   if (haySurtida) return { etapa: "logistica", area: "logistica", abierta: false };
-  if (haySin) return { etapa: "contingencia", area: "almacen", abierta: false };
+  if (haySin) return { etapa: "contingencia", area: "ventas", abierta: false };
   return { etapa: "cancelada", area: "ventas", abierta: false };
 }
 
@@ -185,7 +187,7 @@ export function indicePaso(etapa: EtapaRefaccion): number {
 
 export type EfectoLinea =
   | { ok: true; linea: LineaRefaccion; stock: number }
-  | { ok: false; error: "no_apartada" | "cantidad" | "sin_existencia" };
+  | { ok: false; error: "no_apartada" | "cantidad" | "sin_existencia" | "en_faltante" };
 
 function lineaNueva(linea: LineaRefaccion, patch: Partial<LineaRefaccion>, stock: number): EfectoLinea {
   return { ok: true, linea: { ...linea, ...patch }, stock };
@@ -194,9 +196,13 @@ function lineaNueva(linea: LineaRefaccion, patch: Partial<LineaRefaccion>, stock
 /**
  * Almacén surte. Baja la existencia física y suelta el mismo apartado, así
  * la disponible de los demás pedidos no se mueve: ya se les había descontado.
+ * Con faltante reportado no se puede surtir: hay que esperar a Ventas.
  */
 export function liberarLinea(linea: LineaRefaccion, qty: number, stock: number): EfectoLinea {
-  if (linea.estatus !== "bloqueada" && linea.estatus !== "faltante") {
+  if (linea.estatus === "faltante" || linea.cantidad_faltante > 0) {
+    return { ok: false, error: "en_faltante" };
+  }
+  if (linea.estatus !== "bloqueada") {
     return { ok: false, error: "no_apartada" };
   }
   if (!Number.isInteger(qty) || qty < 1 || qty > linea.cantidad_bloqueada) {
@@ -204,14 +210,11 @@ export function liberarLinea(linea: LineaRefaccion, qty: number, stock: number):
   }
   if (stock < qty) return { ok: false, error: "sin_existencia" };
   const bloqueada = linea.cantidad_bloqueada - qty;
-  const faltante = Math.max(0, linea.cantidad_faltante - qty);
-  const estatus: EstatusLineaRefaccion =
-    bloqueada === 0 ? "surtida" : faltante > 0 ? "faltante" : "bloqueada";
   return lineaNueva(linea, {
     cantidad_bloqueada: bloqueada,
     cantidad_surtida: linea.cantidad_surtida + qty,
-    cantidad_faltante: faltante,
-    estatus,
+    cantidad_faltante: 0,
+    estatus: bloqueada === 0 ? "surtida" : "bloqueada",
   }, stock - qty);
 }
 
@@ -230,8 +233,9 @@ export function reportarFaltante(linea: LineaRefaccion, qty: number, stock: numb
 }
 
 /**
- * Almacén confirma que esas piezas no están. Se suelta el apartado y se
- * corrige la existencia para que no reaparezcan como disponibles.
+ * Ventas (o Almacén si aún no había faltante) confirma que esas piezas no
+ * están. Se suelta el apartado y se corrige la existencia para que no
+ * reaparezcan como disponibles. Tras un faltante, sólo Ventas desbloquea.
  */
 export function confirmarSinExistencia(linea: LineaRefaccion, stock: number): EfectoLinea {
   if (linea.estatus !== "bloqueada" && linea.estatus !== "faltante") {
