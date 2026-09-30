@@ -64,6 +64,13 @@ confundirla:
 - **Escribir.** Sigue el nivel, sin excepción. El operador captura y edita
   **lo suyo**; el supervisor corrige lo de cualquiera de su área; sólo el
   administrador de área borra.
+- **Asignación de chasis/motor (allowlist).** Además del área Fábrica, la
+  tabla `remisiones_asignacion_acceso` otorga a usuarios puntuales (hoy
+  `atenea@dazon.demo.com`) el mismo flujo de asignación manual: capturar NS
+  chasis y NS motor, registrar unidades ya armadas y marcar si la unidad o la
+  remisión ya se entregó. La UI vive en **Remisiones** (no hace falta abrir
+  Producción). Lo resuelven `puede_asignar_remisiones`,
+  `marcar_unidad_entregada` y `marcar_remision_entregada`.
 - **Corregir y complementar, con motivo.** Hasta 2026-09-02 corregir una
   remisión ya capturada era en la práctica cosa del administrador: los
   renglones (`remision_items`) no tenían política de UPDATE y su DELETE pedía el

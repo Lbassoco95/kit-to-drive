@@ -36,6 +36,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { DocumentViewerDialog } from "@/components/DocumentViewerDialog";
 import { BandejaAvisos } from "@/components/BandejaAvisos";
+import { BandejaRemisiones } from "@/components/BandejaRemisiones";
 import { sanitizeStorageBasename } from "@/lib/storagePaths";
 
 // ─── Catálogos ─────────────────────────────────────────────────────────────────
@@ -357,7 +358,7 @@ function suggestNextFolio(folios: string[]): string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
 export default function Remisiones() {
-  const { perms, area, user } = useAuth();
+  const { perms, area, user, puedeAsignarRemisiones } = useAuth();
   // Operador de Comercial: captura a su nombre y sólo edita lo suyo.
   const esVendedor = area === "comercial" && perms.soloPropios("remisiones");
   // Ojo con la distinción: LEER la bandeja completa no depende del nivel — eso
@@ -365,6 +366,9 @@ export default function Remisiones() {
   // trabajar con la misma información. `editaTodas` es sólo permiso de
   // ESCRITURA sobre remisiones ajenas (supervisor y administrador).
   const editaTodas = perms.puedeEditar("remisiones");
+  // Allowlist individual (p. ej. Atenea): misma captura de chasis/motor/entrega
+  // que fábrica, sin abrir Producción ni cambiar de área.
+  const puedeCerrarEntrega = editaTodas || puedeAsignarRemisiones;
   // La confirmación de fechas la hace cada área operativa.
   const confirmaFabrica   = perms.esAdminGlobal || (area === "fabrica" && perms.puedeCrear("produccion"));
   const confirmaLogistica = perms.esAdminGlobal || (area === "almacen_logistica" && perms.puedeCrear("produccion"));
@@ -857,8 +861,15 @@ export default function Remisiones() {
     // `decrementar_inventario_color` sólo llama a `recalcular_inventario_colores`,
     // y esa recalculación ya la disparan los triggers de `motocarros` e
     // `inventario_chasis` con cada movimiento.
-    const { error } = await supabase.from("remisiones").update({ estatus: "COMPLETA" }).eq("id", id);
-    if (error) return toast.error(error.message);
+    // Quien entra por allowlist (no supervisor) no pasa el UPDATE directo de
+    // remisiones ajenas: la RPC SECURITY DEFINER valida puede_asignar_remisiones.
+    if (puedeAsignarRemisiones && !editaTodas) {
+      const { error } = await supabase.rpc("marcar_remision_entregada" as any, { _remision_id: id });
+      if (error) return toast.error(explicarError(error, t.remisiones.errorMarcarRemisionEntregada));
+    } else {
+      const { error } = await supabase.from("remisiones").update({ estatus: "COMPLETA" }).eq("id", id);
+      if (error) return toast.error(error.message);
+    }
 
     toast.success(t.remisiones.entregadaOk);
     setCierreConfirm(null); load();
@@ -1326,6 +1337,11 @@ export default function Remisiones() {
           aquí. Va antes de los atrasos: es lo que espera una reacción. */}
       <BandejaAvisos onChange={load} />
 
+      {/* Misma bandeja de asignación manual que Producción: chasis, motor y
+          alta de unidades ya armadas. Vive aquí para quien tiene el permiso
+          individual sin acceso a /produccion (Comercial allowlist). */}
+      {puedeAsignarRemisiones && <BandejaRemisiones onChange={load} />}
+
       {/* ── Notificaciones de atrasos ─────────────────────────────────────── */}
       {motocarrosAtrasados.length > 0 && (
         <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
@@ -1544,7 +1560,7 @@ export default function Remisiones() {
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id]?"rotate-180":""}`}/>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-2 space-y-2">
-                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} canPropose={canPropose} canConfirmFab={confirmaFabrica} canConfirmLog={confirmaLogistica} onChange={load}/>)}
+                    {motos_.map((m:any)=><MotoRow key={m.id} m={m} canPropose={canPropose} canConfirmFab={confirmaFabrica} canConfirmLog={confirmaLogistica} canMarkEntrega={puedeAsignarRemisiones} onChange={load}/>)}
                   </CollapsibleContent>
                 </Collapsible>
               )}
@@ -1597,8 +1613,9 @@ export default function Remisiones() {
                     <FileDown className="h-5 w-5 mr-2"/> {t.pago.verComprobante}
                   </Button>
                 )}
-                {/* Marcar entregada — supervisor/admin del área, solo si está activa */}
-                {editaTodas&&(r.estatus==="NUEVA"||r.estatus==="PARCIAL")&&(
+                {/* Marcar entregada — supervisor/admin del área, o allowlist de
+                    asignación (p. ej. Atenea) cuando fábrica no actualizó. */}
+                {puedeCerrarEntrega&&(r.estatus==="NUEVA"||r.estatus==="PARCIAL")&&(
                   <Button
                     onClick={()=>setCierreConfirm(r)}
                     className="flex-1 h-12 text-base bg-emerald-700 hover:bg-emerald-800 min-w-[120px]"
@@ -2021,11 +2038,12 @@ export default function Remisiones() {
 }
 
 // ─── MotoRow ──────────────────────────────────────────────────────────────────
-function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:any;canPropose:boolean;canConfirmFab:boolean;canConfirmLog:boolean;onChange:()=>void}) {
+function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, canMarkEntrega, onChange }:{m:any;canPropose:boolean;canConfirmFab:boolean;canConfirmLog:boolean;canMarkEntrega?:boolean;onChange:()=>void}) {
   const { t } = useLang();
   const [editing, setEditing] = useState(false);
   const [fecha, setFecha]     = useState<string>(m.fecha_propuesta_entrega||"");
   const [notas, setNotas]     = useState<string>(m.propuesta_entrega_notas||"");
+  const [marcandoEntrega, setMarcandoEntrega] = useState(false);
 
   const proponer = async () => {
     if (!fecha) return toast.error(t.remisiones.seleccionaFecha);
@@ -2038,9 +2056,18 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:an
     if (error) return toast.error(error.message);
     toast.success(t.remisiones.confirmadoPor(area === "fabrica" ? t.remisiones.areaFabrica : t.remisiones.areaLogistica)); onChange();
   };
+  const marcarEntregada = async () => {
+    setMarcandoEntrega(true);
+    const { error } = await supabase.rpc("marcar_unidad_entregada" as any, { _motocarro_id: m.id });
+    setMarcandoEntrega(false);
+    if (error) return toast.error(explicarError(error, t.remisiones.errorMarcarUnidadEntregada));
+    toast.success(t.remisiones.unidadEntregadaOk);
+    onChange();
+  };
 
   const tieneFab = !!m.confirmada_fabrica_at;
   const tieneLog = !!m.confirmada_logistica_at;
+  const puedeMarcarUnidad = !!canMarkEntrega && m.estatus_entrega !== "ENTREGADA" && !!(m.ns_chasis || m.chasis_asignado) && !!m.ns_motor;
 
   return (
     <div className="rounded-md border bg-white text-sm overflow-hidden">
@@ -2085,6 +2112,17 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, onChange }:{m:an
             {m.fecha_propuesta_entrega&&canConfirmLog&&!tieneLog&&(
               <Button size="sm" className="h-8 text-xs bg-[#065F46] hover:bg-[#04432f]" onClick={()=>confirmar("logistica")}>
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1"/>{t.remisiones.confirmarLogistica}
+              </Button>
+            )}
+            {puedeMarcarUnidad&&(
+              <Button
+                size="sm"
+                className="h-8 text-xs bg-[#5B21B6] hover:bg-[#4c1d95]"
+                onClick={marcarEntregada}
+                disabled={marcandoEntrega}
+              >
+                <Truck className="h-3.5 w-3.5 mr-1"/>
+                {marcandoEntrega ? "…" : t.remisiones.marcarUnidadEntregada}
               </Button>
             )}
           </div>

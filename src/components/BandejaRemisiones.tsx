@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Inbox, RefreshCw, Eye, Download, FileText, Package, Settings2, TriangleAlert, Wrench, UserPlus, X } from "lucide-react";
+import { Inbox, RefreshCw, Eye, Download, FileText, Package, Settings2, TriangleAlert, Wrench, UserPlus, X, Truck } from "lucide-react";
 import { fmtDate, COLORES, claveStock, explicarError, normColor, normSerial,
          nombreComercial, claveCapacidad, CatalogoModelos, CapacidadColor,
          LineaProducto, ModeloInfo } from "@/lib/dazon";
@@ -490,7 +490,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
 
     const { data: asig } = await supabase
       .from("motocarros")
-      .select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado")
+      .select("id, orden_armado, modelo, color, ns_chasis, ns_motor, estatus_armado, estatus_entrega")
       .eq("remision_id", rem.id)
       .order("orden_armado");
     setAsignadosManual((asig ?? []) as MotocarroDisponible[]);
@@ -718,6 +718,37 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     // `asignar_motocarro_a_remision` y no su contraparte.
     if (error) { toast.error(explicarError(error, b.errorLiberar)); return; }
     toast.success(b.okLiberada);
+    if (manualDialog) await abrirManual(manualDialog);
+    await load(); onChange?.();
+  };
+
+  const marcarEntregadaManual = async (motocarroId: string) => {
+    setManualBusy(`entrega-${motocarroId}`);
+    const { error } = await supabase.rpc("marcar_unidad_entregada" as any, {
+      _motocarro_id: motocarroId,
+    });
+    setManualBusy(null);
+    if (error) { toast.error(explicarError(error, b.errorMarcarEntregada)); return; }
+    toast.success(b.okMarcarEntregada);
+    if (manualDialog) await abrirManual(manualDialog);
+    await load(); onChange?.();
+  };
+
+  const capturarSerialesAsignada = async (motocarroId: string) => {
+    const chasis = manualNuevoChasis.trim().toUpperCase().replace(/\s/g, "");
+    const motor = manualNuevoMotor.trim().toUpperCase().replace(/\s/g, "");
+    if (!chasis && !motor) { toast.error(b.faltaSerie); return; }
+    setManualBusy(`serial-${motocarroId}`);
+    const { error } = await supabase.rpc("capturar_seriales_unidad", {
+      _motocarro_id: motocarroId,
+      ...(chasis ? { _ns_chasis: chasis } : {}),
+      ...(motor ? { _ns_motor: motor } : {}),
+    });
+    setManualBusy(null);
+    if (error) { toast.error(explicarError(error, b.errorCapturarSerial)); return; }
+    toast.success(b.okSerialesEnAsignada);
+    setManualNuevoChasis("");
+    setManualNuevoMotor("");
     if (manualDialog) await abrirManual(manualDialog);
     await load(); onChange?.();
   };
@@ -1373,9 +1404,13 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     {b.asignadasA(asignadosManual.length)}
                   </h4>
                   <div className="space-y-1.5">
-                    {asignadosManual.map(m => (
-                      <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
-                        <div className="text-sm">
+                    {asignadosManual.map(m => {
+                      const sinSerial = !m.ns_chasis || !m.ns_motor;
+                      const yaEntregada = m.estatus_entrega === "ENTREGADA";
+                      const puedeEntregar = !yaEntregada && !!m.ns_chasis && !!m.ns_motor;
+                      return (
+                      <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                        <div className="text-sm min-w-0">
                           <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
                           {" · "}
                           <span className="font-medium">{m.color}</span>
@@ -1383,20 +1418,55 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                           <span className="text-xs text-muted-foreground">{b.chasisCorto} {m.ns_chasis ?? b.sinSerial}</span>
                           {" · "}
                           <span className="text-xs text-muted-foreground">{b.motorCorto} {m.ns_motor ?? b.sinSerial}</span>
+                          {yaEntregada && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-800">
+                              {b.entregada}
+                            </span>
+                          )}
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => desasignarManual(m.id)}
-                          disabled={manualBusy === m.id}
-                          className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          title={b.tipQuitar}
-                        >
-                          <X size={14} className="mr-1" />
-                          {manualBusy === m.id ? "…" : b.quitar}
-                        </Button>
+                        <div className="flex items-center gap-1 ml-auto">
+                          {sinSerial && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => capturarSerialesAsignada(m.id)}
+                              disabled={manualBusy === `serial-${m.id}` || (!manualNuevoChasis && !manualNuevoMotor)}
+                              className="h-8 px-2 border-[#1F3864]/30 text-[#1F3864]"
+                              title={b.tipCapturarSerialAsignada}
+                            >
+                              {manualBusy === `serial-${m.id}` ? "…" : b.capturarSeriales}
+                            </Button>
+                          )}
+                          {puedeEntregar && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => marcarEntregadaManual(m.id)}
+                              disabled={manualBusy === `entrega-${m.id}`}
+                              className="h-8 px-2 border-violet-300 text-violet-800 hover:bg-violet-50"
+                              title={b.tipMarcarEntregada}
+                            >
+                              <Truck size={14} className="mr-1" />
+                              {manualBusy === `entrega-${m.id}` ? "…" : b.marcarEntregada}
+                            </Button>
+                          )}
+                          {!yaEntregada && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => desasignarManual(m.id)}
+                              disabled={manualBusy === m.id}
+                              className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title={b.tipQuitar}
+                            >
+                              <X size={14} className="mr-1" />
+                              {manualBusy === m.id ? "…" : b.quitar}
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
