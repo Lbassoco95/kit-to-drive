@@ -310,15 +310,10 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     if (!configDialog) return;
     setSavingConfig(true);
 
-    // Borrar items anteriores
-    try {
-      await supabase.from("remision_items").delete().eq("remision_id", configDialog.id);
-    } catch (_) {}
-
-    // Construir nuevos items
-    const newItems: any[] = [
+    const newItems: {
+      tipo_servicio: string; modelo: string | null; color: string | null; cantidad: number; con_caja: boolean;
+    }[] = [
       {
-        remision_id: configDialog.id,
         tipo_servicio: "motocarro",
         modelo: configForm.modelo,
         color: configForm.color,
@@ -327,22 +322,32 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       },
     ];
     if (configForm.con_cabina)
-      newItems.push({ remision_id: configDialog.id, tipo_servicio: "cabina", modelo: configForm.modelo, color: null, cantidad: configForm.cantidad, con_caja: false });
+      newItems.push({ tipo_servicio: "cabina", modelo: configForm.modelo, color: null, cantidad: configForm.cantidad, con_caja: false });
     if (configForm.con_instalacion)
-      newItems.push({ remision_id: configDialog.id, tipo_servicio: "instalacion_cabina", modelo: null, color: null, cantidad: configForm.cantidad, con_caja: false });
+      newItems.push({ tipo_servicio: "instalacion_cabina", modelo: null, color: null, cantidad: configForm.cantidad, con_caja: false });
     if (configForm.con_activacion)
-      newItems.push({ remision_id: configDialog.id, tipo_servicio: "activacion", modelo: null, color: null, cantidad: configForm.cantidad, con_caja: false });
+      newItems.push({ tipo_servicio: "activacion", modelo: null, color: null, cantidad: configForm.cantidad, con_caja: false });
     if (configForm.con_flete)
-      newItems.push({ remision_id: configDialog.id, tipo_servicio: "flete", modelo: null, color: null, cantidad: 1, con_caja: false });
+      newItems.push({ tipo_servicio: "flete", modelo: null, color: null, cantidad: 1, con_caja: false });
 
-    const { error } = await supabase.from("remision_items").insert(newItems);
-
-    // Actualizar total_unidades_solicitadas en remision
-    try {
-      await supabase.from("remisiones")
-        .update({ total_unidades_solicitadas: configForm.cantidad })
-        .eq("id", configDialog.id);
-    } catch (_) {}
+    // Reemplaza renglones y total en una sola transacción, con constancia en la
+    // bitácora. Si la base aún no tiene la función, se usa la escritura directa.
+    let { error } = await supabase.rpc("configurar_pedido_remision" as any, {
+      _remision_id: configDialog.id,
+      _items: newItems,
+    });
+    if (error && ["PGRST202", "42883"].includes(error.code ?? "")) {
+      try {
+        await supabase.from("remision_items").delete().eq("remision_id", configDialog.id);
+      } catch (_) {}
+      ({ error } = await supabase.from("remision_items")
+        .insert(newItems.map(it => ({ ...it, remision_id: configDialog.id }))));
+      try {
+        await supabase.from("remisiones")
+          .update({ total_unidades_solicitadas: configForm.cantidad })
+          .eq("id", configDialog.id);
+      } catch (_) {}
+    }
 
     setSavingConfig(false);
     if (error) { toast.error(error.message); return; }

@@ -71,6 +71,13 @@ confundirla:
   remisión ya se entregó. La UI vive en **Remisiones** (no hace falta abrir
   Producción). Lo resuelven `puede_asignar_remisiones`,
   `marcar_unidad_entregada` y `marcar_remision_entregada`.
+- **Configurar el pedido (sólo Atenea).** La columna
+  `remisiones_asignacion_acceso.puede_configurar_pedido` (apagada por omisión,
+  encendida sólo para `atenea@dazon.demo.com`) le permite cambiar modelo,
+  color, cantidad y servicios desde «Configurar pedido» en cualquier remisión.
+  No abre RLS: pasa sólo por `configurar_pedido_remision()`, que reemplaza los
+  renglones y el total en una transacción y deja constancia en
+  `remisiones_bitacora` (`tipo_cambio = 'configuracion'`).
 - **Corregir y complementar, con motivo.** Hasta 2026-09-02 corregir una
   remisión ya capturada era en la práctica cosa del administrador: los
   renglones (`remision_items`) no tenían política de UPDATE y su DELETE pedía el

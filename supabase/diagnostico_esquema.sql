@@ -346,7 +346,11 @@ WITH esperado(script, objeto) AS (VALUES
   ('20260929000002_permiso_asignar_remisiones',   'funcion|crear_motocarro_ya_armado(text,text,text,text,uuid)|puede_asignar_remisiones'),
 
   ('20260930000001_marcar_entrega_asignacion',    'funcion|marcar_unidad_entregada(uuid,date)|puede_asignar_remisiones'),
-  ('20260930000001_marcar_entrega_asignacion',    'funcion|marcar_remision_entregada(uuid)|puede_asignar_remisiones')
+  ('20260930000001_marcar_entrega_asignacion',    'funcion|marcar_remision_entregada(uuid)|puede_asignar_remisiones'),
+
+  ('20261001000001_configurar_pedido_atenea',     'columna|remisiones_asignacion_acceso.puede_configurar_pedido'),
+  ('20261001000001_configurar_pedido_atenea',     'funcion|puede_configurar_pedido(uuid,uuid)|remisiones_asignacion_acceso'),
+  ('20261001000001_configurar_pedido_atenea',     'funcion|configurar_pedido_remision(uuid,jsonb)|remisiones_bitacora')
 ), superado(script, por) AS (VALUES
   -- Scripts que otro posterior reemplazó por completo (les tiró la función y
   -- la volvió a crear con otra firma). No hay que correrlos y revisarlos
