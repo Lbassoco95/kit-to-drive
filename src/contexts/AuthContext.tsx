@@ -62,6 +62,10 @@ interface AuthCtx {
   puedeVerRefacciones: boolean;
   /** Permiso individual para asignar chasis y motor en remisiones. */
   puedeAsignarRemisiones: boolean;
+  /** Permiso individual para corregir cualquier remisión (con motivo). */
+  puedeEditarTodasRemisiones: boolean;
+  /** Permiso individual y temporal para cargar remisiones anteriores en físico. */
+  puedeCargarRemisionesAnteriores: boolean;
   signOut: () => Promise<void>;
   refreshRole: () => Promise<void>;
   changePassword: (newPassword: string) => Promise<{ error: Error | null }>;
@@ -86,6 +90,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => readRecoveryFlag());
   const [puedeVerRefacciones, setPuedeVerRefacciones] = useState(false);
   const [puedeAsignarRemisiones, setPuedeAsignarRemisiones] = useState(false);
+  const [puedeEditarTodasRemisiones, setPuedeEditarTodasRemisiones] = useState(false);
+  const [puedeCargarRemisionesAnteriores, setPuedeCargarRemisionesAnteriores] = useState(false);
 
   // Refs para poder comparar sin arrastrar closures viejos dentro de los
   // listeners de foco/visibilidad, que se registran una sola vez.
@@ -94,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const lastCheckRef = useRef(0);
 
   const loadRole = async (uid: string, { notificar = false } = {}) => {
-    const [{ data: r, error }, refacc, asignacion] = await Promise.all([
+    const [{ data: r, error }, refacc, asignacion, editaTodas, anteriores] = await Promise.all([
       supabase
         .from("user_roles")
         .select("role, nivel, area")
@@ -103,6 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .maybeSingle(),
       supabase.rpc("puede_ver_almacen_refacciones" as any, { _user_id: uid }),
       supabase.rpc("puede_asignar_remisiones" as any, { _user_id: uid }),
+      supabase.rpc("puede_editar_todas_remisiones", { _user_id: uid }),
+      supabase.rpc("puede_cargar_remisiones_anteriores", { _user_id: uid }),
     ]);
 
     // Un error de red no debe borrar los permisos que ya teníamos: dejarlos
@@ -120,6 +128,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setArea(nuevaArea);
     setPuedeVerRefacciones(!refacc.error && !!refacc.data);
     setPuedeAsignarRemisiones(!asignacion.error && !!asignacion.data);
+    setPuedeEditarTodasRemisiones(!editaTodas.error && !!editaTodas.data);
+    setPuedeCargarRemisionesAnteriores(!anteriores.error && !!anteriores.data);
 
     const firma  = `${nuevaArea ?? "—"}|${nuevoNivel ?? "—"}`;
     const cambio = permsRef.current !== null && permsRef.current !== firma;
@@ -159,6 +169,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     writeRecoveryFlag(false);
     setPuedeVerRefacciones(false);
     setPuedeAsignarRemisiones(false);
+    setPuedeEditarTodasRemisiones(false);
+    setPuedeCargarRemisionesAnteriores(false);
     permsRef.current = null;
   };
 
@@ -295,6 +307,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <Ctx.Provider value={{
       user, session, nivel, area, perms, role, activo, profileName, loading,
       requiresPasswordChange, isPasswordRecovery, puedeVerRefacciones, puedeAsignarRemisiones,
+      puedeEditarTodasRemisiones, puedeCargarRemisionesAnteriores,
       signOut, refreshRole, changePassword, clearPasswordRecovery,
     }}>
       {children}

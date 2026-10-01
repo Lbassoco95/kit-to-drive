@@ -1566,6 +1566,7 @@ export type Database = {
           comprobante_pago_url: string | null
           created_at: string
           documento_url: string | null
+          es_anterior: boolean
           estatus: Database["public"]["Enums"]["estatus_remision"]
           fecha_remision: string | null
           folio_remision: string
@@ -1586,6 +1587,7 @@ export type Database = {
           comprobante_pago_url?: string | null
           created_at?: string
           documento_url?: string | null
+          es_anterior?: boolean
           estatus?: Database["public"]["Enums"]["estatus_remision"]
           fecha_remision?: string | null
           folio_remision: string
@@ -1606,6 +1608,7 @@ export type Database = {
           comprobante_pago_url?: string | null
           created_at?: string
           documento_url?: string | null
+          es_anterior?: boolean
           estatus?: Database["public"]["Enums"]["estatus_remision"]
           fecha_remision?: string | null
           folio_remision?: string
@@ -1885,6 +1888,14 @@ export type Database = {
       }
       puede_capturar_remision: {
         Args: { _user_id?: string; _vendedor_id: string }
+        Returns: boolean
+      }
+      puede_editar_todas_remisiones: {
+        Args: { _user_id?: string }
+        Returns: boolean
+      }
+      puede_cargar_remisiones_anteriores: {
+        Args: { _user_id?: string }
         Returns: boolean
       }
       responder_solicitud: {

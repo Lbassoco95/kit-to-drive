@@ -358,7 +358,7 @@ function suggestNextFolio(folios: string[]): string {
 
 // ─── Main ───────────────────────────────────────────────────────────────────────
 export default function Remisiones() {
-  const { perms, area, user, puedeAsignarRemisiones } = useAuth();
+  const { perms, area, user, puedeAsignarRemisiones, puedeEditarTodasRemisiones, puedeCargarRemisionesAnteriores } = useAuth();
   // Operador de Comercial: captura a su nombre y sólo edita lo suyo.
   const esVendedor = area === "comercial" && perms.soloPropios("remisiones");
   // Ojo con la distinción: LEER la bandeja completa no depende del nivel — eso
@@ -388,7 +388,7 @@ export default function Remisiones() {
   const [form, setForm] = useState<any>({
     folio_remision:"", cliente_id:"", vendedor_asignado_id:"", nombre_vendedor:"",
     fecha_remision: new Date().toISOString().slice(0,10),
-    notas:"", tipo_pago:"anticipado", pagado:true,
+    notas:"", tipo_pago:"anticipado", pagado:true, es_anterior:false,
   });
   const [modelos, setModelos] = useState<string[]>(MODELOS_RESPALDO);
   const [motos, setMotos]     = useState<MotoItem[]>([defaultMoto()]);
@@ -665,12 +665,23 @@ export default function Remisiones() {
   // ── Dialog open/reset ───────────────────────────────────────────────────────
   const abrirNueva = () => {
     const allFolios = rows.map((r:any) => r.folio_remision);
-    setForm((f:any)=>({ ...f, folio_remision: suggestNextFolio(allFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
+    setForm((f:any)=>({ ...f, es_anterior:false, folio_remision: suggestNextFolio(allFolios), nombre_vendedor: esVendedor?(myProfile?.nombre_completo||""):"" }));
     setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null); setOpen(true);
+  };
+  // Remisión anterior (en físico): el folio es el del papel y el vendedor el
+  // original, así que no se sugiere folio ni se toma al usuario como vendedor.
+  const cambiarTipoCaptura = (anterior: boolean) => {
+    setForm((f:any)=>({
+      ...f,
+      es_anterior: anterior,
+      folio_remision: anterior ? "" : suggestNextFolio(rows.map((r:any)=>r.folio_remision)),
+      vendedor_asignado_id: "",
+      nombre_vendedor: anterior ? "" : (esVendedor ? (myProfile?.nombre_completo||"") : ""),
+    }));
   };
   const resetForm = () => {
     setForm({ folio_remision:"",cliente_id:"",vendedor_asignado_id:"",nombre_vendedor:"",
-      fecha_remision:new Date().toISOString().slice(0,10),notas:"",tipo_pago:"anticipado",pagado:true });
+      fecha_remision:new Date().toISOString().slice(0,10),notas:"",tipo_pago:"anticipado",pagado:true,es_anterior:false });
     setMotos([defaultMoto(modelos[0])]); setConFlete(false); setFormFile(null);
   };
 
@@ -717,28 +728,31 @@ export default function Remisiones() {
     if (activeFolios.includes(form.folio_remision.trim())) { toast.error(t.remisiones.folioEnUso); return; }
     if (totalUnidades===0) { toast.error(t.remisiones.agregaMotocarro); return; }
 
-    // No se compromete lo que no hay. Sin dato de inventario no se bloquea:
-    // ver faltantesDeExistencia().
-    const faltan = faltantesDeExistencia(motos, disponiblesPara);
-    if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes)); return; }
+    const esAnterior = puedeCargarRemisionesAnteriores && !!form.es_anterior;
+    if (!esAnterior) {
+      // No se compromete lo que no hay. Sin dato de inventario no se bloquea:
+      // ver faltantesDeExistencia().
+      const faltan = faltantesDeExistencia(motos, disponiblesPara);
+      if (faltan.length) { toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes)); return; }
 
-    // Cartera vencida: si el cliente tiene CxC abiertas y fuera de tiempo,
-    // se detiene el alta. Si la migración aún no corre, no bloqueamos.
-    const cartera = await evaluarBloqueoPorCartera(form.cliente_id);
-    if (cartera.error && !cartera.schemaFalta) {
-      toast.error(cartera.error.message);
-      return;
-    }
-    if (cartera.bloqueado) {
-      toast.error(mensajeBloqueoCartera(
-        cartera.resumen,
-        t.remisiones.bloqueadoPorCartera,
-        t.remisiones.bloqueadoPorCarteraSinDetalle,
-      ));
-      return;
+      // Cartera vencida: si el cliente tiene CxC abiertas y fuera de tiempo,
+      // se detiene el alta. Si la migración aún no corre, no bloqueamos.
+      const cartera = await evaluarBloqueoPorCartera(form.cliente_id);
+      if (cartera.error && !cartera.schemaFalta) {
+        toast.error(cartera.error.message);
+        return;
+      }
+      if (cartera.bloqueado) {
+        toast.error(mensajeBloqueoCartera(
+          cartera.resumen,
+          t.remisiones.bloqueadoPorCartera,
+          t.remisiones.bloqueadoPorCarteraSinDetalle,
+        ));
+        return;
+      }
     }
 
-    const vendedor_id = canAssignVendedor&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
+    const vendedor_id = (canAssignVendedor||esAnterior)&&form.vendedor_asignado_id ? form.vendedor_asignado_id : user?.id;
 
     // INSERT mínimo: solo columnas que siempre han existido en la tabla.
     // Las columnas agregadas en migraciones posteriores se guardan en UPDATE separado
@@ -750,6 +764,7 @@ export default function Remisiones() {
       fecha_remision: form.fecha_remision,
       notas: form.notas||null,
       estatus: "NUEVA" as const,
+      ...(esAnterior ? { es_anterior: true } : {}),
     };
 
     const { data: nueva, error } = await supabase.from("remisiones").insert(corePayload).select("id").single();
@@ -1045,20 +1060,24 @@ export default function Remisiones() {
     if (rows.some((r:any) => r.id !== editar.id && r.estatus !== "CANCELADA" && r.folio_remision === folio))
       return toast.error(t.remisiones.folioEnUsoOtra);
 
-    const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
-    if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes));
+    // Una remisión anterior (en físico) ya salió: no compromete existencias ni
+    // se frena por cartera, igual que al cargarla.
+    if (!editar.es_anterior) {
+      const faltan = faltantesDeExistencia(editMotos, disponiblesParaEdicion);
+      if (faltan.length) return toast.error(mensajeFaltantes(faltan, colorLabel, t.remisiones.faltantes));
 
-    // Mismo corte que en el alta: cliente con CxC vencida no avanza.
-    const cartera = await evaluarBloqueoPorCartera(editForm.cliente_id);
-    if (cartera.error && !cartera.schemaFalta) {
-      return toast.error(cartera.error.message);
-    }
-    if (cartera.bloqueado) {
-      return toast.error(mensajeBloqueoCartera(
-        cartera.resumen,
-        t.remisiones.bloqueadoPorCartera,
-        t.remisiones.bloqueadoPorCarteraSinDetalle,
-      ));
+      // Mismo corte que en el alta: cliente con CxC vencida no avanza.
+      const cartera = await evaluarBloqueoPorCartera(editForm.cliente_id);
+      if (cartera.error && !cartera.schemaFalta) {
+        return toast.error(cartera.error.message);
+      }
+      if (cartera.bloqueado) {
+        return toast.error(mensajeBloqueoCartera(
+          cartera.resumen,
+          t.remisiones.bloqueadoPorCartera,
+          t.remisiones.bloqueadoPorCarteraSinDetalle,
+        ));
+      }
     }
 
     const plan = planEditarRenglones(editar.id, editMotos, editFlete, editItems);
@@ -1234,6 +1253,23 @@ export default function Remisiones() {
               <DialogHeader><DialogTitle>{t.remisiones.crearTitulo}</DialogTitle></DialogHeader>
 
               <div className="space-y-4">
+                {puedeCargarRemisionesAnteriores&&(
+                  <div>
+                    <Label className="text-base">{t.remisiones.tipoCaptura}</Label>
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      {[false,true].map(anterior=>(
+                        <Button key={String(anterior)} type="button"
+                          variant={!!form.es_anterior===anterior?"default":"outline"}
+                          onClick={()=>cambiarTipoCaptura(anterior)}
+                          className={`h-12 text-base ${!!form.es_anterior===anterior?"bg-[#1F3864] hover:bg-[#162a4d]":""}`}>
+                          {anterior?t.remisiones.capturaAnterior:t.remisiones.capturaNueva}
+                        </Button>
+                      ))}
+                    </div>
+                    {form.es_anterior&&<p className="text-xs text-amber-700 mt-1">{t.remisiones.capturaAnteriorAyuda}</p>}
+                  </div>
+                )}
+
                 {/* Folio */}
                 <div>
                   <Label className="text-base">{t.remisiones.folioRemision}</Label>
@@ -1257,8 +1293,8 @@ export default function Remisiones() {
                   onCrearCliente={crearCliente}
                 />
 
-                {/* Vendedor selector (admin/coord) */}
-                {canAssignVendedor&&(
+                {/* Vendedor selector (admin/coord, o remisión anterior) */}
+                {(canAssignVendedor||(puedeCargarRemisionesAnteriores&&form.es_anterior))&&(
                   <div>
                     <Label className="text-base">{t.remisiones.asignarVendedor}</Label>
                     <Select value={form.vendedor_asignado_id || ASIGNAR_A_MI} onValueChange={v=>{
@@ -1462,6 +1498,7 @@ export default function Remisiones() {
           const pctColor   = pct===100?"#065F46":pct>=50?"#92400E":"#991B1B";
           const isOwner    = r.vendedor_id===user?.id;
           const puedeGestionar = editaTodas||(canCreate&&isOwner);
+          const puedeCorregir  = puedeGestionar||puedeEditarTodasRemisiones;
           const canAssign  = puedeGestionar;
           const canUpload  = puedeGestionar;
           const canPropose = puedeGestionar;
@@ -1475,6 +1512,9 @@ export default function Remisiones() {
                   <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.remisiones.folioRemision}</div>
                   <div className="text-2xl font-bold font-mono text-[#1F3864] leading-tight">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
+                  {r.es_anterior && (
+                    <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wide">{t.remisiones.anteriorBadge}</span>
+                  )}
                   {!!modificaciones[r.id] && (
                     <button
                       type="button"
@@ -1572,7 +1612,7 @@ export default function Remisiones() {
                 </Button>
                 {/* Editar / complementar — operador en las suyas, supervisor y
                     administrador en las de todo el área. Cada cambio pide motivo. */}
-                {puedeGestionar&&(
+                {puedeCorregir&&(
                   <Button variant="outline" onClick={()=>abrirEdicion(r)} className="flex-1 h-12 text-base min-w-[100px] border-[#1F3864]/40 text-[#1F3864] hover:bg-[#DBEAFE]">
                     <Pencil className="h-5 w-5 mr-2"/> {t.remisiones.editar}
                   </Button>

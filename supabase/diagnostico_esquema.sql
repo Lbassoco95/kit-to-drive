@@ -350,7 +350,15 @@ WITH esperado(script, objeto) AS (VALUES
 
   ('20261001000001_configurar_pedido_atenea',     'columna|remisiones_asignacion_acceso.puede_configurar_pedido'),
   ('20261001000001_configurar_pedido_atenea',     'funcion|puede_configurar_pedido(uuid,uuid)|remisiones_asignacion_acceso'),
-  ('20261001000001_configurar_pedido_atenea',     'funcion|configurar_pedido_remision(uuid,jsonb)|remisiones_bitacora')
+  ('20261001000001_configurar_pedido_atenea',     'funcion|configurar_pedido_remision(uuid,jsonb)|remisiones_bitacora'),
+
+  ('20261001000002_atenea_corrige_y_carga_anteriores', 'columna|remisiones_asignacion_acceso.puede_editar_remisiones'),
+  ('20261001000002_atenea_corrige_y_carga_anteriores', 'columna|remisiones_asignacion_acceso.puede_cargar_anteriores'),
+  ('20261001000002_atenea_corrige_y_carga_anteriores', 'columna|remisiones.es_anterior'),
+  ('20261001000002_atenea_corrige_y_carga_anteriores', 'funcion|puede_editar_todas_remisiones(uuid)|puede_editar_remisiones'),
+  ('20261001000002_atenea_corrige_y_carga_anteriores', 'funcion|puede_cargar_remisiones_anteriores(uuid)|puede_cargar_anteriores'),
+  ('20261001000002_atenea_corrige_y_carga_anteriores', 'funcion|puede_editar_remision(uuid,uuid)|puede_editar_todas_remisiones'),
+  ('20261001000002_atenea_corrige_y_carga_anteriores', 'funcion|puede_capturar_remision(uuid,uuid)|puede_cargar_remisiones_anteriores')
 ), superado(script, por) AS (VALUES
   -- Scripts que otro posterior reemplazó por completo (les tiró la función y
   -- la volvió a crear con otra firma). No hay que correrlos y revisarlos
