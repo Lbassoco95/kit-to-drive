@@ -263,6 +263,8 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
     "20260925000005_inventario_trigger_sin_campo_ajeno.sql"],
   [/motivo_cancelacion|cancelada_at/,
     "20260925000004_remision_refacciones_canceladas.sql"],
+  [/remisiones_refacciones_forma_pago_check|La forma de pago es efectivo o transferencia/,
+    "20260925193000_refacciones_pago_credito.sql"],
   [/forma_pago|descuento_pct|remisiones_refacciones_forma_pago/,
     "20260925000003_remision_refacciones_pago_descuento.sql"],
   [/v_almacen_refacciones\.stock_bloqueado|v_almacen_refacciones\.stock_disponible/,
@@ -328,6 +330,15 @@ const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
 export function explicarError(e: unknown, fallback: string): string {
   const err = (e ?? {}) as { code?: string; message?: string };
   const crudo = err.message ?? "";
+  // El crédito de refacciones es una forma de pago. Sin el script, la función
+  // vieja sólo acepta efectivo o transferencia, o el CHECK truena.
+  if (
+    crudo.includes("La forma de pago es efectivo o transferencia") ||
+    crudo.includes("remisiones_refacciones_forma_pago_check")
+  ) {
+    const script = "20260925193000_refacciones_pago_credito.sql";
+    return `La base de datos va atrás del sistema: falta correr supabase/migrations/${script} en el SQL editor de Supabase. (${crudo})`;
+  }
   // 42703 = undefined_column, 42P01 = undefined_table, 42883 = undefined_function.
   if (["42703", "42P01", "42883"].includes(err.code ?? "")) {
     const script = SCRIPT_DE_OBJETO.find(([re]) => re.test(crudo))?.[1];

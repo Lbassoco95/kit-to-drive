@@ -18,7 +18,7 @@ export type EtapaRefaccion =
 export type AreaRemisionRefaccion = "ventas" | "almacen" | "logistica" | "finanzas";
 export type TipoEnvioRefaccion = "paqueteria" | "directo" | "recoge";
 export type TipoPagoRefaccion = "anticipado" | "contra_entrega";
-export type FormaPagoRefaccion = "efectivo" | "transferencia";
+export type FormaPagoRefaccion = "efectivo" | "transferencia" | "credito";
 export type EstatusLineaRefaccion =
   | "bloqueada"
   | "surtida"
@@ -144,7 +144,7 @@ export function envioListo(envio: {
   const dirOk = envio.tipo === "recoge" || dir.length >= 8;
   const cuandoOk = envio.tipoPago === "anticipado" || envio.tipoPago === "contra_entrega";
   const forma = envio.formaPago ?? "efectivo";
-  const formaOk = forma === "efectivo" || forma === "transferencia";
+  const formaOk = forma === "efectivo" || forma === "transferencia" || forma === "credito";
   return tipoOk && dirOk && cuandoOk && formaOk;
 }
 
