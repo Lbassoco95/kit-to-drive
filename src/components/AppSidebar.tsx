@@ -65,57 +65,94 @@ export function useNavItems(): Item[] {
 }
 
 export function AppSidebar() {
-  const { state } = useSidebar();
-  const collapsed = state === "collapsed";
+  const { state, isMobile } = useSidebar();
+  const collapsed = state === "collapsed" && !isMobile;
   const { pathname } = useLocation();
   const { t, toggleLang } = useLang();
   const items = useNavItems();
 
   return (
     <Sidebar collapsible="icon" variant="floating">
-      <SidebarContent className="bg-transparent gap-0">
-        <div className={`px-4 pt-5 pb-3 ${collapsed ? "px-2" : ""}`}>
-          <div className={collapsed ? "" : "flex items-center gap-3"}>
-            <span className={`${collapsed ? "mx-auto" : ""} grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full bg-white shadow-[0_8px_20px_-8px_hsl(214_94%_5%/0.7)] ring-2 ring-white/30`}>
-              <img src="/brand/dazon-app-icono.png" alt="Dazon" className="h-full w-full object-cover" />
+      <SidebarContent className="bg-transparent gap-0 px-0">
+        <div className={`pt-4 pb-2 shrink-0 ${collapsed ? "px-0 flex justify-center" : "px-4"}`}>
+          <div className={collapsed ? "flex justify-center" : "flex items-center gap-3"}>
+            <span
+              className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full bg-white shadow-[0_8px_20px_-8px_hsl(214_94%_5%/0.7)] ring-2 ring-white/30"
+              aria-hidden={!collapsed}
+            >
+              <img
+                src="/brand/dazon-app-icono.png"
+                alt={collapsed ? "Dazon" : ""}
+                className="h-[88%] w-[88%] object-contain"
+              />
             </span>
             {!collapsed && (
-              <div className="flex flex-col leading-tight">
+              <div className="flex flex-col leading-tight min-w-0">
                 <span className="text-white font-extrabold text-xl tracking-tight">Dazon</span>
-                <span className="text-[11px] text-white/75 -mt-0.5">{t.layout.porMati}</span>
+                <span className="text-[11px] text-white/75 -mt-0.5 truncate">{t.layout.porMati}</span>
               </div>
             )}
           </div>
         </div>
+
         {GROUPS.map(g => {
           const list = items.filter(i => i.group === g);
           if (!list.length) return null;
           return (
-            <SidebarGroup key={g} className="py-1">
+            <SidebarGroup key={g} className={`py-1 ${collapsed ? "p-1.5" : ""}`}>
               {!collapsed && g !== "Inicio" && (
                 <SidebarGroupLabel className="text-white/75 uppercase text-[11px] tracking-widest px-4 pt-3">
                   {t.groups[g]}
                 </SidebarGroupLabel>
               )}
               <SidebarGroupContent>
-                <SidebarMenu>
+                <SidebarMenu className={collapsed ? "items-center gap-1.5" : ""}>
                   {list.map(item => {
                     const active = item.url === "/"
                       ? pathname === "/"
                       : pathname === item.url || pathname.startsWith(item.url + "/");
+                    const label = t.nav[item.key];
                     return (
-                      <SidebarMenuItem key={item.url}>
-                        <SidebarMenuButton asChild isActive={active} className="h-12 my-0.5 group-data-[collapsible=icon]:!size-11 group-data-[collapsible=icon]:!p-1">
+                      <SidebarMenuItem key={item.url} className={collapsed ? "flex justify-center w-auto" : ""}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={active}
+                          size="lg"
+                          tooltip={label}
+                          className={
+                            collapsed
+                              ? "h-11 w-11 !p-0 my-0 justify-center"
+                              : "h-12 my-0.5"
+                          }
+                        >
                           <NavLink
                             to={item.url}
                             end
-                            className={`relative flex items-center gap-3 pl-2 pr-4 rounded-full text-white/90 hover:bg-white/10 transition-colors ${active ? "glass-pill-active text-white font-semibold" : ""}`}
+                            title={collapsed ? label : undefined}
+                            aria-label={label}
+                            className={
+                              collapsed
+                                ? `grid h-11 w-11 place-items-center rounded-full text-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+                                    active
+                                      ? "glass-pill-active text-white bg-white/20"
+                                      : "bg-white/[0.07] hover:bg-white/15"
+                                  }`
+                                : `relative flex items-center gap-3 pl-2 pr-4 rounded-full text-white/90 hover:bg-white/10 transition-colors ${
+                                    active ? "glass-pill-active text-white font-semibold" : ""
+                                  }`
+                            }
                           >
-                            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors ${active ? "bg-white/20" : "bg-white/[0.07]"}`}>
-                              <item.icon size={20} strokeWidth={active ? 2.4 : 2} />
-                            </span>
-                            {!collapsed && <span className="text-[14px] truncate">{t.nav[item.key]}</span>}
-                            {active && !collapsed && <span className="ml-auto h-2 w-2 rounded-full bg-dazon-gold shadow-[0_0_10px_hsl(var(--dazon-gold))]" aria-hidden="true" />}
+                            {collapsed ? (
+                              <item.icon size={20} strokeWidth={active ? 2.4 : 2} aria-hidden="true" />
+                            ) : (
+                              <>
+                                <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors ${active ? "bg-white/20" : "bg-white/[0.07]"}`}>
+                                  <item.icon size={20} strokeWidth={active ? 2.4 : 2} />
+                                </span>
+                                <span className="text-[14px] truncate">{label}</span>
+                                {active && <span className="ml-auto h-2 w-2 rounded-full bg-dazon-gold shadow-[0_0_10px_hsl(var(--dazon-gold))]" aria-hidden="true" />}
+                              </>
+                            )}
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -127,19 +164,24 @@ export function AppSidebar() {
           );
         })}
 
-        {/* Idioma y sello Mati al pie */}
-        <div className={`mt-auto p-3 space-y-2 ${collapsed ? "flex flex-col items-center" : ""}`}>
+        <div className={`mt-auto shrink-0 pb-3 pt-2 ${collapsed ? "flex flex-col items-center gap-2 px-0" : "p-3 space-y-2"}`}>
           <button
+            type="button"
             onClick={toggleLang}
-            className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/[0.07] text-white/85 hover:bg-white/15 hover:text-white transition-colors text-sm font-medium w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-            title={collapsed ? t.otherLang : undefined}
+            className={
+              collapsed
+                ? "grid h-11 w-11 place-items-center rounded-full bg-white/[0.07] text-white/85 hover:bg-white/15 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                : "flex items-center gap-2 px-3 py-2 rounded-full bg-white/[0.07] text-white/85 hover:bg-white/15 hover:text-white transition-colors text-sm font-medium w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            }
+            title={t.otherLang}
+            aria-label={t.otherLang}
           >
             <Globe size={18} aria-hidden="true" className="shrink-0" />
             {!collapsed && (
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1 min-w-0">
                 <span className="font-bold text-white">{t.langLabel}</span>
                 <span className="text-white/40 mx-1">|</span>
-                <span className="text-white/70">{t.otherLang}</span>
+                <span className="text-white/70 truncate">{t.otherLang}</span>
               </span>
             )}
           </button>
@@ -150,9 +192,9 @@ export function AppSidebar() {
               rel="noopener noreferrer"
               className="flex items-center gap-2 rounded-full bg-white/[0.07] pl-1.5 pr-3 py-1.5 text-xs text-white/85 hover:bg-white/15 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
-              <img src="/brand/mati-icono.png" alt="" aria-hidden="true" className="h-7 w-7 rounded-full" />
-              <span className="flex-1 leading-tight">{t.auth.learnMoreMati}</span>
-              <ExternalLink size={13} aria-hidden="true" />
+              <img src="/brand/mati-icono.png" alt="" aria-hidden="true" className="h-7 w-7 rounded-full object-contain" />
+              <span className="flex-1 leading-tight truncate">{t.auth.learnMoreMati}</span>
+              <ExternalLink size={13} aria-hidden="true" className="shrink-0" />
             </a>
           )}
         </div>

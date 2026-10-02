@@ -73,28 +73,27 @@ function SeccionDashboard({
 function Orbe({ valor, pct, etiqueta, icon: Icon, color, onClick }: { valor: ReactNode; pct: number; etiqueta: string; icon: LucideIcon; color: string; onClick?: () => void }) {
   const r = 52; const c = 2 * Math.PI * r; const off = c * (1 - Math.min(100, Math.max(0, pct)) / 100);
   return (
-    <button onClick={onClick} className="group flex flex-col items-center gap-3 focus-visible:outline-none">
-      <span className="relative grid h-[9.5rem] w-[9.5rem] place-items-center rounded-full bg-card shadow-[0_18px_40px_-20px_hsl(214_94%_20%/0.5),inset_0_1px_0_hsl(0_0%_100%/0.9)] border border-white transition-transform duration-300 group-hover:-translate-y-1 group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
+    <button type="button" onClick={onClick} className="group flex flex-col items-center gap-2 sm:gap-3 focus-visible:outline-none w-[8.5rem] sm:w-[9.5rem]">
+      <span className="relative grid h-[8.5rem] w-[8.5rem] sm:h-[9.5rem] sm:w-[9.5rem] place-items-center rounded-full bg-card shadow-[0_18px_40px_-20px_hsl(214_94%_20%/0.5),inset_0_1px_0_hsl(0_0%_100%/0.9)] border border-white transition-transform duration-300 group-hover:-translate-y-1 group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
         <svg className="absolute inset-0 -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
           <circle cx="60" cy="60" r={r} fill="none" stroke={`${color}22`} strokeWidth="8" />
           <circle cx="60" cy="60" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
         </svg>
         <span className="flex flex-col items-center">
           <Icon size={20} strokeWidth={2.4} style={{ color }} aria-hidden="true" />
-          <span className="text-4xl font-bold leading-none mt-1" style={{ color }}>{valor}</span>
+          <span className="text-3xl sm:text-4xl font-bold leading-none mt-1" style={{ color }}>{valor}</span>
         </span>
       </span>
-      <span className="text-sm font-medium text-muted-foreground text-center max-w-[10rem]">{etiqueta}</span>
+      <span className="text-xs sm:text-sm font-medium text-muted-foreground text-center max-w-full break-words">{etiqueta}</span>
     </button>
   );
 }
 
 function CentroHero({ greeting }: { greeting: string }) {
   const { t, lang } = useLang();
-  const { profileName } = useAuth();
   const fecha = new Date().toLocaleDateString(lang === "es" ? "es-MX" : "zh-CN", { weekday: "long", day: "numeric", month: "long" });
   return (
-    <section className="relative overflow-hidden rounded-[2.75rem] bg-gradient-to-br from-[#032b62] via-[#03275a] to-[#03234d] text-primary-foreground px-8 py-8 md:px-12 md:py-10 shadow-[0_30px_70px_-34px_hsl(214_94%_10%/0.8)]">
+    <section className="relative overflow-hidden rounded-[1.75rem] sm:rounded-[2.25rem] md:rounded-[2.75rem] bg-gradient-to-br from-[#032b62] via-[#03275a] to-[#03234d] text-primary-foreground px-5 py-6 sm:px-8 sm:py-8 md:px-12 md:py-10 shadow-[0_30px_70px_-34px_hsl(214_94%_10%/0.8)]">
       <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <span className="blob absolute -right-16 -top-24 h-80 w-80 bg-[hsl(209_75%_48%/0.45)] blur-3xl" />
         <span className="blob absolute left-[30%] -bottom-24 h-64 w-64 bg-[hsl(var(--dazon-gold)/0.28)] blur-3xl [animation-delay:-8s]" />
@@ -102,19 +101,23 @@ function CentroHero({ greeting }: { greeting: string }) {
           <circle cx="100" cy="100" r="96" /><circle cx="100" cy="100" r="74" /><circle cx="100" cy="100" r="52" />
         </svg>
       </div>
-      <div className="relative flex items-center gap-6">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-white/80 first-letter:uppercase">{fecha}</p>
-          <h1 className="!text-primary-foreground !text-[34px] !leading-[40px] md:!text-[40px] md:!leading-[46px] mt-1 [text-wrap:balance] [word-break:keep-all]">{t.auth.heroTitle}</h1>
-          <p className="mt-3 text-base text-white/90">{greeting}</p>
-          <ul className="mt-5 flex flex-wrap gap-2">
+      <div className="relative flex items-center gap-4 sm:gap-6 min-w-0">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p className="text-xs sm:text-sm font-medium text-white/80 first-letter:uppercase truncate">{fecha}</p>
+          <h1 className="!text-primary-foreground text-[1.5rem] leading-tight sm:text-[1.875rem] sm:leading-snug md:text-[2.5rem] md:leading-[1.15] mt-1 text-balance break-words [word-break:keep-all]">
+            {t.auth.heroTitle}
+          </h1>
+          <p className="mt-2 sm:mt-3 text-sm sm:text-base text-white/90 break-words [overflow-wrap:anywhere]">{greeting}</p>
+          <ul className="mt-4 sm:mt-5 flex flex-wrap gap-1.5 sm:gap-2">
             {t.auth.heroSub.split(" · ").map((m: string) => (
-              <li key={m} className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-md shadow-[inset_0_1px_0_hsl(0_0%_100%/0.25)]">{m}</li>
+              <li key={m} className="rounded-full border border-white/25 bg-white/10 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm font-medium backdrop-blur-md shadow-[inset_0_1px_0_hsl(0_0%_100%/0.25)]">
+                {m}
+              </li>
             ))}
           </ul>
         </div>
-        <div className="hidden md:block relative h-52 w-52 shrink-0 overflow-hidden rounded-full border border-white/30 bg-white/10 backdrop-blur-xl shadow-[inset_0_2px_0_hsl(0_0%_100%/0.35)]" aria-hidden="true">
-          <img src="/brand/panda-saluda.png" alt="" className="absolute inset-0 m-auto h-[88%] w-auto max-w-[86%] object-contain drop-shadow-[0_10px_14px_hsl(214_94%_6%/0.45)]" />
+        <div className="hidden lg:grid relative h-40 w-40 xl:h-48 xl:w-48 shrink-0 place-items-center overflow-hidden rounded-full border border-white/30 bg-white/10 backdrop-blur-xl shadow-[inset_0_2px_0_hsl(0_0%_100%/0.35)]" aria-hidden="true">
+          <img src="/brand/panda-saluda.png" alt="" className="h-[88%] w-auto max-w-[86%] object-contain drop-shadow-[0_10px_14px_hsl(214_94%_6%/0.45)]" />
         </div>
       </div>
     </section>
@@ -128,23 +131,23 @@ function Accesos() {
   if (!items.length) return null;
   const groups = ["Operación", "Catálogos", "CRM", "Finanzas", "Sistema"] as const;
   return (
-    <section className="space-y-6">
-      <h2 className="text-xl font-bold">{t.dashboard.accesos}</h2>
+    <section className="space-y-5 sm:space-y-6 min-w-0">
+      <h2 className="text-lg sm:text-xl font-bold">{t.dashboard.accesos}</h2>
       {groups.map(g => {
         const list = items.filter(i => i.group === g);
         if (!list.length) return null;
         return (
-          <div key={g} className="space-y-3">
+          <div key={g} className="space-y-3 min-w-0">
             <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">
               {t.dashboard.grupoAccesos[g]}
             </p>
-            <div className="flex flex-wrap gap-x-5 gap-y-6">
+            <div className="flex flex-wrap gap-x-3 gap-y-4 sm:gap-x-5 sm:gap-y-6">
               {list.map(i => (
-                <button key={i.url} onClick={() => nav(i.url)} className="group flex w-[5.5rem] flex-col items-center gap-2 focus-visible:outline-none">
-                  <span className="grid h-16 w-16 place-items-center rounded-full bg-card text-primary border border-white shadow-[0_10px_24px_-14px_hsl(214_94%_20%/0.6),inset_0_1px_0_hsl(0_0%_100%/0.9)] transition-all duration-300 group-hover:-translate-y-1 group-hover:bg-primary group-hover:text-primary-foreground group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
-                    <i.icon size={26} strokeWidth={2} />
+                <button key={i.url} onClick={() => nav(i.url)} className="group flex w-[4.75rem] sm:w-[5.5rem] flex-col items-center gap-2 focus-visible:outline-none">
+                  <span className="grid h-14 w-14 sm:h-16 sm:w-16 place-items-center rounded-full bg-card text-primary border border-white shadow-[0_10px_24px_-14px_hsl(214_94%_20%/0.6),inset_0_1px_0_hsl(0_0%_100%/0.9)] transition-all duration-300 group-hover:-translate-y-1 group-hover:bg-primary group-hover:text-primary-foreground group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
+                    <i.icon size={24} strokeWidth={2} />
                   </span>
-                  <span className="text-xs font-medium text-center text-foreground leading-tight">{t.nav[i.key]}</span>
+                  <span className="text-[11px] sm:text-xs font-medium text-center text-foreground leading-tight break-words w-full">{t.nav[i.key]}</span>
                 </button>
               ))}
             </div>
@@ -406,12 +409,12 @@ export default function Dashboard() {
   const isVendedor = area === "comercial";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 min-w-0 max-w-full">
       <CentroHero greeting={greeting} />
 
-      <section className="space-y-4" aria-label={t.dashboard.hoy}>
-        <h2 className="text-xl font-bold">{t.dashboard.hoy}</h2>
-        <div className="flex flex-wrap justify-center sm:justify-start gap-x-10 gap-y-8">
+      <section className="space-y-4 min-w-0" aria-label={t.dashboard.hoy}>
+        <h2 className="text-lg sm:text-xl font-bold">{t.dashboard.hoy}</h2>
+        <div className="flex flex-wrap justify-center sm:justify-start gap-x-6 gap-y-6 sm:gap-x-10 sm:gap-y-8">
           {([
             { valor: `${avance}%` as ReactNode, pct: avance, etiqueta: t.dashboard.kpi.armadas, icon: CheckCircle, color: "#065F46", onClick: () => nav("/produccion"), show: true },
             { valor: atrasados.length, pct: total ? (atrasados.length / total) * 100 : 0, etiqueta: t.dashboard.kpi.atrasadas, icon: AlertTriangle, color: "#991B1B", onClick: () => nav("/produccion"), show: true },
