@@ -71,6 +71,25 @@ confundirla:
   remisión ya se entregó. La UI vive en **Remisiones** (no hace falta abrir
   Producción). Lo resuelven `puede_asignar_remisiones`,
   `marcar_unidad_entregada` y `marcar_remision_entregada`.
+- **Configurar el pedido (sólo Atenea).** La columna
+  `remisiones_asignacion_acceso.puede_configurar_pedido` (apagada por omisión,
+  encendida sólo para `atenea@dazon.demo.com`) le permite cambiar modelo,
+  color, cantidad y servicios desde «Configurar pedido» en cualquier remisión.
+  No abre RLS: pasa sólo por `configurar_pedido_remision()`, que reemplaza los
+  renglones y el total en una transacción y deja constancia en
+  `remisiones_bitacora` (`tipo_cambio = 'configuracion'`).
+- **Corregir cualquier remisión (sólo Atenea).** La columna
+  `remisiones_asignacion_acceso.puede_editar_remisiones` (apagada por omisión)
+  la hace pasar por `puede_editar_remision()` como supervisor: «Editar» en
+  cualquier remisión de motocarro, con el mismo motivo obligatorio en
+  `remisiones_bitacora`.
+- **Cargar remisiones anteriores en físico (temporal, sólo Atenea).** Con
+  `remisiones_asignacion_acceso.puede_cargar_anteriores` aparece en «Nueva
+  remisión» el selector *Nueva / Remisión anterior (en físico)*. La anterior
+  se captura con el folio y la fecha del papel, a nombre del vendedor original
+  (`puede_capturar_remision`), sin bloqueo de existencias ni de cartera, y
+  queda marcada con `remisiones.es_anterior`. Al apagar la columna el selector
+  desaparece. Script: `20261001000002_atenea_corrige_y_carga_anteriores.sql`.
 - **Corregir y complementar, con motivo.** Hasta 2026-09-02 corregir una
   remisión ya capturada era en la práctica cosa del administrador: los
   renglones (`remision_items`) no tenían política de UPDATE y su DELETE pedía el

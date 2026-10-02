@@ -241,6 +241,10 @@ export const claveCapacidad = (modelo: string, color: string) =>
 // arriba. Ojo con `nombre_comercial`: existe en `modelos_producto` (KIT-3) y
 // también en `inventario_colores` (KIT-4), y son scripts distintos.
 const SCRIPT_DE_OBJETO: Array<[RegExp, string]> = [
+  [/puede_editar_todas_remisiones|puede_cargar_remisiones_anteriores|es_anterior|puede_editar_remisiones|puede_cargar_anteriores/,
+    "20261001000002_atenea_corrige_y_carga_anteriores.sql"],
+  [/configurar_pedido_remision|puede_configurar_pedido/,
+    "20261001000001_configurar_pedido_atenea.sql"],
   [/remisiones_bitacora|puede_editar_remision|puede_capturar_remision|rol_comercial|orden_linea/,
     "20260902000001_operador_edita_remisiones.sql"],
   // Los clientes se vieron «sin resultados» en producción por esto: la lista

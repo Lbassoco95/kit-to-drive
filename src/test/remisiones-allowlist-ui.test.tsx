@@ -10,6 +10,7 @@ import React from "react";
 
 const filas: Record<string, Record<string, unknown>[]> = {};
 const rpcs: { fn: string; args: Record<string, unknown> }[] = [];
+const permisosExtra = { puedeEditarTodasRemisiones: false, puedeCargarRemisionesAnteriores: false };
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -41,6 +42,9 @@ vi.mock("@/integrations/supabase/client", () => ({
       if (fn === "marcar_remision_entregada") {
         return Promise.resolve({ data: { ok: true }, error: null });
       }
+      if (fn === "configurar_pedido_remision") {
+        return Promise.resolve({ data: { ok: true }, error: null });
+      }
       return Promise.resolve({ data: null, error: null });
     },
     storage: {
@@ -64,6 +68,7 @@ vi.mock("@/contexts/AuthContext", () => ({
     profileName: "Atenea Olivera Portilla",
     loading: false,
     puedeAsignarRemisiones: true,
+    ...permisosExtra,
     perms: {
       puedeVer: () => true,
       puedeCrear: () => true,
@@ -161,6 +166,8 @@ describe("Remisiones · allowlist Atenea (sin Producción)", () => {
     filas.profiles = [];
     filas.remisiones_bitacora = [];
     filas.config_general = [{ id: 1, limite_ya_armados: 50 }];
+    permisosExtra.puedeEditarTodasRemisiones = false;
+    permisosExtra.puedeCargarRemisionesAnteriores = false;
   });
 
   it("monta la bandeja de asignación y el botón Manual en Remisiones", async () => {
@@ -203,6 +210,115 @@ describe("Remisiones · allowlist Atenea (sin Producción)", () => {
 
     await waitFor(() => {
       expect(rpcs.some(r => r.fn === "marcar_unidad_entregada")).toBe(true);
+    });
+  });
+
+  it("guarda la configuración del pedido ajeno por la función, no escribiendo renglones directo", async () => {
+    filas.remision_items = REMISION.remision_items.map(it => ({ ...it, remision_id: "r1" }));
+    render(
+      <MemoryRouter>
+        <Remisiones />
+      </MemoryRouter>,
+    );
+
+    const editarConfig = () =>
+      Array.from(document.body.querySelectorAll("button")).find(
+        b => (b.textContent || "").trim() === "Editar" && b.querySelector("svg"),
+      );
+
+    await waitFor(() => {
+      expect(editarConfig()).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.click(editarConfig()!);
+    });
+
+    await waitFor(() => {
+      expect(boton(/Guardar configuración/)).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.click(boton(/Guardar configuración/)!);
+    });
+
+    await waitFor(() => {
+      const llamada = rpcs.find(r => r.fn === "configurar_pedido_remision");
+      expect(llamada?.args).toEqual({
+        _remision_id: "r1",
+        _items: [
+          { tipo_servicio: "motocarro", modelo: "200cc 2026", color: "BLANCO", cantidad: 1, con_caja: false },
+        ],
+      });
+    });
+  });
+
+  it("sin el permiso de corrección no ofrece Editar en la remisión ajena; con él, sí", async () => {
+    const editarRemision = () =>
+      Array.from(document.body.querySelectorAll("button")).filter(b => (b.textContent || "").trim() === "Editar");
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <Remisiones />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(boton(/Ver remisión completa/i)).toBeTruthy();
+    });
+    const sinPermiso = editarRemision().length;
+    unmount();
+
+    permisosExtra.puedeEditarTodasRemisiones = true;
+    render(
+      <MemoryRouter>
+        <Remisiones />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(editarRemision().length).toBe(sinPermiso + 1);
+    });
+  });
+
+  it("ofrece «Remisión anterior (en físico)» sólo con el permiso temporal", async () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <Remisiones />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(boton(/Nueva remisión de motocarro/)).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.click(boton(/Nueva remisión de motocarro/)!);
+    });
+    await waitFor(() => {
+      expect(boton(/Crear remisión/)).toBeTruthy();
+    });
+    expect(boton(/Remisión anterior/)).toBeFalsy();
+    unmount();
+
+    permisosExtra.puedeCargarRemisionesAnteriores = true;
+    render(
+      <MemoryRouter>
+        <Remisiones />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(boton(/Nueva remisión de motocarro/)).toBeTruthy();
+    });
+    await act(async () => {
+      fireEvent.click(boton(/Nueva remisión de motocarro/)!);
+    });
+    await waitFor(() => {
+      expect(boton(/Remisión anterior/)).toBeTruthy();
+    });
+    expect(document.body.textContent).not.toMatch(/Asignar a vendedor/);
+    await act(async () => {
+      fireEvent.click(boton(/Remisión anterior/)!);
+    });
+    await waitFor(() => {
+      expect(document.body.textContent).toMatch(/ya existen en papel/);
+      expect(document.body.textContent).toMatch(/Asignar a vendedor/);
     });
   });
 });
