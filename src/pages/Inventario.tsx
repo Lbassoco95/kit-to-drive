@@ -329,7 +329,7 @@ export default function Inventario() {
               <button
                 key={l}
                 onClick={() => setLineaFiltro(l)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium ${lineaFiltro === l ? "bg-[#2E75B6] text-white" : "text-muted-foreground"}`}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium ${lineaFiltro === l ? "bg-secondary text-white" : "text-muted-foreground"}`}
               >
                 {l === "TODAS" ? t.inventario.todas : t.catalogos.linea[l]}
               </button>
@@ -448,7 +448,7 @@ export default function Inventario() {
                                 id: c.id, numero_chasis: c.numero_chasis, modelo: c.modelo,
                                 color: c.color, color_original: c.color_original, motocarro_id: c.motocarro_id,
                               })}
-                              className="text-muted-foreground hover:text-[#1F3864]"
+                              className="text-muted-foreground hover:text-primary"
                               title={t.inventario.tip.cambiarColor}
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -728,7 +728,7 @@ export default function Inventario() {
                           {puedeEditarColor && (
                             <button
                               onClick={() => setCapacidadEdit({ modelo: c.modelo, color: c.color, juegos: c.piezas_recibidas ?? 0 })}
-                              className="ml-1.5 text-muted-foreground hover:text-[#1F3864]"
+                              className="ml-1.5 text-muted-foreground hover:text-primary"
                               title={t.inventario.tip.registrarJuegos}
                             >
                               <Pencil className="h-3.5 w-3.5 inline" />
@@ -836,7 +836,7 @@ export default function Inventario() {
             </Card>
             <Card className="p-4">
               <div className="text-sm text-muted-foreground">{t.inventario.stock.porConfigurar}</div>
-              <div className="text-3xl font-bold text-[#1F3864]">{chasisPorConfigurar.length}</div>
+              <div className="text-3xl font-bold text-primary">{chasisPorConfigurar.length}</div>
               <div className="text-xs text-muted-foreground mt-1">{t.inventario.stock.porConfigurarDesc}</div>
             </Card>
             <Card className="p-4">

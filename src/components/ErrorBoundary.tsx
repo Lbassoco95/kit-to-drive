@@ -47,7 +47,7 @@ function Aviso({ error, onReintentar }: { error: Error; onReintentar: () => void
     <div className="flex items-center justify-center p-6">
       <div className="max-w-lg w-full bg-card border rounded-lg p-8 text-center space-y-4">
         <div className="flex justify-center text-amber-600"><AlertTriangle className="h-10 w-10" /></div>
-        <h2 className="text-xl font-bold text-[#1F3864]">{t.componentes.errorBoundary.titulo}</h2>
+        <h2 className="text-xl font-bold text-primary">{t.componentes.errorBoundary.titulo}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
           {t.componentes.errorBoundary.detalle}
         </p>
@@ -58,7 +58,7 @@ function Aviso({ error, onReintentar }: { error: Error; onReintentar: () => void
           <Button onClick={onReintentar} variant="outline" className="h-11">
             <RotateCcw className="h-4 w-4 mr-2" /> {t.componentes.errorBoundary.reintentar}
           </Button>
-          <Button onClick={() => window.location.assign("/")} className="h-11 bg-[#1F3864] hover:bg-[#162a4d]">
+          <Button onClick={() => window.location.assign("/")} className="h-11 bg-primary hover:bg-primary-hover">
             {t.componentes.errorBoundary.irInicio}
           </Button>
         </div>

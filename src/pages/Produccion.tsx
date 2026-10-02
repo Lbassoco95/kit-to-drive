@@ -114,7 +114,7 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
           ) : (
             comments.map(c => (
               <div key={c.id} className="flex gap-2.5">
-                <div className="shrink-0 w-8 h-8 rounded-full bg-[#1F3864] text-white text-xs flex items-center justify-center font-bold">
+                <div className="shrink-0 w-8 h-8 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">
                   {(c.profiles?.nombre_completo ?? "?").split(" ").map((n: string) => n[0]).slice(0,2).join("")}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -148,7 +148,7 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
           />
           <div className="space-y-2">
             <FileOrCamera value={foto} onChange={setFoto} imageOnly label={tr.agregarFoto} />
-            <Button onClick={send} disabled={sending || !texto.trim()} size="sm" className="w-full h-10 bg-[#1F3864] hover:bg-[#162a4d]">
+            <Button onClick={send} disabled={sending || !texto.trim()} size="sm" className="w-full h-10 bg-primary hover:bg-primary-hover">
               <Send size={14} className="mr-1.5" />
               {sending ? tr.enviando : tr.enviar}
             </Button>
@@ -417,10 +417,10 @@ export default function Produccion() {
         </div>
         <div className="flex gap-2 items-center">
           <div className="inline-flex rounded-lg border p-1 bg-card">
-            <button onClick={() => setView("cards")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "cards" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}>
+            <button onClick={() => setView("cards")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "cards" ? "bg-primary text-white" : "text-muted-foreground"}`}>
               <LayoutGrid size={18}/> {t.produccion.vista.tarjetas}
             </button>
-            <button onClick={() => setView("tabla")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "tabla" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}>
+            <button onClick={() => setView("tabla")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "tabla" ? "bg-primary text-white" : "text-muted-foreground"}`}>
               <TableIcon size={18}/> {t.produccion.vista.tabla}
             </button>
           </div>
@@ -472,9 +472,9 @@ export default function Produccion() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`min-h-[48px] px-5 rounded-full font-semibold text-base transition-all border-2 ${active ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-[#1F3864] border-[#2E75B6]/30 hover:border-[#2E75B6]"}`}
+              className={`min-h-[48px] px-5 rounded-full font-semibold text-base transition-all border-2 ${active ? "bg-primary text-white border-primary" : "bg-white text-primary border-secondary/30 hover:border-secondary"}`}
             >
-              {f.label} <span className={`ml-2 px-2 py-0.5 rounded-full text-sm ${active ? "bg-white/20" : "bg-[#2E75B6]/10"}`}>{(counts as any)[f.key]}</span>
+              {f.label} <span className={`ml-2 px-2 py-0.5 rounded-full text-sm ${active ? "bg-white/20" : "bg-secondary/10"}`}>{(counts as any)[f.key]}</span>
             </button>
           );
         })}
@@ -487,7 +487,7 @@ export default function Produccion() {
         </div>
         <div className="inline-flex rounded-lg border p-1 bg-card">
           {(["TODOS","BLANCO","AZUL"] as const).map(c => (
-            <button key={c} onClick={() => setColorFilter(c)} className={`px-3 py-2 rounded-md text-sm font-medium ${colorFilter === c ? "bg-[#2E75B6] text-white" : "text-muted-foreground"}`}>
+            <button key={c} onClick={() => setColorFilter(c)} className={`px-3 py-2 rounded-md text-sm font-medium ${colorFilter === c ? "bg-secondary text-white" : "text-muted-foreground"}`}>
               {c === "TODOS" ? t.produccion.filtros.todosColores : c}
             </button>
           ))}
@@ -697,7 +697,7 @@ export default function Produccion() {
       <Dialog open={!!verHistorial} onOpenChange={(o) => { if (!o) setVerHistorial(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-[#1F3864]" /> {t.produccion.historialTitulo(verHistorial?.orden)}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /> {t.produccion.historialTitulo(verHistorial?.orden)}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {(verHistorial?.items ?? []).map((h: any, i: number) => (
@@ -724,7 +724,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
   const conSerial = serialesCompletos(r);
   const faltaSerial = [!r.ns_chasis && t.produccion.nsChasisCorto, !r.ns_motor && t.produccion.nsMotorCorto].filter(Boolean).join(" / ");
 
-  const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
+  const colorBike = r.color === "AZUL" ? "hsl(var(--secondary))" : "#94A3B8";
   const colorBg   = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";
 
   // timeline state
@@ -743,10 +743,10 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
           </div>
           <div>
             <div className="text-sm text-muted-foreground font-medium">{r.color}</div>
-            <div className="text-base font-semibold text-[#1F3864]">{displayFabrica(r.modelo, catalogo)}</div>
+            <div className="text-base font-semibold text-primary">{displayFabrica(r.modelo, catalogo)}</div>
           </div>
         </div>
-        <div className="px-3 py-1.5 rounded-md bg-[#1F3864] text-white font-bold text-xl tracking-tight">
+        <div className="px-3 py-1.5 rounded-md bg-primary text-white font-bold text-xl tracking-tight">
           #{r.orden_armado}
         </div>
       </div>
@@ -772,7 +772,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
           )}
           {r.remisiones?.profiles?.nombre_completo && (
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] font-medium">
-              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#2E75B6] text-white text-[10px] font-bold">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-secondary text-white text-[10px] font-bold">
                 {r.remisiones.profiles.nombre_completo.split(" ").map((n: string) => n[0]).slice(0,2).join("")}
               </span>
               {r.remisiones.profiles.nombre_completo.split(" ")[0]}
@@ -811,10 +811,10 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         <div className="flex items-center justify-between pt-2">
           {steps.map((s, i) => (
             <div key={s} className="flex items-center flex-1 last:flex-none">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${i <= activeIdx ? "bg-[#1F3864] text-white" : "bg-slate-200 text-slate-400"}`} title={s}>
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${i <= activeIdx ? "bg-primary text-white" : "bg-slate-200 text-slate-400"}`} title={s}>
                 {i + 1}
               </div>
-              {i < steps.length - 1 && <div className={`flex-1 h-1 mx-1 rounded ${i < activeIdx ? "bg-[#1F3864]" : "bg-slate-200"}`} />}
+              {i < steps.length - 1 && <div className={`flex-1 h-1 mx-1 rounded ${i < activeIdx ? "bg-primary" : "bg-slate-200"}`} />}
             </div>
           ))}
         </div>
@@ -872,7 +872,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         )}
         {canEditFabrica && r._eff === "EN_PROCESO" && (
           conSerial ? (
-            <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-[#1F3864] hover:bg-[#162a4d] text-base min-w-[120px]">
+            <Button onClick={() => onAction("ARMADO")} className="flex-1 h-12 bg-primary hover:bg-primary-hover text-base min-w-[120px]">
               <CheckCircle className="h-5 w-5 mr-2" /> {t.produccion.marcarArmado}
             </Button>
           ) : (
@@ -906,12 +906,12 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         )}
         {historialCount > 0 && (
           <Button variant="outline" onClick={onVerHistorial} className="h-12 w-12 p-0 relative" title={t.produccion.historialOrden}>
-            <History className="h-5 w-5 text-[#1F3864]" />
-            <span className="absolute -top-1.5 -right-1.5 bg-[#1F3864] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{historialCount}</span>
+            <History className="h-5 w-5 text-primary" />
+            <span className="absolute -top-1.5 -right-1.5 bg-primary text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">{historialCount}</span>
           </Button>
         )}
         <Button variant="outline" onClick={onComentarios} className="h-12 w-12 p-0" title={t.produccion.comentarios.title}>
-          <MessageSquare className="h-5 w-5 text-[#1F3864]" />
+          <MessageSquare className="h-5 w-5 text-primary" />
         </Button>
       </div>
     </Card>

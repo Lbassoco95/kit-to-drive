@@ -452,7 +452,7 @@ export default function Clientes() {
         <div><h1>{t.clientes.title}</h1><p className="text-base text-muted-foreground mt-1">{t.clientes.subtitle(filtered.length, rows.length)}</p></div>
         {canCreate && (
           <Button onClick={() => { resetForm(); setCreating(true); }}
-            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+            className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">
             <Plus className="h-5 w-5 mr-2"/> {t.clientes.nuevo}
           </Button>
         )}
@@ -519,7 +519,7 @@ export default function Clientes() {
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <Badge className={`bg-[#1F3864] ${isArchived ? "bg-slate-500" : ""}`}>{clienteCodigoDisplay(c)}</Badge>
+                    <Badge className={`bg-primary ${isArchived ? "bg-slate-500" : ""}`}>{clienteCodigoDisplay(c)}</Badge>
                     {clienteEsMigrado(c) && <Badge variant="outline" className="text-xs">ERP</Badge>}
                     {clienteTieneCredito(c) && (
                       <Badge variant="outline" className="text-xs border-teal-300 text-teal-700 bg-teal-50">
@@ -531,7 +531,7 @@ export default function Clientes() {
                     )}
                     {isArchived && <Badge variant="outline" className="text-xs">Archivado</Badge>}
                   </div>
-                  <div className="text-lg font-bold text-[#1F3864] truncate">{c.nombre_comercial || <em>{t.clientes.sinNombre}</em>}</div>
+                  <div className="text-lg font-bold text-primary truncate">{c.nombre_comercial || <em>{t.clientes.sinNombre}</em>}</div>
                   {c.razon_social && <div className="text-sm text-muted-foreground truncate">{c.razon_social}</div>}
                   {c.rfc && <div className="text-xs text-muted-foreground mt-0.5">RFC: {c.rfc}</div>}
                 </div>
@@ -660,7 +660,7 @@ export default function Clientes() {
               {perms.puedeVer("credito") && (
                 <p className="text-xs text-muted-foreground">
                   {t.clientes.hintCartera}{" "}
-                  <Link to="/credito" className="text-[#1F3864] font-medium underline-offset-2 hover:underline">
+                  <Link to="/credito" className="text-primary font-medium underline-offset-2 hover:underline">
                     {t.clientes.irModuloCredito}
                   </Link>
                 </p>
@@ -673,7 +673,7 @@ export default function Clientes() {
                   {comments.map((comment: any) => (
                     <div key={comment.id} className="bg-slate-50 p-3 rounded-lg">
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-full bg-[#1F3864] text-white flex items-center justify-center text-sm font-bold">
+                        <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                           {comment.profiles?.nombre_completo?.charAt(0) || "U"}
                         </div>
                         <div>
@@ -714,7 +714,7 @@ export default function Clientes() {
                     return (
                       <div key={entry.id} className="bg-slate-50 p-3 rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="text-[#1F3864]">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
+                          <div className="text-primary">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
                           <div>
                             <div className="text-sm font-medium">{entry.profiles?.nombre_completo || t.clientes.usuario}</div>
                             <div className="text-xs text-muted-foreground">
@@ -868,7 +868,7 @@ export default function Clientes() {
                   {comments.map((comment: any) => (
                     <div key={comment.id} className="bg-slate-50 p-3 rounded-lg">
                       <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-full bg-[#1F3864] text-white flex items-center justify-center text-sm font-bold">
+                        <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                           {comment.profiles?.nombre_completo?.charAt(0) || "U"}
                         </div>
                         <div>
@@ -907,7 +907,7 @@ export default function Clientes() {
                     return (
                       <div key={entry.id} className="bg-slate-50 p-3 rounded-lg">
                         <div className="flex items-center gap-2 mb-1">
-                          <div className="text-[#1F3864]">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
+                          <div className="text-primary">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
                           <div>
                             <div className="text-sm font-medium">{entry.profiles?.nombre_completo || t.clientes.usuario}</div>
                             <div className="text-xs text-muted-foreground">

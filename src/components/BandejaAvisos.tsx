@@ -143,10 +143,10 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
           {avisos.map(a => {
             const esSolicitud = !!a.requiere_respuesta;
             return (
-              <div key={a.id} className={`rounded-lg bg-white p-3 border ${esSolicitud ? "border-[#2E75B6]" : "border-amber-200"}`}>
+              <div key={a.id} className={`rounded-lg bg-white p-3 border ${esSolicitud ? "border-secondary" : "border-amber-200"}`}>
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-sm text-[#1F3864] break-words">
+                    <div className="font-semibold text-sm text-primary break-words">
                       {esSolicitud && (
                         <span className="mr-1.5 px-1.5 py-0.5 rounded bg-[#DBEAFE] text-[#1E40AF] text-[10px] font-bold uppercase tracking-wide align-middle">
                           {t.componentes.avisos.necesitaRespuesta}

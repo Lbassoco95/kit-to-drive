@@ -62,9 +62,9 @@ export default function MisMotocarros() {
               <Collapsible open={open} onOpenChange={(o) => setOpenClient(s => ({ ...s, [key]: o }))}>
                 <CollapsibleTrigger className="w-full text-left">
                   <div className="p-5 flex items-center gap-4 hover:bg-slate-50">
-                    <div className="p-3 rounded-lg bg-[#DBEAFE]"><Users size={32} color="#1F3864"/></div>
+                    <div className="p-3 rounded-lg bg-[#DBEAFE]"><Users size={32} color="hsl(var(--primary))"/></div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-2xl font-bold text-[#1F3864]">{displayCliente}</div>
+                      <div className="text-2xl font-bold text-primary">{displayCliente}</div>
                       {cliente.nombre_comercial && <div className="text-sm text-muted-foreground truncate">{cliente.nombre_comercial}</div>}
                     </div>
                     <div className="hidden md:flex flex-col items-end gap-1">
@@ -83,10 +83,10 @@ export default function MisMotocarros() {
                       <div key={r.id} className="rounded-lg border p-3 bg-white flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                           <div className="p-1.5 rounded-md" style={{ background: r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9" }}>
-                            <Bike size={24} color={r.color === "AZUL" ? "#2E75B6" : "#94A3B8"} />
+                            <Bike size={24} color={r.color === "AZUL" ? "hsl(var(--secondary))" : "#94A3B8"} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-bold text-[#1F3864]">#{r.orden_armado} · {r.color}</div>
+                            <div className="font-bold text-primary">#{r.orden_armado} · {r.color}</div>
                             <div className="text-xs text-muted-foreground truncate">{r.modelo}</div>
                           </div>
                         </div>

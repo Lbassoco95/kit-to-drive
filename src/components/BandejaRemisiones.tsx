@@ -25,7 +25,7 @@ const tipoIcon: Record<string, string> = {
   motocarro: "🏍️", cabina: "🛖", instalacion_cabina: "🔧", activacion: "⚡", flete: "🚛",
 };
 const tipoBadge: Record<string, string> = {
-  motocarro: "bg-[#1F3864]/10 text-[#1F3864] border-[#1F3864]/20",
+  motocarro: "bg-primary/10 text-primary border-primary/20",
   cabina: "bg-violet-50 text-violet-700 border-violet-200",
   instalacion_cabina: "bg-purple-50 text-purple-700 border-purple-200",
   activacion: "bg-amber-50 text-amber-700 border-amber-200",
@@ -780,7 +780,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             <Inbox className="h-6 w-6 text-[#A36B00]" />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-[#1F3864]">{b.title}</h2>
+            <h2 className="text-lg font-bold text-primary">{b.title}</h2>
             <p className="text-sm text-muted-foreground">{b.subtitle(items.length)}</p>
           </div>
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="h-9 shrink-0">
@@ -820,7 +820,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 {/* Header */}
                 <div className="flex items-start justify-between px-4 pt-3 pb-2 border-b bg-[#FFFBF0]">
                   <div>
-                    <div className="font-mono font-bold text-base text-[#1F3864]">{rem.folio_remision}</div>
+                    <div className="font-mono font-bold text-base text-primary">{rem.folio_remision}</div>
                     <div className="text-xs text-muted-foreground">{fmtDate(rem.fecha_remision)}</div>
                   </div>
                   <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${sinAsignar ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
@@ -847,7 +847,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     </span>
                     <button
                       onClick={() => abrirConfig(rem)}
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-[#2E75B6] hover:text-[#1F3864] hover:underline"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-secondary hover:text-primary hover:underline"
                     >
                       <Settings2 size={11} />
                       {tieneConfig ? b.editar : b.configurar}
@@ -925,7 +925,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   <Button
                     onClick={() => asignar(rem.id, faltan)}
                     disabled={busy === rem.id || faltan <= 0 || (cobertura.length > 0 && asignables <= 0)}
-                    className="basis-full grow h-auto min-h-11 whitespace-normal bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold text-sm"
+                    className="basis-full grow h-auto min-h-11 whitespace-normal bg-primary hover:bg-secondary text-white font-semibold text-sm"
                     title={cobertura.length > 0 && asignables <= 0
                       ? b.tipSinUnidades
                       : undefined}
@@ -941,7 +941,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   <Button
                     variant="outline"
                     onClick={() => abrirDetalle(rem)}
-                    className="basis-full h-11 px-3 border-[#1F3864]/30 text-[#1F3864] hover:bg-[#1F3864]/5"
+                    className="basis-full h-11 px-3 border-primary/30 text-primary hover:bg-primary/5"
                   >
                     <FileText className="h-4 w-4 mr-1.5" /> {b.verCompleta}
                   </Button>
@@ -949,7 +949,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     <Button
                       variant="outline"
                       onClick={() => abrirManual(rem)}
-                      className="flex-1 min-w-24 h-11 px-3 border-[#1F3864]/30 text-[#1F3864] hover:bg-[#1F3864]/5"
+                      className="flex-1 min-w-24 h-11 px-3 border-primary/30 text-primary hover:bg-primary/5"
                       title={b.tipManual}
                     >
                       <UserPlus className="h-4 w-4 mr-1.5" /> {b.manual}
@@ -985,7 +985,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
       <Dialog open={!!detalleDialog} onOpenChange={o => { if (!o) { setDetalleDialog(null); setDetalleUnidades([]); } }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex flex-wrap items-center gap-2 text-[#1F3864]">
+            <DialogTitle className="flex flex-wrap items-center gap-2 text-primary">
               {b.detalleTitulo(detalleDialog?.folio_remision ?? "")}
               {detalleDialog && (
                 <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${detalleDialog.asignados === 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
@@ -1088,7 +1088,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
               <div className="flex flex-wrap gap-2 border-t pt-4">
                 {detalleDialog.documento_url ? (
                   <>
-                    <Button onClick={() => verDoc(detalleDialog.documento_url!)} className="flex-1 min-w-40 bg-[#1F3864] hover:bg-[#162a4d]">
+                    <Button onClick={() => verDoc(detalleDialog.documento_url!)} className="flex-1 min-w-40 bg-primary hover:bg-primary-hover">
                       <Eye className="h-4 w-4 mr-2" /> {b.visualizarPdf}
                     </Button>
                     <Button variant="outline" onClick={() => descargarDoc(detalleDialog.documento_url!)} className="flex-1 min-w-40">
@@ -1112,7 +1112,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wrench className="h-5 w-5 text-[#1F3864]" />
+              <Wrench className="h-5 w-5 text-primary" />
               {b.confirmarArmadoTitulo}
             </DialogTitle>
             <DialogDescription>
@@ -1130,7 +1130,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             ].map(([etiqueta, valor]) => (
               <div key={etiqueta} className="flex items-center justify-between gap-3 px-3 py-2">
                 <span className="text-muted-foreground text-xs">{etiqueta}</span>
-                <span className="font-semibold text-[#1F3864] font-mono text-right break-all">{valor}</span>
+                <span className="font-semibold text-primary font-mono text-right break-all">{valor}</span>
               </div>
             ))}
           </div>
@@ -1175,7 +1175,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-[#1F3864]" />
+              <Settings2 className="h-5 w-5 text-primary" />
               {b.configTitulo(configDialog?.folio_remision ?? "")}
             </DialogTitle>
           </DialogHeader>
@@ -1236,7 +1236,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                         return next;
                       });
                     }}
-                    className="w-4 h-4 accent-[#1F3864]"
+                    className="w-4 h-4 accent-primary"
                   />
                   <span className="text-sm">{icon} {label}</span>
                   {key === "con_caja" && configForm.con_instalacion && (
@@ -1252,7 +1252,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             <Button
               onClick={guardarConfig}
               disabled={savingConfig}
-              className="bg-[#1F3864] hover:bg-[#162a4d]"
+              className="bg-primary hover:bg-primary-hover"
             >
               {savingConfig ? b.guardando : b.guardarConfig}
             </Button>
@@ -1265,7 +1265,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-[#1F3864]" />
+              <UserPlus className="h-5 w-5 text-primary" />
               {b.manualTitulo(manualDialog?.folio_remision ?? "")}
             </DialogTitle>
           </DialogHeader>
@@ -1275,8 +1275,8 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           ) : (
             <div className="flex-1 overflow-y-auto space-y-4">
               {/* FORMULARIO PRINCIPAL: asignar por serial */}
-              <div className="border-2 border-[#1F3864]/30 rounded-lg p-4 bg-[#F8FAFC] space-y-3">
-                <h4 className="text-sm font-bold text-[#1F3864]">
+              <div className="border-2 border-primary/30 rounded-lg p-4 bg-[#F8FAFC] space-y-3">
+                <h4 className="text-sm font-bold text-primary">
                   {b.asignarPorSerie}
                 </h4>
                 <p className="text-xs text-muted-foreground">
@@ -1284,7 +1284,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <Label className="text-xs text-[#1F3864]">{b.nsChasis}</Label>
+                    <Label className="text-xs text-primary">{b.nsChasis}</Label>
                     <SerialAutocomplete
                       tipo="chasis"
                       value={manualNuevoChasis}
@@ -1294,7 +1294,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-[#1F3864]">{b.nsMotor}</Label>
+                    <Label className="text-xs text-primary">{b.nsMotor}</Label>
                     <SerialAutocomplete
                       tipo="motor"
                       value={manualNuevoMotor}
@@ -1315,7 +1315,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     }}
                   />
                   <label htmlFor="yaArmado" className="text-xs text-muted-foreground leading-tight cursor-pointer select-none">
-                    <span className="font-medium text-[#1F3864] block mb-0.5">{b.yaArmado}</span>
+                    <span className="font-medium text-primary block mb-0.5">{b.yaArmado}</span>
                     {b.yaArmadoAyuda}
                   </label>
                 </div>
@@ -1323,12 +1323,12 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     Fábrica los corrige aquí: antes se guardaba lo que ventas
                     hubiera capturado, aunque el motocarro fuera otro. */}
                 {manualYaArmado && (
-                  <div className="rounded-lg border border-[#1F3864]/25 bg-white p-3 space-y-2">
+                  <div className="rounded-lg border border-primary/25 bg-white p-3 space-y-2">
                     <p className="text-xs text-muted-foreground">{b.armadoDatosAyuda}</p>
                     {/* El lote es cerrado: por aquí entran las unidades que ya
                         estaban ensambladas antes del sistema, y son contadas. */}
                     {loteYaArmados && (
-                      <p className={`text-xs font-medium ${loteAgotado ? "text-[#991B1B]" : "text-[#1F3864]"}`}>
+                      <p className={`text-xs font-medium ${loteAgotado ? "text-[#991B1B]" : "text-primary"}`}>
                         {loteAgotado
                           ? b.loteYaArmadosAgotado(loteYaArmados.limite)
                           : b.loteYaArmados(loteYaArmados.cargadas, loteYaArmados.limite, loteYaArmados.restantes)}
@@ -1336,7 +1336,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div className="space-y-1">
-                        <Label className="text-xs text-[#1F3864]">{b.cilindraje}</Label>
+                        <Label className="text-xs text-primary">{b.cilindraje}</Label>
                         <Select value={armadoModelo} onValueChange={setArmadoModelo}>
                           <SelectTrigger className="h-11 text-sm"><SelectValue placeholder={b.elegirCilindraje} /></SelectTrigger>
                           <SelectContent>
@@ -1345,7 +1345,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                         </Select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-[#1F3864]">{b.color}</Label>
+                        <Label className="text-xs text-primary">{b.color}</Label>
                         <Select value={armadoColor} onValueChange={setArmadoColor}>
                           <SelectTrigger className="h-11 text-sm"><SelectValue placeholder={b.elegirColor} /></SelectTrigger>
                           <SelectContent>
@@ -1392,7 +1392,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     (manualYaArmado && (!manualNuevoChasis || !manualNuevoMotor || !armadoModelo || !armadoColor || loteAgotado)) ||
                     manualBusy === "buscando"
                   }
-                  className="w-full h-11 bg-[#1F3864] hover:bg-[#2E75B6] text-white font-semibold"
+                  className="w-full h-11 bg-primary hover:bg-secondary text-white font-semibold"
                 >
                   {manualBusy === "buscando"
                     ? b.buscando
@@ -1416,7 +1416,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                       return (
                       <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
                         <div className="text-sm min-w-0">
-                          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+                          <span className="font-bold text-primary">#{m.orden_armado}</span>
                           {" · "}
                           <span className="font-medium">{m.color}</span>
                           {" · "}
@@ -1436,7 +1436,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                               size="sm"
                               onClick={() => capturarSerialesAsignada(m.id)}
                               disabled={manualBusy === `serial-${m.id}` || (!manualNuevoChasis && !manualNuevoMotor)}
-                              className="h-8 px-2 border-[#1F3864]/30 text-[#1F3864]"
+                              className="h-8 px-2 border-primary/30 text-primary"
                               title={b.tipCapturarSerialAsignada}
                             >
                               {manualBusy === `serial-${m.id}` ? "…" : b.capturarSeriales}
@@ -1479,7 +1479,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
               {/* Lista de unidades disponibles (selección directa) */}
               {disponiblesFiltrados.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-[#1F3864] mb-2">
+                  <h4 className="text-sm font-semibold text-primary mb-2">
                     {b.oSelecciona(disponiblesFiltrados.length)}
                   </h4>
                   <Input
@@ -1492,7 +1492,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     {disponiblesFiltrados.map(m => (
                       <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white border hover:bg-slate-50">
                         <div className="text-sm min-w-0 flex-1">
-                          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+                          <span className="font-bold text-primary">#{m.orden_armado}</span>
                           {" · "}
                           <span className="font-medium">{m.color}</span>
                           {" · "}
@@ -1508,7 +1508,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                           size="sm"
                           onClick={() => asignarManual(m.id)}
                           disabled={manualBusy === m.id}
-                          className="h-8 px-3 bg-[#1F3864] hover:bg-[#2E75B6] text-white text-xs shrink-0"
+                          className="h-8 px-3 bg-primary hover:bg-secondary text-white text-xs shrink-0"
                         >
                           {manualBusy === m.id ? "…" : b.asignar}
                         </Button>

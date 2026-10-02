@@ -123,7 +123,7 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
           <Metric label={t.componentes.inventarioStatus.metricas.disponiblesNS} value={s.conSerial} accent="#065F46" />
           <Metric label={t.componentes.inventarioStatus.metricas.sinNS} value={s.sinSerial} accent={s.sinSerial > 0 ? "#D97706" : "#64748B"} />
           <Metric label={t.componentes.inventarioStatus.metricas.porConfigurar} value={s.chasisPorConfigurar} accent={s.chasisPorConfigurar > 0 ? "#92400E" : "#64748B"} />
-          <Metric label={t.componentes.inventarioStatus.metricas.demanda} value={s.demandaPendiente} accent="#1F3864" />
+          <Metric label={t.componentes.inventarioStatus.metricas.demanda} value={s.demandaPendiente} accent="hsl(var(--primary))" />
           <Metric label={t.componentes.inventarioStatus.metricas.deficit} value={Math.max(0, deficit)} accent={deficit > 0 ? "#C0392B" : "#065F46"} />
         </div>
       </div>

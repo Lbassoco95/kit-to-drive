@@ -147,7 +147,7 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Palette className="h-6 w-6 text-[#1F3864]" /> {t.componentes.colorChasis.titulo}
+            <Palette className="h-6 w-6 text-primary" /> {t.componentes.colorChasis.titulo}
           </DialogTitle>
           <DialogDescription>{t.componentes.colorChasis.desc}</DialogDescription>
         </DialogHeader>
@@ -166,13 +166,13 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
         <div className="inline-flex rounded-lg border p-1 bg-card self-start">
           <button
             onClick={() => setModo("cambiar")}
-            className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "cambiar" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}
+            className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "cambiar" ? "bg-primary text-white" : "text-muted-foreground"}`}
           >
             {t.componentes.colorChasis.usarJuegoLibre}
           </button>
           <button
             onClick={() => setModo("intercambiar")}
-            className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "intercambiar" ? "bg-[#1F3864] text-white" : "text-muted-foreground"}`}
+            className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "intercambiar" ? "bg-primary text-white" : "text-muted-foreground"}`}
           >
             <ArrowLeftRight className="h-4 w-4 inline mr-1.5" /> {t.componentes.colorChasis.intercambiar}
           </button>
@@ -191,9 +191,9 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
                   type="button"
                   onClick={() => { setColorNuevo(c); setPareja(null); }}
                   className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
-                    activo ? "bg-[#1F3864] text-white border-[#1F3864]"
+                    activo ? "bg-primary text-white border-primary"
                     : agotado ? "bg-slate-50 text-slate-400 border-slate-200"
-                    : "bg-white text-slate-700 hover:border-[#2E75B6]"}`}
+                    : "bg-white text-slate-700 hover:border-secondary"}`}
                   title={agotado
                     ? t.componentes.colorChasis.agotadoTip(c)
                     : t.componentes.colorChasis.libresTip(libres, c)}
@@ -272,11 +272,11 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t.actions.cancel}</Button>
           {modo === "cambiar" ? (
-            <Button onClick={guardarCambio} disabled={busy || !colorNuevo || sinJuegos} className="bg-[#1F3864] hover:bg-[#162a4d]">
+            <Button onClick={guardarCambio} disabled={busy || !colorNuevo || sinJuegos} className="bg-primary hover:bg-primary-hover">
               {busy ? t.componentes.colorChasis.guardando : t.componentes.colorChasis.cambiarColor}
             </Button>
           ) : (
-            <Button onClick={guardarIntercambio} disabled={busy || !pareja} className="bg-[#1F3864] hover:bg-[#162a4d]">
+            <Button onClick={guardarIntercambio} disabled={busy || !pareja} className="bg-primary hover:bg-primary-hover">
               <ArrowLeftRight className="h-4 w-4 mr-1.5" /> {busy ? t.componentes.colorChasis.guardando : t.componentes.colorChasis.intercambiar}
             </Button>
           )}
@@ -340,7 +340,7 @@ export function AjustarCapacidadColor({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>{t.actions.cancel}</Button>
-          <Button onClick={guardar} disabled={busy} className="bg-[#1F3864] hover:bg-[#162a4d]">
+          <Button onClick={guardar} disabled={busy} className="bg-primary hover:bg-primary-hover">
             {busy ? t.componentes.colorChasis.guardando : t.actions.save}
           </Button>
         </DialogFooter>

@@ -15,8 +15,8 @@ function SinAcceso({ icono, titulo, detalle }: { icono: JSX.Element; titulo: str
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
       <div className="max-w-md w-full bg-card border rounded-lg p-8 text-center space-y-4">
-        <div className="flex justify-center text-[#1F3864]">{icono}</div>
-        <h1 className="text-xl font-bold text-[#1F3864]">{titulo}</h1>
+        <div className="flex justify-center text-primary">{icono}</div>
+        <h1 className="text-xl font-bold text-primary">{titulo}</h1>
         {profileName && <p className="text-sm font-medium text-slate-600">{profileName}</p>}
         <p className="text-muted-foreground text-sm leading-relaxed">{detalle}</p>
         <Button onClick={signOut} variant="outline" className="w-full h-11">

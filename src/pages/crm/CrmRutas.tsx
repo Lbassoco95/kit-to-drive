@@ -183,7 +183,7 @@ export default function CrmRutas() {
         </div>
         {canCreate && (
           <Button onClick={() => { setForm({ vendedor_id: "", fecha_ruta: "", notas: "" }); setParadasLocales([]); setCreating(true); }}
-            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+            className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">
             <Plus className="h-5 w-5 mr-2"/> {t.crm.rutas.nueva}
           </Button>
         )}
@@ -205,8 +205,8 @@ export default function CrmRutas() {
               <div className="flex items-start justify-between mb-4">
                 <div className="min-w-0">
                   <div className="flex items-center gap-3">
-                    <Calendar className="text-[#1F3864]" size={20}/>
-                    <div className="text-2xl font-bold text-[#1F3864]">{fmtDate(r.fecha_ruta)}</div>
+                    <Calendar className="text-primary" size={20}/>
+                    <div className="text-2xl font-bold text-primary">{fmtDate(r.fecha_ruta)}</div>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground mt-1">
                     <User size={16}/> <span>{vendedor?.nombre_completo || t.crm.sinVendedor}</span>
@@ -233,7 +233,7 @@ export default function CrmRutas() {
                     const cliente = clientes.find((c: any) => c.id === p.cliente_id);
                     return (
                       <div key={p.id} className={`flex items-start gap-3 p-3 rounded-lg border ${p.completada ? "bg-green-50 border-green-200" : "bg-gray-50"}`}>
-                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#1F3864] text-white font-bold text-sm shrink-0">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm shrink-0">
                           {p.orden}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -307,7 +307,7 @@ export default function CrmRutas() {
                     const cliente = clientes.find((c: any) => c.id === p.cliente_id);
                     return (
                       <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
-                        <div className="w-6 h-6 rounded-full bg-[#1F3864] text-white flex items-center justify-center text-xs font-bold">
+                        <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
                           {p.orden}
                         </div>
                         <div className="flex-1 text-sm">{cliente?.nombre_comercial || p.descripcion}</div>

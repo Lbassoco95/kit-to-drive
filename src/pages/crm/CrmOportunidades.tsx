@@ -147,7 +147,7 @@ export default function CrmOportunidades() {
         </div>
         {canCreate && (
           <Button onClick={() => { setForm(FORM_VACIO); setCreating(true); }}
-            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+            className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">
             <Plus className="h-5 w-5 mr-2"/> {t.crm.oportunidades.nueva}
           </Button>
         )}
@@ -166,7 +166,7 @@ export default function CrmOportunidades() {
           onClick={() => setSelectedEtapa("all")}
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
             selectedEtapa === "all"
-              ? "bg-[#1F3864] text-white"
+              ? "bg-primary text-white"
               : "bg-muted text-muted-foreground hover:bg-muted/80"
           }`}
         >
@@ -205,7 +205,7 @@ export default function CrmOportunidades() {
                   {/* El título encabeza la tarjeta; antes iba el tipo de venta y
                       todas decían lo mismo. El respaldo es para las que se
                       crearon sin título. */}
-                  <div className="text-lg font-bold text-[#1F3864] truncate">{o.titulo || t.crm.tipoVenta(o.tipo_venta)}</div>
+                  <div className="text-lg font-bold text-primary truncate">{o.titulo || t.crm.tipoVenta(o.tipo_venta)}</div>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${etapaColors[o.etapa]}`}>
                       {t.crm.etapa(o.etapa)}

@@ -166,7 +166,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="h-12 bg-[#1F3864] hover:bg-[#162a4d] text-white font-semibold">
+      <Button onClick={() => setOpen(true)} className="h-12 bg-primary hover:bg-primary-hover text-white font-semibold">
         <Wrench className="h-5 w-5 mr-2" /> {t.componentes.configurarUnidad.boton}
       </Button>
 
@@ -174,7 +174,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-2xl">
-              <Wrench className="h-6 w-6 text-[#1F3864]" /> {t.componentes.configurarUnidad.boton}
+              <Wrench className="h-6 w-6 text-primary" /> {t.componentes.configurarUnidad.boton}
             </DialogTitle>
             <DialogDescription>
               {loading ? t.componentes.configurarUnidad.cargando : t.componentes.configurarUnidad.desc(chasis.length, motores.length)}
@@ -290,9 +290,9 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                       disabled={agotado}
                       onClick={() => setColorSel(c)}
                       className={`text-xs px-2.5 py-1.5 rounded-full border ${
-                        activo ? "bg-[#1F3864] text-white border-[#1F3864]"
+                        activo ? "bg-primary text-white border-primary"
                         : agotado ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
-                        : "bg-white text-slate-700 hover:border-[#2E75B6]"}`}
+                        : "bg-white text-slate-700 hover:border-secondary"}`}
                       title={propio ? t.componentes.configurarUnidad.colorDelChasis
                         : agotado ? t.componentes.configurarUnidad.colorAgotado(c)
                         : t.componentes.configurarUnidad.colorLibres(libres, c)}

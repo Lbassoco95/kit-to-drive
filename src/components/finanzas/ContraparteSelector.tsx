@@ -169,8 +169,8 @@ export default function ContraparteSelector({
               onClick={() => cambiarTab(tab.value)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
                 activo
-                  ? "bg-[#1F3864] text-white border-[#1F3864]"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#1F3864]/40"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-primary/40"
               }`}
             >
               <tab.icon size={14} /> {t.finanzas.contraparte[tab.etiqueta]}

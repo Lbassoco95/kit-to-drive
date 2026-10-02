@@ -208,7 +208,7 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
                   key={p}
                   type="button"
                   onClick={() => setForm(f => ({ ...f, parte_afectada: p }))}
-                  className={`text-[11px] px-2 py-1 rounded-full border ${form.parte_afectada === p ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-slate-600 hover:border-[#2E75B6]"}`}
+                  className={`text-[11px] px-2 py-1 rounded-full border ${form.parte_afectada === p ? "bg-primary text-white border-primary" : "bg-white text-slate-600 hover:border-secondary"}`}
                 >
                   {etiqueta}
                 </button>

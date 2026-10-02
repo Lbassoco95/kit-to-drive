@@ -160,7 +160,7 @@ export default function Finanzas() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2">
-            <Wallet size={28} className="text-[#1F3864]" />
+            <Wallet size={28} className="text-primary" />
             {t.finanzas.title}
           </h1>
           <p className="mt-1 text-base text-muted-foreground">{t.finanzas.subtitle(filtrados.length, movs.length)}</p>
@@ -179,7 +179,7 @@ export default function Finanzas() {
               </Button>
               <Button
                 onClick={() => abrirAlta("EGRESO")}
-                className="h-12 bg-[#1F3864] px-5 text-base hover:bg-[#162a4d]"
+                className="h-12 bg-primary px-5 text-base hover:bg-primary-hover"
               >
                 <ArrowUpCircle className="mr-2 h-5 w-5" /> {t.finanzas.registrarEgreso}
               </Button>
@@ -197,11 +197,11 @@ export default function Finanzas() {
             return (
               <Card key={s.id} className="p-4">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Icono size={15} className="text-[#2E75B6]" />
+                  <Icono size={15} className="text-secondary" />
                   <span className="truncate font-medium">{s.nombre}</span>
                   <Badge variant="outline" className="ml-auto text-[10px]">{s.moneda}</Badge>
                 </div>
-                <div className={`mt-1.5 text-2xl font-extrabold ${negativo ? "text-red-600" : "text-[#1F3864]"}`}>
+                <div className={`mt-1.5 text-2xl font-extrabold ${negativo ? "text-red-600" : "text-primary"}`}>
                   {fmtMoneda(Number(s.saldo_actual), s.moneda, locale)}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
@@ -246,7 +246,7 @@ export default function Finanzas() {
         </Card>
         <Card className="p-4">
           <p className="text-sm text-muted-foreground">{t.finanzas.neto}</p>
-          <p className={`text-2xl font-extrabold ${totales.neto < 0 ? "text-red-600" : "text-[#1F3864]"}`}>
+          <p className={`text-2xl font-extrabold ${totales.neto < 0 ? "text-red-600" : "text-primary"}`}>
             {fmtMoneda(totales.neto, "MXN", locale)}
           </p>
         </Card>
@@ -264,7 +264,7 @@ export default function Finanzas() {
               key={t.v}
               onClick={() => setTipo(t.v)}
               className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
-                tipo === t.v ? "bg-[#1F3864] text-white" : "bg-[#2E75B6]/10 text-[#1F3864] hover:bg-[#2E75B6]/20"
+                tipo === t.v ? "bg-primary text-white" : "bg-secondary/10 text-primary hover:bg-secondary/20"
               }`}
             >
               {t.label}
@@ -389,7 +389,7 @@ export default function Finanzas() {
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-muted-foreground">{m.folio}</span>
-                      <span className="truncate text-base font-bold text-[#1F3864]">{m.concepto}</span>
+                      <span className="truncate text-base font-bold text-primary">{m.concepto}</span>
                       <Badge variant="outline" className={est.clase}>{t.finanzas.estatusMov(m.estatus)}</Badge>
                       {m.tiene_factura && (
                         <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-xs text-emerald-700">
@@ -459,7 +459,7 @@ export default function Finanzas() {
             <Button
               onClick={guardar}
               disabled={guardando}
-              className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
+              className="h-11 bg-primary px-6 hover:bg-primary-hover"
             >
               {guardando ? t.finanzas.guardando : t.finanzas.guardarAbrirExpediente}
             </Button>

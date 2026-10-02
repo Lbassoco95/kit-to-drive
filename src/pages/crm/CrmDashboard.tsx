@@ -137,7 +137,7 @@ export default function CrmDashboard() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm text-muted-foreground">{kpi.title}</div>
-                    <div className="text-2xl font-bold text-[#1F3864] mt-1">{kpi.value}</div>
+                    <div className="text-2xl font-bold text-primary mt-1">{kpi.value}</div>
                   </div>
                   <div className={`p-3 rounded-full ${kpi.color}`}>
                     <kpi.icon size={24} className={kpi.iconColor} />
@@ -150,7 +150,7 @@ export default function CrmDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card className="p-5">
               <div className="flex items-center gap-2 mb-4">
-                <Users className="text-[#1F3864]" size={20}/>
+                <Users className="text-primary" size={20}/>
                 <h3 className="font-semibold">{t.crm.dashboard.topVendedores}</h3>
               </div>
               {kpis.topVendedores.length > 0 ? (
@@ -163,7 +163,7 @@ export default function CrmDashboard() {
                         </div>
                         <div className="font-medium">{v.nombre}</div>
                       </div>
-                      <div className="font-bold text-[#1F3864]">${v.monto.toLocaleString()}</div>
+                      <div className="font-bold text-primary">${v.monto.toLocaleString()}</div>
                     </div>
                   ))}
                 </div>
@@ -174,13 +174,13 @@ export default function CrmDashboard() {
 
             <Card className="p-5">
               <div className="flex items-center gap-2 mb-4">
-                <BarChart2 className="text-[#1F3864]" size={20}/>
+                <BarChart2 className="text-primary" size={20}/>
                 <h3 className="font-semibold">{t.crm.dashboard.resumen}</h3>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="text-muted-foreground">{t.crm.dashboard.tasaConversion}</span>
-                  <span className="font-bold text-[#1F3864]">
+                  <span className="font-bold text-primary">
                     {kpis.totalOportunidades > 0 
                       ? `${((kpis.oportunidadesGanadas / kpis.totalOportunidades) * 100).toFixed(1)}%` 
                       : "0%"}
@@ -188,7 +188,7 @@ export default function CrmDashboard() {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="text-muted-foreground">{t.crm.dashboard.promedioGanada}</span>
-                  <span className="font-bold text-[#1F3864]">
+                  <span className="font-bold text-primary">
                     {kpis.oportunidadesGanadas > 0 
                       ? `$${(kpis.montoTotal / kpis.oportunidadesGanadas).toLocaleString()}` 
                       : "$0"}
@@ -196,7 +196,7 @@ export default function CrmDashboard() {
                 </div>
                 <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                   <span className="text-muted-foreground">{t.crm.dashboard.actividadesPorDia}</span>
-                  <span className="font-bold text-[#1F3864]">
+                  <span className="font-bold text-primary">
                     {(kpis.actividadesMes / 30).toFixed(1)}
                   </span>
                 </div>

@@ -189,7 +189,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
 
       {form.moneda !== "MXN" && montoNum > 0 && tcNum > 0 && (
         <p className="-mt-2 text-sm text-muted-foreground">
-          {t.finanzas.form.equivaleA} <strong className="text-[#1F3864]">{fmtMoneda(montoNum * tcNum, "MXN", locale)}</strong>
+          {t.finanzas.form.equivaleA} <strong className="text-primary">{fmtMoneda(montoNum * tcNum, "MXN", locale)}</strong>
         </p>
       )}
 
@@ -266,7 +266,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
               })}
               className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
                 form.via === v
-                  ? "border-[#1F3864] bg-[#EFF6FF] font-semibold text-[#1F3864]"
+                  ? "border-primary bg-[#EFF6FF] font-semibold text-primary"
                   : "border-slate-200 text-slate-600 hover:border-slate-300"
               }`}
             >

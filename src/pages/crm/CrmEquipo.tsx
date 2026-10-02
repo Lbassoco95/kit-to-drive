@@ -97,7 +97,7 @@ export default function CrmEquipo() {
         </div>
         {perms.gestionaUsuarios && (
           <Button onClick={() => setCreating(true)}
-            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+            className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">
             <Plus className="h-5 w-5 mr-2"/> {t.crm.equipo.agregar}
           </Button>
         )}
@@ -119,7 +119,7 @@ export default function CrmEquipo() {
                 <tr key={u.id} className="border-b last:border-0 hover:bg-muted/50">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[#1F3864] flex items-center justify-center text-white font-semibold">
+                      <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold">
                         {u.nombre_completo?.charAt(0).toUpperCase()}
                       </div>
                       <span className="font-medium">{u.nombre_completo}</span>
@@ -207,7 +207,7 @@ export default function CrmEquipo() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreating(false)}>{t.actions.cancel}</Button>
-            <Button onClick={save} className="bg-[#1F3864] hover:bg-[#162a4d]">{t.crm.equipo.crearUsuario}</Button>
+            <Button onClick={save} className="bg-primary hover:bg-primary-hover">{t.crm.equipo.crearUsuario}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

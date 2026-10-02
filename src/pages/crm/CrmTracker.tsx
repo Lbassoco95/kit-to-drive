@@ -157,7 +157,7 @@ export default function CrmTracker() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#1F3864]">{t.crm.tracker.title}</h1>
+        <h1 className="text-2xl font-bold text-primary">{t.crm.tracker.title}</h1>
         <p className="text-muted-foreground mt-1">{t.crm.tracker.subtitle}</p>
       </div>
 

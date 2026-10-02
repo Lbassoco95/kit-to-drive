@@ -247,7 +247,7 @@ export default function AlmacenRefacciones() {
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1F3864] flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
             <Package className="h-7 w-7" />
             {t.almacenRefacciones?.titulo ?? "Inventario de refacciones"}
           </h1>
@@ -292,23 +292,23 @@ export default function AlmacenRefacciones() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statProductos ?? "Productos"}</div>
-          <div className="text-2xl font-bold text-[#1F3864]">{stats.total}</div>
+          <div className="text-2xl font-bold text-primary">{stats.total}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statDual ?? "Con código dual"}</div>
-          <div className="text-2xl font-bold text-[#1F3864]">{stats.dual}</div>
+          <div className="text-2xl font-bold text-primary">{stats.dual}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statCompat ?? "Con compatibilidad"}</div>
-          <div className="text-2xl font-bold text-[#1F3864]">{stats.conCompat}</div>
+          <div className="text-2xl font-bold text-primary">{stats.conCompat}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statUnidades ?? "Motos/unidades"}</div>
-          <div className="text-2xl font-bold text-[#1F3864]">{stats.unidades}</div>
+          <div className="text-2xl font-bold text-primary">{stats.unidades}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statStock ?? "Piezas en stock"}</div>
-          <div className="text-2xl font-bold text-[#1F3864]">{stats.stock.toLocaleString("es-MX")}</div>
+          <div className="text-2xl font-bold text-primary">{stats.stock.toLocaleString("es-MX")}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{t.almacenRefacciones?.statApartado ?? "Apartadas en remisión"}</div>
@@ -373,7 +373,7 @@ export default function AlmacenRefacciones() {
 
         {unidadFiltro !== "todas" && unidadFiltroNombre && (
           <div className="flex items-center gap-2 text-sm bg-slate-50 border rounded-md px-3 py-2">
-            <Bike className="h-4 w-4 text-[#1F3864]" />
+            <Bike className="h-4 w-4 text-primary" />
             <span>
               {t.almacenRefacciones?.filtrandoUnidad ?? "Piezas compatibles con"}{" "}
               <strong>{unidadFiltroNombre}</strong>
@@ -406,8 +406,8 @@ export default function AlmacenRefacciones() {
                 return (
                 <Fragment key={p.id}>
                 {p.linea_catalogo !== previa && (
-                  <TableRow className="bg-[#1F3864]/5 hover:bg-[#1F3864]/5">
-                    <TableCell colSpan={9} className="font-semibold text-[#1F3864]">{titulo}</TableCell>
+                  <TableRow className="bg-primary/5 hover:bg-primary/5">
+                    <TableCell colSpan={9} className="font-semibold text-primary">{titulo}</TableCell>
                   </TableRow>
                 )}
                 <TableRow
@@ -469,7 +469,7 @@ export default function AlmacenRefacciones() {
           {detalle && (
             <>
               <DialogHeader>
-                <DialogTitle className="font-mono text-[#1F3864]">{detalle.codigo_nuevo}</DialogTitle>
+                <DialogTitle className="font-mono text-primary">{detalle.codigo_nuevo}</DialogTitle>
                 <DialogDescription className="font-mono text-xs">
                   {detalle.codigo_antiguo
                     ? `Antiguo: ${detalle.codigo_antiguo} · ${detalle.clave_completa}`
@@ -497,7 +497,7 @@ export default function AlmacenRefacciones() {
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {t.almacenRefacciones?.seccionDesc ?? "Descripción del producto"}
                   </h3>
-                  <p className="text-base font-medium leading-snug text-[#1F3864]">
+                  <p className="text-base font-medium leading-snug text-primary">
                     {detalle.descripcion_corta || detalle.descripcion}
                   </p>
                   {detalle.categoria && (
@@ -525,7 +525,7 @@ export default function AlmacenRefacciones() {
                           key={c.id}
                           type="button"
                           onClick={() => filtrarPorUnidad(c.id)}
-                          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-left text-sm hover:border-[#1F3864] hover:bg-[#EFF6FF] transition-colors"
+                          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-left text-sm hover:border-primary hover:bg-[#EFF6FF] transition-colors"
                           title="Ver otras piezas compatibles con esta unidad"
                         >
                           <span className="font-medium">{c.nombre}</span>

@@ -204,10 +204,10 @@ export default function Incidencias() {
             <button
               key={f}
               onClick={() => setFiltro(f)}
-              className={`min-h-[44px] px-4 rounded-full font-semibold text-sm border-2 ${activo ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-[#1F3864] border-[#2E75B6]/30 hover:border-[#2E75B6]"}`}
+              className={`min-h-[44px] px-4 rounded-full font-semibold text-sm border-2 ${activo ? "bg-primary text-white border-primary" : "bg-white text-primary border-secondary/30 hover:border-secondary"}`}
             >
               {t.incidencias.filtros[f]}
-              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${activo ? "bg-white/20" : "bg-[#2E75B6]/10"}`}>
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${activo ? "bg-white/20" : "bg-secondary/10"}`}>
                 {conteos[f]}
               </span>
             </button>
@@ -232,7 +232,7 @@ export default function Incidencias() {
             <Card key={i.id} className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
-                  <div className="font-mono font-bold text-[#1F3864]">{i.folio ?? "—"}</div>
+                  <div className="font-mono font-bold text-primary">{i.folio ?? "—"}</div>
                   <div className="font-mono text-sm">{i.ns_chasis}</div>
                   <div className="text-xs text-muted-foreground">
                     {displayFabrica(i.modelo ?? "", catalogo)} · {i.color ?? "—"}
@@ -258,7 +258,7 @@ export default function Incidencias() {
 
               <p className="text-sm">{i.descripcion}</p>
               {i.resolucion && (
-                <p className="text-sm bg-slate-50 border-l-2 border-[#1F3864] pl-2 py-1">
+                <p className="text-sm bg-slate-50 border-l-2 border-primary pl-2 py-1">
                   <span className="font-semibold">{t.incidencias.resolucion}</span> {i.resolucion}
                 </p>
               )}
@@ -280,7 +280,7 @@ export default function Incidencias() {
                   </>
                 )}
                 {puedeResolver && meta.abierta && (
-                  <Button size="sm" className="h-10 bg-[#1F3864] hover:bg-[#162a4d]" onClick={() => { setResolver(i); setResultado("adaptacion"); setResolucion(""); setFolioGarantia(i.folio_garantia ?? ""); }}>
+                  <Button size="sm" className="h-10 bg-primary hover:bg-primary-hover" onClick={() => { setResolver(i); setResultado("adaptacion"); setResolucion(""); setFolioGarantia(i.folio_garantia ?? ""); }}>
                     <Wrench className="h-4 w-4 mr-1.5" /> {t.incidencias.acciones.resolver}
                   </Button>
                 )}
@@ -319,9 +319,9 @@ export default function Incidencias() {
             {RESULTADOS.map(r => (
               <label
                 key={r.key}
-                className={`flex items-start gap-3 rounded-lg border-2 p-3 cursor-pointer ${resultado === r.key ? "border-[#1F3864] bg-[#EFF6FF]" : "hover:bg-slate-50"}`}
+                className={`flex items-start gap-3 rounded-lg border-2 p-3 cursor-pointer ${resultado === r.key ? "border-primary bg-[#EFF6FF]" : "hover:bg-slate-50"}`}
               >
-                <input type="radio" className="mt-1 accent-[#1F3864]" checked={resultado === r.key} onChange={() => setResultado(r.key)} />
+                <input type="radio" className="mt-1 accent-primary" checked={resultado === r.key} onChange={() => setResultado(r.key)} />
                 <span className="text-sm">
                   <span className="font-semibold flex items-center gap-1.5"><r.icon className="h-4 w-4" /> {t.incidencias.resultados[r.key]}</span>
                   <span className="block text-xs text-muted-foreground">{t.incidencias.resultados[`${r.key}Ayuda`]}</span>
@@ -368,7 +368,7 @@ export default function Incidencias() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReabrir(null)}>{t.actions.cancel}</Button>
-            <Button onClick={guardarReapertura} disabled={busy} className="bg-[#1F3864] hover:bg-[#162a4d]">{t.incidencias.acciones.reabrir}</Button>
+            <Button onClick={guardarReapertura} disabled={busy} className="bg-primary hover:bg-primary-hover">{t.incidencias.acciones.reabrir}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -378,7 +378,7 @@ export default function Incidencias() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-[#1F3864]" /> {historial?.inc.folio} — {historial?.inc.ns_chasis}
+              <History className="h-5 w-5 text-primary" /> {historial?.inc.folio} — {historial?.inc.ns_chasis}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">

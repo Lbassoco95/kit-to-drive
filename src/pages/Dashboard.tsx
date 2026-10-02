@@ -236,7 +236,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground mb-4">{error}</p>
           <button
             onClick={() => setRetry(r => r + 1)}
-            className="px-4 py-2 rounded-md bg-[#1F3864] text-white font-medium hover:bg-[#152a4a] transition-colors"
+            className="px-4 py-2 rounded-md bg-primary text-white font-medium hover:bg-primary-hover transition-colors"
           >
             {t.dashboard.reintentar}
           </button>
@@ -316,7 +316,7 @@ export default function Dashboard() {
           <Orbe valor={`${avance}%`} pct={avance} etiqueta={t.dashboard.kpi.armadas} icon={CheckCircle} color="#065F46" onClick={() => nav("/produccion")} />
           <Orbe valor={atrasados.length} pct={total ? (atrasados.length / total) * 100 : 0} etiqueta={t.dashboard.kpi.atrasadas} icon={AlertTriangle} color="#991B1B" onClick={() => nav("/produccion")} />
           <Orbe valor={entregados} pct={total ? (entregados / total) * 100 : 0} etiqueta={t.dashboard.kpi.entregadas} icon={Truck} color="#5B21B6" onClick={() => nav("/entregas")} />
-          <Orbe valor={stockLibre.length} pct={total ? (stockLibre.length / total) * 100 : 0} etiqueta={t.dashboard.kpi.stockLibre} icon={Boxes} color="#2E75B6" onClick={() => nav("/inventario")} />
+          <Orbe valor={stockLibre.length} pct={total ? (stockLibre.length / total) * 100 : 0} etiqueta={t.dashboard.kpi.stockLibre} icon={Boxes} color="hsl(var(--secondary))" onClick={() => nav("/inventario")} />
         </div>
       </section>
 
@@ -331,13 +331,13 @@ export default function Dashboard() {
             <InventarioStatus />
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="#1F3864" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
+              <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="hsl(var(--primary))" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.porConfigurar} value={chasisPorConfigurar} icon={Wrench} color="#D97706" tooltip={t.dashboard.tooltips.chasisSinUnidad} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" tooltip={t.dashboard.tooltips.armadosLisots} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" tooltip={t.dashboard.tooltips.porArmar} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" tooltip={t.dashboard.tooltips.pasadosFecha} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={Truck} color="#5B21B6" tooltip={t.dashboard.tooltips.entregadosCliente} onClick={() => nav("/entregas")} />
-              <KpiCard label={t.dashboard.kpi.stockLibre} value={stockLibre.length} icon={Boxes} color="#2E75B6" tooltip={t.dashboard.tooltips.stockLibre} onClick={() => nav("/inventario")} />
+              <KpiCard label={t.dashboard.kpi.stockLibre} value={stockLibre.length} icon={Boxes} color="hsl(var(--secondary))" tooltip={t.dashboard.tooltips.stockLibre} onClick={() => nav("/inventario")} />
             </div>
 
             {stockLibreViejo > 0 && (
@@ -386,7 +386,7 @@ export default function Dashboard() {
                   {atrasados.slice(0, 8).map(m => (
                     <button key={m.id} onClick={() => nav("/produccion")} className="text-left px-4 py-3 bg-white rounded-3xl border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {nombreComercial(m.modelo, data.catalogo)} {m.color}</div>
+                        <div className="font-bold text-primary">#{m.orden_armado} · {nombreComercial(m.modelo, data.catalogo)} {m.color}</div>
                         <div className="text-xs text-muted-foreground">{t.dashboard.fechaEstimada}: {fmtDate(m.fecha_estimada_armado)}</div>
                       </div>
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">{t.dashboard.diasAtraso(diasDesvio(m) ?? 0)}</span>
@@ -406,7 +406,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="mb-0">{t.dashboard.planVsReal}</h3>
                 <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-[#2E75B6]/10 text-[#2E75B6]"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-secondary/10 text-secondary"
                   title={t.dashboard.avanceTooltip}
                 >
                   {t.dashboard.avanceSobreConfiguradas(avance)}
@@ -419,7 +419,7 @@ export default function Dashboard() {
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="planAcum" stroke="#2E75B6" name="Plan acumulado" strokeWidth={3} />
+                    <Line type="monotone" dataKey="planAcum" stroke="hsl(var(--secondary))" name="Plan acumulado" strokeWidth={3} />
                     <Line type="monotone" dataKey="realAcum" stroke="#065F46" name="Real acumulado" strokeWidth={3} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -437,7 +437,7 @@ export default function Dashboard() {
                 <h3 className="mb-4">{t.dashboard.resumenRapido}</h3>
                 <ul className="text-base space-y-3">
                   <li className="flex items-center gap-2"><Truck className="text-[#5B21B6]" size={20}/> {t.dashboard.listosParaEntregar(listosEntrega)}</li>
-                  <li className="flex items-center gap-2"><BarChart3 className="text-[#1F3864]" size={20}/> {t.dashboard.remisionesParciales(rems.filter(r => r.estatus === "PARCIAL").length)}</li>
+                  <li className="flex items-center gap-2"><BarChart3 className="text-primary" size={20}/> {t.dashboard.remisionesParciales(rems.filter(r => r.estatus === "PARCIAL").length)}</li>
                   <li className="flex items-center gap-2"><CheckCircle className="text-[#065F46]" size={20}/> {t.dashboard.remisionesCompletas(rems.filter(r => r.estatus === "COMPLETA").length)}</li>
                 </ul>
               </Card>
@@ -456,7 +456,7 @@ export default function Dashboard() {
             <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" />
             <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" />
             <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" />
-            <KpiCard label={t.dashboard.kpi.capacidadDiaria} value={CAPACIDAD} icon={Factory} color="#1F3864" />
+            <KpiCard label={t.dashboard.kpi.capacidadDiaria} value={CAPACIDAD} icon={Factory} color="hsl(var(--primary))" />
           </div>
           <Card className="p-6">
             <h3 className="mb-3">{t.dashboard.proximasOrdenes}</h3>
@@ -467,17 +467,17 @@ export default function Dashboard() {
 
       {area === "almacen_logistica" && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard label={t.dashboard.kpi.listosEntrega} value={listosEntrega} icon={Truck} color="#1F3864" onClick={() => nav("/entregas")} />
+          <KpiCard label={t.dashboard.kpi.listosEntrega} value={listosEntrega} icon={Truck} color="hsl(var(--primary))" onClick={() => nav("/entregas")} />
           <KpiCard label={t.dashboard.kpi.enRuta} value={motos.filter(m => m.estatus_entrega === "EN_RUTA").length} icon={Truck} color="#92400E" />
-          <KpiCard label={t.dashboard.kpi.programadasHoy} value={motos.filter(m => m.estatus_entrega === "PROGRAMADA").length} icon={BarChart3} color="#2E75B6" />
+          <KpiCard label={t.dashboard.kpi.programadasHoy} value={motos.filter(m => m.estatus_entrega === "PROGRAMADA").length} icon={BarChart3} color="hsl(var(--secondary))" />
           <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
       )}
 
       {isVendedor && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard label={t.dashboard.kpi.misRemisiones} value={rems.length} icon={BarChart3} color="#1F3864" onClick={() => nav("/remisiones")} />
-          <KpiCard label={t.dashboard.kpi.unidadesAsignadas} value={motos.filter(m => m.remision_id).length} icon={Bike} color="#2E75B6" onClick={() => nav("/mis-motocarros")} />
+          <KpiCard label={t.dashboard.kpi.misRemisiones} value={rems.length} icon={BarChart3} color="hsl(var(--primary))" onClick={() => nav("/remisiones")} />
+          <KpiCard label={t.dashboard.kpi.unidadesAsignadas} value={motos.filter(m => m.remision_id).length} icon={Bike} color="hsl(var(--secondary))" onClick={() => nav("/mis-motocarros")} />
           <KpiCard label={t.dashboard.kpi.listasEntrega} value={listosEntrega} icon={Truck} color="#065F46" />
           <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
@@ -500,14 +500,14 @@ function TopVendedores({ rems }: { rems: any[] }) {
         const initials = v.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase();
         return (
           <li key={v} className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#2E75B6] text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
+            <div className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between mb-1">
                 <span className="font-medium text-sm truncate">{v}</span>
-                <span className="font-bold text-[#1F3864] text-sm">{n}</span>
+                <span className="font-bold text-primary text-sm">{n}</span>
               </div>
               <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-[#2E75B6]" style={{ width: `${(n / max) * 100}%` }} />
+                <div className="h-full bg-secondary" style={{ width: `${(n / max) * 100}%` }} />
               </div>
             </div>
           </li>
@@ -713,13 +713,13 @@ function ResumenEjecutivo() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-[#1F3864]">{e.title}</h2>
+      <h2 className="text-lg font-bold text-primary">{e.title}</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4 bg-[#1F3864]/5 border-[#1F3864]/10">
+        <Card className="p-4 bg-primary/5 border-primary/10">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Bike size={18} className="text-[#1F3864]" /> {e.motocarrosTotales}
+            <Bike size={18} className="text-primary" /> {e.motocarrosTotales}
           </div>
-          <div className="text-3xl font-extrabold text-[#1F3864] mt-1">{kpis.motosTotal}</div>
+          <div className="text-3xl font-extrabold text-primary mt-1">{kpis.motosTotal}</div>
         </Card>
         <Card className="p-4 bg-emerald-50 border-emerald-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -761,18 +761,18 @@ function ResumenEjecutivo() {
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-4">
-          <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
+          <h3 className="font-semibold text-primary flex items-center gap-2 mb-3">
             <Truck size={20} /> {e.estadoRemisiones}
           </h3>
           <div className="space-y-2">
             <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.completas}</span><span className="font-bold text-emerald-600">{kpis.remisionesCompletas}</span></div>
-            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.parciales}</span><span className="font-bold text-[#1F3864]">{kpis.remisionesParciales}</span></div>
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.parciales}</span><span className="font-bold text-primary">{kpis.remisionesParciales}</span></div>
             <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.otras}</span><span className="font-bold text-slate-600">{kpis.remisionesTotal - kpis.remisionesCompletas - kpis.remisionesParciales}</span></div>
           </div>
         </Card>
 
         <Card className="p-4">
-          <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
+          <h3 className="font-semibold text-primary flex items-center gap-2 mb-3">
             <Users size={20} /> {e.topVendedores}
           </h3>
           {kpis.topVendedores.length > 0 ? (
@@ -780,7 +780,7 @@ function ResumenEjecutivo() {
               {kpis.topVendedores.map((v, idx) => (
                 <div key={v.nombre} className="flex justify-between p-2 bg-slate-50 rounded">
                   <span className="font-medium">{idx + 1}. {v.nombre}</span>
-                  <span className="font-bold text-[#1F3864]">{fmtMoneda(v.monto)}</span>
+                  <span className="font-bold text-primary">{fmtMoneda(v.monto)}</span>
                 </div>
               ))}
             </div>

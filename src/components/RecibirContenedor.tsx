@@ -377,7 +377,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                       {parsedContainerSheets.map((sheet, i) => (
                         <div key={i} className="border rounded-lg p-3 bg-white">
                           <div className="flex justify-between items-center mb-2">
-                            <span className="font-bold text-[#1F3864]">{sheet.folio_contenedor}</span>
+                            <span className="font-bold text-primary">{sheet.folio_contenedor}</span>
                             <span className={`px-2 py-1 rounded-full text-xs ${sheet.tipo === 'chasis' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                               {sheet.tipo === 'chasis' ? c.chasis : c.motores}
                             </span>
@@ -516,7 +516,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                 {reportes.map((r, i) => (
                   <div key={i} className="border rounded-lg p-4 bg-white">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-[#1F3864]">{r.folio}</span>
+                      <span className="font-bold text-primary">{r.folio}</span>
                     </div>
                     <div className="text-sm text-muted-foreground space-y-1">
                       <div><strong>{c.chasisLinea}</strong> {r.chasis_insertados} {c.insertados} · {r.chasis_actualizados} {c.actualizados}{r.chasis_invalidos > 0 && <span className="text-amber-700"> · {r.chasis_invalidos} {c.invalidos}</span>}</div>
@@ -533,9 +533,9 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
           <DialogFooter className="gap-2">
             {step > 1 && step < 4 && <Button variant="outline" onClick={() => setStep((step - 1) as 1 | 2 | 3)} className="h-12"><ArrowLeft className="h-4 w-4 mr-2" />{c.atras}</Button>}
-            {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-[#1F3864]">{c.siguiente}<ArrowRight className="h-4 w-4 ml-2" /></Button>}
+            {step === 1 && importMode === "single" && <Button onClick={irPaso2} className="h-12 bg-primary">{c.siguiente}<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 1 && importMode === "multiple" && <Button onClick={irPaso2} disabled={busy || parsedContainerSheets.length === 0} className="h-12 bg-[#065F46]"><FileSpreadsheet className="h-5 w-5 mr-2" />{busy ? c.procesando : c.importarN(parsedContainerSheets.length, parsedContainerSheets.reduce((a,s)=>a+s.chasis.length,0), parsedContainerSheets.reduce((a,s)=>a+s.motores.length,0))}</Button>}
-            {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-[#1F3864]">{c.revisar}<ArrowRight className="h-4 w-4 ml-2" /></Button>}
+            {step === 2 && <Button onClick={() => setStep(3)} disabled={!unidades.length} className="h-12 bg-primary">{c.revisar}<ArrowRight className="h-4 w-4 ml-2" /></Button>}
             {step === 3 && <Button onClick={guardar} disabled={busy || validacion.length > 0} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{busy ? c.guardando : c.crearN(unidades.length)}</Button>}
             {step === 4 && <Button onClick={() => { setOpen(false); reset(); onDone?.(); }} className="h-12 bg-[#065F46]"><CheckCircle2 className="h-5 w-5 mr-2" />{t.actions.close}</Button>}
           </DialogFooter>

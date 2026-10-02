@@ -64,8 +64,8 @@ export default function Entregas() {
           const active = filter === f.key;
           return (
             <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`min-h-[48px] px-5 rounded-full font-semibold text-base border-2 transition-all ${active ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-[#1F3864] border-[#2E75B6]/30 hover:border-[#2E75B6]"}`}>
-              {f.label} <span className={`ml-2 px-2 py-0.5 rounded-full text-sm ${active ? "bg-white/20" : "bg-[#2E75B6]/10"}`}>{(counts as any)[f.key]}</span>
+              className={`min-h-[48px] px-5 rounded-full font-semibold text-base border-2 transition-all ${active ? "bg-primary text-white border-primary" : "bg-white text-primary border-secondary/30 hover:border-secondary"}`}>
+              {f.label} <span className={`ml-2 px-2 py-0.5 rounded-full text-sm ${active ? "bg-white/20" : "bg-secondary/10"}`}>{(counts as any)[f.key]}</span>
             </button>
           );
         })}
@@ -73,7 +73,7 @@ export default function Entregas() {
 
       <div className="responsive-card-grid gap-4">
         {filtered.map(r => {
-          const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
+          const colorBike = r.color === "AZUL" ? "hsl(var(--secondary))" : "#94A3B8";
           const colorBg = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";
           // Bloquear si contra_entrega sin pago confirmado
           const pagoPendiente = r.remisiones?.tipo_pago === "contra_entrega" && !r.remisiones?.pagado;
@@ -83,7 +83,7 @@ export default function Entregas() {
                 <div className="p-2.5 rounded-lg bg-white/70"><Bike size={36} color={colorBike} strokeWidth={2}/></div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-muted-foreground">{t.fields.chasis}</div>
-                  <div className="text-xl font-bold text-[#1F3864] truncate">{r.chasis_asignado || `#${r.orden_armado}`}</div>
+                  <div className="text-xl font-bold text-primary truncate">{r.chasis_asignado || `#${r.orden_armado}`}</div>
                 </div>
                 <EstatusBadge estatus={r.estatus_entrega} size="sm" />
               </div>
@@ -119,7 +119,7 @@ export default function Entregas() {
                   <Button
                     disabled={pagoPendiente}
                     onClick={() => { setScheduling(r); setDate(new Date().toISOString().slice(0,10)); }}
-                    className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full h-12 text-base bg-primary hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Calendar className="h-5 w-5 mr-2"/> {t.entregas.programar}
                   </Button>
