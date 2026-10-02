@@ -185,7 +185,7 @@ export const es = {
     Inicio: "Inicio",
     "Operación": "Operación",
     "Catálogos": "Catálogos",
-    CRM: "CRM",
+    CRM: "Comercial",
     Finanzas: "Finanzas",
     Sistema: "Sistema",
   },
@@ -203,6 +203,12 @@ export const es = {
     invalidCredentials: "Correo o contraseña incorrectos.",
     emailNotConfirmed: "Confirma tu correo antes de ingresar.",
     loginRateLimited: "Demasiados intentos de acceso. Espera un momento e inténtalo de nuevo.",
+    signInTitle: "Entra a tu cuenta",
+    heroTitle: "Todo Dazon, fluyendo en un solo lugar",
+    heroSub: "Producción · Inventario · Remisiones · Clientes · Finanzas",
+    poweredBy: "Dazon por Mati",
+    developedBy: "Un desarrollo de Yoltik",
+    learnMoreMati: "Saber más de Mati",
     forgotPassword: "¿Olvidaste tu contraseña?",
     forgotSubtitle: "Te enviaremos un enlace si el correo está registrado.",
     sendResetLink: "Enviar enlace",
@@ -369,12 +375,19 @@ export const es = {
 
   // Layout
   layout: {
+    porMati: "por Mati",
+    searchShort: "Buscar…",
+    paletteTitle: "Ir a una pantalla…",
+    paletteEmpty: "Sin resultados.",
+    paletteScreens: "Pantallas",
     search: "Buscar orden, chasis, NS, remisión, cliente…",
     signOut: "Salir",
   },
 
   // Dashboard
   dashboard: {
+    hoy: "Hoy en Dazon",
+    accesos: "Ir a",
     title: "Dashboard",
     greeting: (name: string, role: string) => `Hola, ${name} — ${role}`,
     kpi: {

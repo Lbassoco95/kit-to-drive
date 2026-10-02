@@ -22,8 +22,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 10%;
 
-    /* Azul oscuro principal #1F3864 */
-    --primary: 217 53% 26%;
+    /* Identidad Dazon: azul del logotipo #032B61 (antes #1F3864) */
+    --primary: 214 94% 20%;
     --primary-foreground: 0 0% 100%;
 
     /* Azul medio #2E75B6 */
@@ -46,18 +46,33 @@
 
     --border: 214 15% 88%;
     --input: 214 15% 88%;
-    --ring: 217 53% 26%;
+    --ring: 214 94% 20%;
 
-    --radius: 0.375rem;
+    /* Marca Dazon (muestreada del logotipo) */
+    --dazon-navy: 214 94% 20%;          /* #032B61 */
+    --dazon-navy-deep: 214 92% 16%;     /* #03234D */
+    --dazon-red: 353 91% 46%;           /* #DE0B25: sólo identidad, nunca errores */
+    --dazon-gold: 49 84% 45%;           /* #D1AF11: sólo filetes */
+
+    --radius: 1.25rem;
+
+    /* Cristal líquido: sólo en la capa de navegación */
+    --glass-blur: 22px;
+    --glass-bar-bg: 0 0% 100% / 0.62;
+    --glass-pop-bg: 0 0% 100% / 0.94;
+    --glass-shadow: 0 18px 50px -18px hsl(214 94% 10% / 0.45);
+    --ambient-a: 214 90% 52% / 0.30;
+    --ambient-b: 49 84% 55% / 0.22;
+    --ambient-c: 168 70% 45% / 0.16;
 
     /* Sidebar */
-    --sidebar-background: 217 53% 26%;
+    --sidebar-background: 214 94% 20%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-primary: 209 60% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 45% 32%;
+    --sidebar-accent: 214 80% 27%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 217 40% 35%;
+    --sidebar-border: 214 60% 32%;
     --sidebar-ring: 209 60% 45%;
   }
 
@@ -73,7 +88,7 @@
   html, body, #root { @apply h-full; }
   body {
     @apply bg-[hsl(var(--surface))] text-foreground;
-    font-family: 'Inter', Arial, Helvetica, sans-serif;
+    font-family: 'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', Arial, Helvetica, sans-serif;
     font-size: 16px;
   }
   h1 { @apply text-[28px] font-bold text-primary; }
@@ -102,3 +117,61 @@
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
   }
 }
+
+
+/* ============ Liquid glass + formas fluidas ============ */
+@layer components {
+  .glass-bar {
+    background: hsl(var(--glass-bar-bg));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+    border: 1px solid hsl(0 0% 100% / 0.7);
+    box-shadow: var(--glass-shadow), inset 0 1px 0 hsl(0 0% 100% / 0.9);
+  }
+  .glass-pop {
+    background: hsl(var(--glass-pop-bg));
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid hsl(var(--border));
+    border-radius: 1.5rem;
+    box-shadow: var(--glass-shadow);
+    color: hsl(var(--popover-foreground));
+  }
+  .glass-pill-active {
+    background: hsl(0 0% 100% / 0.14);
+    border: 1px solid hsl(0 0% 100% / 0.28);
+    box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.3), 0 6px 18px -8px hsl(214 94% 8% / 0.6);
+  }
+  /* Orbes de fondo: dan algo que refractar al cristal y movimiento lento */
+  .ambient { position: fixed; inset: 0; z-index: -10; overflow: hidden; pointer-events: none; background: hsl(var(--surface)); }
+  .ambient > i { position: absolute; display: block; filter: blur(60px); animation: blob-morph 22s ease-in-out infinite, blob-drift 34s ease-in-out infinite; }
+  .ambient > i:nth-child(1) { width: 46vmax; height: 46vmax; left: -12vmax; top: -14vmax; background: hsl(var(--ambient-a)); }
+  .ambient > i:nth-child(2) { width: 38vmax; height: 38vmax; right: -10vmax; bottom: -12vmax; background: hsl(var(--ambient-b)); animation-delay: -9s; }
+  .ambient > i:nth-child(3) { width: 30vmax; height: 30vmax; left: 38%; top: 46%; background: hsl(var(--ambient-c)); animation-delay: -15s; }
+  .blob { animation: blob-morph 16s ease-in-out infinite, blob-drift 26s ease-in-out infinite; }
+}
+@keyframes blob-morph {
+  0%, 100% { border-radius: 58% 42% 55% 45% / 52% 58% 42% 48%; }
+  33% { border-radius: 42% 58% 38% 62% / 60% 40% 60% 40%; }
+  66% { border-radius: 63% 37% 58% 42% / 44% 56% 44% 56%; }
+}
+@keyframes blob-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(3vmax, 2vmax, 0) rotate(14deg); }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-bar { background: hsl(var(--card)); }
+  .glass-pop { background: hsl(var(--popover)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass-bar { background: hsl(var(--card)); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .glass-pop { background: hsl(var(--popover)); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .glass-bar, .glass-pop { background: hsl(var(--card)); backdrop-filter: none; -webkit-backdrop-filter: none; border-color: hsl(var(--foreground) / 0.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ambient > i, .blob { animation: none; }
+}
+html.sin-cristal .glass-bar, html.sin-cristal .glass-pop { background: hsl(var(--card)); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html.sin-cristal .ambient > i, html.sin-cristal .blob { animation: none; }

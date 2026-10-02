@@ -183,7 +183,7 @@ export const zh = {
     Inicio: "首页",
     "Operación": "操作",
     "Catálogos": "目录",
-    CRM: "CRM",
+    CRM: "销售与客户",
     Finanzas: "财务",
     Sistema: "系统",
   },
@@ -201,6 +201,12 @@ export const zh = {
     invalidCredentials: "邮箱或密码不正确。",
     emailNotConfirmed: "请先确认邮箱后再登录。",
     loginRateLimited: "登录尝试过多。请稍后再试。",
+    signInTitle: "登录您的账户",
+    heroTitle: "Dazon 的一切，汇流于一处",
+    heroSub: "生产 · 库存 · 提货单 · 客户 · 财务",
+    poweredBy: "Dazon 由 Mati 驱动",
+    developedBy: "由 Yoltik 开发",
+    learnMoreMati: "了解更多 Mati",
     forgotPassword: "忘记密码？",
     forgotSubtitle: "如果该邮箱已注册，我们将发送重置链接。",
     sendResetLink: "发送链接",
@@ -367,12 +373,19 @@ export const zh = {
 
   // Layout
   layout: {
+    porMati: "由 Mati 驱动",
+    searchShort: "搜索…",
+    paletteTitle: "前往页面…",
+    paletteEmpty: "没有结果。",
+    paletteScreens: "页面",
     search: "搜索工单、车架、序列号、提货单、客户…",
     signOut: "退出",
   },
 
   // Dashboard
   dashboard: {
+    hoy: "今日 Dazon",
+    accesos: "快速前往",
     title: "仪表盘",
     greeting: (name: string, role: string) => `您好，${name} — ${role}`,
     kpi: {
