@@ -414,6 +414,8 @@ export const es = {
     atrasados: (n: number) => `Motocarros atrasados (${n})`,
     planVsReal: "Plan vs Real (acumulado)",
     topVendedores: "Top vendedores",
+    topVendedoresNota: "Por el vendedor asignado en la remisión, no por quien la capturó",
+    sinVendedor: "Sin asignar",
     resumenRapido: "Resumen rápido",
     listosParaEntregar: (n: number) => `${n} listos para entregar`,
     remisionesParciales: (n: number) => `${n} remisiones parciales`,

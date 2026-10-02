@@ -22,6 +22,7 @@ import { BandejaAvisos } from "@/components/BandejaAvisos";
 import { FileOrCamera } from "@/components/FileOrCamera";
 import { ContenedorPartes } from "@/components/ContenedorPartes";
 import { isAbsoluteHttpUrl, storageExtFromFile } from "@/lib/storagePaths";
+import { nombreVendedorDe } from "@/lib/vendedoresRemision";
 
 type FilterKey = "TODOS" | "PENDIENTES" | "ARMADOS" | "ATRASADOS" | "ENTREGADOS";
 
@@ -200,7 +201,7 @@ export default function Produccion() {
     // ── 1. Query base garantizado (sin columnas nuevas en joins) ──────────────
     const { data: base } = await supabase
       .from("motocarros")
-      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
+      .select("id,orden_armado,modelo,color,ns_chasis,ns_motor,chasis_asignado,estatus_armado,fecha_estimada_armado,fecha_real_armado,estatus_entrega,fecha_estimada_entrega,observaciones_paro,remision_id,contenedor_id, remisiones(folio_remision, vendedor_id, nombre_vendedor, notas, profiles:vendedor_id(nombre_completo,codigo_vendedor), clientes(codigo_erp))")
       .order("orden_armado", { ascending: true });
 
     // Producción sólo lista línea "motocarro" — mototaxis y otras líneas
@@ -265,7 +266,7 @@ export default function Produccion() {
       if (remIds.length) {
         const { data: remExt } = await supabase
           .from("remisiones")
-          .select("id,tipo_pago,pagado")
+          .select("id,tipo_pago,pagado,nombre_vendedor,notas")
           .in("id", remIds);
         if (remExt?.length) {
           const remMap = Object.fromEntries(remExt.map((r: any) => [r.id, r]));
@@ -319,7 +320,7 @@ export default function Produccion() {
       const qLower = q.toLowerCase();
       const blob = [r.orden_armado, r.chasis_asignado, r.ns_chasis, r.ns_motor,
         r.remisiones?.folio_remision, r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno,
-        r.remisiones?.profiles?.nombre_completo].filter(Boolean).join(" ").toLowerCase();
+        nombreVendedorDe(r.remisiones), r.remisiones?.profiles?.nombre_completo].filter(Boolean).join(" ").toLowerCase();
       if (!blob.includes(qLower)) return false;
     }
     return true;
@@ -328,7 +329,7 @@ export default function Produccion() {
   const exportCsv = () => {
     const c = t.produccion.columna;
     const header = [c.orden, c.modelo, c.color, c.fechaEstimada, c.estatus, c.fechaReal, c.ns_chasis, c.ns_motor, c.chasis, c.vendedor, c.cliente, c.remision, c.fechaEntrega, c.entrega];
-    const rows2 = filtered.map(r => [r.orden_armado, r.modelo, r.color, r.fecha_estimada_armado, r._eff, r.fecha_real_armado || "", r.ns_chasis||"", r.ns_motor||"", r.chasis_asignado||"", r.remisiones?.profiles?.nombre_completo||"", r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "", r.remisiones?.folio_remision||"", r.fecha_estimada_entrega||"", r.estatus_entrega]);
+    const rows2 = filtered.map(r => [r.orden_armado, r.modelo, r.color, r.fecha_estimada_armado, r._eff, r.fecha_real_armado || "", r.ns_chasis||"", r.ns_motor||"", r.chasis_asignado||"", nombreVendedorDe(r.remisiones), r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "", r.remisiones?.folio_remision||"", r.fecha_estimada_entrega||"", r.estatus_entrega]);
     const csv = [header, ...rows2].map(r => r.map(c => `"${String(c ?? "").replace(/"/g,'""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     if (typeof URL === "undefined" || !URL.createObjectURL) return;
@@ -529,7 +530,7 @@ export default function Produccion() {
                     <td className="font-mono text-[11px]">{r.ns_chasis || "—"}</td>
                     <td className="font-mono text-[11px]">{r.ns_motor || "—"}</td>
                     <td>{r.chasis_asignado || "—"}</td>
-                    <td>{r.remisiones?.profiles?.nombre_completo || "—"}</td>
+                    <td>{nombreVendedorDe(r.remisiones) || "—"}</td>
                     <td>{r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno || "—"}</td>
                     <td>{r.remisiones?.folio_remision || "—"}</td>
                     <td>{fmtDate(r.fecha_estimada_entrega)}</td>
@@ -726,6 +727,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
 
   const colorBike = r.color === "AZUL" ? "#2E75B6" : "#94A3B8";
   const colorBg   = r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9";
+  const vendedor = nombreVendedorDe(r.remisiones);
 
   // timeline state
   const steps = ["PENDIENTE", "ARMADO", "LISTO", "ENTREGADO"];
@@ -770,12 +772,12 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
               👤 {r.remisiones.clientes.codigo_erp || r.remisiones.clientes.folio_interno}
             </span>
           )}
-          {r.remisiones?.profiles?.nombre_completo && (
+          {vendedor && (
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] font-medium">
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#2E75B6] text-white text-[10px] font-bold">
-                {r.remisiones.profiles.nombre_completo.split(" ").map((n: string) => n[0]).slice(0,2).join("")}
+                {vendedor.split(" ").map((n: string) => n[0]).slice(0,2).join("")}
               </span>
-              {r.remisiones.profiles.nombre_completo.split(" ")[0]}
+              {vendedor.split(" ")[0]}
             </span>
           )}
           {r.remisiones?.folio_remision && (
