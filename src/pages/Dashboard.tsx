@@ -11,8 +11,10 @@ import { useLang } from "@/contexts/LangContext";
 import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
 import { ResumenAvisos } from "@/components/BandejaAvisos";
-import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, TrendingUp, DollarSign, Wallet, type LucideIcon } from "lucide-react";
+import { useNavItems } from "@/components/AppSidebar";
+import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, TrendingUp, DollarSign, Wallet, FileText, TriangleAlert, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { listarClientesCredito } from "@/lib/creditoDb";
 
 const CAPACIDAD = 4;
 
@@ -35,11 +37,11 @@ function KpiCard({
     <button
       onClick={onClick}
       title={tooltip}
-      className="text-left bg-card rounded-xl border border-border min-h-[140px] p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col"
+      className="text-left bg-card rounded-[2rem] border border-border/70 min-h-[140px] p-5 shadow-[0_6px_24px_-12px_hsl(214_94%_20%/0.25)] hover:shadow-md hover:-translate-y-0.5 transition-all flex flex-col"
     >
       <div className="flex items-start justify-between">
-        <div className="p-2.5 rounded-lg" style={{ backgroundColor: `${color}20` }}>
-          <Icon size={40} strokeWidth={2.2} style={{ color }} />
+        <div className="grid h-16 w-16 place-items-center rounded-full" style={{ backgroundColor: `${color}1f` }}>
+          <Icon size={32} strokeWidth={2.2} style={{ color }} />
         </div>
       </div>
       <div className="text-4xl font-bold mt-3" style={{ color }}>{value}</div>
@@ -68,11 +70,166 @@ function SeccionDashboard({
   );
 }
 
+function Orbe({ valor, pct, etiqueta, icon: Icon, color, onClick }: { valor: ReactNode; pct: number; etiqueta: string; icon: LucideIcon; color: string; onClick?: () => void }) {
+  const r = 52; const c = 2 * Math.PI * r; const off = c * (1 - Math.min(100, Math.max(0, pct)) / 100);
+  return (
+    <button type="button" onClick={onClick} className="group flex flex-col items-center gap-2 sm:gap-3 focus-visible:outline-none w-[8.5rem] sm:w-[9.5rem]">
+      <span className="relative grid h-[8.5rem] w-[8.5rem] sm:h-[9.5rem] sm:w-[9.5rem] place-items-center rounded-full bg-card shadow-[0_18px_40px_-20px_hsl(214_94%_20%/0.5),inset_0_1px_0_hsl(0_0%_100%/0.9)] border border-white transition-transform duration-300 group-hover:-translate-y-1 group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
+        <svg className="absolute inset-0 -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
+          <circle cx="60" cy="60" r={r} fill="none" stroke={`${color}22`} strokeWidth="8" />
+          <circle cx="60" cy="60" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} />
+        </svg>
+        <span className="flex flex-col items-center">
+          <Icon size={20} strokeWidth={2.4} style={{ color }} aria-hidden="true" />
+          <span className="text-3xl sm:text-4xl font-bold leading-none mt-1" style={{ color }}>{valor}</span>
+        </span>
+      </span>
+      <span className="text-xs sm:text-sm font-medium text-muted-foreground text-center max-w-full break-words">{etiqueta}</span>
+    </button>
+  );
+}
+
+function CentroHero({ greeting }: { greeting: string }) {
+  const { t, lang } = useLang();
+  const fecha = new Date().toLocaleDateString(lang === "es" ? "es-MX" : "zh-CN", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <section className="relative overflow-hidden rounded-[1.75rem] sm:rounded-[2.25rem] md:rounded-[2.75rem] bg-gradient-to-br from-[#032b62] via-[#03275a] to-[#03234d] text-primary-foreground px-5 py-6 sm:px-8 sm:py-8 md:px-12 md:py-10 shadow-[0_30px_70px_-34px_hsl(214_94%_10%/0.8)]">
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+        <span className="blob absolute -right-16 -top-24 h-80 w-80 bg-[hsl(209_75%_48%/0.45)] blur-3xl" />
+        <span className="blob absolute left-[30%] -bottom-24 h-64 w-64 bg-[hsl(var(--dazon-gold)/0.28)] blur-3xl [animation-delay:-8s]" />
+        <svg className="absolute -right-24 -bottom-32 h-[32rem] w-[32rem] text-white/10" viewBox="0 0 200 200" fill="none" stroke="currentColor" strokeWidth="0.6">
+          <circle cx="100" cy="100" r="96" /><circle cx="100" cy="100" r="74" /><circle cx="100" cy="100" r="52" />
+        </svg>
+      </div>
+      <div className="relative flex items-center gap-4 sm:gap-6 min-w-0">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <p className="text-xs sm:text-sm font-medium text-white/80 first-letter:uppercase truncate">{fecha}</p>
+          <h1 className="!text-primary-foreground text-[1.5rem] leading-tight sm:text-[1.875rem] sm:leading-snug md:text-[2.5rem] md:leading-[1.15] mt-1 text-balance break-words [word-break:keep-all]">
+            {t.auth.heroTitle}
+          </h1>
+          <p className="mt-2 sm:mt-3 text-sm sm:text-base text-white/90 break-words [overflow-wrap:anywhere]">{greeting}</p>
+          <ul className="mt-4 sm:mt-5 flex flex-wrap gap-1.5 sm:gap-2">
+            {t.auth.heroSub.split(" · ").map((m: string) => (
+              <li key={m} className="rounded-full border border-white/25 bg-white/10 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm font-medium backdrop-blur-md shadow-[inset_0_1px_0_hsl(0_0%_100%/0.25)]">
+                {m}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="hidden lg:grid relative h-40 w-40 xl:h-48 xl:w-48 shrink-0 place-items-center overflow-hidden rounded-full border border-white/30 bg-white/10 backdrop-blur-xl shadow-[inset_0_2px_0_hsl(0_0%_100%/0.35)]" aria-hidden="true">
+          <img src="/brand/panda-saluda.png" alt="" className="h-[88%] w-auto max-w-[86%] object-contain drop-shadow-[0_10px_14px_hsl(214_94%_6%/0.45)]" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Accesos() {
+  const { t } = useLang();
+  const nav = useNavigate();
+  const items = useNavItems().filter(i => i.url !== "/");
+  if (!items.length) return null;
+  const groups = ["Operación", "Catálogos", "CRM", "Finanzas", "Sistema"] as const;
+  return (
+    <section className="space-y-5 sm:space-y-6 min-w-0">
+      <h2 className="text-lg sm:text-xl font-bold">{t.dashboard.accesos}</h2>
+      {groups.map(g => {
+        const list = items.filter(i => i.group === g);
+        if (!list.length) return null;
+        return (
+          <div key={g} className="space-y-3 min-w-0">
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">
+              {t.dashboard.grupoAccesos[g]}
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-4 sm:gap-x-5 sm:gap-y-6">
+              {list.map(i => (
+                <button key={i.url} onClick={() => nav(i.url)} className="group flex w-[4.75rem] sm:w-[5.5rem] flex-col items-center gap-2 focus-visible:outline-none">
+                  <span className="grid h-14 w-14 sm:h-16 sm:w-16 place-items-center rounded-full bg-card text-primary border border-white shadow-[0_10px_24px_-14px_hsl(214_94%_20%/0.6),inset_0_1px_0_hsl(0_0%_100%/0.9)] transition-all duration-300 group-hover:-translate-y-1 group-hover:bg-primary group-hover:text-primary-foreground group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
+                    <i.icon size={24} strokeWidth={2} />
+                  </span>
+                  <span className="text-[11px] sm:text-xs font-medium text-center text-foreground leading-tight break-words w-full">{t.nav[i.key]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function ActividadReciente() {
+  const { t, lang } = useLang();
+  const { perms } = useAuth();
+  const [rows, setRows] = useState<any[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!perms.puedeVer("bitacora")) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("bitacora_eventos")
+        .select("id, accion, modulo, entidad_tipo, created_at, usuario_id")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (cancelled) return;
+      const list = data ?? [];
+      setRows(list);
+      const ids = Array.from(new Set(list.map((r: any) => r.usuario_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: p } = await supabase.from("profiles").select("id, nombre_completo").in("id", ids);
+        if (cancelled) return;
+        const m: Record<string, string> = {};
+        p?.forEach((x: any) => { m[x.id] = x.nombre_completo; });
+        setNames(m);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [perms]);
+
+  if (!perms.puedeVer("bitacora")) return null;
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-xl font-bold">{t.dashboard.actividadReciente}</h2>
+      <Card className="rounded-[1.75rem] overflow-hidden border border-border/70 divide-y">
+        {rows.length === 0 ? (
+          <p className="p-6 text-sm text-muted-foreground text-center">{t.dashboard.actividadVacia}</p>
+        ) : (
+          rows.map(r => (
+            <div key={r.id} className="px-5 py-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium text-sm truncate">{r.accion || r.modulo || "—"}</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {[r.modulo, r.entidad_tipo, names[r.usuario_id]].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              <time className="text-xs text-muted-foreground shrink-0">
+                {r.created_at ? new Date(r.created_at).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" }) : ""}
+              </time>
+            </div>
+          ))
+        )}
+      </Card>
+    </section>
+  );
+}
+
 export default function Dashboard() {
   const { perms, area, nivel, user, profileName } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
-  const [data, setData] = useState<{ motos: any[]; rems: any[]; catalogo: CatalogoModelos; chasisPorConfigurar: number } | null>(null);
+  const [data, setData] = useState<{
+    motos: any[];
+    rems: any[];
+    catalogo: CatalogoModelos;
+    chasisPorConfigurar: number;
+    incidenciasAbiertas: number;
+    oportunidadesAbiertas: number;
+    cobranzaVencida: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -83,7 +240,7 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [{ data: motos, error: errM }, { data: rems, error: errR }, { data: catalogo }, { data: chasisDisp }] = await Promise.all([
+        const [{ data: motos, error: errM }, { data: rems, error: errR }, { data: catalogo }, { data: chasisDisp }, incidenciasRes, oportunidadesRes, creditoRes] = await Promise.all([
           supabase
             .from("motocarros")
             .select(
@@ -96,6 +253,21 @@ export default function Dashboard() {
             ),
           supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
           supabase.from("inventario_chasis").select("modelo").is("motocarro_id", null),
+          perms.puedeVer("inventario")
+            ? supabase
+                .from("incidencias_chasis")
+                .select("id", { count: "exact", head: true })
+                .in("estatus", ["abierta", "en_revision"])
+            : Promise.resolve({ count: 0, error: null } as any),
+          perms.puedeVer("crm")
+            ? supabase
+                .from("crm_oportunidades")
+                .select("id", { count: "exact", head: true })
+                .not("etapa", "in", '("ganada","perdida")')
+            : Promise.resolve({ count: 0, error: null } as any),
+          perms.puedeVer("credito")
+            ? listarClientesCredito()
+            : Promise.resolve({ data: [] as any[] }),
         ]);
         if (cancelled) return;
         if (errM || errR) {
@@ -104,11 +276,15 @@ export default function Dashboard() {
         } else {
           const catMap: CatalogoModelos = new Map((catalogo ?? []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }]));
           const chasisPorConfigurar = (chasisDisp ?? []).filter((c: any) => lineaDe(c.modelo, catMap) === "motocarro").length;
+          const cobranzaVencida = (creditoRes.data ?? []).filter((c: any) => Number(c.saldo_vencido) > 0).length;
           setData({
             motos: (motos ?? []).map((m: any) => ({ ...m, color: normColor(m.color), _eff: effEstatusArmado(m) })),
             rems: rems ?? [],
             catalogo: catMap,
             chasisPorConfigurar,
+            incidenciasAbiertas: incidenciasRes?.count ?? 0,
+            oportunidadesAbiertas: oportunidadesRes?.count ?? 0,
+            cobranzaVencida,
           });
         }
       } catch (e) {
@@ -119,7 +295,7 @@ export default function Dashboard() {
     }
     fetchData();
     return () => { cancelled = true; };
-  }, [user, retry, t.dashboard.errorInesperado]);
+  }, [user, retry, t.dashboard.errorInesperado, perms]);
 
   // El tablero general es de Dirección; las demás áreas entran a su módulo.
   useEffect(() => {
@@ -162,7 +338,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground mb-4">{error}</p>
           <button
             onClick={() => setRetry(r => r + 1)}
-            className="px-4 py-2 rounded-md bg-[#1F3864] text-white font-medium hover:bg-[#152a4a] transition-colors"
+            className="px-4 py-2 rounded-full bg-primary text-white font-medium hover:bg-primary-hover transition-colors"
           >
             {t.dashboard.reintentar}
           </button>
@@ -233,11 +409,33 @@ export default function Dashboard() {
   const isVendedor = area === "comercial";
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1>{t.dashboard.title}</h1>
-        <p className="text-muted-foreground text-base mt-1">{greeting}</p>
-      </div>
+    <div className="space-y-6 sm:space-y-8 min-w-0 max-w-full">
+      <CentroHero greeting={greeting} />
+
+      <section className="space-y-4 min-w-0" aria-label={t.dashboard.hoy}>
+        <h2 className="text-lg sm:text-xl font-bold">{t.dashboard.hoy}</h2>
+        <div className="flex flex-wrap justify-center sm:justify-start gap-x-6 gap-y-6 sm:gap-x-10 sm:gap-y-8">
+          {([
+            { valor: `${avance}%` as ReactNode, pct: avance, etiqueta: t.dashboard.kpi.armadas, icon: CheckCircle, color: "#065F46", onClick: () => nav("/produccion"), show: true },
+            { valor: atrasados.length, pct: total ? (atrasados.length / total) * 100 : 0, etiqueta: t.dashboard.kpi.atrasadas, icon: AlertTriangle, color: "#991B1B", onClick: () => nav("/produccion"), show: true },
+            { valor: entregados, pct: total ? (entregados / total) * 100 : 0, etiqueta: t.dashboard.kpi.entregadas, icon: Truck, color: "#5B21B6", onClick: () => nav("/entregas"), show: true },
+            { valor: stockLibre.length, pct: total ? (stockLibre.length / total) * 100 : 0, etiqueta: t.dashboard.kpi.stockLibre, icon: Boxes, color: "hsl(var(--secondary))", onClick: () => nav("/inventario"), show: true },
+            { valor: rems.filter((r: any) => r.estatus !== "COMPLETA" && r.estatus !== "CANCELADA").length, pct: (() => { const pend = rems.filter((r: any) => r.estatus !== "COMPLETA" && r.estatus !== "CANCELADA").length; return rems.length ? (pend / rems.length) * 100 : 0; })(), etiqueta: t.dashboard.kpi.remisionesPendientes, icon: FileText, color: "hsl(var(--primary))", onClick: () => nav("/remisiones"), show: perms.puedeVer("remisiones") },
+            { valor: data.incidenciasAbiertas, pct: Math.min(100, data.incidenciasAbiertas * 10), etiqueta: t.dashboard.kpi.incidenciasAbiertas, icon: TriangleAlert, color: "#D97706", onClick: () => nav("/incidencias"), show: perms.puedeVer("inventario") },
+            { valor: data.cobranzaVencida, pct: Math.min(100, data.cobranzaVencida * 15), etiqueta: t.dashboard.kpi.cobranzaVencida, icon: DollarSign, color: "#991B1B", onClick: () => nav("/credito"), show: perms.puedeVer("credito") },
+            { valor: data.oportunidadesAbiertas, pct: Math.min(100, data.oportunidadesAbiertas * 5), etiqueta: t.dashboard.kpi.oportunidadesAbiertas, icon: TrendingUp, color: "#5B21B6", onClick: () => nav("/crm/oportunidades"), show: perms.puedeVer("crm") },
+          ] as const)
+            .filter(o => o.show)
+            .slice(0, 6)
+            .map(o => (
+              <Orbe key={o.etiqueta} valor={o.valor} pct={o.pct} etiqueta={o.etiqueta} icon={o.icon} color={o.color} onClick={o.onClick} />
+            ))}
+        </div>
+      </section>
+
+      <Accesos />
+
+      <ActividadReciente />
 
       {/* Avisos de otra área sin acusar. Sólo se dibuja si hay. */}
       <ResumenAvisos onClick={() => nav("/produccion")} />
@@ -248,17 +446,17 @@ export default function Dashboard() {
             <InventarioStatus />
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="#1F3864" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
+              <KpiCard label={t.dashboard.kpi.programadas} value={total} icon={BarChart3} color="hsl(var(--primary))" tooltip={t.dashboard.tooltips.totalPlan} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.porConfigurar} value={chasisPorConfigurar} icon={Wrench} color="#D97706" tooltip={t.dashboard.tooltips.chasisSinUnidad} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" tooltip={t.dashboard.tooltips.armadosLisots} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" tooltip={t.dashboard.tooltips.porArmar} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" tooltip={t.dashboard.tooltips.pasadosFecha} onClick={() => nav("/produccion")} />
               <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={Truck} color="#5B21B6" tooltip={t.dashboard.tooltips.entregadosCliente} onClick={() => nav("/entregas")} />
-              <KpiCard label={t.dashboard.kpi.stockLibre} value={stockLibre.length} icon={Boxes} color="#2E75B6" tooltip={t.dashboard.tooltips.stockLibre} onClick={() => nav("/inventario")} />
+              <KpiCard label={t.dashboard.kpi.stockLibre} value={stockLibre.length} icon={Boxes} color="hsl(var(--secondary))" tooltip={t.dashboard.tooltips.stockLibre} onClick={() => nav("/inventario")} />
             </div>
 
             {stockLibreViejo > 0 && (
-              <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-[#FEF3C7] text-[#92400E] text-sm font-medium">
+              <div className="flex items-center gap-2 px-4 py-3 rounded-full bg-[#FEF3C7] text-[#92400E] text-sm font-medium">
                 <AlertTriangle className="h-5 w-5 shrink-0" />
                 {t.dashboard.avisoStockViejo(stockLibreViejo)}
               </div>
@@ -278,7 +476,7 @@ export default function Dashboard() {
                   <div key={d.iso} className="flex-1 text-center" title={t.dashboard.armadosDia(d.iso, d.count)}>
                     <div className="text-xs text-muted-foreground mb-1 font-medium">{d.label}</div>
                     <div
-                      className="h-12 rounded-md flex items-center justify-center text-sm font-bold border-2"
+                      className="h-12 w-12 mx-auto rounded-full flex items-center justify-center text-sm font-bold border-2"
                       style={{
                         backgroundColor: d.status === "ok" ? "#D1FAE5" : d.status === "partial" ? "#FEF3C7" : d.status === "miss" ? "#FEE2E2" : "#F3F4F6",
                         color: d.status === "ok" ? "#065F46" : d.status === "partial" ? "#92400E" : d.status === "miss" ? "#991B1B" : "#9CA3AF",
@@ -301,9 +499,9 @@ export default function Dashboard() {
                 </div>
                 <div className="grid md:grid-cols-2 gap-2">
                   {atrasados.slice(0, 8).map(m => (
-                    <button key={m.id} onClick={() => nav("/produccion")} className="text-left p-3 bg-white rounded-md border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
+                    <button key={m.id} onClick={() => nav("/produccion")} className="text-left px-4 py-3 bg-white rounded-3xl border border-[#FECACA] hover:border-[#991B1B] flex justify-between items-center">
                       <div>
-                        <div className="font-bold text-[#1F3864]">#{m.orden_armado} · {nombreComercial(m.modelo, data.catalogo)} {m.color}</div>
+                        <div className="font-bold text-primary">#{m.orden_armado} · {nombreComercial(m.modelo, data.catalogo)} {m.color}</div>
                         <div className="text-xs text-muted-foreground">{t.dashboard.fechaEstimada}: {fmtDate(m.fecha_estimada_armado)}</div>
                       </div>
                       <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#FEE2E2] text-[#991B1B]">{t.dashboard.diasAtraso(diasDesvio(m) ?? 0)}</span>
@@ -323,7 +521,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="mb-0">{t.dashboard.planVsReal}</h3>
                 <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-[#2E75B6]/10 text-[#2E75B6]"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold bg-secondary/10 text-secondary"
                   title={t.dashboard.avanceTooltip}
                 >
                   {t.dashboard.avanceSobreConfiguradas(avance)}
@@ -336,7 +534,7 @@ export default function Dashboard() {
                     <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Line type="monotone" dataKey="planAcum" stroke="#2E75B6" name="Plan acumulado" strokeWidth={3} />
+                    <Line type="monotone" dataKey="planAcum" stroke="hsl(var(--secondary))" name="Plan acumulado" strokeWidth={3} />
                     <Line type="monotone" dataKey="realAcum" stroke="#065F46" name="Real acumulado" strokeWidth={3} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -354,7 +552,7 @@ export default function Dashboard() {
                 <h3 className="mb-4">{t.dashboard.resumenRapido}</h3>
                 <ul className="text-base space-y-3">
                   <li className="flex items-center gap-2"><Truck className="text-[#5B21B6]" size={20}/> {t.dashboard.listosParaEntregar(listosEntrega)}</li>
-                  <li className="flex items-center gap-2"><BarChart3 className="text-[#1F3864]" size={20}/> {t.dashboard.remisionesParciales(rems.filter(r => r.estatus === "PARCIAL").length)}</li>
+                  <li className="flex items-center gap-2"><BarChart3 className="text-primary" size={20}/> {t.dashboard.remisionesParciales(rems.filter(r => r.estatus === "PARCIAL").length)}</li>
                   <li className="flex items-center gap-2"><CheckCircle className="text-[#065F46]" size={20}/> {t.dashboard.remisionesCompletas(rems.filter(r => r.estatus === "COMPLETA").length)}</li>
                 </ul>
               </Card>
@@ -373,7 +571,7 @@ export default function Dashboard() {
             <KpiCard label={t.dashboard.kpi.pendientes} value={pendientes} icon={Clock} color="#6B7280" />
             <KpiCard label={t.dashboard.kpi.armadas} value={armados} icon={CheckCircle} color="#065F46" />
             <KpiCard label={t.dashboard.kpi.atrasadas} value={atrasados.length} icon={AlertTriangle} color="#991B1B" />
-            <KpiCard label={t.dashboard.kpi.capacidadDiaria} value={CAPACIDAD} icon={Factory} color="#1F3864" />
+            <KpiCard label={t.dashboard.kpi.capacidadDiaria} value={CAPACIDAD} icon={Factory} color="hsl(var(--primary))" />
           </div>
           <Card className="p-6">
             <h3 className="mb-3">{t.dashboard.proximasOrdenes}</h3>
@@ -384,17 +582,17 @@ export default function Dashboard() {
 
       {area === "almacen_logistica" && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard label={t.dashboard.kpi.listosEntrega} value={listosEntrega} icon={Truck} color="#1F3864" onClick={() => nav("/entregas")} />
+          <KpiCard label={t.dashboard.kpi.listosEntrega} value={listosEntrega} icon={Truck} color="hsl(var(--primary))" onClick={() => nav("/entregas")} />
           <KpiCard label={t.dashboard.kpi.enRuta} value={motos.filter(m => m.estatus_entrega === "EN_RUTA").length} icon={Truck} color="#92400E" />
-          <KpiCard label={t.dashboard.kpi.programadasHoy} value={motos.filter(m => m.estatus_entrega === "PROGRAMADA").length} icon={BarChart3} color="#2E75B6" />
+          <KpiCard label={t.dashboard.kpi.programadasHoy} value={motos.filter(m => m.estatus_entrega === "PROGRAMADA").length} icon={BarChart3} color="hsl(var(--secondary))" />
           <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
       )}
 
       {isVendedor && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard label={t.dashboard.kpi.misRemisiones} value={rems.length} icon={BarChart3} color="#1F3864" onClick={() => nav("/remisiones")} />
-          <KpiCard label={t.dashboard.kpi.unidadesAsignadas} value={motos.filter(m => m.remision_id).length} icon={Bike} color="#2E75B6" onClick={() => nav("/mis-motocarros")} />
+          <KpiCard label={t.dashboard.kpi.misRemisiones} value={rems.length} icon={BarChart3} color="hsl(var(--primary))" onClick={() => nav("/remisiones")} />
+          <KpiCard label={t.dashboard.kpi.unidadesAsignadas} value={motos.filter(m => m.remision_id).length} icon={Bike} color="hsl(var(--secondary))" onClick={() => nav("/mis-motocarros")} />
           <KpiCard label={t.dashboard.kpi.listasEntrega} value={listosEntrega} icon={Truck} color="#065F46" />
           <KpiCard label={t.dashboard.kpi.entregadas} value={entregados} icon={CheckCircle} color="#5B21B6" />
         </div>
@@ -417,14 +615,14 @@ function TopVendedores({ rems }: { rems: any[] }) {
         const initials = v.split(" ").map(s => s[0]).slice(0,2).join("").toUpperCase();
         return (
           <li key={v} className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#2E75B6] text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
+            <div className="w-10 h-10 rounded-full bg-secondary text-white flex items-center justify-center font-bold text-sm shrink-0">{initials}</div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between mb-1">
                 <span className="font-medium text-sm truncate">{v}</span>
-                <span className="font-bold text-[#1F3864] text-sm">{n}</span>
+                <span className="font-bold text-primary text-sm">{n}</span>
               </div>
               <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full bg-[#2E75B6]" style={{ width: `${(n / max) * 100}%` }} />
+                <div className="h-full bg-secondary" style={{ width: `${(n / max) * 100}%` }} />
               </div>
             </div>
           </li>
@@ -630,13 +828,13 @@ function ResumenEjecutivo() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-[#1F3864]">{e.title}</h2>
+      <h2 className="text-lg font-bold text-primary">{e.title}</h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-4 bg-[#1F3864]/5 border-[#1F3864]/10">
+        <Card className="p-4 bg-primary/5 border-primary/10">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Bike size={18} className="text-[#1F3864]" /> {e.motocarrosTotales}
+            <Bike size={18} className="text-primary" /> {e.motocarrosTotales}
           </div>
-          <div className="text-3xl font-extrabold text-[#1F3864] mt-1">{kpis.motosTotal}</div>
+          <div className="text-3xl font-extrabold text-primary mt-1">{kpis.motosTotal}</div>
         </Card>
         <Card className="p-4 bg-emerald-50 border-emerald-100">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -678,18 +876,18 @@ function ResumenEjecutivo() {
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card className="p-4">
-          <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
+          <h3 className="font-semibold text-primary flex items-center gap-2 mb-3">
             <Truck size={20} /> {e.estadoRemisiones}
           </h3>
           <div className="space-y-2">
             <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.completas}</span><span className="font-bold text-emerald-600">{kpis.remisionesCompletas}</span></div>
-            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.parciales}</span><span className="font-bold text-[#1F3864]">{kpis.remisionesParciales}</span></div>
+            <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.parciales}</span><span className="font-bold text-primary">{kpis.remisionesParciales}</span></div>
             <div className="flex justify-between p-2 bg-slate-50 rounded"><span>{e.otras}</span><span className="font-bold text-slate-600">{kpis.remisionesTotal - kpis.remisionesCompletas - kpis.remisionesParciales}</span></div>
           </div>
         </Card>
 
         <Card className="p-4">
-          <h3 className="font-semibold text-[#1F3864] flex items-center gap-2 mb-3">
+          <h3 className="font-semibold text-primary flex items-center gap-2 mb-3">
             <Users size={20} /> {e.topVendedores}
           </h3>
           {kpis.topVendedores.length > 0 ? (
@@ -697,7 +895,7 @@ function ResumenEjecutivo() {
               {kpis.topVendedores.map((v, idx) => (
                 <div key={v.nombre} className="flex justify-between p-2 bg-slate-50 rounded">
                   <span className="font-medium">{idx + 1}. {v.nombre}</span>
-                  <span className="font-bold text-[#1F3864]">{fmtMoneda(v.monto)}</span>
+                  <span className="font-bold text-primary">{fmtMoneda(v.monto)}</span>
                 </div>
               ))}
             </div>

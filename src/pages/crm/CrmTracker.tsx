@@ -157,7 +157,7 @@ export default function CrmTracker() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#1F3864]">{t.crm.tracker.title}</h1>
+        <h1 className="text-2xl font-bold text-primary">{t.crm.tracker.title}</h1>
         <p className="text-muted-foreground mt-1">{t.crm.tracker.subtitle}</p>
       </div>
 
@@ -292,21 +292,21 @@ export default function CrmTracker() {
               {t.crm.limitantes.title}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="bg-red-50 border border-red-200 rounded-3xl p-4">
                 <div className="text-sm text-red-600 font-medium">{t.crm.limitantes.descuento}</div>
                 <div className="text-2xl font-bold text-red-700 mt-1">{limitantesSummary.descuento}</div>
                 <div className="text-xs text-red-500 mt-1">
                   {t.crm.limitantes.vendedores}: {sellersWithDescuento.length > 0 ? sellersWithDescuento.join(", ") : t.crm.limitantes.ninguno}
                 </div>
               </div>
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="bg-orange-50 border border-orange-200 rounded-3xl p-4">
                 <div className="text-sm text-orange-600 font-medium">{t.crm.limitantes.flete}</div>
                 <div className="text-2xl font-bold text-orange-700 mt-1">{limitantesSummary.flete}</div>
                 <div className="text-xs text-orange-500 mt-1">
                   {t.crm.limitantes.vendedores}: {sellersWithFlete.length > 0 ? sellersWithFlete.join(", ") : t.crm.limitantes.ninguno}
                 </div>
               </div>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="bg-red-50 border border-red-200 rounded-3xl p-4">
                 <div className="text-sm text-red-600 font-medium">{t.crm.limitantes.precio}</div>
                 <div className="text-2xl font-bold text-red-700 mt-1">{limitantesSummary.precio}</div>
                 <div className="text-xs text-red-500 mt-1">

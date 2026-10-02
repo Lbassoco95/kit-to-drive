@@ -4,11 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import { Globe, ExternalLink } from "lucide-react";
+import { es } from "@/i18n/es";
+import { zh } from "@/i18n/zh";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 
+const MATI_URL = "https://www.yoltik.mx/productos/mati";
 const RESET_COOLDOWN_MS = 60_000;
 const LOGIN_LOCK_MS = 30_000;
 const LOGIN_FAIL_THRESHOLD = 5;
@@ -34,7 +37,9 @@ export default function Auth() {
   const [now, setNow] = useState(Date.now());
   const nav = useNavigate();
   const { user, isPasswordRecovery } = useAuth();
-  const { t, toggleLang } = useLang();
+  const { t, lang, toggleLang } = useLang();
+  // Segunda lengua del titular: el personal mexicano y el chino ven los dos idiomas.
+  const heroOtra = lang === "es" ? zh.auth.heroTitle : es.auth.heroTitle;
 
   useEffect(() => {
     if (user && isPasswordRecovery) {
@@ -116,84 +121,145 @@ export default function Auth() {
   const cooldownLeft = Math.max(0, Math.ceil((cooldownUntil - now) / 1000));
   const loginLockLeft = Math.max(0, Math.ceil((loginLockUntil - now) / 1000));
 
+  const modulos = t.auth.heroSub.split(" · ");
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4">
-      <Card className="w-full max-w-lg p-8 shadow-2xl relative">
+    <div className="relative min-h-screen grid lg:grid-cols-[1.05fr_1fr] bg-background overflow-hidden">
+      <div className="ambient" aria-hidden="true"><i /><i /><i /></div>
+
+      {/* Panel de marca: fluye en curvas, sin esquinas; el panda vive dentro de un orbe */}
+      <aside className="relative m-3 lg:m-4 rounded-[2.5rem] lg:rounded-[3.5rem] bg-gradient-to-br from-[#032b62] via-[#03275a] to-[#03234d] text-primary-foreground overflow-hidden px-6 py-3 lg:px-12 lg:py-12 flex flex-col shadow-[0_30px_70px_-30px_hsl(214_94%_10%/0.7)]">
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          <span className="blob absolute -right-24 top-[28%] h-[26rem] w-[26rem] bg-[hsl(209_75%_48%/0.45)] blur-3xl" />
+          <span className="blob hidden lg:block absolute -left-28 bottom-[-6rem] h-[24rem] w-[24rem] bg-[hsl(var(--dazon-gold)/0.30)] blur-3xl [animation-delay:-7s]" />
+          <span className="blob hidden lg:block absolute right-[22%] bottom-[-8rem] h-[18rem] w-[18rem] bg-[hsl(168_65%_45%/0.28)] blur-3xl [animation-delay:-12s]" />
+          <svg className="absolute -right-40 -bottom-40 h-[44rem] w-[44rem] text-white/10" viewBox="0 0 200 200" fill="none" stroke="currentColor" strokeWidth="0.6">
+            <circle cx="100" cy="100" r="96" /><circle cx="100" cy="100" r="76" /><circle cx="100" cy="100" r="56" /><circle cx="100" cy="100" r="36" />
+          </svg>
+        </div>
+        <img
+          src="/brand/dazon-negativo.png"
+          alt="Dazon Mex"
+          className="relative w-40 lg:w-64 mix-blend-lighten self-center lg:self-start -mb-6 lg:mb-0 lg:-ml-5"
+        />
+        <div className="hidden lg:block mt-12 max-w-md relative z-10">
+          <h2 className="!text-primary-foreground !text-[40px] !leading-[46px] !font-bold [text-wrap:balance] [word-break:keep-all]">{t.auth.heroTitle}</h2>
+          <p lang={lang === "es" ? "zh-CN" : "es-MX"} className="mt-3 text-base leading-7 text-primary-foreground/90">
+            {heroOtra}
+          </p>
+          <ul className="mt-7 flex flex-wrap gap-2" aria-label={t.auth.heroSub}>
+            {modulos.map((m) => (
+              <li key={m} className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-md shadow-[inset_0_1px_0_hsl(0_0%_100%/0.25)]">
+                {m}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div
+          className="hidden lg:block absolute right-10 bottom-10 h-[290px] w-[290px] xl:h-[330px] xl:w-[330px] rounded-full overflow-hidden border border-white/30 bg-white/10 backdrop-blur-xl shadow-[inset_0_2px_0_hsl(0_0%_100%/0.35),0_24px_50px_-20px_hsl(214_94%_6%/0.7)]"
+          aria-hidden="true"
+        >
+          <img src="/brand/panda-saluda.png" alt="" className="absolute inset-0 m-auto h-[88%] w-auto max-w-[86%] object-contain drop-shadow-[0_10px_14px_hsl(214_94%_6%/0.45)]" />
+        </div>
+      </aside>
+
+      {/* Panel de acceso */}
+      <main className="relative flex items-center justify-center p-6 lg:p-12">
         <button
           type="button"
           onClick={toggleLang}
-          className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-[#1F3864] hover:border-[#1F3864] transition-all text-sm font-medium"
+          className="glass-bar absolute top-5 right-5 flex items-center gap-1.5 px-4 py-2 rounded-full text-primary hover:text-primary transition-colors text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          🌐 {t.otherLang}
+          <Globe size={14} aria-hidden="true" /> {t.otherLang}
         </button>
 
-        <div className="text-center mb-8">
-          <h1 className="!text-4xl !text-[#1F3864]">{t.auth.title}</h1>
-          <p className="text-muted-foreground text-base mt-2">
-            {mode === "login" ? t.auth.subtitle : t.auth.forgotSubtitle}
-          </p>
-        </div>
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <h1 className="!text-[28px]">{t.auth.signInTitle}</h1>
+            <p className="text-muted-foreground text-base mt-2">
+              {mode === "login" ? t.auth.subtitle : t.auth.forgotSubtitle}
+            </p>
+          </div>
 
-        {mode === "login" ? (
-          <form onSubmit={login} className="space-y-4">
-            <div>
-              <Label className="text-base">{t.auth.email}</Label>
-              <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 text-base" />
-            </div>
-            <div>
-              <Label className="text-base">{t.auth.password}</Label>
-              <Input type="password" required value={pwd} onChange={(e) => setPwd(e.target.value)} className="h-12 text-base" />
-            </div>
-            <Button
-              type="submit"
-              disabled={busy || loginLockLeft > 0}
-              className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]"
-            >
-              {busy
-                ? t.auth.signingIn
-                : loginLockLeft > 0
-                  ? `${t.auth.signIn} (${loginLockLeft}s)`
-                  : t.auth.signIn}
-            </Button>
-            <div className="text-center">
-              <button
-                type="button"
-                className="text-sm text-[#1F3864] hover:underline"
-                onClick={() => setMode("forgot")}
+          {mode === "login" ? (
+            <form onSubmit={login} className="space-y-4">
+              <div>
+                <Label className="text-base ml-4">{t.auth.email}</Label>
+                <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 text-base mt-1.5" />
+              </div>
+              <div>
+                <Label className="text-base ml-4">{t.auth.password}</Label>
+                <Input type="password" required value={pwd} onChange={(e) => setPwd(e.target.value)} className="h-12 text-base mt-1.5" />
+              </div>
+              <Button
+                type="submit"
+                disabled={busy || loginLockLeft > 0}
+                className="w-full h-12 text-base hover:bg-[#021f47] shadow-[0_10px_24px_-10px_hsl(214_94%_20%/0.7)]"
               >
-                {t.auth.forgotPassword}
-              </button>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={requestReset} className="space-y-4">
-            <div>
-              <Label className="text-base">{t.auth.email}</Label>
-              <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 text-base" autoFocus />
-            </div>
-            <Button
-              type="submit"
-              disabled={busy || cooldownLeft > 0}
-              className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]"
-            >
-              {busy
-                ? t.auth.sendingReset
-                : cooldownLeft > 0
-                  ? `${t.auth.sendResetLink} (${cooldownLeft}s)`
-                  : t.auth.sendResetLink}
-            </Button>
-            <div className="text-center">
-              <button
-                type="button"
-                className="text-sm text-[#1F3864] hover:underline"
-                onClick={() => setMode("login")}
+                {busy
+                  ? t.auth.signingIn
+                  : loginLockLeft > 0
+                    ? `${t.auth.signIn} (${loginLockLeft}s)`
+                    : t.auth.signIn}
+              </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-primary hover:underline"
+                  onClick={() => setMode("forgot")}
+                >
+                  {t.auth.forgotPassword}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={requestReset} className="space-y-4">
+              <div>
+                <Label className="text-base ml-4">{t.auth.email}</Label>
+                <Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 text-base mt-1.5" autoFocus />
+              </div>
+              <Button
+                type="submit"
+                disabled={busy || cooldownLeft > 0}
+                className="w-full h-12 text-base hover:bg-[#021f47]"
               >
-                {t.auth.backToLogin}
-              </button>
+                {busy
+                  ? t.auth.sendingReset
+                  : cooldownLeft > 0
+                    ? `${t.auth.sendResetLink} (${cooldownLeft}s)`
+                    : t.auth.sendResetLink}
+              </Button>
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="text-sm text-primary hover:underline"
+                  onClick={() => setMode("login")}
+                >
+                  {t.auth.backToLogin}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Sello Dazon por Mati y enlace al producto */}
+          <div className="mt-10 glass-bar rounded-full pl-3 pr-5 py-2.5 flex items-center gap-3 text-sm text-muted-foreground">
+            <img src="/brand/mati-icono.png" alt="" aria-hidden="true" className="h-9 w-9 rounded-full shrink-0" />
+            <div className="leading-tight">
+              <div className="font-semibold text-foreground">{t.auth.poweredBy}</div>
+              <div className="text-xs">{t.auth.developedBy}</div>
             </div>
-          </form>
-        )}
-      </Card>
+            <a
+              href={MATI_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-auto inline-flex items-center gap-1 font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-full px-1"
+            >
+              {t.auth.learnMoreMati}
+              <ExternalLink size={14} aria-hidden="true" />
+            </a>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

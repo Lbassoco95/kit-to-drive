@@ -57,13 +57,13 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#1F3864]/90 p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-primary/90 p-4">
       <Card className="w-full max-w-md p-6 shadow-2xl">
         <div className="mb-4 flex items-center gap-3">
           <div className="rounded-full bg-amber-100 p-2 text-amber-600">
             <Lock size={20} />
           </div>
-          <h2 className="text-xl font-bold text-[#1F3864]">{t.auth.forceTitle}</h2>
+          <h2 className="text-xl font-bold text-primary">{t.auth.forceTitle}</h2>
         </div>
         <p className="mb-4 text-sm text-muted-foreground">
           {t.auth.forceSubtitle}
@@ -92,8 +92,8 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
               placeholder={t.auth.confirmPassword}
             />
           </div>
-          <div className="rounded-lg border bg-slate-50 p-3">
-            <p className="mb-2 text-sm font-medium text-[#1F3864]">{t.auth.passwordRequirements.title}</p>
+          <div className="rounded-3xl border bg-slate-50 p-3">
+            <p className="mb-2 text-sm font-medium text-primary">{t.auth.passwordRequirements.title}</p>
             <ul className="space-y-1.5">
               {requirements.map(({ key, met }) => (
                 <li key={key} className="flex items-start gap-2 text-sm">
@@ -120,7 +120,7 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
           <Button
             type="submit"
             disabled={busy || !allMet}
-            className="w-full h-11 bg-[#1F3864] hover:bg-[#162a4d]"
+            className="w-full h-11 bg-primary hover:bg-primary-hover"
           >
             {busy ? t.auth.savingPassword : t.auth.savePassword}
           </Button>

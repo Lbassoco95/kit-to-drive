@@ -253,7 +253,7 @@ export default function Bitacora() {
               </div>
               <div>
                 <span className="font-medium block mb-2">{t.bitacora.datosEliminadosLbl}</span>
-                <pre className="bg-slate-100 p-4 rounded-lg text-xs overflow-x-auto">
+                <pre className="bg-slate-100 p-4 rounded-3xl text-xs overflow-x-auto">
                   {JSON.stringify(selectedDeletion.datos_eliminados, null, 2)}
                 </pre>
               </div>

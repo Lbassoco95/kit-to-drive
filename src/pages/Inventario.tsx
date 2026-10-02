@@ -324,12 +324,12 @@ export default function Inventario() {
         {/* Filtro de línea — aplica a Unidades, Chasis y Motores */}
         <div className="flex items-center gap-2 mt-3">
           <span className="text-sm text-muted-foreground">{t.inventario.lineaFiltro}</span>
-          <div className="inline-flex rounded-lg border p-1 bg-card">
+          <div className="inline-flex rounded-full border p-1 bg-card">
             {(["TODAS", "motocarro", "mototaxi", "otro"] as const).map(l => (
               <button
                 key={l}
                 onClick={() => setLineaFiltro(l)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium ${lineaFiltro === l ? "bg-[#2E75B6] text-white" : "text-muted-foreground"}`}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium ${lineaFiltro === l ? "bg-secondary text-white" : "text-muted-foreground"}`}
               >
                 {l === "TODAS" ? t.inventario.todas : t.catalogos.linea[l]}
               </button>
@@ -345,7 +345,7 @@ export default function Inventario() {
                 {t.inventario.totalUnidades(unidadesFiltrado.length)}
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-hidden max-h-[60vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
@@ -406,7 +406,7 @@ export default function Inventario() {
                 )}
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-hidden max-h-[60vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
@@ -448,7 +448,7 @@ export default function Inventario() {
                                 id: c.id, numero_chasis: c.numero_chasis, modelo: c.modelo,
                                 color: c.color, color_original: c.color_original, motocarro_id: c.motocarro_id,
                               })}
-                              className="text-muted-foreground hover:text-[#1F3864]"
+                              className="text-muted-foreground hover:text-primary"
                               title={t.inventario.tip.cambiarColor}
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -497,7 +497,7 @@ export default function Inventario() {
                 {t.inventario.totalPiezas(motoresFiltrado.length, motoresFiltrado.filter(m => m.estatus === 'disponible').length)}
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-hidden max-h-[60vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
@@ -549,7 +549,7 @@ export default function Inventario() {
                 {t.inventario.totalRegistros(partes.length)}
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-hidden max-h-[60vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
@@ -602,7 +602,7 @@ export default function Inventario() {
                 </p>
               </div>
             </div>
-            <div className="border rounded-lg overflow-x-auto max-h-[60vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-x-auto max-h-[60vh] overflow-y-auto overflow-hidden">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
@@ -696,7 +696,7 @@ export default function Inventario() {
               <h3 className="font-semibold text-lg">{t.inventario.colores.porCodigoFabrica}</h3>
               <div className="text-sm text-muted-foreground">{t.inventario.colores.alertaUmbral}</div>
             </div>
-            <div className="border rounded-lg overflow-x-auto max-h-[50vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-x-auto max-h-[50vh] overflow-y-auto overflow-hidden">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
@@ -728,7 +728,7 @@ export default function Inventario() {
                           {puedeEditarColor && (
                             <button
                               onClick={() => setCapacidadEdit({ modelo: c.modelo, color: c.color, juegos: c.piezas_recibidas ?? 0 })}
-                              className="ml-1.5 text-muted-foreground hover:text-[#1F3864]"
+                              className="ml-1.5 text-muted-foreground hover:text-primary"
                               title={t.inventario.tip.registrarJuegos}
                             >
                               <Pencil className="h-3.5 w-3.5 inline" />
@@ -766,7 +766,7 @@ export default function Inventario() {
                 {t.inventario.otras.desc}
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden max-h-[70vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-hidden max-h-[70vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>
@@ -836,7 +836,7 @@ export default function Inventario() {
             </Card>
             <Card className="p-4">
               <div className="text-sm text-muted-foreground">{t.inventario.stock.porConfigurar}</div>
-              <div className="text-3xl font-bold text-[#1F3864]">{chasisPorConfigurar.length}</div>
+              <div className="text-3xl font-bold text-primary">{chasisPorConfigurar.length}</div>
               <div className="text-xs text-muted-foreground mt-1">{t.inventario.stock.porConfigurarDesc}</div>
             </Card>
             <Card className="p-4">
@@ -883,7 +883,7 @@ export default function Inventario() {
                 <span className="px-2 py-1 rounded-full bg-red-100 text-red-700">+60d: {rangos["60+"]}</span>
               </div>
             </div>
-            <div className="border rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-hidden max-h-[50vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>

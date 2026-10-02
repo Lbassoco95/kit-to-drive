@@ -168,7 +168,7 @@ export const ESTATUS_INCIDENCIA: Record<EstatusIncidencia, {
     abierta: true, retiene: false,
   },
   en_revision: {
-    label: "En revisión", cls: "bg-[#DBEAFE] text-[#1E40AF] border-[#2E75B6]/40",
+    label: "En revisión", cls: "bg-[#DBEAFE] text-[#1E40AF] border-secondary/40",
     ayuda: "Alguien la está revisando para decidir si se puede adaptar.",
     abierta: true, retiene: false,
   },

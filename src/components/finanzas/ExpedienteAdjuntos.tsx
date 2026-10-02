@@ -115,15 +115,15 @@ export default function ExpedienteAdjuntos({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Paperclip size={16} className="text-[#1F3864]" />
-        <h3 className="font-bold text-[#1F3864]">{t.finanzas.expediente.title}</h3>
+        <Paperclip size={16} className="text-primary" />
+        <h3 className="font-bold text-primary">{t.finanzas.expediente.title}</h3>
         <Badge variant="outline" className="text-xs">
           {adjuntos.length} {adjuntos.length === 1 ? t.finanzas.expediente.documento : t.finanzas.expediente.documentos}
         </Badge>
       </div>
 
       {puedeSubir && (
-        <div className="rounded-lg border bg-slate-50/60 p-3 space-y-2">
+        <div className="rounded-3xl border bg-slate-50/60 p-3 space-y-2">
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <Label className="text-xs">{t.finanzas.expediente.tipoDocumento}</Label>
@@ -148,7 +148,7 @@ export default function ExpedienteAdjuntos({
           </div>
 
           <div
-            className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-[#1F3864] transition-colors"
+            className="border-2 border-dashed rounded-3xl p-4 text-center cursor-pointer hover:border-primary transition-colors"
             onClick={() => fileRef.current?.click()}
           >
             <Upload size={22} className="mx-auto mb-1 opacity-50" />
@@ -173,14 +173,14 @@ export default function ExpedienteAdjuntos({
       {cargando ? (
         <div className="text-sm text-muted-foreground py-3">{t.finanzas.expediente.cargando}</div>
       ) : adjuntos.length === 0 ? (
-        <div className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
+        <div className="text-sm text-muted-foreground py-4 text-center border rounded-3xl">
           {t.finanzas.expediente.vacio}
         </div>
       ) : (
-        <div className="divide-y rounded-lg border">
+        <div className="divide-y rounded-3xl border overflow-hidden">
           {adjuntos.map(a => (
             <div key={a.id} className="flex items-center gap-2 p-3">
-              <FileText size={17} className="text-[#2E75B6] shrink-0" />
+              <FileText size={17} className="text-secondary shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold truncate">{a.nombre_archivo}</span>

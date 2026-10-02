@@ -114,7 +114,7 @@ export default function CrmOportunidadDetail() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-[#1F3864]">{oportunidad.titulo || t.crm.detalle.title}</h1>
+          <h1 className="text-2xl font-bold text-primary">{oportunidad.titulo || t.crm.detalle.title}</h1>
           <p className="text-muted-foreground mt-1">{cliente?.nombre_comercial || t.crm.sinCliente}</p>
         </div>
         {canEdit && (
@@ -210,7 +210,7 @@ export default function CrmOportunidadDetail() {
               )}
             </div>
             {oportunidad.limitante_notas && (
-              <div className="mt-3 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
+              <div className="mt-3 text-sm text-muted-foreground bg-muted p-3 rounded-3xl">
                 {oportunidad.limitante_notas}
               </div>
             )}
@@ -220,7 +220,7 @@ export default function CrmOportunidadDetail() {
         {oportunidad.notas && (
           <div className="mt-6 pt-6 border-t">
             <Label className="text-muted-foreground text-sm mb-2 block">{t.crm.notas}</Label>
-            <div className="text-sm bg-muted p-3 rounded-lg">{oportunidad.notas}</div>
+            <div className="text-sm bg-muted p-3 rounded-3xl">{oportunidad.notas}</div>
           </div>
         )}
       </Card>
@@ -233,14 +233,14 @@ export default function CrmOportunidadDetail() {
             {t.crm.detalle.actividades(actividades.length)}
           </h2>
           {canCreateActivity && (
-            <Button onClick={() => setCreatingActivity(true)} className="bg-[#1F3864] hover:bg-[#162a4d]">
+            <Button onClick={() => setCreatingActivity(true)} className="bg-primary hover:bg-primary-hover">
               <Plus className="h-4 w-4 mr-2" /> {t.crm.detalle.agregarActividad}
             </Button>
           )}
         </div>
 
         {actividades.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg">
+          <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-3xl">
             {t.crm.detalle.sinActividades}
           </div>
         ) : (
@@ -296,7 +296,7 @@ export default function CrmOportunidadDetail() {
 
                 {expandedActivity === act.id && act.tipo === 'visita' && (
                   <div className="mt-4 pt-4 border-t space-y-3 text-sm">
-                    <div className="font-medium text-[#1F3864]">{t.crm.perfilVisita.perfilCliente}</div>
+                    <div className="font-medium text-primary">{t.crm.perfilVisita.perfilCliente}</div>
                     
                     <div className="grid grid-cols-2 gap-2">
                       {act.region && <div><span className="text-muted-foreground">{t.crm.perfilVisita.region}:</span> {act.region}</div>}
@@ -307,7 +307,7 @@ export default function CrmOportunidadDetail() {
                       {act.telefono_contacto && <div><span className="text-muted-foreground">{t.crm.perfilVisita.telefono}:</span> {act.telefono_contacto}</div>}
                     </div>
 
-                    <div className="font-medium text-[#1F3864] mt-2">{t.crm.perfilVisita.operacionNegocio}</div>
+                    <div className="font-medium text-primary mt-2">{t.crm.perfilVisita.operacionNegocio}</div>
                     <div className="grid grid-cols-2 gap-2">
                       {act.tipo_negocio && <div><span className="text-muted-foreground">{t.crm.perfilVisita.tipo}:</span> {act.tipo_negocio}</div>}
                       {act.escala_operacion && <div><span className="text-muted-foreground">{t.crm.perfilVisita.escala}:</span> {act.escala_operacion}</div>}
@@ -317,7 +317,7 @@ export default function CrmOportunidadDetail() {
                       {act.fecha_ultima_visita && <div><span className="text-muted-foreground">{t.crm.perfilVisita.ultimaVisita}:</span> {new Date(act.fecha_ultima_visita).toLocaleDateString()}</div>}
                     </div>
 
-                    <div className="font-medium text-[#1F3864] mt-2">{t.crm.perfilVisita.reporteVisita}</div>
+                    <div className="font-medium text-primary mt-2">{t.crm.perfilVisita.reporteVisita}</div>
                     <div className="space-y-2">
                       {act.asuntos_tratados && <div><span className="text-muted-foreground">{t.crm.perfilVisita.asuntosTratados}:</span> {act.asuntos_tratados}</div>}
                       {act.acuerdos_alcanzados && <div><span className="text-muted-foreground">{t.crm.perfilVisita.acuerdos}:</span> {act.acuerdos_alcanzados}</div>}
@@ -390,7 +390,7 @@ export default function CrmOportunidadDetail() {
               <Textarea value={activityForm.descripcion} onChange={e => setActivityForm({ ...activityForm, descripcion: e.target.value })} placeholder={t.crm.detalle.notasAdicionales} rows={2} />
             </div>
           </div>
-          <DialogFooter><Button onClick={saveActivity} className="bg-[#1F3864] hover:bg-[#162a4d]">{t.actions.save}</Button></DialogFooter>
+          <DialogFooter><Button onClick={saveActivity} className="bg-primary hover:bg-primary-hover">{t.actions.save}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

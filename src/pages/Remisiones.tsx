@@ -57,7 +57,7 @@ const comoJson = (v: unknown): Json => JSON.parse(JSON.stringify(v ?? null));
 const colorLabel = (c: string) => c.charAt(0) + c.slice(1).toLowerCase();
 
 const tipoBadgeClass: Record<string, string> = {
-  motocarro:          "bg-[#1F3864]/10 text-[#1F3864] border-[#1F3864]/20",
+  motocarro:          "bg-primary/10 text-primary border-primary/20",
   cabina:             "bg-violet-50 text-violet-700 border-violet-200",
   instalacion_cabina: "bg-purple-50 text-purple-700 border-purple-200",
   activacion:         "bg-amber-50 text-amber-700 border-amber-200",
@@ -133,17 +133,17 @@ function CampoCliente({ clientes, value, onChange, onCrearCliente }:{
     <div>
       <div className="flex items-center justify-between">
         <Label className="text-base">{t.remisiones.cliente}</Label>
-        <button type="button" onClick={()=>setCreando(s=>!s)} className="inline-flex items-center gap-1 text-xs text-[#2E75B6] hover:underline font-medium">
+        <button type="button" onClick={()=>setCreando(s=>!s)} className="inline-flex items-center gap-1 text-xs text-secondary hover:underline font-medium">
           <UserPlus className="h-3.5 w-3.5" /> {creando ? t.actions.cancel : t.remisiones.nuevoCliente}
         </button>
       </div>
 
       {creando ? (
-        <div className="border-2 border-dashed border-[#2E75B6]/40 rounded-md p-3 space-y-2 bg-[#DBEAFE]/30">
+        <div className="border-2 border-dashed border-secondary/40 rounded-3xl p-3 space-y-2 bg-[#DBEAFE]/30">
           <Input placeholder={t.remisiones.nombreComercialReq} value={nuevo.nombre_comercial} onChange={e=>setNuevo({...nuevo,nombre_comercial:e.target.value})} className="h-11"/>
           <Input placeholder={t.remisiones.codigoErpOpcional} value={nuevo.codigo_erp} onChange={e=>setNuevo({...nuevo,codigo_erp:e.target.value})} className="h-11"/>
           <Input placeholder={t.remisiones.telefono} value={nuevo.telefono} onChange={e=>setNuevo({...nuevo,telefono:e.target.value})} className="h-11"/>
-          <Button type="button" onClick={guardar} disabled={guardando} className="w-full h-11 bg-[#2E75B6] hover:bg-[#246094]">
+          <Button type="button" onClick={guardar} disabled={guardando} className="w-full h-11 bg-secondary hover:bg-secondary">
             {guardando ? t.remisiones.guardandoCliente : t.remisiones.guardarCliente}
           </Button>
         </div>
@@ -203,14 +203,14 @@ function LineasMotocarro({
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className="text-base font-semibold">{t.remisiones.motocarros}</Label>
-          <span className="text-sm font-semibold text-[#1F3864]">{t.remisiones.unidades(totalUnidades)}</span>
+          <span className="text-sm font-semibold text-primary">{t.remisiones.unidades(totalUnidades)}</span>
         </div>
 
         {motos.map((moto, idx) => (
-          <div key={moto._key} className="border rounded-xl overflow-hidden">
+          <div key={moto._key} className="border rounded-3xl overflow-hidden">
             {/* Header motocarro */}
-            <div className="flex items-center justify-between px-3 py-2 bg-[#1F3864]/5 border-b">
-              <span className="text-xs font-bold text-[#1F3864] uppercase tracking-wide">🏍️ {t.remisiones.motocarroN(idx+1)}</span>
+            <div className="flex items-center justify-between px-3 py-2 bg-primary/5 border-b">
+              <span className="text-xs font-bold text-primary uppercase tracking-wide">🏍️ {t.remisiones.motocarroN(idx+1)}</span>
               {motos.length>1&&(
                 <button type="button" onClick={()=>onRemove(idx)} className="text-red-400 hover:text-red-600"><Trash2 size={14}/></button>
               )}
@@ -296,8 +296,8 @@ function LineasMotocarro({
                     className="h-10 text-sm"/>
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer pt-5 flex-1">
-                  <input type="checkbox" checked={moto.con_caja} onChange={e=>onUpdate(idx,"con_caja",e.target.checked)} className="w-4 h-4 accent-[#1F3864]"/>
-                  <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-[#1F3864]"/> {t.remisiones.conCajaMontada}</span>
+                  <input type="checkbox" checked={moto.con_caja} onChange={e=>onUpdate(idx,"con_caja",e.target.checked)} className="w-4 h-4 accent-primary"/>
+                  <span className="text-sm font-medium flex items-center gap-1.5"><Package size={14} className="text-primary"/> {t.remisiones.conCajaMontada}</span>
                 </label>
               </div>
             </div>
@@ -322,13 +322,13 @@ function LineasMotocarro({
         ))}
 
         <Button type="button" variant="outline" onClick={onAdd}
-          className="w-full h-10 border-dashed border-[#2E75B6]/50 text-[#2E75B6] hover:bg-[#DBEAFE]/30">
+          className="w-full h-10 border-dashed border-secondary/50 text-secondary hover:bg-[#DBEAFE]/30">
           <Plus className="h-4 w-4 mr-2"/> {t.remisiones.agregarMotocarro}
         </Button>
       </div>
 
       {/* ── FLETE — toda la orden ──────────────────────── */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50/40 px-3 py-3">
+      <div className="rounded-3xl border border-blue-200 bg-blue-50/40 px-3 py-3">
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={conFlete} onChange={e=>onFlete(e.target.checked)} className="w-4 h-4 accent-blue-600"/>
           <span className="text-sm font-medium flex items-center gap-1.5">
@@ -1244,7 +1244,7 @@ export default function Remisiones() {
         {canCreate && (
           <Dialog open={open} onOpenChange={o=>{ setOpen(o); if(o) abrirNueva(); if(!o) setActiveTab('activas'); }}>
             <DialogTrigger asChild>
-              <Button className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+              <Button className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">
                 <Plus className="h-5 w-5 mr-2" /> {t.remisiones.nueva}
               </Button>
             </DialogTrigger>
@@ -1261,7 +1261,7 @@ export default function Remisiones() {
                         <Button key={String(anterior)} type="button"
                           variant={!!form.es_anterior===anterior?"default":"outline"}
                           onClick={()=>cambiarTipoCaptura(anterior)}
-                          className={`h-12 text-base ${!!form.es_anterior===anterior?"bg-[#1F3864] hover:bg-[#162a4d]":""}`}>
+                          className={`h-12 text-base ${!!form.es_anterior===anterior?"bg-primary hover:bg-primary-hover":""}`}>
                           {anterior?t.remisiones.capturaAnterior:t.remisiones.capturaNueva}
                         </Button>
                       ))}
@@ -1279,7 +1279,7 @@ export default function Remisiones() {
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {recentFolios.map(f=>(
                         <button key={f} type="button" onClick={()=>setForm((s:any)=>({...s,folio_remision:suggestNextFolio(rows.map((r:any)=>r.folio_remision))}))}
-                          className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-[#1F3864] border">{f}</button>
+                          className="px-2.5 py-1 rounded-full bg-slate-100 hover:bg-[#DBEAFE] text-xs font-mono text-primary border">{f}</button>
                       ))}
                     </div>
                   )}
@@ -1362,7 +1362,7 @@ export default function Remisiones() {
               </div>
 
               <DialogFooter>
-                <Button onClick={crearRemision} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">{t.remisiones.crearBtn}</Button>
+                <Button onClick={crearRemision} className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">{t.remisiones.crearBtn}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -1380,7 +1380,7 @@ export default function Remisiones() {
 
       {/* ── Notificaciones de atrasos ─────────────────────────────────────── */}
       {motocarrosAtrasados.length > 0 && (
-        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
+        <div className="rounded-3xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
           <button
             className="w-full flex items-center justify-between text-left"
             onClick={() => setNotifOpen(o => !o)}
@@ -1416,7 +1416,7 @@ export default function Remisiones() {
       {/* ── Alcance: todo el equipo comercial / solo las mías ─────────────── */}
       <div className="flex items-center gap-2">
         <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium">{t.remisiones.ver}</span>
-        <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5">
+        <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-0.5">
           {([
             { key: 'todas', label: t.remisiones.alcanceTodas },
             { key: 'mias',  label: t.remisiones.alcanceMias },
@@ -1426,7 +1426,7 @@ export default function Remisiones() {
               type="button"
               onClick={() => setScope(opt.key)}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${
-                scope===opt.key ? 'bg-white text-[#1F3864] shadow-sm' : 'text-muted-foreground hover:text-[#1F3864]'
+                scope===opt.key ? 'bg-white text-primary shadow-sm' : 'text-muted-foreground hover:text-primary'
               }`}
             >
               {opt.label}
@@ -1439,7 +1439,7 @@ export default function Remisiones() {
       <div className="flex gap-0 border-b border-slate-200">
         <button
           onClick={() => setActiveTab('activas')}
-          className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='activas' ? 'border-[#1F3864] text-[#1F3864]' : 'border-transparent text-muted-foreground hover:text-[#1F3864]'}`}
+          className={`px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${activeTab==='activas' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-primary'}`}
         >
           {t.remisiones.tabActivas} <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-slate-100 text-xs font-bold">{activeRows.length}</span>
         </button>
@@ -1457,7 +1457,7 @@ export default function Remisiones() {
       <div className="responsive-card-grid gap-4">
         {activeTab === 'canceladas' ? (
           canceledRows.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.remisiones.sinCanceladas}</div>
+            <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">{t.remisiones.sinCanceladas}</div>
           ) : canceledRows.map((r:any) => (
             <Card key={r.id} className="p-5 flex flex-col gap-3 border-red-100 bg-red-50/30 opacity-80">
               <div className="flex items-start justify-between gap-2">
@@ -1480,7 +1480,7 @@ export default function Remisiones() {
                 <Button
                   variant="outline"
                   onClick={() => restaurarRemision(r.id)}
-                  className="w-full h-10 text-sm border-[#2E75B6] text-[#2E75B6] hover:bg-[#DBEAFE]"
+                  className="w-full h-10 text-sm border-secondary text-secondary hover:bg-[#DBEAFE]"
                 >
                   {t.remisiones.restaurar}
                 </Button>
@@ -1510,10 +1510,10 @@ export default function Remisiones() {
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{t.remisiones.folioRemision}</div>
-                  <div className="text-2xl font-bold font-mono text-[#1F3864] leading-tight">{r.folio_remision}</div>
+                  <div className="text-2xl font-bold font-mono text-primary leading-tight">{r.folio_remision}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{fmtDate(r.fecha_remision)}</div>
                   {r.es_anterior && (
-                    <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wide">{t.remisiones.anteriorBadge}</span>
+                    <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[10px] font-bold uppercase tracking-wide">{t.remisiones.anteriorBadge}</span>
                   )}
                   {!!modificaciones[r.id] && (
                     <button
@@ -1532,20 +1532,20 @@ export default function Remisiones() {
 
               {/* Vendedor + cliente + pago */}
               <div className="flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] text-xs font-medium">
-                  <span className="w-5 h-5 rounded-full bg-[#2E75B6] text-white flex items-center justify-center text-[10px] font-bold shrink-0">{initials||"?"}</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#DBEAFE] text-[#1E40AF] text-xs font-medium">
+                  <span className="w-5 h-5 rounded-full bg-secondary text-white flex items-center justify-center text-[10px] font-bold shrink-0">{initials||"?"}</span>
                   {vendedorNombre.split(" ")[0]}
                 </span>
                 {isOwner && (
-                  <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#1F3864] text-white text-[10px] font-bold uppercase tracking-wide">{t.remisiones.tuya}</span>
+                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-primary text-white text-[10px] font-bold uppercase tracking-wide">{t.remisiones.tuya}</span>
                 )}
-                <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-medium">
                   👤 {r.clientes?.codigo_erp || r.clientes?.folio_interno || "—"}
                 </span>
                 {r.tipo_pago==="contra_entrega"&&!r.pagado ? (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100 text-amber-700 text-xs font-semibold">{t.pago.pendiente}</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">{t.pago.pendiente}</span>
                 ):(
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-700 text-xs font-semibold">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
                     <DollarSign className="h-3 w-3"/> {r.tipo_pago==="contra_entrega"?t.pago.contra_entrega:t.pago.anticipado}
                   </span>
                 )}
@@ -1595,7 +1595,7 @@ export default function Remisiones() {
               {/* Moto list */}
               {motos_.length>0&&(
                 <Collapsible open={!!expanded[r.id]} onOpenChange={o=>setExpanded(s=>({...s,[r.id]:o}))}>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 rounded-md bg-slate-50 hover:bg-slate-100 text-sm font-medium">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 rounded-3xl bg-slate-50 hover:bg-slate-100 text-sm font-medium">
                     {t.remisiones.verChasisEntregas(motos_.length)}
                     <ChevronDown className={`h-4 w-4 transition-transform ${expanded[r.id]?"rotate-180":""}`}/>
                   </CollapsibleTrigger>
@@ -1613,12 +1613,12 @@ export default function Remisiones() {
                 {/* Editar / complementar — operador en las suyas, supervisor y
                     administrador en las de todo el área. Cada cambio pide motivo. */}
                 {puedeCorregir&&(
-                  <Button variant="outline" onClick={()=>abrirEdicion(r)} className="flex-1 h-12 text-base min-w-[100px] border-[#1F3864]/40 text-[#1F3864] hover:bg-[#DBEAFE]">
+                  <Button variant="outline" onClick={()=>abrirEdicion(r)} className="flex-1 h-12 text-base min-w-[100px] border-primary/40 text-primary hover:bg-[#DBEAFE]">
                     <Pencil className="h-5 w-5 mr-2"/> {t.remisiones.editar}
                   </Button>
                 )}
                 {canAssign&&asignadas<total&&r.estatus!=="COMPLETA"&&r.estatus!=="CANCELADA"&&(
-                  <Button onClick={()=>asignarChasis(r)} className="flex-1 h-12 bg-[#2E75B6] hover:bg-[#246094] text-base min-w-[100px]">
+                  <Button onClick={()=>asignarChasis(r)} className="flex-1 h-12 bg-secondary hover:bg-secondary text-base min-w-[100px]">
                     <Wand2 className="h-5 w-5 mr-2"/> {t.remisiones.asignar}
                   </Button>
                 )}
@@ -1634,7 +1634,7 @@ export default function Remisiones() {
                 ):canUpload?(
                   <label className="flex-1 min-w-[100px]">
                     <input type="file" accept="application/pdf,image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f)subirPdf(r,f);}}/>
-                    <span className="flex items-center justify-center cursor-pointer h-12 rounded-md border-2 border-dashed border-[#2E75B6]/40 text-[#1F3864] font-medium hover:bg-[#DBEAFE] text-base">
+                    <span className="flex items-center justify-center cursor-pointer h-12 rounded-3xl border-2 border-dashed border-secondary/40 text-primary font-medium hover:bg-[#DBEAFE] text-base">
                       <Upload className="h-5 w-5 mr-2"/> {t.remisiones.subirPdf}
                     </span>
                   </label>
@@ -1689,13 +1689,13 @@ export default function Remisiones() {
             </Card>
           );
         })}
-        {activeTab==='activas'&&!activeRows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.remisiones.sinActivas}</div>}
+        {activeTab==='activas'&&!activeRows.length&&<div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">{t.remisiones.sinActivas}</div>}
       </div>
 
       <Dialog open={!!detalleRemision} onOpenChange={o=>{if(!o)setDetalleRemision(null);}}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex flex-wrap items-center gap-2 text-[#1F3864]">
+            <DialogTitle className="flex flex-wrap items-center gap-2 text-primary">
               {t.remisiones.detalleTitulo(detalleRemision?.folio_remision ?? "")}
               {detalleRemision&&<EstatusBadge estatus={detalleRemision.estatus} size="md"/>}
             </DialogTitle>
@@ -1704,34 +1704,34 @@ export default function Remisiones() {
           {detalleRemision&&(
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.fecha}</div>
                   <div className="font-semibold">{fmtDate(detalleRemision.fecha_remision)}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3 sm:col-span-2">
+                <div className="rounded-3xl border bg-slate-50 p-3 sm:col-span-2">
                   <div className="text-xs text-muted-foreground">{t.remisiones.cliente}</div>
                   <div className="font-semibold break-words">
                     {detalleRemision.clientes?.codigo_erp||detalleRemision.clientes?.folio_interno||"—"}
                     {detalleRemision.clientes?.nombre_comercial?` · ${detalleRemision.clientes.nombre_comercial}`:""}
                   </div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.fields.vendedor}</div>
                   <div className="font-semibold break-words">{detalleRemision.nombre_vendedor||detalleRemision.profiles?.nombre_completo||"—"}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.tipoPagoLbl}</div>
                   <div className="font-semibold">{detalleRemision.tipo_pago==="contra_entrega"?t.pago.contra_entrega:t.pago.anticipado}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.estadoPago}</div>
                   <div className="font-semibold">{detalleRemision.pagado===false?t.estatus.PENDIENTE:t.pago.pagado}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.unidadesSolicitadas}</div>
                   <div className="font-semibold">{detalleRemision.total_unidades_solicitadas||detalleRemision.motocarros?.length||1}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{t.remisiones.unidadesAsignadas}</div>
                   <div className="font-semibold">{detalleRemision.motocarros?.length||0}</div>
                 </div>
@@ -1742,7 +1742,7 @@ export default function Remisiones() {
                 {detalleRemision.remision_items?.length?(
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {detalleRemision.remision_items.map((item:any)=>(
-                      <div key={item.id} className="rounded-lg border p-3 flex items-start gap-2">
+                      <div key={item.id} className="rounded-3xl border p-3 flex items-start gap-2">
                         <span>{tipoIcon[item.tipo_servicio]||"•"}</span>
                         <div className="min-w-0">
                           <div className="font-semibold">{t.componentes.bandejaRemisiones.tipoServicio(item.tipo_servicio)}</div>
@@ -1753,7 +1753,7 @@ export default function Remisiones() {
                       </div>
                     ))}
                   </div>
-                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{t.remisiones.sinConfiguracion}</div>}
+                ):<div className="rounded-3xl border border-dashed p-4 text-sm text-muted-foreground">{t.remisiones.sinConfiguracion}</div>}
               </div>
 
               <div>
@@ -1761,7 +1761,7 @@ export default function Remisiones() {
                 {detalleRemision.motocarros?.length?(
                   <div className="space-y-2">
                     {detalleRemision.motocarros.map((m:any)=>(
-                      <div key={m.id} className="rounded-lg border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
+                      <div key={m.id} className="rounded-3xl border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
                         <div><span className="text-muted-foreground">{t.remisiones.ordenLbl}</span> <strong>#{m.orden_armado}</strong></div>
                         <div><span className="text-muted-foreground">{t.remisiones.modeloColorLbl}</span> <strong>{m.modelo||"—"} {m.color||""}</strong></div>
                         <div className="break-all"><span className="text-muted-foreground">{t.remisiones.nsChasisLbl}</span> <strong>{m.ns_chasis||m.chasis_asignado||"—"}</strong></div>
@@ -1773,13 +1773,13 @@ export default function Remisiones() {
                       </div>
                     ))}
                   </div>
-                ):<div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{t.remisiones.sinUnidadesAsignadas}</div>}
+                ):<div className="rounded-3xl border border-dashed p-4 text-sm text-muted-foreground">{t.remisiones.sinUnidadesAsignadas}</div>}
               </div>
 
               {detalleRemision.notas&&(
                 <div>
                   <h3 className="text-base mb-2">{t.remisiones.notas}</h3>
-                  <div className="rounded-lg border bg-blue-50/50 p-3 text-sm whitespace-pre-wrap break-words">{detalleRemision.notas}</div>
+                  <div className="rounded-3xl border bg-blue-50/50 p-3 text-sm whitespace-pre-wrap break-words">{detalleRemision.notas}</div>
                 </div>
               )}
 
@@ -1790,9 +1790,9 @@ export default function Remisiones() {
                   <h3 className="text-base mb-2 flex items-center gap-2"><History className="h-4 w-4"/> {t.remisiones.modificaciones}</h3>
                   <div className="space-y-2">
                     {historial.map((h:any)=>(
-                      <div key={h.id} className="rounded-lg border bg-amber-50/50 p-3 text-sm">
+                      <div key={h.id} className="rounded-3xl border bg-amber-50/50 p-3 text-sm">
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <strong className="text-[#1F3864]">{h.nombre_usuario||"—"}</strong>
+                          <strong className="text-primary">{h.nombre_usuario||"—"}</strong>
                           <span>{new Date(h.created_at).toLocaleString(locale)}</span>
                           <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold uppercase tracking-wide">{h.tipo_cambio}</span>
                         </div>
@@ -1806,14 +1806,14 @@ export default function Remisiones() {
               <div className="flex flex-wrap gap-2 border-t pt-4">
                 {detalleRemision.documento_url?(
                   <>
-                    <Button onClick={()=>verPdf(detalleRemision.documento_url)} className="flex-1 min-w-40 bg-[#1F3864] hover:bg-[#162a4d]">
+                    <Button onClick={()=>verPdf(detalleRemision.documento_url)} className="flex-1 min-w-40 bg-primary hover:bg-primary-hover">
                       <Eye className="h-4 w-4 mr-2"/> {t.remisiones.visualizarPdf}
                     </Button>
                     <Button variant="outline" onClick={()=>descargarPdf(detalleRemision.documento_url)} className="flex-1 min-w-40">
                       <Download className="h-4 w-4 mr-2"/> {t.remisiones.descargarPdf}
                     </Button>
                   </>
-                ):<div className="flex-1 rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">{t.remisiones.sinPdfAdjunto}</div>}
+                ):<div className="flex-1 rounded-3xl border border-dashed p-3 text-center text-sm text-muted-foreground">{t.remisiones.sinPdfAdjunto}</div>}
                 <Button variant="outline" onClick={()=>setDetalleRemision(null)}>{t.actions.close}</Button>
               </div>
             </div>
@@ -1825,7 +1825,7 @@ export default function Remisiones() {
       <Dialog open={!!editar} onOpenChange={o=>{ if(!o) cerrarEdicion(); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[#1F3864]">
+            <DialogTitle className="flex items-center gap-2 text-primary">
               <Pencil className="h-5 w-5"/> {t.remisiones.editarTitulo(editar?.folio_remision ?? "")}
             </DialogTitle>
             <DialogDescription>{t.remisiones.editarDesc}</DialogDescription>
@@ -1839,7 +1839,7 @@ export default function Remisiones() {
                 const reparto = repartoDe(editar, totalUnidadesEdit);
                 const mueve   = reparto.liberables + reparto.porPedir;
                 return (
-                  <div className={`rounded-lg border px-3 py-2 text-xs flex items-start gap-2 ${
+                  <div className={`rounded-3xl border px-3 py-2 text-xs flex items-start gap-2 ${
                     mueve ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-muted-foreground"
                   }`}>
                     <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5"/>
@@ -1850,7 +1850,7 @@ export default function Remisiones() {
                       {!mueve && t.remisiones.repartoLibre}
                       {reparto.liberables > 0 && t.remisiones.repartoLiberables(totalUnidadesEdit, reparto.liberables)}
                       {reparto.porPedir > 0 && (
-                        <strong className="block mt-1 text-[#1F3864]">
+                        <strong className="block mt-1 text-primary">
                           {t.remisiones.repartoPorPedir(reparto.porPedir)}
                         </strong>
                       )}
@@ -1922,7 +1922,7 @@ export default function Remisiones() {
               </div>
 
               {/* ── Motivo — obligatorio ───────────────────────────────── */}
-              <div className="rounded-xl border-2 border-[#2E75B6]/40 bg-[#DBEAFE]/30 p-3 space-y-2">
+              <div className="rounded-3xl border-2 border-secondary/40 bg-[#DBEAFE]/30 p-3 space-y-2">
                 <Label className="text-base font-semibold">
                   {t.remisiones.motivoModificacion} <span className="text-red-500">*</span>
                 </Label>
@@ -1957,7 +1957,7 @@ export default function Remisiones() {
             <Button
               onClick={guardarEdicion}
               disabled={guardandoEdicion||!motivoValido(editMotivo)}
-              className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
+              className="h-12 px-5 text-base bg-primary hover:bg-primary-hover"
             >
               {guardandoEdicion?t.remisiones.guardandoEdicion:t.remisiones.guardarCambios}
             </Button>
@@ -2110,10 +2110,10 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, canMarkEntrega, 
   const puedeMarcarUnidad = !!canMarkEntrega && m.estatus_entrega !== "ENTREGADA" && !!(m.ns_chasis || m.chasis_asignado) && !!m.ns_motor;
 
   return (
-    <div className="rounded-md border bg-white text-sm overflow-hidden">
+    <div className="rounded-3xl border bg-white text-sm overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold text-[#1F3864]">#{m.orden_armado}</span>
+          <span className="font-bold text-primary">#{m.orden_armado}</span>
           <span className="text-xs font-mono text-muted-foreground truncate">{m.ns_chasis||m.chasis_asignado||"—"}</span>
         </div>
         <EstatusBadge estatus={m.estatus_entrega==="ENTREGADA"?"ENTREGADA":effEstatusArmado(m)} size="sm"/>
@@ -2126,7 +2126,7 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, canMarkEntrega, 
         <div className="px-3 pb-3 flex flex-wrap items-center gap-2">
           {m.fecha_propuesta_entrega?(
             <div className="flex-1 min-w-0 text-xs">
-              <div className="font-medium text-[#1F3864] flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5"/> {t.remisiones.propuesta(fmtDate(m.fecha_propuesta_entrega))}</div>
+              <div className="font-medium text-primary flex items-center gap-1.5"><CalendarClock className="h-3.5 w-3.5"/> {t.remisiones.propuesta(fmtDate(m.fecha_propuesta_entrega))}</div>
               {m.propuesta_entrega_notas&&<div className="text-muted-foreground truncate">{m.propuesta_entrega_notas}</div>}
               <div className="flex gap-1.5 mt-1">
                 <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${tieneFab?"bg-[#D1FAE5] text-[#065F46]":"bg-slate-100 text-slate-500"}`}>
@@ -2174,7 +2174,7 @@ function MotoRow({ m, canPropose, canConfirmFab, canConfirmLog, canMarkEntrega, 
             <div><Label className="text-xs">{t.remisiones.horaContacto}</Label><Input value={notas} onChange={e=>setNotas(e.target.value)} placeholder={t.remisiones.horaPlaceholder} className="h-9 text-sm"/></div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" className="h-9 bg-[#1F3864] hover:bg-[#162a4d]" onClick={proponer}>{t.remisiones.enviarPropuesta}</Button>
+            <Button size="sm" className="h-9 bg-primary hover:bg-primary-hover" onClick={proponer}>{t.remisiones.enviarPropuesta}</Button>
             <Button size="sm" variant="ghost" className="h-9" onClick={()=>setEditing(false)}>{t.actions.cancel}</Button>
           </div>
         </div>

@@ -182,7 +182,7 @@ export default function Credito() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#1F3864] flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
             <CreditCard className="h-7 w-7" />
             {tc.title}
           </h1>
@@ -197,7 +197,7 @@ export default function Credito() {
       </div>
 
       {schemaFalta && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex gap-2">
+        <div className="rounded-full border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex gap-2">
           <AlertTriangle className="h-5 w-5 shrink-0" />
           <div>
             <div className="font-semibold">{tc.schemaFaltaTitulo}</div>
@@ -209,23 +209,23 @@ export default function Credito() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{tc.kpiClientes}</div>
-          <div className="text-2xl font-bold text-[#1F3864]">{totales.clientes}</div>
+          <div className="text-2xl font-bold text-primary">{totales.clientes}</div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{tc.kpiVencidos}</div>
-          <div className={`text-2xl font-bold ${totales.vencidos ? "text-red-600" : "text-[#1F3864]"}`}>
+          <div className={`text-2xl font-bold ${totales.vencidos ? "text-red-600" : "text-primary"}`}>
             {totales.vencidos}
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{tc.kpiSaldoAbierto}</div>
-          <div className="text-xl font-bold text-[#1F3864]">
+          <div className="text-xl font-bold text-primary">
             {fmtMoneda(totales.saldoAbierto, "MXN", locale)}
           </div>
         </Card>
         <Card className="p-4">
           <div className="text-xs text-muted-foreground">{tc.kpiSaldoVencido}</div>
-          <div className={`text-xl font-bold ${totales.saldoVencido ? "text-red-600" : "text-[#1F3864]"}`}>
+          <div className={`text-xl font-bold ${totales.saldoVencido ? "text-red-600" : "text-primary"}`}>
             {fmtMoneda(totales.saldoVencido, "MXN", locale)}
           </div>
         </Card>
@@ -267,14 +267,14 @@ export default function Credito() {
             return (
               <Card
                 key={c.id}
-                className={`p-4 cursor-pointer hover:border-[#1F3864]/40 transition-colors ${
+                className={`p-4 cursor-pointer hover:border-primary/40 transition-colors ${
                   vencido ? "border-red-200 bg-red-50/40" : ""
                 }`}
                 onClick={() => abrirDetalle(c)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="font-semibold text-[#1F3864] truncate">
+                    <div className="font-semibold text-primary truncate">
                       {c.nombre_comercial || c.razon_social || "—"}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">
@@ -338,7 +338,7 @@ export default function Credito() {
           {detalle && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-[#1F3864]">
+                <DialogTitle className="text-primary">
                   {detalle.nombre_comercial || detalle.razon_social || "—"}
                 </DialogTitle>
                 <p className="text-sm text-muted-foreground">
@@ -350,7 +350,7 @@ export default function Credito() {
               </DialogHeader>
 
               {Number(detalle.saldo_vencido) > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 flex gap-2">
+                <div className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 flex gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                   {tc.avisoBloqueo}
                 </div>
@@ -378,7 +378,7 @@ export default function Credito() {
                     return (
                       <div
                         key={cxc.id}
-                        className={`rounded-md border p-3 ${
+                        className={`rounded-3xl border p-3 ${
                           vencida ? "border-red-200 bg-red-50/50" : "bg-white"
                         }`}
                       >

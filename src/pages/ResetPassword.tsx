@@ -55,7 +55,7 @@ export default function ResetPassword() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4 text-white">
+      <div className="min-h-screen flex items-center justify-center bg-primary p-4 text-white">
         {t.componentes.acceso.cargando}
       </div>
     );
@@ -63,18 +63,18 @@ export default function ResetPassword() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4">
+      <div className="min-h-screen flex items-center justify-center bg-primary p-4">
         <Card className="w-full max-w-lg p-8 shadow-2xl relative space-y-4">
           <button
             type="button"
             onClick={toggleLang}
-            className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-[#1F3864] hover:border-[#1F3864] transition-all text-sm font-medium"
+            className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-primary hover:border-primary transition-all text-sm font-medium"
           >
             🌐 {t.otherLang}
           </button>
-          <h1 className="!text-2xl !text-[#1F3864] text-center">{t.auth.resetTitle}</h1>
+          <h1 className="!text-2xl !text-primary text-center">{t.auth.resetTitle}</h1>
           <p className="text-muted-foreground text-center text-sm">{t.auth.resetLinkInvalid}</p>
-          <Button asChild className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+          <Button asChild className="w-full h-12 text-base bg-primary hover:bg-primary-hover">
             <Link to="/auth">{t.auth.requestNewLink}</Link>
           </Button>
         </Card>
@@ -83,18 +83,18 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#1F3864] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-primary p-4">
       <Card className="w-full max-w-lg p-8 shadow-2xl relative">
         <button
           type="button"
           onClick={toggleLang}
-          className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-[#1F3864] hover:border-[#1F3864] transition-all text-sm font-medium"
+          className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-200 text-slate-500 hover:text-primary hover:border-primary transition-all text-sm font-medium"
         >
           🌐 {t.otherLang}
         </button>
 
         <div className="text-center mb-8">
-          <h1 className="!text-3xl !text-[#1F3864]">{t.auth.resetTitle}</h1>
+          <h1 className="!text-3xl !text-primary">{t.auth.resetTitle}</h1>
           <p className="text-muted-foreground text-base mt-2">{t.auth.resetSubtitle}</p>
         </div>
 
@@ -134,7 +134,7 @@ export default function ResetPassword() {
               {t.auth.showPasswords}
             </label>
           </div>
-          <Button type="submit" disabled={busy} className="w-full h-12 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+          <Button type="submit" disabled={busy} className="w-full h-12 text-base bg-primary hover:bg-primary-hover">
             {busy ? t.auth.savingPassword : t.auth.savePassword}
           </Button>
         </form>
@@ -142,7 +142,7 @@ export default function ResetPassword() {
         <div className="mt-4 text-center">
           <button
             type="button"
-            className="text-sm text-[#1F3864] hover:underline"
+            className="text-sm text-primary hover:underline"
             onClick={() => {
               clearPasswordRecovery();
               void signOut();

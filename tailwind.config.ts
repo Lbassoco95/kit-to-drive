@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter', 'Arial', 'Helvetica', 'sans-serif'],
+        sans: ['Inter', '"Noto Sans SC"', '"PingFang SC"', '"Microsoft YaHei"', 'Arial', 'Helvetica', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -22,6 +22,12 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        dazon: {
+          navy: "hsl(var(--dazon-navy))",
+          "navy-deep": "hsl(var(--dazon-navy-deep))",
+          red: "hsl(var(--dazon-red))",
+          gold: "hsl(var(--dazon-gold))",
+        },
         surface: "hsl(var(--surface))",
         "surface-alt": "hsl(var(--surface-alt))",
         success: { DEFAULT: "hsl(var(--success))", foreground: "hsl(var(--success-foreground))" },
@@ -29,7 +35,9 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          hover: "hsl(var(--dazon-navy-deep))",
         },
+        "primary-hover": "hsl(var(--dazon-navy-deep))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

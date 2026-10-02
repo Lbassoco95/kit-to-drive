@@ -129,7 +129,7 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
 
         {/* Selección de chasis */}
         {chasis ? (
-          <div className="rounded-lg border bg-slate-50 p-3">
+          <div className="rounded-3xl border bg-slate-50 p-3">
             <div className="font-mono font-bold text-base">{chasis.numero_chasis}</div>
             <div className="text-xs text-muted-foreground">
               {chasis.modelo} · {chasis.color} · {t.catalogos.estatusChasis(chasis.estatus)}
@@ -142,7 +142,7 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input className="pl-8 h-10" placeholder={t.componentes.reportarIncidencia.buscar} value={q} onChange={e => setQ(e.target.value)} />
             </div>
-            <div className="border rounded-lg max-h-52 overflow-y-auto divide-y">
+            <div className="border rounded-3xl max-h-52 overflow-hidden overflow-y-auto divide-y">
               {filtrados.map(c => {
                 const yaTiene = conReporte.has(c.id);
                 return (
@@ -208,7 +208,7 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
                   key={p}
                   type="button"
                   onClick={() => setForm(f => ({ ...f, parte_afectada: p }))}
-                  className={`text-[11px] px-2 py-1 rounded-full border ${form.parte_afectada === p ? "bg-[#1F3864] text-white border-[#1F3864]" : "bg-white text-slate-600 hover:border-[#2E75B6]"}`}
+                  className={`text-[11px] px-2 py-1 rounded-full border ${form.parte_afectada === p ? "bg-primary text-white border-primary" : "bg-white text-slate-600 hover:border-secondary"}`}
                 >
                   {etiqueta}
                 </button>
@@ -226,7 +226,7 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
           />
         </div>
 
-        <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-slate-50">
+        <label className="flex items-start gap-3 rounded-3xl border p-3 cursor-pointer hover:bg-slate-50">
           <input
             type="checkbox"
             checked={form.retiene}
@@ -240,7 +240,7 @@ export function ReportarIncidencia({ chasis, open, onOpenChange, onDone }: Props
         </label>
 
         {form.retiene && (
-          <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
+          <div className="rounded-3xl p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
             <AlertTriangle className="h-5 w-5 shrink-0" />
             {t.catalogos.ayudaIncidencia("en_revision")}
           </div>

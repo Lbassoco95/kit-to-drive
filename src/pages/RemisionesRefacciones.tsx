@@ -218,7 +218,7 @@ export default function RemisionesRefacciones() {
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1F3864] flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
             <Boxes className="h-7 w-7" />
             {tx.titulo}
           </h1>
@@ -226,7 +226,7 @@ export default function RemisionesRefacciones() {
         </div>
         <div className="flex flex-wrap gap-2">
           {puedeCapturar && (
-            <Button className="bg-[#1F3864] hover:bg-[#162a4d]" onClick={() => setOpen(true)}>
+            <Button className="bg-primary hover:bg-primary-hover" onClick={() => setOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               {tx.nueva}
             </Button>
@@ -234,7 +234,7 @@ export default function RemisionesRefacciones() {
         </div>
       </div>
 
-      <Card className="p-4 text-sm text-[#1F3864] bg-[#EFF6FF] border-[#1F3864]/15">
+      <Card className="p-4 text-sm text-primary bg-[#EFF6FF] border-primary/15">
         {tx.leyendaBloqueo}
       </Card>
 
@@ -273,7 +273,7 @@ export default function RemisionesRefacciones() {
               <div className="space-y-1">
                 <div className="space-y-0.5">
                   <div className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{tx.folioSeguimiento}</div>
-                  <div className={`font-mono text-2xl font-bold leading-tight ${r.etapa === "cancelada" ? "text-slate-500 line-through" : "text-[#1F3864]"}`}>{r.folio}</div>
+                  <div className={`font-mono text-2xl font-bold leading-tight ${r.etapa === "cancelada" ? "text-slate-500 line-through" : "text-primary"}`}>{r.folio}</div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <EtapaBadge etapa={r.etapa} abierta={r.abierta} />
@@ -311,7 +311,7 @@ export default function RemisionesRefacciones() {
           {detalle && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex flex-wrap items-center gap-2 text-[#1F3864]">
+                <DialogTitle className="flex flex-wrap items-center gap-2 text-primary">
                   <span className="font-mono">{detalle.folio}</span>
                   <EtapaBadge etapa={detalle.etapa} abierta={detalle.abierta} />
                   <AreaBadge area={detalle.area_actual} />
@@ -323,14 +323,14 @@ export default function RemisionesRefacciones() {
               </div>
               {detalle.notas && <p className="text-sm">{detalle.notas}</p>}
               {detalle.etapa === "cancelada" && (
-                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                <div className="rounded-3xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800">
                   <p className="font-medium">{tx.canceladaBanner}</p>
                   <p className="mt-1">{tx.motivoCancelacion}: {detalle.motivo_cancelacion || "—"}</p>
                   {detalle.cancelada_at && <p className="text-xs text-muted-foreground mt-1">{fmtDate(detalle.cancelada_at)}</p>}
                 </div>
               )}
               {detalle.etapa === "contingencia" && (
-                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{tx.avisoFaltante}</p>
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-3 py-2">{tx.avisoFaltante}</p>
               )}
               <EnvioPanel
                 remision={detalle}
@@ -365,7 +365,7 @@ export default function RemisionesRefacciones() {
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tx.historial}</h3>
                 <ol className="space-y-2">
                   {eventos.map(ev => (
-                    <li key={ev.id} className="rounded-md border px-3 py-2 text-sm">
+                    <li key={ev.id} className="rounded-full border px-3 py-2 text-sm">
                       <div className="flex flex-wrap items-center gap-2">
                         <AreaBadge area={ev.area} />
                         <span className="font-medium">{tx.accion[ev.accion as keyof typeof tx.accion] ?? ev.accion}</span>
@@ -457,7 +457,7 @@ function Camino({ etapa }: { etapa: Etapa }) {
       {PASOS_REMISION_REFACCION.map((paso, i) => {
         const marca = marcaPaso(etapa, paso);
         const tono =
-          marca === "aqui" ? "bg-[#1F3864] text-white" :
+          marca === "aqui" ? "bg-primary text-white" :
           marca === "hecho" ? "bg-emerald-100 text-emerald-800" :
           marca === "omitido" ? "bg-slate-50 text-slate-400 line-through" :
           "bg-slate-100 text-slate-500";
@@ -632,9 +632,9 @@ function NuevaRemision({
           <DialogTitle>{tx.crearTitulo}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="rounded-md border border-[#1F3864]/20 bg-[#EFF6FF] px-3 py-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-[#1F3864]">{tx.folioSeguimiento}</div>
-            <div className="font-mono text-2xl font-bold text-[#1F3864]">{folioPrevisto}</div>
+          <div className="rounded-full border border-primary/20 bg-[#EFF6FF] px-3 py-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-primary">{tx.folioSeguimiento}</div>
+            <div className="font-mono text-2xl font-bold text-primary">{folioPrevisto}</div>
             <p className="text-xs text-muted-foreground mt-1">{tx.folioSerie}</p>
           </div>
           <div>
@@ -675,7 +675,7 @@ function NuevaRemision({
                 </Button>
               ))}
             </div>
-            <div className="mt-2 max-h-64 overflow-y-auto space-y-1 rounded-md border p-1">
+            <div className="mt-2 max-h-64 overflow-hidden overflow-y-auto space-y-1 rounded-3xl border p-1">
               {coincidencias.map(p => {
                 const disp = dispDe(p);
                 return (
@@ -683,7 +683,7 @@ function NuevaRemision({
                     key={p.id}
                     type="button"
                     onClick={() => agregar(p)}
-                    className="w-full text-left rounded-md border px-3 py-2 hover:bg-slate-50 flex items-center gap-3"
+                    className="w-full text-left rounded-3xl border px-3 py-2 hover:bg-slate-50 flex items-center gap-3"
                   >
                     <span className="font-mono text-xs font-semibold w-28 shrink-0">{p.codigo_nuevo}</span>
                     <span className="text-[10px] uppercase text-muted-foreground w-24 shrink-0 truncate">{tx.seccionLinea[p.linea_catalogo as keyof typeof tx.seccionLinea] || p.linea_catalogo || ""}</span>
@@ -704,7 +704,7 @@ function NuevaRemision({
           {lineas.length > 0 && (
             <div className="space-y-2">
               {lineas.map(l => (
-                <div key={l.productoId} className="flex items-center gap-2 rounded-md border p-2">
+                <div key={l.productoId} className="flex items-center gap-2 rounded-3xl border p-2">
                   <div className="flex-1 min-w-0">
                     <div className="font-mono text-xs font-semibold">{l.codigo}</div>
                     <div className="text-sm truncate">{l.descripcion}</div>
@@ -800,7 +800,7 @@ function NuevaRemision({
             <Label>{tx.notas}</Label>
             <Textarea className="mt-1" value={notas} onChange={e => setNotas(e.target.value)} />
           </div>
-          <Button onClick={guardar} disabled={guardando} className="w-full bg-[#1F3864] hover:bg-[#162a4d]">
+          <Button onClick={guardar} disabled={guardando} className="w-full bg-primary hover:bg-primary-hover">
             {guardando ? tx.creando : tx.crearBtn}
           </Button>
         </div>
@@ -836,7 +836,7 @@ function Partida({
   };
 
   return (
-    <div className="rounded-md border p-3 space-y-2">
+    <div className="rounded-3xl border p-3 space-y-2">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="font-mono text-sm font-semibold">{item.codigo_nuevo}</div>
@@ -920,7 +920,7 @@ function CancelarRemision({ id, onHecho }: { id: string; onHecho: () => Promise<
   const [motivo, setMotivo] = useState("");
   const [ocupado, setOcupado] = useState(false);
   return (
-    <div className="space-y-2 rounded-md border border-dashed p-3">
+    <div className="space-y-2 rounded-3xl border border-dashed p-3">
       <div>
         <div className="text-sm font-medium">{tx.cancelarRemision}</div>
         <p className="text-xs text-muted-foreground">{tx.cancelarRemisionAyuda}</p>
@@ -970,11 +970,11 @@ async function descargarPdf(remision: Remision, lineas: Item[]) {
   const total = lineas.reduce((s, it) => s + (it.precio_unitario ?? 0) * it.cantidad, 0);
   const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(remision.folio)}</title>
     <style>
-      body { font-family: Arial, sans-serif; color: #1F3864; margin: 32px; }
+      body { font-family: Arial, sans-serif; color: hsl(var(--primary)); margin: 32px; }
       h1 { font-size: 20px; margin: 0 0 4px; }
       table { width: 100%; border-collapse: collapse; margin-top: 16px; }
       th, td { border: 1px solid #d0d7e2; padding: 6px 8px; font-size: 12px; text-align: left; }
-      th { background: #1F3864; color: white; }
+      th { background: hsl(var(--primary)); color: white; }
       .num { text-align: right; }
       .meta { font-size: 13px; color: #334155; }
       @media print { button { display: none; } }
@@ -1054,7 +1054,7 @@ function EnvioPanel({
   const formaLabel = remision.forma_pago === "transferencia" ? tx.transferencia : tx.efectivo;
 
   return (
-    <section className="rounded-md border p-3 space-y-3 text-sm">
+    <section className="rounded-3xl border p-3 space-y-3 text-sm">
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline"><Truck className="h-3 w-3 mr-1" />{envioLabel}</Badge>
         <Badge variant="outline" className={remision.pagado ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}>{pagoLabel} · {formaLabel}</Badge>

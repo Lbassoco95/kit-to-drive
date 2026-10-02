@@ -228,7 +228,7 @@ export default function FinanzasMovimiento() {
         <Button variant="outline" onClick={() => navigate("/finanzas")}>
           <ArrowLeft size={16} className="mr-2" /> {t.finanzas.volver}
         </Button>
-        <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
+        <div className="rounded-3xl border bg-card py-16 text-center text-muted-foreground">
           {t.finanzas.detalle.noEncontrado}
         </div>
       </div>
@@ -267,7 +267,7 @@ export default function FinanzasMovimiento() {
                 </Badge>
               )}
             </div>
-            <h1 className="text-2xl font-extrabold text-[#1F3864]">{mov.concepto}</h1>
+            <h1 className="text-2xl font-extrabold text-primary">{mov.concepto}</h1>
             <p className="text-sm text-muted-foreground">
               {esIngreso ? t.finanzas.detalle.nosPago : t.finanzas.detalle.lePagamosA}{" "}
               <strong className="text-foreground">{mov.contraparte_nombre}</strong>
@@ -328,7 +328,7 @@ export default function FinanzasMovimiento() {
         </div>
 
         {mov.estatus === "CANCELADO" && mov.motivo_cancelacion && (
-          <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div className="mt-3 rounded-3xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
             <strong>{t.finanzas.detalle.cancelado}</strong> {mov.motivo_cancelacion}
           </div>
         )}
@@ -337,7 +337,7 @@ export default function FinanzasMovimiento() {
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Datos del movimiento */}
         <Card className="space-y-4 p-5">
-          <h3 className="flex items-center gap-2 font-bold text-[#1F3864]">
+          <h3 className="flex items-center gap-2 font-bold text-primary">
             <Wallet size={16} /> {t.finanzas.detalle.datosMovimiento}
           </h3>
           <dl className="grid grid-cols-2 gap-3">
@@ -360,7 +360,7 @@ export default function FinanzasMovimiento() {
             )}
           </dl>
           {mov.descripcion && (
-            <div className="rounded-md bg-slate-50 p-3 text-sm text-muted-foreground">
+            <div className="rounded-3xl bg-slate-50 p-3 text-sm text-muted-foreground">
               {mov.descripcion}
             </div>
           )}
@@ -368,14 +368,14 @@ export default function FinanzasMovimiento() {
 
         {/* Quién y cómo */}
         <Card className="space-y-4 p-5">
-          <h3 className="flex items-center gap-2 font-bold text-[#1F3864]">
+          <h3 className="flex items-center gap-2 font-bold text-primary">
             <User size={16} /> {esIngreso ? t.finanzas.detalle.quienPagoTrajo : t.finanzas.detalle.aQuienPorMedio}
           </h3>
 
-          <div className="rounded-lg border p-3">
+          <div className="rounded-3xl border p-3">
             <div className="flex items-center gap-2">
-              {mov.contraparte_tipo === "PROVEEDOR" ? <Building2 size={15} className="text-[#2E75B6]" />
-                : <User size={15} className="text-[#2E75B6]" />}
+              {mov.contraparte_tipo === "PROVEEDOR" ? <Building2 size={15} className="text-secondary" />
+                : <User size={15} className="text-secondary" />}
               <span className="font-semibold">{mov.contraparte_nombre}</span>
               <Badge variant="outline" className="ml-auto text-[11px]">
                 {t.finanzas.detalle.contraparte[mov.contraparte_tipo] ?? t.finanzas.detalle.contraparte.OTRO}
@@ -386,7 +386,7 @@ export default function FinanzasMovimiento() {
             )}
           </div>
 
-          <div className="rounded-lg border p-3 text-sm">
+          <div className="rounded-3xl border p-3 text-sm">
             <p className="font-medium">{etiquetaVia(mov.tipo, mov.via, t.finanzas.validacion)}</p>
             {mov.via === "INTERMEDIARIO" && (
               <p className="mt-1 text-muted-foreground">
@@ -405,7 +405,7 @@ export default function FinanzasMovimiento() {
           {/* Comprobación de efectivo */}
           {mov.requiere_comprobacion && (
             <div
-              className={`rounded-lg border p-3 ${
+              className={`rounded-3xl border p-3 ${
                 mov.comprobado ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
               }`}
             >
@@ -447,7 +447,7 @@ export default function FinanzasMovimiento() {
 
       {/* Bitácora */}
       <Card className="p-5">
-        <h3 className="mb-3 flex items-center gap-2 font-bold text-[#1F3864]">
+        <h3 className="mb-3 flex items-center gap-2 font-bold text-primary">
           <ScrollText size={16} /> {t.finanzas.detalle.bitacora}
         </h3>
         {bitacora.length === 0 ? (
@@ -562,7 +562,7 @@ export default function FinanzasMovimiento() {
               {t.actions.cancel}
             </Button>
             <Button
-              className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
+              className="h-11 bg-primary px-6 hover:bg-primary-hover"
               onClick={guardarEdicion}
               disabled={trabajando}
             >

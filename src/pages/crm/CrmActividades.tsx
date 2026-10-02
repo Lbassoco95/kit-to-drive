@@ -368,7 +368,7 @@ export default function CrmActividades() {
         </div>
         {canCreate && (
           <Button onClick={() => { setProgramarForm({ vendedor_id: user?.id || "", oportunidad_id: "", cliente_id: "", tipo: "visita", fecha_actividad: "", objetivo_visita: "" }); setCreating(true); }}
-            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+            className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">
             <Plus className="h-5 w-5 mr-2"/> {t.crm.actividades.programarVisita}
           </Button>
         )}
@@ -403,7 +403,7 @@ export default function CrmActividades() {
                       </div>
                     )}
                   </div>
-                  <div className="text-lg font-bold text-[#1F3864] truncate">{t.crm.tipoActividad(a.tipo)}</div>
+                  <div className="text-lg font-bold text-primary truncate">{t.crm.tipoActividad(a.tipo)}</div>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     {a.evidencia_url && (
                       <img 
@@ -427,7 +427,7 @@ export default function CrmActividades() {
                 </div>
                 <div className="flex gap-1">
                   {a.tipo === 'visita' && a.estatus === 'programada' && (
-                    <Button size="sm" onClick={() => openCompletar(a)} className="h-8 px-3 bg-[#1F3864] hover:bg-[#162a4d] text-xs">
+                    <Button size="sm" onClick={() => openCompletar(a)} className="h-8 px-3 bg-primary hover:bg-primary-hover text-xs">
                       {t.crm.actividades.completarVisita}
                     </Button>
                   )}
@@ -481,7 +481,7 @@ export default function CrmActividades() {
 
               {expandedActivity === a.id && a.tipo === 'visita' && (
                 <div className="mt-3 pt-3 border-t space-y-3 text-sm">
-                  <div className="font-medium text-[#1F3864]">{t.crm.perfilVisita.perfilCliente}</div>
+                  <div className="font-medium text-primary">{t.crm.perfilVisita.perfilCliente}</div>
                   
                   <div className="grid grid-cols-2 gap-2">
                     {a.region && <div><span className="text-muted-foreground">{t.crm.perfilVisita.region}:</span> {a.region}</div>}
@@ -492,7 +492,7 @@ export default function CrmActividades() {
                     {a.telefono_contacto && <div><span className="text-muted-foreground">{t.crm.perfilVisita.telefono}:</span> {a.telefono_contacto}</div>}
                   </div>
 
-                  <div className="font-medium text-[#1F3864] mt-2">{t.crm.perfilVisita.operacionNegocio}</div>
+                  <div className="font-medium text-primary mt-2">{t.crm.perfilVisita.operacionNegocio}</div>
                   <div className="grid grid-cols-2 gap-2">
                     {a.tipo_negocio && <div><span className="text-muted-foreground">{t.crm.perfilVisita.tipo}:</span> {a.tipo_negocio}</div>}
                     {a.escala_operacion && <div><span className="text-muted-foreground">{t.crm.perfilVisita.escala}:</span> {a.escala_operacion}</div>}
@@ -502,7 +502,7 @@ export default function CrmActividades() {
                     {a.fecha_ultima_visita && <div><span className="text-muted-foreground">{t.crm.perfilVisita.ultimaVisita}:</span> {new Date(a.fecha_ultima_visita).toLocaleDateString()}</div>}
                   </div>
 
-                  <div className="font-medium text-[#1F3864] mt-2">{t.crm.perfilVisita.reporteVisita}</div>
+                  <div className="font-medium text-primary mt-2">{t.crm.perfilVisita.reporteVisita}</div>
                   <div className="space-y-2">
                     {a.asuntos_tratados && <div><span className="text-muted-foreground">{t.crm.perfilVisita.asuntosTratados}:</span> {a.asuntos_tratados}</div>}
                     {a.acuerdos_alcanzados && <div><span className="text-muted-foreground">{t.crm.perfilVisita.acuerdos}:</span> {a.acuerdos_alcanzados}</div>}
@@ -519,7 +519,7 @@ export default function CrmActividades() {
             </Card>
           );
         })}
-        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.crm.actividades.sinActividades}</div>}
+        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">{t.crm.actividades.sinActividades}</div>}
       </div>
 
       {/* Programar Visita Dialog */}
@@ -582,7 +582,7 @@ export default function CrmActividades() {
               <Textarea value={programarForm.objetivo_visita || ""} onChange={e => setProgramarForm({ ...programarForm, objetivo_visita: e.target.value })} placeholder={t.crm.actividades.objetivoPlaceholder} rows={2} />
             </div>
           </div>
-          <DialogFooter><Button onClick={saveProgramar} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">{t.crm.actividades.programar}</Button></DialogFooter>
+          <DialogFooter><Button onClick={saveProgramar} className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">{t.crm.actividades.programar}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -592,7 +592,7 @@ export default function CrmActividades() {
           <DialogHeader><DialogTitle>{t.crm.actividades.reporteVisita}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-3">
-              <div className="font-medium text-[#1F3864]">{t.crm.actividades.datosCliente}</div>
+              <div className="font-medium text-primary">{t.crm.actividades.datosCliente}</div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>{t.crm.actividades.codigoCliente}</Label>
@@ -648,7 +648,7 @@ export default function CrmActividades() {
             </div>
 
             <div className="space-y-3 pt-2 border-t">
-              <div className="font-medium text-[#1F3864]">{t.crm.actividades.marcasComercializa}</div>
+              <div className="font-medium text-primary">{t.crm.actividades.marcasComercializa}</div>
               <div className="grid grid-cols-4 gap-2">
                 {Object.entries(marcasCheckboxes).map(([marca, checked]) => (
                   <label key={marca} className="flex items-center gap-2 cursor-pointer">
@@ -671,7 +671,7 @@ export default function CrmActividades() {
             </div>
 
             <div className="space-y-3 pt-2 border-t">
-              <div className="font-medium text-[#1F3864]">{t.crm.actividades.top3Title}</div>
+              <div className="font-medium text-primary">{t.crm.actividades.top3Title}</div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
                   <Label>{t.crm.actividades.marcaN(1)}</Label>
@@ -731,7 +731,7 @@ export default function CrmActividades() {
             </div>
 
             <div className="space-y-3 pt-2 border-t">
-              <div className="font-medium text-[#1F3864]">{t.crm.actividades.volumenPotencial}</div>
+              <div className="font-medium text-primary">{t.crm.actividades.volumenPotencial}</div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>{t.crm.actividades.volumenPromedio}</Label>
@@ -745,7 +745,7 @@ export default function CrmActividades() {
             </div>
 
             <div className="space-y-3 pt-2 border-t">
-              <div className="font-medium text-[#1F3864]">{t.crm.perfilVisita.reporteVisita}</div>
+              <div className="font-medium text-primary">{t.crm.perfilVisita.reporteVisita}</div>
               <div>
                 <Label>{t.crm.actividades.resultadoQuePaso}</Label>
                 <Textarea value={completarForm.resultado || ""} onChange={e => setCompletarForm({ ...completarForm, resultado: e.target.value })} placeholder={t.crm.actividades.describeResultado} rows={3} />
@@ -773,7 +773,7 @@ export default function CrmActividades() {
             </div>
 
             <div className="space-y-3 pt-2 border-t">
-              <div className="font-medium text-[#1F3864]">{t.crm.limitantes.detectadas}</div>
+              <div className="font-medium text-primary">{t.crm.limitantes.detectadas}</div>
               <div className="flex flex-wrap gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={completarForm.limitante_descuento} onChange={e => setCompletarForm({ ...completarForm, limitante_descuento: e.target.checked })} className="rounded" />
@@ -797,7 +797,7 @@ export default function CrmActividades() {
             </div>
 
             <div className="space-y-3 pt-2 border-t">
-              <div className="font-medium text-[#1F3864]">{t.crm.actividades.evidenciaFotografica}</div>
+              <div className="font-medium text-primary">{t.crm.actividades.evidenciaFotografica}</div>
               <FileOrCamera 
                 value={evidenciaFile} 
                 onChange={setEvidenciaFile} 
@@ -806,7 +806,7 @@ export default function CrmActividades() {
               />
             </div>
           </div>
-          <DialogFooter><Button onClick={saveCompletar} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">{t.crm.actividades.guardarReporte}</Button></DialogFooter>
+          <DialogFooter><Button onClick={saveCompletar} className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">{t.crm.actividades.guardarReporte}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -867,7 +867,7 @@ export default function CrmActividades() {
               <Textarea value={form.descripcion || ""} onChange={e => setForm({ ...form, descripcion: e.target.value })} rows={2} />
             </div>
           </div>
-          <DialogFooter><Button onClick={guardarEdicion} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">{t.actions.save}</Button></DialogFooter>
+          <DialogFooter><Button onClick={guardarEdicion} className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">{t.actions.save}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

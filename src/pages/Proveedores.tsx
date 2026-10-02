@@ -276,8 +276,8 @@ export default function Proveedores() {
         <Input className="h-11" value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} />
       </div>
 
-      <div className="rounded-lg border p-3 space-y-3">
-        <p className="text-sm font-semibold text-[#1F3864]">{t.proveedores.campos.datosPago}</p>
+      <div className="rounded-3xl border p-3 space-y-3">
+        <p className="text-sm font-semibold text-primary">{t.proveedores.campos.datosPago}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label>{t.proveedores.campos.banco}</Label>
@@ -337,13 +337,13 @@ export default function Proveedores() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2">
-            <Building2 size={28} className="text-[#1F3864]" />
+            <Building2 size={28} className="text-primary" />
             {t.proveedores.title}
           </h1>
           <p className="mt-1 text-base text-muted-foreground">{t.proveedores.subtitle(filtrados.length, verArchivados)}</p>
         </div>
         {puedeEditar && (
-          <Button onClick={abrirAlta} className="h-12 bg-[#1F3864] px-5 text-base hover:bg-[#162a4d]">
+          <Button onClick={abrirAlta} className="h-12 bg-primary px-5 text-base hover:bg-primary-hover">
             <Plus className="mr-2 h-5 w-5" /> {t.proveedores.nuevo}
           </Button>
         )}
@@ -353,16 +353,16 @@ export default function Proveedores() {
         <div className="flex gap-2">
           <button
             onClick={() => setVerArchivados(false)}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${
-              !verArchivados ? "bg-[#1F3864] text-white" : "bg-[#2E75B6]/10 text-[#1F3864]"
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+              !verArchivados ? "bg-primary text-white" : "bg-secondary/10 text-primary"
             }`}
           >
             {t.proveedores.activos}
           </button>
           <button
             onClick={() => setVerArchivados(true)}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${
-              verArchivados ? "bg-[#1F3864] text-white" : "bg-[#2E75B6]/10 text-[#1F3864]"
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+              verArchivados ? "bg-primary text-white" : "bg-secondary/10 text-primary"
             }`}
           >
             {t.proveedores.archivados}
@@ -382,7 +382,7 @@ export default function Proveedores() {
       {cargando ? (
         <div className="py-16 text-center text-muted-foreground">{t.finanzas.cargando}</div>
       ) : filtrados.length === 0 ? (
-        <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
+        <div className="rounded-3xl border bg-card py-16 text-center text-muted-foreground">
           {rows.length === 0 ? t.proveedores.vacio : t.proveedores.sinResultados}
         </div>
       ) : (
@@ -392,7 +392,7 @@ export default function Proveedores() {
               <div className="flex flex-wrap items-start gap-3">
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-base font-bold text-[#1F3864]">{p.nombre_comercial}</span>
+                    <span className="text-base font-bold text-primary">{p.nombre_comercial}</span>
                     {p.codigo && <Badge variant="outline" className="text-[11px]">{p.codigo}</Badge>}
                     {p.categoria && (
                       <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[11px] text-blue-700">
@@ -422,7 +422,7 @@ export default function Proveedores() {
                 {veGastos && gastoPorProveedor[p.id] != null && (
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">{t.proveedores.pagado}</p>
-                    <p className="font-bold text-[#1F3864]">{fmtMoneda(gastoPorProveedor[p.id], "MXN", locale)}</p>
+                    <p className="font-bold text-primary">{fmtMoneda(gastoPorProveedor[p.id], "MXN", locale)}</p>
                   </div>
                 )}
 
@@ -463,7 +463,7 @@ export default function Proveedores() {
           <DialogFooter>
             <Button variant="outline" className="h-11" onClick={() => setAltaAbierta(false)}>{t.actions.cancel}</Button>
             <Button
-              className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
+              className="h-11 bg-primary px-6 hover:bg-primary-hover"
               onClick={guardarAlta}
               disabled={guardando}
             >
@@ -481,7 +481,7 @@ export default function Proveedores() {
           <DialogFooter>
             <Button variant="outline" className="h-11" onClick={() => setEditando(null)}>{t.actions.cancel}</Button>
             <Button
-              className="h-11 bg-[#1F3864] px-6 hover:bg-[#162a4d]"
+              className="h-11 bg-primary px-6 hover:bg-primary-hover"
               onClick={guardarEdicion}
               disabled={guardando}
             >

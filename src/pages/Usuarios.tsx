@@ -206,7 +206,7 @@ export default function Usuarios() {
       <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
           <h1 className="flex items-center gap-2">
-            <ShieldCheck size={28} className="text-[#1F3864]" />
+            <ShieldCheck size={28} className="text-primary" />
             {t.usuarios.title}
           </h1>
           <p className="text-base text-muted-foreground mt-1">{t.usuarios.subtitle(filtered.length, rows.length)}</p>
@@ -214,7 +214,7 @@ export default function Usuarios() {
         {perms.gestionaUsuarios && (
           <Button
             onClick={() => { setNewForm({ ...EMPTY_NEW, area: areasDisponibles[0] ?? "comercial" }); setNewOpen(true); }}
-            className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]"
+            className="h-12 px-5 text-base bg-primary hover:bg-primary-hover"
           >
             <Plus className="h-5 w-5 mr-2" /> {t.usuarios.nuevo}
           </Button>
@@ -223,12 +223,12 @@ export default function Usuarios() {
 
       {/* Los tres tipos de usuario */}
       <Card className="p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[#1F3864] mb-3">
+        <div className="flex items-center gap-2 text-sm font-semibold text-primary mb-3">
           <Info size={16} /> {t.usuarios.tiposUsuario}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {NIVELES.map(n => (
-            <div key={n} className="rounded-lg border p-3">
+            <div key={n} className="rounded-3xl border p-3">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${NIVEL_COLORS[n]}`}>
                 {t.niveles[n]}
               </span>
@@ -273,7 +273,7 @@ export default function Usuarios() {
             <Card key={u.id} className={`p-5 flex flex-col gap-3 transition-shadow hover:shadow-md ${!u.activo ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-[#1F3864] text-lg truncate">{u.nombre_completo || "—"}</div>
+                  <div className="font-bold text-primary text-lg truncate">{u.nombre_completo || "—"}</div>
                   <div className="text-sm text-muted-foreground truncate">{u.email || <em className="text-xs">{t.usuarios.sinEmail}</em>}</div>
                 </div>
                 {editable && (
@@ -322,7 +322,7 @@ export default function Usuarios() {
           );
         })}
         {!filtered.length && (
-          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">
+          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">
             {t.usuarios.sinResultados}
           </div>
         )}
@@ -379,7 +379,7 @@ export default function Usuarios() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditTarget(null)} className="h-11">{t.actions.cancel}</Button>
-            <Button onClick={saveEdit} disabled={saving} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
+            <Button onClick={saveEdit} disabled={saving} className="h-11 px-6 bg-primary hover:bg-primary-hover">
               {saving ? t.usuarios.guardando : t.actions.save}
             </Button>
           </DialogFooter>
@@ -400,7 +400,7 @@ export default function Usuarios() {
                   {copied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} />}
                 </Button>
               </div>
-              <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{t.usuarios.passwordTemporalAviso}</p>
+              <p className="rounded-3xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{t.usuarios.passwordTemporalAviso}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t.usuarios.confirmarPasswordTemporal(resetTarget?.nombre_completo || resetTarget?.email || "")}</p>
@@ -410,7 +410,7 @@ export default function Usuarios() {
               {temporaryPassword ? t.actions.close : t.actions.cancel}
             </Button>
             {!temporaryPassword && (
-              <Button onClick={resetPassword} disabled={resetting} className="h-11 bg-[#1F3864] hover:bg-[#162a4d]">
+              <Button onClick={resetPassword} disabled={resetting} className="h-11 bg-primary hover:bg-primary-hover">
                 {resetting ? t.usuarios.generandoPassword : t.usuarios.generarPasswordTemporal}
               </Button>
             )}
@@ -472,13 +472,13 @@ export default function Usuarios() {
                 <Input value={newForm.codigo_vendedor} onChange={e => setNewForm({ ...newForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder={t.usuarios.codigoVendedorPlaceholder} />
               </div>
             )}
-            <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-md p-2">
+            <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-3xl p-2">
               {t.usuarios.avisoAcceso}
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewOpen(false)} className="h-11">{t.actions.cancel}</Button>
-            <Button onClick={createUser} disabled={saving} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
+            <Button onClick={createUser} disabled={saving} className="h-11 px-6 bg-primary hover:bg-primary-hover">
               {saving ? t.usuarios.creando : t.usuarios.crearUsuario}
             </Button>
           </DialogFooter>

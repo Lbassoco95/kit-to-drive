@@ -167,10 +167,10 @@ export default function ContraparteSelector({
               key={tab.value}
               type="button"
               onClick={() => cambiarTab(tab.value)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                 activo
-                  ? "bg-[#1F3864] text-white border-[#1F3864]"
-                  : "bg-white text-slate-600 border-slate-200 hover:border-[#1F3864]/40"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-primary/40"
               }`}
             >
               <tab.icon size={14} /> {t.finanzas.contraparte[tab.etiqueta]}
@@ -181,7 +181,7 @@ export default function ContraparteSelector({
 
       {/* Ya hay contraparte elegida */}
       {(seleccionadoId || (contraparteTipo === "OTRO" && nombre)) && (
-        <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+        <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-2">
           <Check size={16} className="text-emerald-600 shrink-0" />
           <span className="text-sm font-semibold text-emerald-900 truncate flex-1">{nombre}</span>
           <button type="button" onClick={limpiar} className="text-red-400 hover:text-red-600 shrink-0">
@@ -218,7 +218,7 @@ export default function ContraparteSelector({
             />
           </div>
 
-          <div className="max-h-44 overflow-y-auto rounded-md border divide-y">
+          <div className="max-h-44 overflow-hidden overflow-y-auto rounded-3xl border divide-y">
             {cargando ? (
               <div className="p-3 text-sm text-muted-foreground">{t.finanzas.contraparte.cargandoCatalogo}</div>
             ) : opciones.length === 0 ? (

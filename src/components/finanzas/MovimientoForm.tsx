@@ -107,7 +107,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
               type="button"
               disabled={tipoFijo}
               onClick={() => cambiarTipo(tipo)}
-              className={`flex items-center justify-center gap-2 rounded-lg border-2 py-3 font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+              className={`flex items-center justify-center gap-2 rounded-3xl border-2 py-3 font-bold transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                 activo
                   ? esIngreso
                     ? "border-emerald-500 bg-emerald-50 text-emerald-700"
@@ -189,7 +189,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
 
       {form.moneda !== "MXN" && montoNum > 0 && tcNum > 0 && (
         <p className="-mt-2 text-sm text-muted-foreground">
-          {t.finanzas.form.equivaleA} <strong className="text-[#1F3864]">{fmtMoneda(montoNum * tcNum, "MXN", locale)}</strong>
+          {t.finanzas.form.equivaleA} <strong className="text-primary">{fmtMoneda(montoNum * tcNum, "MXN", locale)}</strong>
         </p>
       )}
 
@@ -239,7 +239,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
       )}
 
       {/* ── Contraparte ── */}
-      <div className="rounded-lg border p-3">
+      <div className="rounded-3xl border p-3">
         <ContraparteSelector
           tipoMovimiento={form.tipo}
           contraparteTipo={form.contraparte_tipo}
@@ -252,7 +252,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
       </div>
 
       {/* ── Vía del dinero ── */}
-      <div className="rounded-lg border p-3 space-y-2">
+      <div className="rounded-3xl border p-3 space-y-2">
         <Label>{t.finanzas.form.comoSeMovio}</Label>
         <div className="grid gap-2 sm:grid-cols-2">
           {(["DIRECTO", "INTERMEDIARIO"] as MovVia[]).map(v => (
@@ -264,9 +264,9 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
                 intermediario_id: v === "DIRECTO" ? null : form.intermediario_id,
                 intermediario_nombre: v === "DIRECTO" ? "" : form.intermediario_nombre,
               })}
-              className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+              className={`rounded-full border px-3 py-2 text-left text-sm transition-colors ${
                 form.via === v
-                  ? "border-[#1F3864] bg-[#EFF6FF] font-semibold text-[#1F3864]"
+                  ? "border-primary bg-[#EFF6FF] font-semibold text-primary"
                   : "border-slate-200 text-slate-600 hover:border-slate-300"
               }`}
             >
@@ -318,7 +318,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
         </div>
 
         {exigeComprobacion && (
-          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5">
+          <div className="flex items-start gap-2 rounded-3xl border border-amber-200 bg-amber-50 p-2.5">
             <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-600" />
             <p className="text-xs text-amber-800">
               {t.finanzas.form.avisoComprobar1} <strong>{t.finanzas.form.avisoComprobarBold}</strong>{t.finanzas.form.avisoComprobar2}
@@ -329,10 +329,10 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
 
       {/* ── Amarre con la venta ── */}
       {form.tipo === "INGRESO" && (
-        <div className="rounded-lg border p-3 space-y-2">
+        <div className="rounded-3xl border p-3 space-y-2">
           <Label>{t.finanzas.form.remisionCobrada}</Label>
           {form.remision_id ? (
-            <div className="flex items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
+            <div className="flex items-center justify-between gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-2">
               <span className="text-sm font-semibold text-blue-900">
                 {remisiones.find(r => r.id === form.remision_id)?.folio_remision ?? t.finanzas.form.remisionLigada}
               </span>
@@ -356,7 +356,7 @@ export default function MovimientoForm({ form, setForm, cuentas, tipoFijo }: Pro
                 />
               </div>
               {qRemision && (
-                <div className="max-h-32 divide-y overflow-y-auto rounded-md border">
+                <div className="max-h-32 divide-y overflow-hidden overflow-y-auto rounded-3xl border">
                   {remisionesFiltradas.length === 0 ? (
                     <div className="p-2.5 text-sm text-muted-foreground">{t.finanzas.form.sinResultados}</div>
                   ) : remisionesFiltradas.map(r => (

@@ -160,7 +160,7 @@ export default function ReportesTurno() {
           <p className="text-base text-muted-foreground mt-1">{tr.subtitle(rows.length)}</p>
         </div>
         {canCreate && (
-          <Button onClick={openNew} className="h-12 px-5 text-base bg-[#1F3864] hover:bg-[#162a4d]">
+          <Button onClick={openNew} className="h-12 px-5 text-base bg-primary hover:bg-primary-hover">
             <Plus className="h-5 w-5 mr-2" /> {tr.nuevo}
           </Button>
         )}
@@ -205,13 +205,13 @@ export default function ReportesTurno() {
 
                       {/* Units */}
                       <div className="flex items-end gap-2">
-                        <span className="text-4xl font-extrabold text-[#1F3864]">{r.unidades_armadas}</span>
+                        <span className="text-4xl font-extrabold text-primary">{r.unidades_armadas}</span>
                         <span className="text-sm text-muted-foreground mb-1">{tr.unidadesArmadas}</span>
                       </div>
 
                       {/* Paros */}
                       {r.paros && (
-                        <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                        <div className="rounded-full bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
                           <span className="font-semibold">{tr.paros}:</span> {r.paros}
                         </div>
                       )}
@@ -264,9 +264,9 @@ export default function ReportesTurno() {
                         key={tv}
                         type="button"
                         onClick={() => setForm({ ...form, turno: tv })}
-                        className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-md border text-xs font-medium transition-all ${
+                        className={`flex-1 flex flex-col items-center gap-0.5 py-2 rounded-3xl border text-xs font-medium transition-all ${
                           form.turno === tv
-                            ? "border-[#1F3864] bg-[#1F3864] text-white"
+                            ? "border-primary bg-primary text-white"
                             : "border-slate-200 text-slate-500 hover:border-slate-400"
                         }`}
                       >
@@ -281,7 +281,7 @@ export default function ReportesTurno() {
 
             {/* Resumen auto desde motocarros marcados hoy */}
             {!editing && autoArmados.length > 0 && (
-              <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5">
+              <div className="rounded-3xl bg-emerald-50 border border-emerald-200 px-3 py-2.5">
                 <div className="text-xs font-semibold text-emerald-700 mb-1.5">
                   ✓ {autoArmados.length} motocarros marcados como ARMADO hoy (auto-detectados)
                 </div>
@@ -298,7 +298,7 @@ export default function ReportesTurno() {
               </div>
             )}
             {!editing && autoArmados.length === 0 && (
-              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-muted-foreground">
+              <div className="rounded-3xl bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-muted-foreground">
                 {tr.sinArmadosHoy}
               </div>
             )}
@@ -336,7 +336,7 @@ export default function ReportesTurno() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} className="h-11">{t.actions.cancel}</Button>
-            <Button onClick={save} disabled={saving} className="h-11 px-6 bg-[#1F3864] hover:bg-[#162a4d]">
+            <Button onClick={save} disabled={saving} className="h-11 px-6 bg-primary hover:bg-primary-hover">
               {saving ? t.actions.loading : t.actions.save}
             </Button>
           </DialogFooter>

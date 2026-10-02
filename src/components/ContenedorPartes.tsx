@@ -132,7 +132,7 @@ export function ContenedorPartes({
 
         <div className="space-y-4">
           {/* Upload Section */}
-          <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+          <div className="border-2 border-dashed border-slate-300 rounded-3xl p-6 text-center">
             <Upload className="h-10 w-10 text-slate-400 mx-auto mb-3" />
             <p className="text-sm font-medium mb-2">{t.componentes.contenedorPartes.importar}</p>
             <p className="text-xs text-muted-foreground mb-3">{t.componentes.contenedorPartes.importarDesc}</p>
@@ -148,7 +148,7 @@ export function ContenedorPartes({
 
           {/* Summary */}
           {partes.length > 0 && (
-            <div className={`rounded-lg p-4 flex items-center gap-3 ${totalDiferencia === 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
+            <div className={`rounded-3xl p-4 flex items-center gap-3 ${totalDiferencia === 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
               {totalDiferencia === 0 ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
               <div>
                 <div className="font-bold text-lg">
@@ -161,7 +161,7 @@ export function ContenedorPartes({
 
           {/* Parts Table */}
           {partes.length > 0 && (
-            <div className="border rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
+            <div className="border rounded-3xl overflow-hidden max-h-[50vh] overflow-y-auto">
               <Table>
                 <TableHeader className="bg-slate-50 sticky top-0">
                   <TableRow>

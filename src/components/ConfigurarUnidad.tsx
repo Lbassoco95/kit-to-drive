@@ -166,7 +166,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="h-12 bg-[#1F3864] hover:bg-[#162a4d] text-white font-semibold">
+      <Button onClick={() => setOpen(true)} className="h-12 bg-primary hover:bg-primary-hover text-white font-semibold">
         <Wrench className="h-5 w-5 mr-2" /> {t.componentes.configurarUnidad.boton}
       </Button>
 
@@ -174,7 +174,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-2xl">
-              <Wrench className="h-6 w-6 text-[#1F3864]" /> {t.componentes.configurarUnidad.boton}
+              <Wrench className="h-6 w-6 text-primary" /> {t.componentes.configurarUnidad.boton}
             </DialogTitle>
             <DialogDescription>
               {loading ? t.componentes.configurarUnidad.cargando : t.componentes.configurarUnidad.desc(chasis.length, motores.length)}
@@ -188,7 +188,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input className="pl-8 h-10" placeholder={t.componentes.configurarUnidad.buscarChasis} value={qChasis} onChange={e => setQChasis(e.target.value)} />
               </div>
-              <div className="border rounded-lg max-h-64 overflow-y-auto divide-y">
+              <div className="border rounded-3xl max-h-64 overflow-hidden overflow-y-auto divide-y">
                 {chasisFiltrados.map(c => (
                   <button
                     key={c.id}
@@ -216,7 +216,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input className="pl-8 h-10" placeholder={t.componentes.configurarUnidad.buscarMotor} value={qMotor} onChange={e => setQMotor(e.target.value)} />
               </div>
-              <div className="border rounded-lg max-h-64 overflow-y-auto divide-y">
+              <div className="border rounded-3xl max-h-64 overflow-hidden overflow-y-auto divide-y">
                 {motoresFiltrados.map(m => (
                   <button
                     key={m.id}
@@ -233,7 +233,7 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
           </div>
 
           {detenidos > 0 && (
-            <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEE2E2] text-[#991B1B] text-sm">
+            <div className="rounded-3xl p-3 flex items-start gap-2 bg-[#FEE2E2] text-[#991B1B] text-sm">
               <TriangleAlert className="h-5 w-5 shrink-0" />
               <span className="flex-1">
                 {t.componentes.configurarUnidad.detenidos(detenidos)}
@@ -256,14 +256,14 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
           )}
 
           {chasisSel?.incidencia && (
-            <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
+            <div className="rounded-3xl p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
               <TriangleAlert className="h-5 w-5 shrink-0" />
               {t.componentes.configurarUnidad.reporteAbierto(chasisSel.incidencia.folio ?? "", chasisSel.incidencia.parte_afectada ?? "")}
             </div>
           )}
 
           {!modelosCoinciden && (
-            <div className="rounded-lg p-3 flex items-center gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
+            <div className="rounded-3xl p-3 flex items-center gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
               <AlertTriangle className="h-5 w-5 shrink-0" />
               {t.componentes.configurarUnidad.modelosDistintos(chasisSel?.modelo ?? "", motorSel?.modelo ?? "")}
             </div>
@@ -290,9 +290,9 @@ export function ConfigurarUnidad({ onDone }: { onDone?: () => void }) {
                       disabled={agotado}
                       onClick={() => setColorSel(c)}
                       className={`text-xs px-2.5 py-1.5 rounded-full border ${
-                        activo ? "bg-[#1F3864] text-white border-[#1F3864]"
+                        activo ? "bg-primary text-white border-primary"
                         : agotado ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
-                        : "bg-white text-slate-700 hover:border-[#2E75B6]"}`}
+                        : "bg-white text-slate-700 hover:border-secondary"}`}
                       title={propio ? t.componentes.configurarUnidad.colorDelChasis
                         : agotado ? t.componentes.configurarUnidad.colorAgotado(c)
                         : t.componentes.configurarUnidad.colorLibres(libres, c)}
