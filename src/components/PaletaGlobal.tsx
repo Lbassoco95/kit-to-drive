@@ -65,14 +65,14 @@ export function PaletaGlobal({ open, onOpenChange }: { open: boolean; onOpenChan
           (async () => {
             const { data } = await supabase
               .from("clientes")
-              .select("id, nombre_comercial, codigo_erp, folio_interno")
-              .or(`nombre_comercial.ilike.${like},codigo_erp.ilike.${like},folio_interno.ilike.${like}`)
+              .select("id, nombre_comercial, codigo_erp")
+              .or(`nombre_comercial.ilike.${like},codigo_erp.ilike.${like}`)
               .limit(5);
             next.clientes = (data ?? []).map((c: any) => ({
               id: c.id,
-              label: c.nombre_comercial || c.folio_interno || c.codigo_erp || c.id,
-              sub: [c.folio_interno, c.codigo_erp].filter(Boolean).join(" · ") || undefined,
-              url: `/clientes?q=${encodeURIComponent(c.nombre_comercial || c.folio_interno || term)}`,
+              label: c.nombre_comercial || c.codigo_erp || c.id,
+              sub: c.codigo_erp || undefined,
+              url: `/clientes?q=${encodeURIComponent(c.nombre_comercial || c.codigo_erp || term)}`,
             }));
           })(),
         );
