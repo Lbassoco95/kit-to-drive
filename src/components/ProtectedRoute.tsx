@@ -70,8 +70,17 @@ export default function ProtectedRoute({
     );
   }
 
-  if (requireRefacciones && !puedeVerRefacciones) {
-    return <Navigate to="/" replace />;
+  // Refacciones: allowlist, o áreas que operan pagos/depósitos/remisiones.
+  if (requireRefacciones && !puedeVerRefacciones && !perms.esAdminGlobal) {
+    const areaPago =
+      area === "administracion" ||
+      area === "compras" ||
+      area === "direccion" ||
+      area === "comercial" ||
+      area === "almacen_logistica";
+    if (!areaPago && !perms.puedeVer("remisiones")) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   if (modulo && !perms.puedeVer(modulo)) return <Navigate to="/" replace />;

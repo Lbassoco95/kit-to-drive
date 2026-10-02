@@ -19,6 +19,8 @@ type Item = {
   requiereRefacciones?: boolean;
   /** También visible para quien tiene el almacén de refacciones, aunque su área no vea el módulo. */
   oRefacciones?: boolean;
+  /** Finanzas / Compras / Dirección entran por pagos y depósitos. */
+  oFinanzasCompras?: boolean;
   group: Group;
 };
 
@@ -32,7 +34,7 @@ const ITEMS: Item[] = [
   { key: "incidencias",     url: "/incidencias",      icon: TriangleAlert,   modulo: "inventario",    group: "Operación" },
   { key: "reportesTurno",   url: "/reportes-turno",   icon: ClipboardList,   modulo: "reportesTurno", group: "Operación" },
   { key: "remisiones",      url: "/remisiones",       icon: FileText,        modulo: "remisiones",    group: "Operación" },
-  { key: "remisionesRefacciones", url: "/remisiones-refacciones", icon: Receipt, modulo: "remisiones", oRefacciones: true, group: "Operación" },
+      { key: "remisionesRefacciones", url: "/remisiones-refacciones", icon: Receipt, modulo: "remisiones", oRefacciones: true, oFinanzasCompras: true, group: "Operación" },
   { key: "entregas",        url: "/entregas",         icon: Truck,           modulo: "entregas",      group: "Operación" },
   { key: "misMotocarros",   url: "/mis-motocarros",   icon: Bike,            modulo: "misMotocarros", group: "Catálogos" },
   { key: "clientes",        url: "/clientes",         icon: Users,           modulo: "clientes",      group: "Catálogos" },
@@ -62,6 +64,7 @@ export function AppSidebar() {
     ? ITEMS.filter(i => {
         if (i.requiereRefacciones) return puedeVerRefacciones;
         if (i.oRefacciones && puedeVerRefacciones) return true;
+        if (i.oFinanzasCompras && (area === "administracion" || area === "compras" || area === "direccion" || perms.esAdminGlobal)) return true;
         return i.modulo ? perms.puedeVer(i.modulo) : false;
       })
     : [];

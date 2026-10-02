@@ -15,7 +15,9 @@ export type EtapaRefaccion =
   | "logistica"
   | "entregada"
   | "cancelada";
-export type AreaRemisionRefaccion = "ventas" | "almacen" | "logistica" | "finanzas";
+export type AreaRemisionRefaccion = "ventas" | "almacen" | "logistica" | "finanzas" | "compras";
+export type NaturalezaRemisionRefaccion = "cotizacion" | "remision_final";
+export type EstadoPagoRemisionRefaccion = "sin_pago" | "parcial" | "pagado";
 export type TipoEnvioRefaccion = "paqueteria" | "directo" | "recoge";
 export type TipoPagoRefaccion = "anticipado" | "contra_entrega";
 export type FormaPagoRefaccion = "efectivo" | "transferencia";
