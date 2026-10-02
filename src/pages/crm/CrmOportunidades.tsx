@@ -277,7 +277,7 @@ export default function CrmOportunidades() {
             </Card>
           );
         })}
-        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.crm.oportunidades.sinOportunidades}</div>}
+        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">{t.crm.oportunidades.sinOportunidades}</div>}
       </div>
 
       <Dialog open={creating || !!editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); } }}>

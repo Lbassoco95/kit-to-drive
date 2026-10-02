@@ -153,7 +153,7 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
         </DialogHeader>
 
         {chasis && (
-          <div className="rounded-lg border bg-slate-50 p-3 text-sm">
+          <div className="rounded-3xl border bg-slate-50 p-3 text-sm">
             <div className="font-mono font-bold text-base">{chasis.numero_chasis}</div>
             <div className="text-xs text-muted-foreground">
               {chasis.modelo} · {t.componentes.colorChasis.colorActual} <strong>{normColor(chasis.color)}</strong>
@@ -163,16 +163,16 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
           </div>
         )}
 
-        <div className="inline-flex rounded-lg border p-1 bg-card self-start">
+        <div className="inline-flex rounded-full border p-1 bg-card self-start">
           <button
             onClick={() => setModo("cambiar")}
-            className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "cambiar" ? "bg-primary text-white" : "text-muted-foreground"}`}
+            className={`px-3 py-2 rounded-full text-sm font-medium ${modo === "cambiar" ? "bg-primary text-white" : "text-muted-foreground"}`}
           >
             {t.componentes.colorChasis.usarJuegoLibre}
           </button>
           <button
             onClick={() => setModo("intercambiar")}
-            className={`px-3 py-2 rounded-md text-sm font-medium ${modo === "intercambiar" ? "bg-primary text-white" : "text-muted-foreground"}`}
+            className={`px-3 py-2 rounded-full text-sm font-medium ${modo === "intercambiar" ? "bg-primary text-white" : "text-muted-foreground"}`}
           >
             <ArrowLeftRight className="h-4 w-4 inline mr-1.5" /> {t.componentes.colorChasis.intercambiar}
           </button>
@@ -208,7 +208,7 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
         </div>
 
         {modo === "cambiar" && sinJuegos && (
-          <div className="rounded-lg p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
+          <div className="rounded-3xl p-3 flex items-start gap-2 bg-[#FEF3C7] text-[#92400E] text-sm">
             <TriangleAlert className="h-5 w-5 shrink-0" />
             {t.componentes.colorChasis.sinJuegos1(normColor(colorNuevo))}{" "}
             <strong>{t.componentes.colorChasis.intercambiarBold}</strong>{" "}
@@ -226,7 +226,7 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input className="pl-8 h-10" placeholder={t.componentes.colorChasis.buscarChasis} value={q} onChange={e => setQ(e.target.value)} />
             </div>
-            <div className="border rounded-lg max-h-48 overflow-y-auto divide-y">
+            <div className="border rounded-3xl max-h-48 overflow-hidden overflow-y-auto divide-y">
               {candidatosFiltrados.map(c => (
                 <button
                   key={c.id}
@@ -250,7 +250,7 @@ export function ColorChasis({ chasis, open, onOpenChange, onDone }: Props) {
               )}
             </div>
             {pareja && (
-              <div className="rounded-lg p-3 bg-[#EFF6FF] text-[#1E40AF] text-sm">
+              <div className="rounded-3xl p-3 bg-[#EFF6FF] text-[#1E40AF] text-sm">
                 {chasis?.numero_chasis} {t.componentes.colorChasis.resumenIntercambio1}{" "}
                 <strong>{normColor(pareja.color)}</strong> {t.componentes.colorChasis.resumenIntercambio2}{" "}
                 {pareja.numero_chasis} {t.componentes.colorChasis.resumenIntercambio3}{" "}

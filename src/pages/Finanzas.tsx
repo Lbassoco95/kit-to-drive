@@ -263,7 +263,7 @@ export default function Finanzas() {
             <button
               key={t.v}
               onClick={() => setTipo(t.v)}
-              className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
                 tipo === t.v ? "bg-primary text-white" : "bg-secondary/10 text-primary hover:bg-secondary/20"
               }`}
             >
@@ -345,7 +345,7 @@ export default function Finanzas() {
               <button
                 type="button"
                 onClick={() => setSoloPorComprobar(v => !v)}
-                className={`h-10 w-full rounded-md border px-3 text-sm font-medium transition-colors ${
+                className={`h-10 w-full rounded-full border px-3 text-sm font-medium transition-colors ${
                   soloPorComprobar
                     ? "border-amber-400 bg-amber-50 text-amber-800"
                     : "border-slate-200 text-slate-600 hover:border-slate-300"
@@ -362,7 +362,7 @@ export default function Finanzas() {
       {cargando ? (
         <div className="py-16 text-center text-muted-foreground">{t.finanzas.cargando}</div>
       ) : filtrados.length === 0 ? (
-        <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
+        <div className="rounded-3xl border bg-card py-16 text-center text-muted-foreground">
           {movs.length === 0 ? t.finanzas.sinMovimientos : t.finanzas.sinCoincidencias}
         </div>
       ) : (

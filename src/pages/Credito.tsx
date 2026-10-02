@@ -197,7 +197,7 @@ export default function Credito() {
       </div>
 
       {schemaFalta && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex gap-2">
+        <div className="rounded-full border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex gap-2">
           <AlertTriangle className="h-5 w-5 shrink-0" />
           <div>
             <div className="font-semibold">{tc.schemaFaltaTitulo}</div>
@@ -350,7 +350,7 @@ export default function Credito() {
               </DialogHeader>
 
               {Number(detalle.saldo_vencido) > 0 && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 flex gap-2">
+                <div className="rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 flex gap-2">
                   <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
                   {tc.avisoBloqueo}
                 </div>
@@ -378,7 +378,7 @@ export default function Credito() {
                     return (
                       <div
                         key={cxc.id}
-                        className={`rounded-md border p-3 ${
+                        className={`rounded-3xl border p-3 ${
                           vencida ? "border-red-200 bg-red-50/50" : "bg-white"
                         }`}
                       >

@@ -92,7 +92,7 @@ export default function ForcePasswordChange({ onChangePassword, onSignOut }: Pro
               placeholder={t.auth.confirmPassword}
             />
           </div>
-          <div className="rounded-lg border bg-slate-50 p-3">
+          <div className="rounded-3xl border bg-slate-50 p-3">
             <p className="mb-2 text-sm font-medium text-primary">{t.auth.passwordRequirements.title}</p>
             <ul className="space-y-1.5">
               {requirements.map(({ key, met }) => (

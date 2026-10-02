@@ -45,7 +45,7 @@ function Aviso({ error, onReintentar }: { error: Error; onReintentar: () => void
   const { t } = useLang();
   return (
     <div className="flex items-center justify-center p-6">
-      <div className="max-w-lg w-full bg-card border rounded-lg p-8 text-center space-y-4">
+      <div className="max-w-lg w-full bg-card border rounded-3xl p-8 text-center space-y-4">
         <div className="flex justify-center text-amber-600"><AlertTriangle className="h-10 w-10" /></div>
         <h2 className="text-xl font-bold text-primary">{t.componentes.errorBoundary.titulo}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">

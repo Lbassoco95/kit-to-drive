@@ -232,7 +232,7 @@ export default function CrmRutas() {
                   {rutaParadas.map((p: any) => {
                     const cliente = clientes.find((c: any) => c.id === p.cliente_id);
                     return (
-                      <div key={p.id} className={`flex items-start gap-3 p-3 rounded-lg border ${p.completada ? "bg-green-50 border-green-200" : "bg-gray-50"}`}>
+                      <div key={p.id} className={`flex items-start gap-3 p-3 rounded-3xl border ${p.completada ? "bg-green-50 border-green-200" : "bg-gray-50"}`}>
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm shrink-0">
                           {p.orden}
                         </div>
@@ -271,7 +271,7 @@ export default function CrmRutas() {
             </Card>
           );
         })}
-        {!filtered.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.crm.rutas.sinRutas}</div>}
+        {!filtered.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border">{t.crm.rutas.sinRutas}</div>}
       </div>
 
       <Dialog open={creating || !!editing} onOpenChange={(o) => { if (!o) { setCreating(false); setEditing(null); } }}>
@@ -306,7 +306,7 @@ export default function CrmRutas() {
                   {paradasLocales.map((p, idx) => {
                     const cliente = clientes.find((c: any) => c.id === p.cliente_id);
                     return (
-                      <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                      <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded-3xl">
                         <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
                           {p.orden}
                         </div>

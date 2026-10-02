@@ -567,12 +567,12 @@ export default function Clientes() {
               </div>
 
               <div className="grid grid-cols-2 gap-2 mt-auto pt-3 border-t">
-                <div className="text-center p-2 rounded-md bg-[#DBEAFE]">
+                <div className="text-center p-2 rounded-3xl bg-[#DBEAFE]">
                   <Bike className="mx-auto mb-1 text-[#1E40AF]" size={20}/>
                   <div className="text-xl font-bold text-[#1E40AF]">{activos}</div>
                   <div className="text-[11px] text-[#1E40AF] font-medium">{t.clientes.activos}</div>
                 </div>
-                <div className="text-center p-2 rounded-md bg-[#EDE9FE]">
+                <div className="text-center p-2 rounded-3xl bg-[#EDE9FE]">
                   <Truck className="mx-auto mb-1 text-[#5B21B6]" size={20}/>
                   <div className="text-xl font-bold text-[#5B21B6]">{s.entregados}</div>
                   <div className="text-[11px] text-[#5B21B6] font-medium">{t.clientes.entregados}</div>
@@ -582,7 +582,7 @@ export default function Clientes() {
           );
         })}
         {!filtered.length && !errorCarga && (
-          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">
+          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">
             {cargando ? t.clientes.cargando : t.clientes.sinResultados}
           </div>
         )}
@@ -671,7 +671,7 @@ export default function Clientes() {
                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
                   {comments.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t.clientes.sinComentarios}</p>}
                   {comments.map((comment: any) => (
-                    <div key={comment.id} className="bg-slate-50 p-3 rounded-lg">
+                    <div key={comment.id} className="bg-slate-50 p-3 rounded-3xl">
                       <div className="flex items-center gap-2 mb-1">
                         <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                           {comment.profiles?.nombre_completo?.charAt(0) || "U"}
@@ -712,7 +712,7 @@ export default function Clientes() {
                       comentario: <MessageSquare className="h-4 w-4" />,
                     };
                     return (
-                      <div key={entry.id} className="bg-slate-50 p-3 rounded-lg">
+                      <div key={entry.id} className="bg-slate-50 p-3 rounded-3xl">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="text-primary">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
                           <div>
@@ -823,7 +823,7 @@ export default function Clientes() {
                 ].map(doc => {
                   const url = selectedCliente[`doc_${doc.key}_url`];
                   return (
-                    <div key={doc.key} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div key={doc.key} className="flex items-center justify-between p-3 border rounded-3xl">
                       <div className="flex-1">
                         <div className="font-medium">{doc.label}</div>
                         {url && <div className="text-xs text-muted-foreground truncate">{url}</div>}
@@ -866,7 +866,7 @@ export default function Clientes() {
                 <div className="space-y-3 max-h-[300px] overflow-y-auto">
                   {comments.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">{t.clientes.sinComentarios}</p>}
                   {comments.map((comment: any) => (
-                    <div key={comment.id} className="bg-slate-50 p-3 rounded-lg">
+                    <div key={comment.id} className="bg-slate-50 p-3 rounded-3xl">
                       <div className="flex items-center gap-2 mb-1">
                         <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                           {comment.profiles?.nombre_completo?.charAt(0) || "U"}
@@ -905,7 +905,7 @@ export default function Clientes() {
                       comentario: <MessageSquare className="h-4 w-4" />,
                     };
                     return (
-                      <div key={entry.id} className="bg-slate-50 p-3 rounded-lg">
+                      <div key={entry.id} className="bg-slate-50 p-3 rounded-3xl">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="text-primary">{iconMap[entry.tipo_cambio] || <History className="h-4 w-4" />}</div>
                           <div>
@@ -931,7 +931,7 @@ export default function Clientes() {
                 ].map(doc => {
                   const url = selectedCliente[`doc_${doc.key}_url`];
                   return (
-                    <div key={doc.key} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div key={doc.key} className="flex items-center justify-between p-3 border rounded-3xl">
                       <div className="flex-1">
                         <div className="font-medium">{doc.label}</div>
                         {url && <div className="text-xs text-muted-foreground truncate">{url}</div>}

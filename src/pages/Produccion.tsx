@@ -110,7 +110,7 @@ function ComentariosDialog({ motocarroId, orden, open, onClose, t }: {
           {loading ? (
             <div className="text-center text-sm text-muted-foreground py-6">{t.actions.loading}</div>
           ) : comments.length === 0 ? (
-            <div className="text-center text-sm text-muted-foreground py-8 border rounded-lg border-dashed">{tr.sinComentarios}</div>
+            <div className="text-center text-sm text-muted-foreground py-8 border rounded-3xl border-dashed">{tr.sinComentarios}</div>
           ) : (
             comments.map(c => (
               <div key={c.id} className="flex gap-2.5">
@@ -416,11 +416,11 @@ export default function Produccion() {
           <p className="text-muted-foreground text-base mt-1">{t.produccion.subtitle(filtered.length, rows.length)}</p>
         </div>
         <div className="flex gap-2 items-center">
-          <div className="inline-flex rounded-lg border p-1 bg-card">
-            <button onClick={() => setView("cards")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "cards" ? "bg-primary text-white" : "text-muted-foreground"}`}>
+          <div className="inline-flex rounded-full border p-1 bg-card">
+            <button onClick={() => setView("cards")} className={`px-3 py-2 rounded-full flex items-center gap-2 text-sm font-medium ${view === "cards" ? "bg-primary text-white" : "text-muted-foreground"}`}>
               <LayoutGrid size={18}/> {t.produccion.vista.tarjetas}
             </button>
-            <button onClick={() => setView("tabla")} className={`px-3 py-2 rounded-md flex items-center gap-2 text-sm font-medium ${view === "tabla" ? "bg-primary text-white" : "text-muted-foreground"}`}>
+            <button onClick={() => setView("tabla")} className={`px-3 py-2 rounded-full flex items-center gap-2 text-sm font-medium ${view === "tabla" ? "bg-primary text-white" : "text-muted-foreground"}`}>
               <TableIcon size={18}/> {t.produccion.vista.tabla}
             </button>
           </div>
@@ -485,9 +485,9 @@ export default function Produccion() {
           <Search className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
           <Input className="pl-10 h-12 text-base" placeholder={t.produccion.buscar} value={q} onChange={e => setQ(e.target.value)} />
         </div>
-        <div className="inline-flex rounded-lg border p-1 bg-card">
+        <div className="inline-flex rounded-full border p-1 bg-card">
           {(["TODOS","BLANCO","AZUL"] as const).map(c => (
-            <button key={c} onClick={() => setColorFilter(c)} className={`px-3 py-2 rounded-md text-sm font-medium ${colorFilter === c ? "bg-secondary text-white" : "text-muted-foreground"}`}>
+            <button key={c} onClick={() => setColorFilter(c)} className={`px-3 py-2 rounded-full text-sm font-medium ${colorFilter === c ? "bg-secondary text-white" : "text-muted-foreground"}`}>
               {c === "TODOS" ? t.produccion.filtros.todosColores : c}
             </button>
           ))}
@@ -507,7 +507,7 @@ export default function Produccion() {
             onVerHistorial={() => abrirHistorial(r)}
             t={t}
           />)}
-          {!filtered.length && <div className="col-span-full text-center text-muted-foreground py-12 bg-card rounded-lg border">{t.produccion.sinResultados}</div>}
+          {!filtered.length && <div className="col-span-full text-center text-muted-foreground py-12 bg-card rounded-3xl border">{t.produccion.sinResultados}</div>}
         </div>
       ) : (
         <Card className="overflow-hidden">
@@ -569,7 +569,7 @@ export default function Produccion() {
               />
             </div>
             {(!editForm.ns_chasis || !editForm.ns_motor) && (
-              <div className="rounded-md p-2.5 text-sm bg-[#FEF3C7] text-[#92400E] flex items-start gap-2">
+              <div className="rounded-3xl p-2.5 text-sm bg-[#FEF3C7] text-[#92400E] flex items-start gap-2">
                 <TriangleAlert className="h-4 w-4 shrink-0 mt-0.5" />
                 {t.produccion.avisoSeriales}
               </div>
@@ -701,7 +701,7 @@ export default function Produccion() {
           </DialogHeader>
           <div className="space-y-2 max-h-80 overflow-y-auto">
             {(verHistorial?.items ?? []).map((h: any, i: number) => (
-              <div key={i} className="border rounded-md p-2 text-sm">
+              <div key={i} className="border rounded-3xl p-2 text-sm">
                 <div className="font-medium">#{h.orden_anterior ?? "—"} → #{h.orden_nuevo}</div>
                 <div className="text-xs text-muted-foreground">{h.motivo || t.produccion.sinMotivo} · {new Date(h.cambiado_at).toLocaleString(locale)}</div>
               </div>
@@ -738,7 +738,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
     <Card className="overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
       <div className="flex items-start justify-between p-4 pb-2" style={{ background: colorBg }}>
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-lg bg-white/70">
+          <div className="p-2.5 rounded-3xl bg-white/70">
             <Bike size={36} strokeWidth={2} color={colorBike} />
           </div>
           <div>
@@ -746,7 +746,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
             <div className="text-base font-semibold text-primary">{displayFabrica(r.modelo, catalogo)}</div>
           </div>
         </div>
-        <div className="px-3 py-1.5 rounded-md bg-primary text-white font-bold text-xl tracking-tight">
+        <div className="px-3 py-1.5 rounded-full bg-primary text-white font-bold text-xl tracking-tight">
           #{r.orden_armado}
         </div>
       </div>
@@ -766,12 +766,12 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
 
         <div className="flex flex-wrap gap-1.5 text-xs">
           {(r.remisiones?.clientes?.codigo_erp || r.remisiones?.clientes?.folio_interno) && (
-            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
+            <span className="inline-flex items-center px-2 py-1 rounded-full bg-slate-100 text-slate-700 font-medium">
               👤 {r.remisiones.clientes.codigo_erp || r.remisiones.clientes.folio_interno}
             </span>
           )}
           {r.remisiones?.profiles?.nombre_completo && (
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] font-medium">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#DBEAFE] text-[#1E40AF] font-medium">
               <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-secondary text-white text-[10px] font-bold">
                 {r.remisiones.profiles.nombre_completo.split(" ").map((n: string) => n[0]).slice(0,2).join("")}
               </span>
@@ -779,7 +779,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
             </span>
           )}
           {r.remisiones?.folio_remision && (
-            <span className="inline-flex items-center px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">
+            <span className="inline-flex items-center px-2 py-1 rounded-full bg-slate-100 text-slate-700 font-medium">
               📄 {r.remisiones.folio_remision}
             </span>
           )}
@@ -827,7 +827,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
         </div>
 
         {/* Seriales: sin ellos no cierra proceso */}
-        <div className={`rounded-md px-2.5 py-2 text-xs ${conSerial ? "bg-slate-50 text-slate-600" : "bg-[#FEF3C7] text-[#92400E]"}`}>
+        <div className={`rounded-full px-2.5 py-2 text-xs ${conSerial ? "bg-slate-50 text-slate-600" : "bg-[#FEF3C7] text-[#92400E]"}`}>
           {conSerial ? (
             <div className="space-y-0.5 font-mono">
               <div>{t.produccion.chasisCorto} <strong>{r.ns_chasis}</strong></div>
@@ -892,7 +892,7 @@ function MotocarroCard({ r, canEditFabrica, canEditEntrega, onEdit, onAction, on
           </Button>
         )}
         {r.estatus_entrega === "ENTREGADA" && (
-          <div className="flex-1 h-12 flex items-center justify-center text-[#5B21B6] font-semibold bg-[#EDE9FE] rounded-md">
+          <div className="flex-1 h-12 flex items-center justify-center text-[#5B21B6] font-semibold bg-[#EDE9FE] rounded-full">
             <TruckIcon className="h-5 w-5 mr-2" /> {t.produccion.entregado}
           </div>
         )}

@@ -323,14 +323,14 @@ export default function RemisionesRefacciones() {
               </div>
               {detalle.notas && <p className="text-sm">{detalle.notas}</p>}
               {detalle.etapa === "cancelada" && (
-                <div className="rounded-md border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                <div className="rounded-3xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800">
                   <p className="font-medium">{tx.canceladaBanner}</p>
                   <p className="mt-1">{tx.motivoCancelacion}: {detalle.motivo_cancelacion || "—"}</p>
                   {detalle.cancelada_at && <p className="text-xs text-muted-foreground mt-1">{fmtDate(detalle.cancelada_at)}</p>}
                 </div>
               )}
               {detalle.etapa === "contingencia" && (
-                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">{tx.avisoFaltante}</p>
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-full px-3 py-2">{tx.avisoFaltante}</p>
               )}
               <EnvioPanel
                 remision={detalle}
@@ -365,7 +365,7 @@ export default function RemisionesRefacciones() {
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{tx.historial}</h3>
                 <ol className="space-y-2">
                   {eventos.map(ev => (
-                    <li key={ev.id} className="rounded-md border px-3 py-2 text-sm">
+                    <li key={ev.id} className="rounded-full border px-3 py-2 text-sm">
                       <div className="flex flex-wrap items-center gap-2">
                         <AreaBadge area={ev.area} />
                         <span className="font-medium">{tx.accion[ev.accion as keyof typeof tx.accion] ?? ev.accion}</span>
@@ -632,7 +632,7 @@ function NuevaRemision({
           <DialogTitle>{tx.crearTitulo}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="rounded-md border border-primary/20 bg-[#EFF6FF] px-3 py-2">
+          <div className="rounded-full border border-primary/20 bg-[#EFF6FF] px-3 py-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-primary">{tx.folioSeguimiento}</div>
             <div className="font-mono text-2xl font-bold text-primary">{folioPrevisto}</div>
             <p className="text-xs text-muted-foreground mt-1">{tx.folioSerie}</p>
@@ -675,7 +675,7 @@ function NuevaRemision({
                 </Button>
               ))}
             </div>
-            <div className="mt-2 max-h-64 overflow-y-auto space-y-1 rounded-md border p-1">
+            <div className="mt-2 max-h-64 overflow-hidden overflow-y-auto space-y-1 rounded-3xl border p-1">
               {coincidencias.map(p => {
                 const disp = dispDe(p);
                 return (
@@ -683,7 +683,7 @@ function NuevaRemision({
                     key={p.id}
                     type="button"
                     onClick={() => agregar(p)}
-                    className="w-full text-left rounded-md border px-3 py-2 hover:bg-slate-50 flex items-center gap-3"
+                    className="w-full text-left rounded-3xl border px-3 py-2 hover:bg-slate-50 flex items-center gap-3"
                   >
                     <span className="font-mono text-xs font-semibold w-28 shrink-0">{p.codigo_nuevo}</span>
                     <span className="text-[10px] uppercase text-muted-foreground w-24 shrink-0 truncate">{tx.seccionLinea[p.linea_catalogo as keyof typeof tx.seccionLinea] || p.linea_catalogo || ""}</span>
@@ -704,7 +704,7 @@ function NuevaRemision({
           {lineas.length > 0 && (
             <div className="space-y-2">
               {lineas.map(l => (
-                <div key={l.productoId} className="flex items-center gap-2 rounded-md border p-2">
+                <div key={l.productoId} className="flex items-center gap-2 rounded-3xl border p-2">
                   <div className="flex-1 min-w-0">
                     <div className="font-mono text-xs font-semibold">{l.codigo}</div>
                     <div className="text-sm truncate">{l.descripcion}</div>
@@ -836,7 +836,7 @@ function Partida({
   };
 
   return (
-    <div className="rounded-md border p-3 space-y-2">
+    <div className="rounded-3xl border p-3 space-y-2">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="font-mono text-sm font-semibold">{item.codigo_nuevo}</div>
@@ -920,7 +920,7 @@ function CancelarRemision({ id, onHecho }: { id: string; onHecho: () => Promise<
   const [motivo, setMotivo] = useState("");
   const [ocupado, setOcupado] = useState(false);
   return (
-    <div className="space-y-2 rounded-md border border-dashed p-3">
+    <div className="space-y-2 rounded-3xl border border-dashed p-3">
       <div>
         <div className="text-sm font-medium">{tx.cancelarRemision}</div>
         <p className="text-xs text-muted-foreground">{tx.cancelarRemisionAyuda}</p>
@@ -1054,7 +1054,7 @@ function EnvioPanel({
   const formaLabel = remision.forma_pago === "transferencia" ? tx.transferencia : tx.efectivo;
 
   return (
-    <section className="rounded-md border p-3 space-y-3 text-sm">
+    <section className="rounded-3xl border p-3 space-y-3 text-sm">
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline"><Truck className="h-3 w-3 mr-1" />{envioLabel}</Badge>
         <Badge variant="outline" className={remision.pagado ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}>{pagoLabel} · {formaLabel}</Badge>

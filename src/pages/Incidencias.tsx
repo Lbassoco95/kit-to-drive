@@ -250,10 +250,10 @@ export default function Incidencias() {
               </div>
 
               <div className="flex flex-wrap gap-1.5 text-xs">
-                <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-700">{tipoIcon} {t.catalogos.tipoFalla(i.tipo_falla)}</span>
-                {i.parte_afectada && <span className="px-2 py-1 rounded-md bg-[#DBEAFE] text-[#1E40AF] font-medium">🔧 {i.parte_afectada}</span>}
-                {sev && <span className={`px-2 py-1 rounded-md border font-medium ${sev.cls}`}>{t.catalogos.severidad(i.severidad)}</span>}
-                {i.folio_garantia && <span className="px-2 py-1 rounded-md bg-[#EDE9FE] text-[#5B21B6] font-mono">{i.folio_garantia}</span>}
+                <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">{tipoIcon} {t.catalogos.tipoFalla(i.tipo_falla)}</span>
+                {i.parte_afectada && <span className="px-2 py-1 rounded-full bg-[#DBEAFE] text-[#1E40AF] font-medium">🔧 {i.parte_afectada}</span>}
+                {sev && <span className={`px-2 py-1 rounded-full border font-medium ${sev.cls}`}>{t.catalogos.severidad(i.severidad)}</span>}
+                {i.folio_garantia && <span className="px-2 py-1 rounded-full bg-[#EDE9FE] text-[#5B21B6] font-mono">{i.folio_garantia}</span>}
               </div>
 
               <p className="text-sm">{i.descripcion}</p>
@@ -319,7 +319,7 @@ export default function Incidencias() {
             {RESULTADOS.map(r => (
               <label
                 key={r.key}
-                className={`flex items-start gap-3 rounded-lg border-2 p-3 cursor-pointer ${resultado === r.key ? "border-primary bg-[#EFF6FF]" : "hover:bg-slate-50"}`}
+                className={`flex items-start gap-3 rounded-3xl border-2 p-3 cursor-pointer ${resultado === r.key ? "border-primary bg-[#EFF6FF]" : "hover:bg-slate-50"}`}
               >
                 <input type="radio" className="mt-1 accent-primary" checked={resultado === r.key} onChange={() => setResultado(r.key)} />
                 <span className="text-sm">
@@ -383,7 +383,7 @@ export default function Incidencias() {
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {(historial?.eventos ?? []).map((e: any, idx: number) => (
-              <div key={idx} className="border rounded-md p-2 text-sm">
+              <div key={idx} className="border rounded-3xl p-2 text-sm">
                 <div className="font-medium">
                   {e.estatus_anterior ? `${t.catalogos.estatusIncidencia(e.estatus_anterior)} → ` : ""}
                   {t.catalogos.estatusIncidencia(e.estatus_nuevo)}

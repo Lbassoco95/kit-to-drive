@@ -86,7 +86,7 @@ export function SerialAutocomplete({ tipo, value, onChange, placeholder, classNa
         autoComplete="off"
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full bg-white border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-50 mt-1 w-full bg-white border rounded-3xl shadow-lg max-h-48 overflow-y-auto">
           {loading && <div className="px-3 py-2 text-xs text-muted-foreground">Buscando…</div>}
           {suggestions.map(s => (
             <button
@@ -111,7 +111,7 @@ export function SerialAutocomplete({ tipo, value, onChange, placeholder, classNa
         </div>
       )}
       {open && suggestions.length === 0 && value.length >= 2 && !loading && (
-        <div className="absolute z-50 mt-1 w-full bg-white border rounded-lg shadow-lg px-3 py-2">
+        <div className="absolute z-50 mt-1 w-full bg-white border rounded-3xl shadow-lg px-3 py-2">
           <span className="text-xs text-muted-foreground">{t.componentes.serialAutocomplete.sinCoincidencia}</span>
         </div>
       )}

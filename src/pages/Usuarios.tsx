@@ -228,7 +228,7 @@ export default function Usuarios() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {NIVELES.map(n => (
-            <div key={n} className="rounded-lg border p-3">
+            <div key={n} className="rounded-3xl border p-3">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-semibold ${NIVEL_COLORS[n]}`}>
                 {t.niveles[n]}
               </span>
@@ -322,7 +322,7 @@ export default function Usuarios() {
           );
         })}
         {!filtered.length && (
-          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">
+          <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">
             {t.usuarios.sinResultados}
           </div>
         )}
@@ -400,7 +400,7 @@ export default function Usuarios() {
                   {copied ? <Check size={18} className="text-emerald-600" /> : <Copy size={18} />}
                 </Button>
               </div>
-              <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{t.usuarios.passwordTemporalAviso}</p>
+              <p className="rounded-3xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{t.usuarios.passwordTemporalAviso}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">{t.usuarios.confirmarPasswordTemporal(resetTarget?.nombre_completo || resetTarget?.email || "")}</p>
@@ -472,7 +472,7 @@ export default function Usuarios() {
                 <Input value={newForm.codigo_vendedor} onChange={e => setNewForm({ ...newForm, codigo_vendedor: e.target.value })} className="h-11 font-mono" placeholder={t.usuarios.codigoVendedorPlaceholder} />
               </div>
             )}
-            <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-md p-2">
+            <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-3xl p-2">
               {t.usuarios.avisoAcceso}
             </p>
           </div>

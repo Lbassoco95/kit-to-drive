@@ -344,7 +344,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                     </div>
                     <div>
                       <Label>{c.color}</Label>
-                      <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as typeof cab.color })} className="h-12 w-full rounded-md border border-input bg-background px-3 text-base">
+                      <select value={cab.color} onChange={e => setCab({ ...cab, color: e.target.value as typeof cab.color })} className="h-12 w-full rounded-full border border-input bg-background px-3 text-base">
                         {COLORES.map(col => <option key={col} value={col}>{t.colors[col]}</option>)}
                       </select>
                     </div>
@@ -357,7 +357,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                 </TabsContent>
 
                 <TabsContent value="multiple" className="space-y-4 mt-4">
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center">
+                  <div className="border-2 border-dashed border-slate-300 rounded-3xl p-8 text-center">
                     <Upload className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                     <p className="text-sm font-medium mb-2">{c.importarExcel}</p>
                     <p className="text-xs text-muted-foreground mb-4">{c.importarExcelAyuda}</p>
@@ -372,10 +372,10 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                   </div>
 
                   {parsedContainerSheets.length > 0 && (
-                    <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+                    <div className="bg-slate-50 rounded-3xl p-4 space-y-4">
                       <p className="font-medium">{c.detectados}</p>
                       {parsedContainerSheets.map((sheet, i) => (
-                        <div key={i} className="border rounded-lg p-3 bg-white">
+                        <div key={i} className="border rounded-3xl p-3 bg-white">
                           <div className="flex justify-between items-center mb-2">
                             <span className="font-bold text-primary">{sheet.folio_contenedor}</span>
                             <span className={`px-2 py-1 rounded-full text-xs ${sheet.tipo === 'chasis' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
@@ -441,7 +441,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
                     <p className="text-sm font-medium">{c.resumenUnidades(unidades.length)} {validacion.length === 0 ? <span className="text-[#065F46]">{c.sinErrores}</span> : <span className="text-[#C0392B]">{c.conErrores(validacion.length)}</span>}</p>
                     <Button size="sm" variant="outline" onClick={() => setUnidades(prev => [...prev, { ns_chasis: "", ns_motor: "", chasis_asignado: "" }])}>{c.agregarFila}</Button>
                   </div>
-                  <div className="border rounded-lg overflow-hidden max-h-[50vh] overflow-y-auto">
+                  <div className="border rounded-3xl overflow-hidden max-h-[50vh] overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-slate-50 sticky top-0">
                         <tr>
@@ -490,13 +490,13 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
 
           {step === 3 && (
             <div className="space-y-3 mt-4">
-              <div className="bg-slate-50 rounded-lg p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="bg-slate-50 rounded-3xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm overflow-hidden">
                 <div><div className="text-muted-foreground">{c.resumenFolio}</div><div className="font-bold">{cab.folio_contenedor}</div></div>
                 <div><div className="text-muted-foreground">{c.resumenArribo}</div><div className="font-bold">{cab.fecha_arribo}</div></div>
                 <div><div className="text-muted-foreground">{c.resumenModelo}</div><div className="font-bold">{cab.modelo}</div></div>
                 <div><div className="text-muted-foreground">{c.resumenColor}</div><div className="font-bold">{t.colors[cab.color]}</div></div>
               </div>
-              <div className={`rounded-lg p-4 flex items-center gap-3 ${validacion.length === 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
+              <div className={`rounded-3xl p-4 flex items-center gap-3 ${validacion.length === 0 ? "bg-[#D1FAE5] text-[#065F46]" : "bg-[#FEE2E2] text-[#991B1B]"}`}>
                 {validacion.length === 0 ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
                 <div>
                   <div className="font-bold text-lg">{c.seCrearan(unidades.length)}</div>
@@ -514,7 +514,7 @@ export function RecibirContenedor({ onDone }: { onDone?: () => void }) {
               </div>
               <div className="space-y-3">
                 {reportes.map((r, i) => (
-                  <div key={i} className="border rounded-lg p-4 bg-white">
+                  <div key={i} className="border rounded-3xl p-4 bg-white">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-bold text-primary">{r.folio}</span>
                     </div>

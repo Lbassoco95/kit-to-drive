@@ -776,7 +776,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
     <>
       <Card className="p-3 sm:p-5 border-2 border-[#E8A30D]/40 bg-gradient-to-br from-[#FFF8E7] to-white min-w-0">
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <div className="w-11 h-11 rounded-xl bg-[#E8A30D]/15 flex items-center justify-center shrink-0">
+          <div className="w-11 h-11 rounded-full bg-[#E8A30D]/15 flex items-center justify-center shrink-0">
             <Inbox className="h-6 w-6 text-[#A36B00]" />
           </div>
           <div className="flex-1 min-w-0">
@@ -816,7 +816,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             const asignables = cobertura.length ? Math.min(faltan, libresTotales) : faltan;
 
             return (
-              <div key={rem.id} className="bg-white rounded-xl border border-[#E8A30D]/25 flex flex-col min-w-0 overflow-hidden shadow-sm">
+              <div key={rem.id} className="bg-white rounded-3xl border border-[#E8A30D]/25 flex flex-col min-w-0 overflow-hidden shadow-sm">
                 {/* Header */}
                 <div className="flex items-start justify-between px-4 pt-3 pb-2 border-b bg-[#FFFBF0]">
                   <div>
@@ -872,7 +872,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   ) : (
                     <button
                       onClick={() => abrirConfig(rem)}
-                      className="w-full py-2 rounded-lg border-2 border-dashed border-[#E8A30D]/50 text-xs text-[#A36B00] font-medium hover:bg-[#FFF8E7] transition-colors"
+                      className="w-full py-2 rounded-3xl border-2 border-dashed border-[#E8A30D]/50 text-xs text-[#A36B00] font-medium hover:bg-[#FFF8E7] transition-colors"
                     >
                       {b.capturarConfig}
                     </button>
@@ -999,35 +999,35 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           {detalleDialog && (
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{b.fecha}</div>
                   <div className="font-semibold">{fmtDate(detalleDialog.fecha_remision)}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3 sm:col-span-2">
+                <div className="rounded-3xl border bg-slate-50 p-3 sm:col-span-2">
                   <div className="text-xs text-muted-foreground">{b.clienteLbl}</div>
                   <div className="font-semibold break-words">{detalleDialog.cliente}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{b.vendedorLbl}</div>
                   <div className="font-semibold break-words">{detalleDialog.nombre_vendedor || detalleDialog.vendedor}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{b.solicitadas}</div>
                   <div className="font-semibold">{detalleDialog.total_unidades}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{b.asignadas}</div>
                   <div className="font-semibold">{detalleDialog.asignados}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{b.pendientes}</div>
                   <div className="font-semibold text-red-600">{Math.max(detalleDialog.total_unidades - detalleDialog.asignados, 0)}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{b.tipoPago}</div>
                   <div className="font-semibold">{detalleDialog.tipo_pago === "contra_entrega" ? b.contraEntrega : detalleDialog.tipo_pago === "anticipado" ? b.anticipado : "—"}</div>
                 </div>
-                <div className="rounded-lg border bg-slate-50 p-3">
+                <div className="rounded-3xl border bg-slate-50 p-3">
                   <div className="text-xs text-muted-foreground">{b.estadoPago}</div>
                   <div className="font-semibold">{detalleDialog.pagado === null ? "—" : detalleDialog.pagado ? b.pagado : b.pendiente}</div>
                 </div>
@@ -1038,7 +1038,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                 {detalleDialog.items.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {detalleDialog.items.map((item: any) => (
-                      <div key={item.id} className="rounded-lg border p-3 flex items-start gap-2">
+                      <div key={item.id} className="rounded-3xl border p-3 flex items-start gap-2">
                         <span>{tipoIcon[item.tipo_servicio] || "•"}</span>
                         <div className="min-w-0">
                           <div className="font-semibold">{b.tipoServicio(item.tipo_servicio)}</div>
@@ -1050,18 +1050,18 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{b.sinConfiguracion}</div>
+                  <div className="rounded-3xl border border-dashed p-4 text-sm text-muted-foreground">{b.sinConfiguracion}</div>
                 )}
               </div>
 
               <div>
                 <h3 className="text-base mb-2">{b.unidadesAsignadas}</h3>
                 {detalleLoading ? (
-                  <div className="rounded-lg border p-4 text-sm text-muted-foreground text-center">{b.cargandoUnidades}</div>
+                  <div className="rounded-3xl border p-4 text-sm text-muted-foreground text-center">{b.cargandoUnidades}</div>
                 ) : detalleUnidades.length > 0 ? (
                   <div className="space-y-2">
                     {detalleUnidades.map(m => (
-                      <div key={m.id} className="rounded-lg border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
+                      <div key={m.id} className="rounded-3xl border p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-sm">
                         <div><span className="text-muted-foreground">{b.orden}</span> <strong>#{m.orden_armado}</strong></div>
                         <div><span className="text-muted-foreground">{b.modeloColor}</span> <strong>{m.modelo || "—"} {m.color || ""}</strong></div>
                         <div className="break-all"><span className="text-muted-foreground">{b.nsChasisLbl}</span> <strong>{m.ns_chasis || "—"}</strong></div>
@@ -1074,14 +1074,14 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{b.sinUnidadesAsignadas}</div>
+                  <div className="rounded-3xl border border-dashed p-4 text-sm text-muted-foreground">{b.sinUnidadesAsignadas}</div>
                 )}
               </div>
 
               {detalleDialog.notas && (
                 <div>
                   <h3 className="text-base mb-2">{b.notas}</h3>
-                  <div className="rounded-lg border bg-blue-50/50 p-3 text-sm whitespace-pre-wrap break-words">{detalleDialog.notas}</div>
+                  <div className="rounded-3xl border bg-blue-50/50 p-3 text-sm whitespace-pre-wrap break-words">{detalleDialog.notas}</div>
                 </div>
               )}
 
@@ -1096,7 +1096,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     </Button>
                   </>
                 ) : (
-                  <div className="flex-1 rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">{b.sinPdf}</div>
+                  <div className="flex-1 rounded-3xl border border-dashed p-3 text-center text-sm text-muted-foreground">{b.sinPdf}</div>
                 )}
                 <Button variant="outline" onClick={() => setDetalleDialog(null)}>{t.actions.close}</Button>
               </div>
@@ -1120,7 +1120,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-lg border divide-y text-sm">
+          <div className="rounded-3xl border divide-y text-sm overflow-hidden">
             {[
               [b.nsChasis, confirmarArmado?.chasis ?? ""],
               [b.nsMotor, confirmarArmado?.motor ?? ""],
@@ -1211,7 +1211,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
             </div>
 
             {/* Checkboxes servicios */}
-            <div className="rounded-xl border divide-y">
+            <div className="rounded-3xl border divide-y overflow-hidden">
               <div className="px-4 py-2 bg-slate-50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 {b.serviciosAdicionales}
               </div>
@@ -1275,7 +1275,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
           ) : (
             <div className="flex-1 overflow-y-auto space-y-4">
               {/* FORMULARIO PRINCIPAL: asignar por serial */}
-              <div className="border-2 border-primary/30 rounded-lg p-4 bg-[#F8FAFC] space-y-3">
+              <div className="border-2 border-primary/30 rounded-3xl p-4 bg-[#F8FAFC] space-y-3">
                 <h4 className="text-sm font-bold text-primary">
                   {b.asignarPorSerie}
                 </h4>
@@ -1323,7 +1323,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                     Fábrica los corrige aquí: antes se guardaba lo que ventas
                     hubiera capturado, aunque el motocarro fuera otro. */}
                 {manualYaArmado && (
-                  <div className="rounded-lg border border-primary/25 bg-white p-3 space-y-2">
+                  <div className="rounded-3xl border border-primary/25 bg-white p-3 space-y-2">
                     <p className="text-xs text-muted-foreground">{b.armadoDatosAyuda}</p>
                     {/* El lote es cerrado: por aquí entran las unidades que ya
                         estaban ensambladas antes del sistema, y son contadas. */}
@@ -1414,7 +1414,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                       const yaEntregada = m.estatus_entrega === "ENTREGADA";
                       const puedeEntregar = !yaEntregada && !!m.ns_chasis && !!m.ns_motor;
                       return (
-                      <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-green-50 border border-green-200">
+                      <div key={m.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-3xl bg-green-50 border border-green-200">
                         <div className="text-sm min-w-0">
                           <span className="font-bold text-primary">#{m.orden_armado}</span>
                           {" · "}
@@ -1490,7 +1490,7 @@ export function BandejaRemisiones({ onChange }: { onChange?: () => void }) {
                   />
                   <div className="space-y-1.5 max-h-[25vh] overflow-y-auto">
                     {disponiblesFiltrados.map(m => (
-                      <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white border hover:bg-slate-50">
+                      <div key={m.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-3xl bg-white border hover:bg-slate-50">
                         <div className="text-sm min-w-0 flex-1">
                           <span className="font-bold text-primary">#{m.orden_armado}</span>
                           {" · "}

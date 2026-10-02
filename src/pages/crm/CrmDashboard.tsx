@@ -156,7 +156,7 @@ export default function CrmDashboard() {
               {kpis.topVendedores.length > 0 ? (
                 <div className="space-y-3">
                   {kpis.topVendedores.map((v: any, idx: number) => (
-                    <div key={v.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div key={v.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-3xl">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0 ? "bg-yellow-400 text-yellow-900" : idx === 1 ? "bg-gray-300 text-gray-700" : idx === 2 ? "bg-orange-300 text-orange-800" : "bg-gray-200 text-gray-600"}`}>
                           {idx + 1}
@@ -178,7 +178,7 @@ export default function CrmDashboard() {
                 <h3 className="font-semibold">{t.crm.dashboard.resumen}</h3>
               </div>
               <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-3xl">
                   <span className="text-muted-foreground">{t.crm.dashboard.tasaConversion}</span>
                   <span className="font-bold text-primary">
                     {kpis.totalOportunidades > 0 
@@ -186,7 +186,7 @@ export default function CrmDashboard() {
                       : "0%"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-3xl">
                   <span className="text-muted-foreground">{t.crm.dashboard.promedioGanada}</span>
                   <span className="font-bold text-primary">
                     {kpis.oportunidadesGanadas > 0 
@@ -194,7 +194,7 @@ export default function CrmDashboard() {
                       : "$0"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-3xl">
                   <span className="text-muted-foreground">{t.crm.dashboard.actividadesPorDia}</span>
                   <span className="font-bold text-primary">
                     {(kpis.actividadesMes / 30).toFixed(1)}

@@ -62,7 +62,7 @@ export default function MisMotocarros() {
               <Collapsible open={open} onOpenChange={(o) => setOpenClient(s => ({ ...s, [key]: o }))}>
                 <CollapsibleTrigger className="w-full text-left">
                   <div className="p-5 flex items-center gap-4 hover:bg-slate-50">
-                    <div className="p-3 rounded-lg bg-[#DBEAFE]"><Users size={32} color="hsl(var(--primary))"/></div>
+                    <div className="p-3 rounded-full bg-[#DBEAFE]"><Users size={32} color="hsl(var(--primary))"/></div>
                     <div className="flex-1 min-w-0">
                       <div className="text-2xl font-bold text-primary">{displayCliente}</div>
                       {cliente.nombre_comercial && <div className="text-sm text-muted-foreground truncate">{cliente.nombre_comercial}</div>}
@@ -80,9 +80,9 @@ export default function MisMotocarros() {
                 <CollapsibleContent>
                   <div className="px-4 pb-4 responsive-card-grid gap-3">
                     {items.map(r => (
-                      <div key={r.id} className="rounded-lg border p-3 bg-white flex flex-col gap-2">
+                      <div key={r.id} className="rounded-3xl border p-3 bg-white flex flex-col gap-2">
                         <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-md" style={{ background: r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9" }}>
+                          <div className="p-1.5 rounded-full" style={{ background: r.color === "AZUL" ? "#DBEAFE" : "#F1F5F9" }}>
                             <Bike size={24} color={r.color === "AZUL" ? "hsl(var(--secondary))" : "#94A3B8"} />
                           </div>
                           <div className="flex-1 min-w-0">
@@ -106,7 +106,7 @@ export default function MisMotocarros() {
             </Card>
           );
         })}
-        {!groups.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.misMotocarros.sinMotocarros}</div>}
+        {!groups.length && <div className="text-center py-12 text-muted-foreground bg-card rounded-3xl border">{t.misMotocarros.sinMotocarros}</div>}
       </div>
 
       <Dialog open={!!detail} onOpenChange={o => { if (!o) setDetail(null); }}>

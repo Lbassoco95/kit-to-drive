@@ -519,7 +519,7 @@ export default function CrmActividades() {
             </Card>
           );
         })}
-        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-lg border">{t.crm.actividades.sinActividades}</div>}
+        {!filtered.length && <div className="col-span-full text-center py-12 text-muted-foreground bg-card rounded-3xl border">{t.crm.actividades.sinActividades}</div>}
       </div>
 
       {/* Programar Visita Dialog */}

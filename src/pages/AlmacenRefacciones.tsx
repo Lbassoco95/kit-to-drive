@@ -372,7 +372,7 @@ export default function AlmacenRefacciones() {
         </div>
 
         {unidadFiltro !== "todas" && unidadFiltroNombre && (
-          <div className="flex items-center gap-2 text-sm bg-slate-50 border rounded-md px-3 py-2">
+          <div className="flex items-center gap-2 text-sm bg-slate-50 border rounded-3xl px-3 py-2">
             <Bike className="h-4 w-4 text-primary" />
             <span>
               {t.almacenRefacciones?.filtrandoUnidad ?? "Piezas compatibles con"}{" "}
@@ -384,7 +384,7 @@ export default function AlmacenRefacciones() {
           </div>
         )}
 
-        <div className="rounded-md border overflow-auto max-h-[65vh]">
+        <div className="rounded-3xl border overflow-auto max-h-[65vh]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -479,11 +479,11 @@ export default function AlmacenRefacciones() {
 
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-md border p-3">
+                  <div className="rounded-3xl border p-3">
                     <div className="text-xs text-muted-foreground">Precio</div>
                     <div className="text-lg font-semibold">{money(detalle.precio)}</div>
                   </div>
-                  <div className="rounded-md border p-3">
+                  <div className="rounded-3xl border p-3">
                     <div className="text-xs text-muted-foreground">Stock</div>
                     <div className="text-lg font-semibold">{detalle.stock}</div>
                     <div className="text-xs text-muted-foreground mt-1">
@@ -493,7 +493,7 @@ export default function AlmacenRefacciones() {
                   </div>
                 </div>
 
-                <section className="rounded-md border p-3 space-y-1.5 bg-slate-50/80">
+                <section className="rounded-3xl border p-3 space-y-1.5 bg-slate-50/80">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {t.almacenRefacciones?.seccionDesc ?? "Descripción del producto"}
                   </h3>
@@ -505,7 +505,7 @@ export default function AlmacenRefacciones() {
                   )}
                 </section>
 
-                <section className="rounded-md border p-3 space-y-2">
+                <section className="rounded-3xl border p-3 space-y-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                     <Bike className="h-3.5 w-3.5" />
                     {t.almacenRefacciones?.seccionCompat ?? "Compatible con"} ({compats.length})
@@ -525,7 +525,7 @@ export default function AlmacenRefacciones() {
                           key={c.id}
                           type="button"
                           onClick={() => filtrarPorUnidad(c.id)}
-                          className="inline-flex items-center gap-1.5 rounded-md border bg-white px-2.5 py-1.5 text-left text-sm hover:border-primary hover:bg-[#EFF6FF] transition-colors"
+                          className="inline-flex items-center gap-1.5 rounded-full border bg-white px-2.5 py-1.5 text-left text-sm hover:border-primary hover:bg-[#EFF6FF] transition-colors"
                           title="Ver otras piezas compatibles con esta unidad"
                         >
                           <span className="font-medium">{c.nombre}</span>

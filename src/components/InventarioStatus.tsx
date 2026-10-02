@@ -133,7 +133,7 @@ export function InventarioStatus({ refreshKey }: { refreshKey?: number }) {
 
 function Metric({ label, value, accent }: { label: string; value: number; accent: string }) {
   return (
-    <div className="bg-white/70 rounded-md px-3 py-2 min-w-[110px]">
+    <div className="bg-white/70 rounded-3xl px-3 py-2 min-w-[110px]">
       <div className="text-2xl font-bold" style={{ color: accent }}>{value}</div>
       <div className="text-[11px] text-slate-600 leading-tight">{label}</div>
     </div>

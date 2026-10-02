@@ -123,7 +123,7 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
   if (!avisos.length) return null;
 
   return (
-    <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
+    <div className="rounded-3xl border-2 border-amber-300 bg-amber-50 px-4 py-3">
       <button className="w-full flex items-center justify-between text-left" onClick={() => setAbierto(o => !o)}>
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-amber-700" />
@@ -143,7 +143,7 @@ export function BandejaAvisos({ onChange }: { onChange?: () => void }) {
           {avisos.map(a => {
             const esSolicitud = !!a.requiere_respuesta;
             return (
-              <div key={a.id} className={`rounded-lg bg-white p-3 border ${esSolicitud ? "border-secondary" : "border-amber-200"}`}>
+              <div key={a.id} className={`rounded-3xl bg-white p-3 border ${esSolicitud ? "border-secondary" : "border-amber-200"}`}>
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-sm text-primary break-words">
@@ -214,7 +214,7 @@ export function ResumenAvisos({ onClick }: { onClick?: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="w-full text-left rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 hover:bg-amber-100 transition-colors"
+      className="w-full text-left rounded-3xl border-2 border-amber-300 bg-amber-50 px-4 py-3 hover:bg-amber-100 transition-colors"
     >
       <div className="flex items-center gap-2">
         <Bell className="h-4 w-4 text-amber-700" />

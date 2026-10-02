@@ -210,7 +210,7 @@ export default function CrmOportunidadDetail() {
               )}
             </div>
             {oportunidad.limitante_notas && (
-              <div className="mt-3 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
+              <div className="mt-3 text-sm text-muted-foreground bg-muted p-3 rounded-3xl">
                 {oportunidad.limitante_notas}
               </div>
             )}
@@ -220,7 +220,7 @@ export default function CrmOportunidadDetail() {
         {oportunidad.notas && (
           <div className="mt-6 pt-6 border-t">
             <Label className="text-muted-foreground text-sm mb-2 block">{t.crm.notas}</Label>
-            <div className="text-sm bg-muted p-3 rounded-lg">{oportunidad.notas}</div>
+            <div className="text-sm bg-muted p-3 rounded-3xl">{oportunidad.notas}</div>
           </div>
         )}
       </Card>
@@ -240,7 +240,7 @@ export default function CrmOportunidadDetail() {
         </div>
 
         {actividades.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-lg">
+          <div className="text-center py-8 text-muted-foreground bg-muted/30 rounded-3xl">
             {t.crm.detalle.sinActividades}
           </div>
         ) : (

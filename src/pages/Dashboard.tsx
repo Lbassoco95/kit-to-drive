@@ -12,8 +12,9 @@ import { EstatusBadge } from "@/components/EstatusBadge";
 import { InventarioStatus } from "@/components/InventarioStatus";
 import { ResumenAvisos } from "@/components/BandejaAvisos";
 import { useNavItems } from "@/components/AppSidebar";
-import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, TrendingUp, DollarSign, Wallet, type LucideIcon } from "lucide-react";
+import { BarChart3, Factory, Truck, Bike, AlertTriangle, CheckCircle, Clock, Users, Boxes, Wrench, TrendingUp, DollarSign, Wallet, FileText, TriangleAlert, type LucideIcon } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { listarClientesCredito } from "@/lib/creditoDb";
 
 const CAPACIDAD = 4;
 
@@ -125,19 +126,90 @@ function Accesos() {
   const nav = useNavigate();
   const items = useNavItems().filter(i => i.url !== "/");
   if (!items.length) return null;
+  const groups = ["Operación", "Catálogos", "CRM", "Finanzas", "Sistema"] as const;
+  return (
+    <section className="space-y-6">
+      <h2 className="text-xl font-bold">{t.dashboard.accesos}</h2>
+      {groups.map(g => {
+        const list = items.filter(i => i.group === g);
+        if (!list.length) return null;
+        return (
+          <div key={g} className="space-y-3">
+            <p className="text-[11px] uppercase tracking-widest text-muted-foreground font-medium">
+              {t.dashboard.grupoAccesos[g]}
+            </p>
+            <div className="flex flex-wrap gap-x-5 gap-y-6">
+              {list.map(i => (
+                <button key={i.url} onClick={() => nav(i.url)} className="group flex w-[5.5rem] flex-col items-center gap-2 focus-visible:outline-none">
+                  <span className="grid h-16 w-16 place-items-center rounded-full bg-card text-primary border border-white shadow-[0_10px_24px_-14px_hsl(214_94%_20%/0.6),inset_0_1px_0_hsl(0_0%_100%/0.9)] transition-all duration-300 group-hover:-translate-y-1 group-hover:bg-primary group-hover:text-primary-foreground group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
+                    <i.icon size={26} strokeWidth={2} />
+                  </span>
+                  <span className="text-xs font-medium text-center text-foreground leading-tight">{t.nav[i.key]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function ActividadReciente() {
+  const { t, lang } = useLang();
+  const { perms } = useAuth();
+  const [rows, setRows] = useState<any[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!perms.puedeVer("bitacora")) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("bitacora_eventos")
+        .select("id, accion, modulo, entidad_tipo, created_at, usuario_id")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (cancelled) return;
+      const list = data ?? [];
+      setRows(list);
+      const ids = Array.from(new Set(list.map((r: any) => r.usuario_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: p } = await supabase.from("profiles").select("id, nombre_completo").in("id", ids);
+        if (cancelled) return;
+        const m: Record<string, string> = {};
+        p?.forEach((x: any) => { m[x.id] = x.nombre_completo; });
+        setNames(m);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [perms]);
+
+  if (!perms.puedeVer("bitacora")) return null;
+  const locale = lang === "zh" ? "zh-CN" : "es-MX";
+
   return (
     <section className="space-y-4">
-      <h2 className="text-xl font-bold">{t.dashboard.accesos}</h2>
-      <div className="flex flex-wrap gap-x-5 gap-y-6">
-        {items.map(i => (
-          <button key={i.url} onClick={() => nav(i.url)} className="group flex w-[5.5rem] flex-col items-center gap-2 focus-visible:outline-none">
-            <span className="grid h-16 w-16 place-items-center rounded-full bg-card text-primary border border-white shadow-[0_10px_24px_-14px_hsl(214_94%_20%/0.6),inset_0_1px_0_hsl(0_0%_100%/0.9)] transition-all duration-300 group-hover:-translate-y-1 group-hover:bg-primary group-hover:text-primary-foreground group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2">
-              <i.icon size={26} strokeWidth={2} />
-            </span>
-            <span className="text-xs font-medium text-center text-foreground leading-tight">{t.nav[i.key]}</span>
-          </button>
-        ))}
-      </div>
+      <h2 className="text-xl font-bold">{t.dashboard.actividadReciente}</h2>
+      <Card className="rounded-[1.75rem] overflow-hidden border border-border/70 divide-y">
+        {rows.length === 0 ? (
+          <p className="p-6 text-sm text-muted-foreground text-center">{t.dashboard.actividadVacia}</p>
+        ) : (
+          rows.map(r => (
+            <div key={r.id} className="px-5 py-3 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-medium text-sm truncate">{r.accion || r.modulo || "—"}</div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {[r.modulo, r.entidad_tipo, names[r.usuario_id]].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+              <time className="text-xs text-muted-foreground shrink-0">
+                {r.created_at ? new Date(r.created_at).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" }) : ""}
+              </time>
+            </div>
+          ))
+        )}
+      </Card>
     </section>
   );
 }
@@ -146,7 +218,15 @@ export default function Dashboard() {
   const { perms, area, nivel, user, profileName } = useAuth();
   const nav = useNavigate();
   const { t } = useLang();
-  const [data, setData] = useState<{ motos: any[]; rems: any[]; catalogo: CatalogoModelos; chasisPorConfigurar: number } | null>(null);
+  const [data, setData] = useState<{
+    motos: any[];
+    rems: any[];
+    catalogo: CatalogoModelos;
+    chasisPorConfigurar: number;
+    incidenciasAbiertas: number;
+    oportunidadesAbiertas: number;
+    cobranzaVencida: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -157,7 +237,7 @@ export default function Dashboard() {
       setLoading(true);
       setError(null);
       try {
-        const [{ data: motos, error: errM }, { data: rems, error: errR }, { data: catalogo }, { data: chasisDisp }] = await Promise.all([
+        const [{ data: motos, error: errM }, { data: rems, error: errR }, { data: catalogo }, { data: chasisDisp }, incidenciasRes, oportunidadesRes, creditoRes] = await Promise.all([
           supabase
             .from("motocarros")
             .select(
@@ -170,6 +250,21 @@ export default function Dashboard() {
             ),
           supabase.from("modelos_producto").select("modelo, linea, nombre_comercial"),
           supabase.from("inventario_chasis").select("modelo").is("motocarro_id", null),
+          perms.puedeVer("inventario")
+            ? supabase
+                .from("incidencias_chasis")
+                .select("id", { count: "exact", head: true })
+                .in("estatus", ["abierta", "en_revision"])
+            : Promise.resolve({ count: 0, error: null } as any),
+          perms.puedeVer("crm")
+            ? supabase
+                .from("crm_oportunidades")
+                .select("id", { count: "exact", head: true })
+                .not("etapa", "in", '("ganada","perdida")')
+            : Promise.resolve({ count: 0, error: null } as any),
+          perms.puedeVer("credito")
+            ? listarClientesCredito()
+            : Promise.resolve({ data: [] as any[] }),
         ]);
         if (cancelled) return;
         if (errM || errR) {
@@ -178,11 +273,15 @@ export default function Dashboard() {
         } else {
           const catMap: CatalogoModelos = new Map((catalogo ?? []).map((c: any) => [c.modelo, { linea: c.linea, nombre_comercial: c.nombre_comercial }]));
           const chasisPorConfigurar = (chasisDisp ?? []).filter((c: any) => lineaDe(c.modelo, catMap) === "motocarro").length;
+          const cobranzaVencida = (creditoRes.data ?? []).filter((c: any) => Number(c.saldo_vencido) > 0).length;
           setData({
             motos: (motos ?? []).map((m: any) => ({ ...m, color: normColor(m.color), _eff: effEstatusArmado(m) })),
             rems: rems ?? [],
             catalogo: catMap,
             chasisPorConfigurar,
+            incidenciasAbiertas: incidenciasRes?.count ?? 0,
+            oportunidadesAbiertas: oportunidadesRes?.count ?? 0,
+            cobranzaVencida,
           });
         }
       } catch (e) {
@@ -193,7 +292,7 @@ export default function Dashboard() {
     }
     fetchData();
     return () => { cancelled = true; };
-  }, [user, retry, t.dashboard.errorInesperado]);
+  }, [user, retry, t.dashboard.errorInesperado, perms]);
 
   // El tablero general es de Dirección; las demás áreas entran a su módulo.
   useEffect(() => {
@@ -236,7 +335,7 @@ export default function Dashboard() {
           <p className="text-muted-foreground mb-4">{error}</p>
           <button
             onClick={() => setRetry(r => r + 1)}
-            className="px-4 py-2 rounded-md bg-primary text-white font-medium hover:bg-primary-hover transition-colors"
+            className="px-4 py-2 rounded-full bg-primary text-white font-medium hover:bg-primary-hover transition-colors"
           >
             {t.dashboard.reintentar}
           </button>
@@ -313,14 +412,27 @@ export default function Dashboard() {
       <section className="space-y-4" aria-label={t.dashboard.hoy}>
         <h2 className="text-xl font-bold">{t.dashboard.hoy}</h2>
         <div className="flex flex-wrap justify-center sm:justify-start gap-x-10 gap-y-8">
-          <Orbe valor={`${avance}%`} pct={avance} etiqueta={t.dashboard.kpi.armadas} icon={CheckCircle} color="#065F46" onClick={() => nav("/produccion")} />
-          <Orbe valor={atrasados.length} pct={total ? (atrasados.length / total) * 100 : 0} etiqueta={t.dashboard.kpi.atrasadas} icon={AlertTriangle} color="#991B1B" onClick={() => nav("/produccion")} />
-          <Orbe valor={entregados} pct={total ? (entregados / total) * 100 : 0} etiqueta={t.dashboard.kpi.entregadas} icon={Truck} color="#5B21B6" onClick={() => nav("/entregas")} />
-          <Orbe valor={stockLibre.length} pct={total ? (stockLibre.length / total) * 100 : 0} etiqueta={t.dashboard.kpi.stockLibre} icon={Boxes} color="hsl(var(--secondary))" onClick={() => nav("/inventario")} />
+          {([
+            { valor: `${avance}%` as ReactNode, pct: avance, etiqueta: t.dashboard.kpi.armadas, icon: CheckCircle, color: "#065F46", onClick: () => nav("/produccion"), show: true },
+            { valor: atrasados.length, pct: total ? (atrasados.length / total) * 100 : 0, etiqueta: t.dashboard.kpi.atrasadas, icon: AlertTriangle, color: "#991B1B", onClick: () => nav("/produccion"), show: true },
+            { valor: entregados, pct: total ? (entregados / total) * 100 : 0, etiqueta: t.dashboard.kpi.entregadas, icon: Truck, color: "#5B21B6", onClick: () => nav("/entregas"), show: true },
+            { valor: stockLibre.length, pct: total ? (stockLibre.length / total) * 100 : 0, etiqueta: t.dashboard.kpi.stockLibre, icon: Boxes, color: "hsl(var(--secondary))", onClick: () => nav("/inventario"), show: true },
+            { valor: rems.filter((r: any) => r.estatus !== "COMPLETA" && r.estatus !== "CANCELADA").length, pct: (() => { const pend = rems.filter((r: any) => r.estatus !== "COMPLETA" && r.estatus !== "CANCELADA").length; return rems.length ? (pend / rems.length) * 100 : 0; })(), etiqueta: t.dashboard.kpi.remisionesPendientes, icon: FileText, color: "hsl(var(--primary))", onClick: () => nav("/remisiones"), show: perms.puedeVer("remisiones") },
+            { valor: data.incidenciasAbiertas, pct: Math.min(100, data.incidenciasAbiertas * 10), etiqueta: t.dashboard.kpi.incidenciasAbiertas, icon: TriangleAlert, color: "#D97706", onClick: () => nav("/incidencias"), show: perms.puedeVer("inventario") },
+            { valor: data.cobranzaVencida, pct: Math.min(100, data.cobranzaVencida * 15), etiqueta: t.dashboard.kpi.cobranzaVencida, icon: DollarSign, color: "#991B1B", onClick: () => nav("/credito"), show: perms.puedeVer("credito") },
+            { valor: data.oportunidadesAbiertas, pct: Math.min(100, data.oportunidadesAbiertas * 5), etiqueta: t.dashboard.kpi.oportunidadesAbiertas, icon: TrendingUp, color: "#5B21B6", onClick: () => nav("/crm/oportunidades"), show: perms.puedeVer("crm") },
+          ] as const)
+            .filter(o => o.show)
+            .slice(0, 6)
+            .map(o => (
+              <Orbe key={o.etiqueta} valor={o.valor} pct={o.pct} etiqueta={o.etiqueta} icon={o.icon} color={o.color} onClick={o.onClick} />
+            ))}
         </div>
       </section>
 
       <Accesos />
+
+      <ActividadReciente />
 
       {/* Avisos de otra área sin acusar. Sólo se dibuja si hay. */}
       <ResumenAvisos onClick={() => nav("/produccion")} />

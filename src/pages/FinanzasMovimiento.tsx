@@ -228,7 +228,7 @@ export default function FinanzasMovimiento() {
         <Button variant="outline" onClick={() => navigate("/finanzas")}>
           <ArrowLeft size={16} className="mr-2" /> {t.finanzas.volver}
         </Button>
-        <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
+        <div className="rounded-3xl border bg-card py-16 text-center text-muted-foreground">
           {t.finanzas.detalle.noEncontrado}
         </div>
       </div>
@@ -328,7 +328,7 @@ export default function FinanzasMovimiento() {
         </div>
 
         {mov.estatus === "CANCELADO" && mov.motivo_cancelacion && (
-          <div className="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <div className="mt-3 rounded-3xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
             <strong>{t.finanzas.detalle.cancelado}</strong> {mov.motivo_cancelacion}
           </div>
         )}
@@ -360,7 +360,7 @@ export default function FinanzasMovimiento() {
             )}
           </dl>
           {mov.descripcion && (
-            <div className="rounded-md bg-slate-50 p-3 text-sm text-muted-foreground">
+            <div className="rounded-3xl bg-slate-50 p-3 text-sm text-muted-foreground">
               {mov.descripcion}
             </div>
           )}
@@ -372,7 +372,7 @@ export default function FinanzasMovimiento() {
             <User size={16} /> {esIngreso ? t.finanzas.detalle.quienPagoTrajo : t.finanzas.detalle.aQuienPorMedio}
           </h3>
 
-          <div className="rounded-lg border p-3">
+          <div className="rounded-3xl border p-3">
             <div className="flex items-center gap-2">
               {mov.contraparte_tipo === "PROVEEDOR" ? <Building2 size={15} className="text-secondary" />
                 : <User size={15} className="text-secondary" />}
@@ -386,7 +386,7 @@ export default function FinanzasMovimiento() {
             )}
           </div>
 
-          <div className="rounded-lg border p-3 text-sm">
+          <div className="rounded-3xl border p-3 text-sm">
             <p className="font-medium">{etiquetaVia(mov.tipo, mov.via, t.finanzas.validacion)}</p>
             {mov.via === "INTERMEDIARIO" && (
               <p className="mt-1 text-muted-foreground">
@@ -405,7 +405,7 @@ export default function FinanzasMovimiento() {
           {/* Comprobación de efectivo */}
           {mov.requiere_comprobacion && (
             <div
-              className={`rounded-lg border p-3 ${
+              className={`rounded-3xl border p-3 ${
                 mov.comprobado ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
               }`}
             >

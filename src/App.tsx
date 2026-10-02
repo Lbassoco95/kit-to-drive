@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -35,6 +35,7 @@ import Inventario from "./pages/Inventario";
 import AlmacenRefacciones from "./pages/AlmacenRefacciones";
 import Incidencias from "./pages/Incidencias";
 import NotFound from "./pages/NotFound";
+import Buscar from "./pages/Buscar";
 
 const queryClient = new QueryClient();
 
@@ -75,7 +76,7 @@ const App = () => (
               <Route path="/crm/rutas" element={<ProtectedRoute modulo="crm"><CrmRutas /></ProtectedRoute>} />
               <Route path="/crm/equipo" element={<ProtectedRoute modulo="crmEquipo"><CrmEquipo /></ProtectedRoute>} />
               <Route path="/crm/tracker" element={<ProtectedRoute modulo="crmEquipo"><CrmTracker /></ProtectedRoute>} />
-              <Route path="/buscar" element={<Navigate to="/produccion" replace />} />
+              <Route path="/buscar" element={<Buscar />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

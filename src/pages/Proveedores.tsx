@@ -276,7 +276,7 @@ export default function Proveedores() {
         <Input className="h-11" value={form.direccion} onChange={e => setForm({ ...form, direccion: e.target.value })} />
       </div>
 
-      <div className="rounded-lg border p-3 space-y-3">
+      <div className="rounded-3xl border p-3 space-y-3">
         <p className="text-sm font-semibold text-primary">{t.proveedores.campos.datosPago}</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
@@ -353,7 +353,7 @@ export default function Proveedores() {
         <div className="flex gap-2">
           <button
             onClick={() => setVerArchivados(false)}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
               !verArchivados ? "bg-primary text-white" : "bg-secondary/10 text-primary"
             }`}
           >
@@ -361,7 +361,7 @@ export default function Proveedores() {
           </button>
           <button
             onClick={() => setVerArchivados(true)}
-            className={`rounded-md px-4 py-2 text-sm font-semibold ${
+            className={`rounded-full px-4 py-2 text-sm font-semibold ${
               verArchivados ? "bg-primary text-white" : "bg-secondary/10 text-primary"
             }`}
           >
@@ -382,7 +382,7 @@ export default function Proveedores() {
       {cargando ? (
         <div className="py-16 text-center text-muted-foreground">{t.finanzas.cargando}</div>
       ) : filtrados.length === 0 ? (
-        <div className="rounded-lg border bg-card py-16 text-center text-muted-foreground">
+        <div className="rounded-3xl border bg-card py-16 text-center text-muted-foreground">
           {rows.length === 0 ? t.proveedores.vacio : t.proveedores.sinResultados}
         </div>
       ) : (
