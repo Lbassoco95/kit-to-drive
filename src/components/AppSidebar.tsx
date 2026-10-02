@@ -111,7 +111,7 @@ export function AppSidebar() {
                             end
                             className={`relative flex items-center gap-3 pl-2 pr-4 rounded-full text-white/90 hover:bg-white/10 transition-colors ${active ? "glass-pill-active text-white font-semibold" : ""}`}
                           >
-                            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors ${active ? "bg-white/20" : "bg-white/[0.07]"}`}>
+                            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors ${active ? "bg-white/20" : "bg-white/[0.07]"}`}>
                               <item.icon size={20} strokeWidth={active ? 2.4 : 2} />
                             </span>
                             {!collapsed && <span className="text-[14px] truncate">{t.nav[item.key]}</span>}

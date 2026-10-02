@@ -48,7 +48,7 @@ export function PaletaGlobal({ open, onOpenChange }: { open: boolean; onOpenChan
 
   const buscarDatos = useCallback(
     async (texto: string) => {
-      const term = texto.trim();
+      const term = texto.trim().replace(/[,.()%]/g, " ").replace(/\s+/g, " ").trim();
       if (term.length < 2) {
         setHits(VACIO);
         setBuscando(false);
